@@ -321,7 +321,10 @@ class SaveExtractor:
         """Get all active wars.
 
         Returns:
-            Dict with war information
+            Dict with war information including:
+            - wars: List of war names (used by get_situation for at_war check)
+            - count: Number of wars found
+            - active_war_ids: IDs of active wars if found
         """
         result = {'wars': [], 'count': 0}
 
@@ -332,7 +335,8 @@ class SaveExtractor:
 
         if war_matches:
             result['count'] = len(war_matches)
-            result['war_names'] = war_matches[:10]  # First 10
+            # Populate 'wars' list (used by get_situation for at_war detection)
+            result['wars'] = war_matches[:10]  # First 10
 
         # Try to find detailed war section
         # Look for active wars involving player
@@ -754,7 +758,7 @@ class SaveExtractor:
         rel_block = player_chunk[rel_start:rel_end]
 
         # Parse individual relations
-        # Pattern: relation={owner=0 country=X ...}
+        # Pattern: relation={owner=<player_id> country=X ...}
         relation_pattern = r'relation=\s*\{([^}]+(?:\{[^}]*\}[^}]*)*)\}'
 
         relations_found = []
@@ -764,8 +768,8 @@ class SaveExtractor:
         for match in re.finditer(relation_pattern, rel_block):
             rel_content = match.group(1)
 
-            # Only process relations where owner=0 (player)
-            if not re.search(r'owner=0\b', rel_content):
+            # Only process relations where owner=player_id (not hardcoded 0)
+            if not re.search(rf'owner={player_id}\b', rel_content):
                 continue
 
             relation_info = {}
@@ -968,12 +972,13 @@ class SaveExtractor:
         go_start = galactic_match.start()
         go_chunk = self.gamestate[go_start:go_start + 5000000]  # 5MB for systems
 
-        # Find systems where inhibitor_owners contains player_id (0)
-        # Pattern: starbases={ ID } ... inhibitor_owners={ 0 }
+        # Find systems where inhibitor_owners contains player_id
+        # Pattern: starbases={ ID } ... inhibitor_owners={ player_id }
         player_starbase_ids = []
 
         # Match system blocks that have starbases and are owned by player
-        system_pattern = r'starbases=\s*\{\s*(\d+)\s*\}[^}]*?inhibitor_owners=\s*\{[^}]*\b0\b'
+        # Use player_id instead of hardcoded 0
+        system_pattern = rf'starbases=\s*\{{\s*(\d+)\s*\}}[^}}]*?inhibitor_owners=\s*\{{[^}}]*\b{player_id}\b'
         for match in re.finditer(system_pattern, go_chunk):
             sb_id = match.group(1)
             if sb_id != '4294967295':  # Not null
@@ -1179,12 +1184,15 @@ class SaveExtractor:
             'economy': {
                 'economy_power': player_clean.get('economy_power'),
                 'tech_power': player_clean.get('tech_power'),
-                'monthly_net': resources.get('monthly_net', {}),
+                # Use 'net_monthly' (correct key) and 'summary' for pre-computed values
+                'net_monthly': resources.get('net_monthly', {}),
                 'key_resources': {
-                    'energy': resources.get('monthly_net', {}).get('energy_net'),
-                    'minerals': resources.get('monthly_net', {}).get('minerals_net'),
-                    'alloys': resources.get('monthly_net', {}).get('alloys_net'),
-                    'consumer_goods': resources.get('monthly_net', {}).get('consumer_goods_net'),
+                    # net_monthly uses bare keys like 'energy', not 'energy_net'
+                    'energy': resources.get('net_monthly', {}).get('energy'),
+                    'minerals': resources.get('net_monthly', {}).get('minerals'),
+                    'alloys': resources.get('net_monthly', {}).get('alloys'),
+                    'consumer_goods': resources.get('net_monthly', {}).get('consumer_goods'),
+                    'research_total': resources.get('summary', {}).get('research_total'),
                 },
             },
             'territory': {

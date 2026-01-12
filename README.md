@@ -1,79 +1,159 @@
-# Stellaris LLM Companion - V1 Test
+# Stellaris LLM Companion
 
-Quick test to verify we can access Stellaris saves and chat with Claude about them.
+AI-powered strategic advisor for Stellaris using Gemini 3 Flash. Chat with an intelligent advisor that understands your empire's situation, provides strategic analysis, and adapts its personality to your empire's ethics and civics.
 
-## Setup
+## Features
+
+- **12 Data Extraction Tools** - Military, economy, diplomacy, leaders, planets, starbases, technology
+- **Dynamic Personality** - Advisor tone adapts to your empire's ethics, government, and civics
+- **Efficient Architecture** - Lean + Tools approach minimizes token usage (~85% cheaper than full-context)
+- **Auto Save Detection** - Automatically finds your most recent Stellaris save
+
+## Quick Start
 
 ```bash
+# Clone and setup
 cd ~/stellaris-companion
+python -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
+
+# Set your API key
+export GOOGLE_API_KEY="your-gemini-api-key"
+
+# Run the companion
+python v2_native_tools.py
 ```
 
-Make sure you have `ANTHROPIC_API_KEY` set in your environment.
+## Getting a Gemini API Key
+
+1. Go to [Google AI Studio](https://aistudio.google.com/)
+2. Sign in with your Google account
+3. Click "Get API Key" and create a new key
+4. Set it as an environment variable or add to `.env` file:
+   ```bash
+   echo 'GOOGLE_API_KEY="your-key-here"' > .env
+   ```
 
 ## Getting Your Save Files
 
-### Option A: Manual Download (Quick Test)
+### Option A: Local Stellaris Install
+
+Save files are automatically detected from:
+- **macOS:** `~/Documents/Paradox Interactive/Stellaris/save games/`
+- **Linux:** `~/.local/share/Paradox Interactive/Stellaris/save games/`
+- **Windows:** `Documents\Paradox Interactive\Stellaris\save games\`
+
+### Option B: GeForce Now / Cloud Gaming
 
 1. Go to https://store.steampowered.com/account/remotestorage
 2. Log into Steam
 3. Find **Stellaris** in the list
-4. Click to expand and download a `.sav` file
-5. Run: `python v1_test.py ~/Downloads/your_save.sav`
-
-### Option B: Automatic Steam Sync (Ongoing Use)
-
-If you have Steam installed locally but play on GeForce Now:
-
-1. Open Steam client
-2. Go to Library → Find Stellaris
-3. Right-click → Properties → Cloud
-4. Ensure "Steam Cloud" is enabled
-5. Steam should sync your GFN saves to: `~/Library/Application Support/Steam/userdata/<id>/281990/remote/save games/`
-
-Then just run `python v1_test.py` and it will find saves automatically.
+4. Download your `.sav` file
+5. Run: `python v2_native_tools.py ~/Downloads/your_save.sav`
 
 ## Usage
 
 ```bash
-# With automatic save detection
-python v1_test.py
+# Auto-detect most recent save
+python v2_native_tools.py
 
-# With specific save file
-python v1_test.py /path/to/save.sav
+# Specific save file
+python v2_native_tools.py /path/to/save.sav
 ```
 
-### Commands in Chat
+### Commands
 
-- `/search <term>` - Search the full gamestate for specific text
-- `/info` - Show save file summary
-- `/quit` - Exit
+| Command | Description |
+|---------|-------------|
+| `/quit` | Exit the companion |
+| `/clear` | Clear conversation history |
+| `/reload` | Reload save file (after new autosave) |
+| `/personality` | Show current advisor personality |
+| `/prompt` | Display full system prompt |
+| `/thinking <level>` | Set thinking depth (dynamic/minimal/low/medium/high) |
 
 ### Example Questions
 
-- "What's the state of my empire?"
-- "Who are my neighbors and what do I know about them?"
-- "Am I at war with anyone?"
-- "What's my fleet strength?"
-- "Tell me about my leaders"
+- "Give me a strategic briefing"
+- "What's my military situation?"
+- "Who should I be worried about?"
+- "Tell me about my admirals"
+- "What's wrong with my economy?"
+- "What tech should I research next?"
 
-## How It Works
+## Architecture
 
-1. Stellaris saves are ZIP files containing:
-   - `meta` - Basic save info (name, date, version)
-   - `gamestate` - Full game state in Clausewitz format (can be 10-50MB)
+```
+User Question
+     │
+     ▼
+┌─────────────────┐
+│  Gemini 3 Flash │ ◄── Dynamic personality prompt
+│  + Tool Calling │     based on empire identity
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  12 Data Tools  │ ◄── Query save file on demand
+│  (on-demand)    │     (not pre-loaded into context)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Strategic       │
+│ Response        │
+└─────────────────┘
+```
 
-2. We extract the save and send the first ~80k characters to Claude
-   - This captures metadata, player empire, and early game data
-   - Use `/search` to find specific info in the rest of the file
+## Available Tools
 
-3. Claude reads the Clausewitz format directly - no parsing needed for V1
+| Tool | Description |
+|------|-------------|
+| `get_full_briefing()` | Comprehensive overview (use for broad questions) |
+| `get_player_status()` | Military power, economy, tech |
+| `get_leaders()` | Scientists, admirals, generals, governors |
+| `get_technology()` | Completed techs and current research |
+| `get_resources()` | Income, expenses, net monthly |
+| `get_diplomacy()` | Relations, treaties, alliances |
+| `get_planets()` | Colonies, population, stability |
+| `get_starbases()` | Starbases, modules, buildings |
+| `get_fleet_info()` | Fleet names and counts |
+| `get_active_wars()` | Current conflicts |
+| `get_empire_details(name)` | Info about a specific empire |
+| `search_save_file(query)` | Raw text search in save |
 
-## Limitations (V1)
+## Modes
 
-- Only sees first ~80k chars of gamestate (full file too big for context)
-- No automatic file watching yet
-- No fancy parsing - raw Clausewitz format
-- No intel filtering yet (Claude sees everything in the save)
+Currently operates in **Omniscient Mode** - the advisor can see all data in your save file. This is ideal for post-game analysis and learning.
 
-These will be addressed in future versions.
+**Immersive Mode** (fog-of-war filtering) is planned for a future release.
+
+## Project Structure
+
+```
+stellaris-companion/
+├── v2_native_tools.py   # Main CLI interface
+├── save_extractor.py    # Save file parser with tools
+├── save_loader.py       # Save file discovery
+├── personality.py       # Dynamic advisor personality
+├── FINDINGS.md          # Development notes
+├── PLAN.md              # Implementation roadmap
+└── requirements.txt     # Python dependencies
+```
+
+## Development
+
+See [FINDINGS.md](./FINDINGS.md) for technical decisions and [PLAN.md](./PLAN.md) for the roadmap.
+
+### Running Legacy V1 (Claude)
+
+The original Claude-based prototype is preserved:
+```bash
+export ANTHROPIC_API_KEY="your-key"
+python v1_test.py /path/to/save.sav
+```
+
+## License
+
+MIT
