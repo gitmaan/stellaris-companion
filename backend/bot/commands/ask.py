@@ -95,8 +95,9 @@ def setup(bot) -> None:
         await interaction.response.defer(thinking=True)
 
         try:
-            # Get response from companion (run in thread to avoid blocking event loop)
-            response_text, elapsed = await asyncio.to_thread(bot.companion.chat, question)
+            # Get response from companion using ask_simple (pre-injects data, 3 AFC max)
+            # This is faster than chat() which allows 8 AFC calls
+            response_text, elapsed = await asyncio.to_thread(bot.companion.ask_simple, question)
 
             # Split into multiple messages if needed
             chunks = split_response(response_text)
