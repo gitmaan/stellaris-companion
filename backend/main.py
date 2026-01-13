@@ -12,6 +12,7 @@ Environment Variables:
     DISCORD_BOT_TOKEN: Your Discord bot token (required)
     GOOGLE_API_KEY: Your Google API key for Gemini (required)
     NOTIFICATION_CHANNEL_ID: Discord channel ID for save notifications (optional)
+    STELLARIS_DB_PATH: Path to SQLite history DB (optional; Phase 3)
 
 If no save file is specified, the bot will try to find the most recent save
 in the standard Stellaris save locations.
@@ -36,6 +37,7 @@ except ImportError:
     pass  # dotenv not installed, rely on environment variables
 
 from backend.core.companion import Companion
+from backend.core.database import get_default_db
 from backend.core.save_watcher import SaveWatcher
 from backend.bot.discord_bot import create_bot
 
@@ -138,6 +140,14 @@ def main():
     notification_channel = get_notification_channel()
     if notification_channel:
         logger.info(f"Save notifications will be sent to channel: {notification_channel}")
+
+    # Initialize history database (Phase 3 foundation)
+    try:
+        db = get_default_db()
+        logger.info(f"History DB ready: {db.path}")
+    except Exception as e:
+        logger.error(f"Failed to initialize history DB: {e}")
+        sys.exit(1)
 
     # Initialize companion
     try:
