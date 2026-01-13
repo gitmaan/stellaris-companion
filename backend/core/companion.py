@@ -6,10 +6,14 @@ Refactored companion class from v2_native_tools.py.
 Provides a reusable interface for the Gemini-powered strategic advisor.
 """
 
+import hashlib
+import json
+import logging
 import os
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 # Add project root to path for imports
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -26,6 +30,10 @@ from save_extractor import SaveExtractor
 from personality import build_personality_prompt_v2, get_personality_summary
 
 
+# Configure dedicated logger for companion performance metrics
+logger = logging.getLogger("stellaris.companion")
+
+
 # Fallback system prompt (used if personality generation fails)
 FALLBACK_SYSTEM_PROMPT = """You are a Stellaris strategic advisor. You have access to tools that can query the player's save file.
 
@@ -35,11 +43,32 @@ Your role:
 - Be conversational and helpful, like a trusted advisor
 - Call tools to get the data you need before answering
 
-IMPORTANT - Tool Selection Strategy:
-- For BROAD questions (status reports, strategic briefings, "catch me up", overall analysis):
-  -> Use get_full_briefing() - it returns everything in ONE call (most efficient)
-- For SPECIFIC questions (just leaders, just economy, specific empire):
-  -> Use the targeted tool (get_leaders, get_resources, etc.)
+IMPORTANT - Tool Selection Strategy (you have 4 tools):
+
+1. get_snapshot() - ALWAYS call this FIRST
+   Returns comprehensive empire data covering ~80% of questions in ONE call.
+   Includes: military power, economy, resources, colonies, diplomacy, starbases, leaders.
+
+2. get_details(category, limit) - Call AFTER get_snapshot() if you need MORE detail
+   Categories: "leaders", "planets", "starbases", "technology", "wars", "fleets", "resources", "diplomacy"
+   Only use if get_snapshot() doesn't have enough information.
+
+3. search_save_file(query) - Escape hatch for edge cases
+   Search raw save data when other tools don't have what you need.
+
+4. get_empire_details(empire_name) - Look up other empires by name
+   Use when asked about a specific AI empire.
+
+WORKFLOW:
+1. Call get_snapshot() first
+2. Answer from that data if possible
+3. Only call get_details() or other tools if you need more specific information
+
+FACTUAL ACCURACY CONTRACT:
+- ALL numbers (military power, resources, populations, dates) MUST come from tool data or injected context
+- If a specific value is not in the data, say "unknown" or "I don't have that information" - NEVER estimate or guess
+- You may provide strategic advice and opinions, but clearly distinguish them from facts
+- When quoting numbers, use the exact values from the data
 
 Always use tools to get current data rather than guessing."""
 
@@ -76,6 +105,23 @@ class Companion:
         self.system_prompt: str = FALLBACK_SYSTEM_PROMPT
         self.personality_summary: str = "No save loaded"
 
+        # Performance tracking for last request
+        self._last_call_stats: dict[str, Any] = {
+            "total_calls": 0,
+            "tools_used": [],
+            "wall_time_ms": 0.0,
+            "response_length": 0,
+            "payload_sizes": {},
+        }
+
+        # Save state tracking for staleness detection
+        self._save_hash: str | None = None  # Hash of current save state
+        self._last_known_date: str | None = None  # For context update messages
+
+        # Snapshot tracking for diff mode (foundation for future use)
+        self._previous_snapshot: dict | None = None
+        self._current_snapshot: dict | None = None
+
         # Load save if provided
         if save_path:
             self.load_save(save_path)
@@ -103,6 +149,14 @@ class Companion:
         # Build dynamic personality prompt
         self._build_personality()
 
+        # Initialize save state tracking
+        self._save_hash = self._compute_save_hash()
+        self._last_known_date = self.metadata.get('date')
+
+        # Initialize snapshot tracking
+        self._previous_snapshot = None
+        self._current_snapshot = self.extractor.get_full_briefing()
+
         # Reset chat session for new save
         self._chat_session = None
 
@@ -124,6 +178,19 @@ class Companion:
             print(f"Warning: Failed to build personality ({e}), using fallback")
             self.system_prompt = FALLBACK_SYSTEM_PROMPT
             self.personality_summary = "Fallback: Generic advisor"
+
+    def _compute_save_hash(self) -> str:
+        """Compute a hash of the current save state for staleness detection.
+
+        Returns:
+            8-character hash string, or empty string if no save loaded.
+        """
+        if not self.is_loaded:
+            return ""
+        # Hash key fields: date, military_power, empire_name
+        player = self.extractor.get_player_status()
+        key_data = f"{self.metadata.get('date')}|{player.get('military_power')}|{self.metadata.get('name')}"
+        return hashlib.md5(key_data.encode()).hexdigest()[:8]
 
     @property
     def is_loaded(self) -> bool:
@@ -151,6 +218,8 @@ class Companion:
             return False
 
         old_identity = self.identity.copy() if self.identity else {}
+        old_hash = self._save_hash
+        old_date = self._last_known_date
 
         # Reload extractor
         self.extractor = SaveExtractor(str(self.save_path))
@@ -171,10 +240,144 @@ class Companion:
         # Rebuild personality
         self._build_personality()
 
-        # Reset chat session
-        self._chat_session = None
+        # Update save state tracking
+        new_hash = self._compute_save_hash()
+        hash_changed = old_hash != new_hash
+
+        # Save current snapshot as previous, load new snapshot as current
+        self._previous_snapshot = self._current_snapshot
+        self._current_snapshot = self.extractor.get_full_briefing()
+
+        # Update tracking state
+        self._save_hash = new_hash
+        self._last_known_date = self.metadata.get('date')
+
+        # Reset chat session if hash changed (game state is different)
+        if hash_changed:
+            self._chat_session = None
+            logger.info(
+                "save_update_detected",
+                extra={
+                    "old_hash": old_hash,
+                    "new_hash": new_hash,
+                    "old_date": old_date,
+                    "new_date": self._last_known_date,
+                    "identity_changed": identity_changed,
+                }
+            )
 
         return identity_changed
+
+    def get_changes_summary(self) -> str | None:
+        """Get a summary of what changed since the last save.
+
+        Compares key metrics between the previous and current snapshots
+        to provide a human-readable summary of changes.
+
+        Returns:
+            Human-readable summary of changes, or None if no previous snapshot.
+        """
+        if self._previous_snapshot is None or self._current_snapshot is None:
+            return None
+
+        changes = []
+        prev = self._previous_snapshot
+        curr = self._current_snapshot
+
+        # Compare military power
+        prev_mil = prev.get('military', {}).get('power', 0)
+        curr_mil = curr.get('military', {}).get('power', 0)
+        if prev_mil != curr_mil and prev_mil > 0:
+            pct = ((curr_mil - prev_mil) / prev_mil) * 100
+            sign = '+' if pct > 0 else ''
+            changes.append(f"Military power: {prev_mil:,} -> {curr_mil:,} ({sign}{pct:.0f}%)")
+
+        # Compare fleet count
+        prev_fleets = prev.get('military', {}).get('fleet_count', 0)
+        curr_fleets = curr.get('military', {}).get('fleet_count', 0)
+        if prev_fleets != curr_fleets:
+            diff = curr_fleets - prev_fleets
+            sign = '+' if diff > 0 else ''
+            changes.append(f"Fleets: {prev_fleets} -> {curr_fleets} ({sign}{diff})")
+
+        # Compare tech power
+        prev_tech = prev.get('economy', {}).get('tech_power', 0)
+        curr_tech = curr.get('economy', {}).get('tech_power', 0)
+        if prev_tech != curr_tech and prev_tech > 0:
+            pct = ((curr_tech - prev_tech) / prev_tech) * 100
+            sign = '+' if pct > 0 else ''
+            changes.append(f"Tech power: {prev_tech:,} -> {curr_tech:,} ({sign}{pct:.0f}%)")
+
+        # Compare population
+        prev_pop = prev.get('territory', {}).get('total_population', 0)
+        curr_pop = curr.get('territory', {}).get('total_population', 0)
+        if prev_pop != curr_pop:
+            diff = curr_pop - prev_pop
+            sign = '+' if diff > 0 else ''
+            changes.append(f"Population: {prev_pop} -> {curr_pop} ({sign}{diff})")
+
+        # Compare colony count
+        prev_colonies = prev.get('territory', {}).get('colony_count', 0)
+        curr_colonies = curr.get('territory', {}).get('colony_count', 0)
+        if prev_colonies != curr_colonies:
+            diff = curr_colonies - prev_colonies
+            sign = '+' if diff > 0 else ''
+            changes.append(f"Colonies: {prev_colonies} -> {curr_colonies} ({sign}{diff})")
+
+        # Check for new wars (compare war counts or detect new entries)
+        prev_wars = prev.get('military', {}).get('active_wars', [])
+        curr_wars = curr.get('military', {}).get('active_wars', [])
+        prev_war_names = {w.get('name', '') for w in prev_wars} if isinstance(prev_wars, list) else set()
+        curr_war_names = {w.get('name', '') for w in curr_wars} if isinstance(curr_wars, list) else set()
+        new_wars = curr_war_names - prev_war_names
+        for war_name in new_wars:
+            if war_name:
+                changes.append(f"New war detected: {war_name}")
+
+        # Compare key resources (net monthly)
+        for resource in ['energy', 'minerals', 'alloys', 'food']:
+            prev_net = prev.get('economy', {}).get('net_monthly', {}).get(resource, 0)
+            curr_net = curr.get('economy', {}).get('net_monthly', {}).get(resource, 0)
+            if prev_net != curr_net:
+                diff = curr_net - prev_net
+                sign = '+' if diff > 0 else ''
+                changes.append(f"{resource.capitalize()} income: {prev_net:+.0f} -> {curr_net:+.0f} ({sign}{diff:.0f})")
+
+        if not changes:
+            return "No significant changes detected."
+
+        return "\n".join(changes)
+
+    def notify_save_update(self) -> tuple[bool, str]:
+        """Check if save changed and return notification info.
+
+        This method is designed for the Discord bot to poll for save changes
+        and notify the user when the game state has been updated.
+
+        Returns:
+            Tuple of (changed: bool, message: str)
+            - changed: True if save file has been modified
+            - message: Human-readable message about the change
+        """
+        if not self.save_path:
+            return False, "No save file loaded."
+
+        if not self.check_save_changed():
+            return False, "No changes detected."
+
+        # Save changed, reload and get summary
+        old_date = self._last_known_date
+        self.reload_save()
+        new_date = self._last_known_date
+
+        # Build notification message
+        message_parts = [f"Save updated: {old_date} -> {new_date}"]
+
+        changes = self.get_changes_summary()
+        if changes and changes != "No significant changes detected.":
+            message_parts.append(changes)
+
+        return True, "\n".join(message_parts)
 
     # === Tool Functions ===
     # These are passed directly to the SDK which auto-generates schemas from docstrings
@@ -273,40 +476,90 @@ class Companion:
         """
         return self.extractor.get_starbases()
 
-    def get_full_briefing(self) -> dict:
-        """Get comprehensive empire overview for strategic briefings.
+    def get_snapshot(self) -> dict:
+        """Get comprehensive empire snapshot - CALL THIS FIRST for any question.
 
-        USE THIS TOOL when the user asks for:
-        - A full status report or strategic briefing
-        - Overall empire analysis or overview
-        - Multiple pieces of information at once (military + economy + diplomacy)
-        - "Catch me up" or "What's the situation?"
-        - Any broad question requiring data from multiple sources
+        This is your PRIMARY data source. It returns all major empire data in ONE call
+        and answers ~80% of questions directly without needing other tools.
 
-        This is MORE EFFICIENT than calling multiple individual tools because it
-        returns all major data in a single call (~4k tokens).
+        Returns data on:
+        - Military: power, fleet count, fleet size
+        - Economy: power, tech power, net monthly resources (energy, minerals, alloys, etc.)
+        - Territory: colonies (count, population, breakdown by type), planets by type
+        - Diplomacy: contact count, allies, rivals, federation membership
+        - Defense: starbase count and levels
+        - Leadership: leader count and breakdown by class
+
+        ALWAYS call this first. Only use get_details() if you need MORE information
+        on a specific category than what's provided here.
 
         Returns:
             Dictionary with military status, economy, diplomacy, territory, defense, and leadership
         """
         return self.extractor.get_full_briefing()
 
-    def _get_tools_list(self) -> list:
-        """Get list of tool functions for the SDK."""
-        return [
-            self.get_full_briefing,
-            self.get_player_status,
-            self.get_empire_details,
-            self.get_active_wars,
-            self.get_fleet_info,
-            self.search_save_file,
-            self.get_leaders,
-            self.get_technology,
-            self.get_resources,
-            self.get_diplomacy,
-            self.get_planets,
-            self.get_starbases,
-        ]
+    def get_details(self, category: str, limit: int = 10) -> dict:
+        """Get detailed information for a specific category - use AFTER get_snapshot().
+
+        This is a drill-down tool for when get_snapshot() doesn't have enough detail.
+        Only call this if you need MORE information than what get_snapshot() provides.
+
+        Args:
+            category: One of:
+                - "leaders" - Full leader list with traits, levels, ages
+                - "planets" - Full planet list with stability, amenities, size
+                - "starbases" - Full starbase list with modules and buildings
+                - "technology" - Completed techs and current research
+                - "wars" - Active war details
+                - "fleets" - Fleet names and details
+                - "resources" - Full income/expense breakdown
+                - "diplomacy" - Full relations list with opinion scores
+            limit: Max items to return (default 10, max 50)
+
+        Returns:
+            Category-specific details
+        """
+        return self.extractor.get_details(category, limit)
+
+    def get_full_briefing(self) -> dict:
+        """DEPRECATED: Use get_snapshot() instead. Kept for backwards compatibility."""
+        return self.extractor.get_full_briefing()
+
+    def _get_tools_list(self, mode: str = "full") -> list:
+        """Get list of tool functions for the SDK.
+
+        Args:
+            mode: Tool availability mode:
+                - "none": No tools (for /briefing where data is pre-injected)
+                - "minimal": [get_snapshot, search_save_file] (for simple /ask)
+                - "full": [get_snapshot, get_details, search_save_file, get_empire_details]
+                         (for complex /ask requiring drill-down)
+
+        Returns:
+            List of tool functions based on mode
+        """
+        if mode == "none":
+            return []
+
+        elif mode == "minimal":
+            # Snapshot + escape hatch only - for simple questions
+            return [
+                self.get_snapshot,
+                self.search_save_file,
+            ]
+
+        elif mode == "full":
+            # Full consolidated toolset - 4 tools instead of 12
+            return [
+                self.get_snapshot,      # Primary data source (80% of questions)
+                self.get_details,       # Drill-down by category
+                self.search_save_file,  # Escape hatch for edge cases
+                self.get_empire_details,  # Look up other empires by name
+            ]
+
+        else:
+            # Default to full if invalid mode
+            return self._get_tools_list("full")
 
     def set_thinking_level(self, level: str) -> None:
         """Set the thinking level for the model.
@@ -333,13 +586,59 @@ class Companion:
         # In future, could use async SDK if available
         return self.chat(user_message)
 
-    def chat(self, user_message: str) -> tuple[str, float]:
+    def _extract_afc_stats(self, response: Any) -> tuple[int, list[str], dict[str, int]]:
+        """Extract automatic function calling statistics from the response.
+
+        Args:
+            response: The Gemini response object
+
+        Returns:
+            Tuple of (total_calls, tools_used, payload_sizes)
+        """
+        total_calls = 0
+        tools_used = []
+        payload_sizes = {}
+
+        # The AFC history is stored in the chat session's curated history
+        # We need to look at function_call and function_response parts
+        if self._chat_session is not None:
+            try:
+                history = self._chat_session.get_history()
+                for content in history:
+                    if content.parts:
+                        for part in content.parts:
+                            # Check for function calls
+                            if hasattr(part, 'function_call') and part.function_call:
+                                func_name = part.function_call.name
+                                total_calls += 1
+                                if func_name not in tools_used:
+                                    tools_used.append(func_name)
+                            # Check for function responses to get payload sizes
+                            if hasattr(part, 'function_response') and part.function_response:
+                                func_name = part.function_response.name
+                                response_data = part.function_response.response
+                                # Calculate approximate size of the response payload
+                                try:
+                                    payload_str = json.dumps(response_data, default=str)
+                                    payload_sizes[func_name] = len(payload_str)
+                                except (TypeError, ValueError):
+                                    payload_sizes[func_name] = 0
+            except Exception as e:
+                logger.debug(f"Could not extract AFC history: {e}")
+
+        return total_calls, tools_used, payload_sizes
+
+    def chat(self, user_message: str, tool_mode: str = "full") -> tuple[str, float]:
         """Send a message and get a response using automatic function calling.
 
         The SDK handles the tool execution loop automatically for gemini-3-flash-preview.
 
         Args:
             user_message: The user's question or message
+            tool_mode: Tool availability mode ("none", "minimal", "full")
+                - "none": No tools (data pre-injected)
+                - "minimal": get_snapshot + search_save_file only
+                - "full": All 4 consolidated tools (default)
 
         Returns:
             Tuple of (response_text, elapsed_time_seconds)
@@ -348,25 +647,67 @@ class Companion:
             return "No save file loaded. Please load a save file first.", 0.0
 
         start_time = time.time()
+        truncated_question = user_message[:100] + "..." if len(user_message) > 100 else user_message
+
+        # Log request start
+        logger.info(
+            "chat_request_start",
+            extra={
+                "timestamp": time.time(),
+                "mode": "afc",
+                "question_preview": truncated_question,
+                "question_length": len(user_message),
+            }
+        )
 
         try:
+            # Check for stale context before sending message
+            # Compute current hash to see if save changed since last interaction
+            context_update_note = ""
+            if self._chat_session is not None:
+                current_hash = self._compute_save_hash()
+                if current_hash != self._save_hash:
+                    # Save state changed - prepend context update note
+                    old_date = self._last_known_date
+                    new_date = self.metadata.get('date')
+                    context_update_note = (
+                        f"[SAVE UPDATE: The game state has changed since our last conversation. "
+                        f"Previous: {old_date}, Current: {new_date}]\n\n"
+                    )
+                    # Update tracking state
+                    self._save_hash = current_hash
+                    self._last_known_date = new_date
+                    logger.info(
+                        "stale_context_detected",
+                        extra={
+                            "old_date": old_date,
+                            "new_date": new_date,
+                        }
+                    )
+
             # Create chat session once (just for history management)
             if self._chat_session is None:
                 self._chat_session = self.client.chats.create(
                     model="gemini-3-flash-preview",
                 )
 
+            # Prepare message with optional context update note
+            message_to_send = context_update_note + user_message if context_update_note else user_message
+
             # Build per-message config with tools (cookbook pattern)
+            tools = self._get_tools_list(tool_mode)
             message_config = {
                 'system_instruction': self.system_prompt,
-                'tools': self._get_tools_list(),
-                'temperature': 1.0,
-                'max_output_tokens': 4096,
-                # Increase AFC limit from default 10 to 20 for complex queries
-                'automatic_function_calling': types.AutomaticFunctionCallingConfig(
-                    maximum_remote_calls=20,
-                ),
+                'tools': tools if tools else None,  # None if empty list (no tools mode)
+                'temperature': 1.0,  # Gemini 3 recommended default
+                'max_output_tokens': 2048,
             }
+
+            # Only add AFC config if we have tools
+            if tools:
+                message_config['automatic_function_calling'] = types.AutomaticFunctionCallingConfig(
+                    maximum_remote_calls=8,
+                )
 
             # Add thinking config if not dynamic
             if self._thinking_level != 'dynamic':
@@ -376,9 +717,12 @@ class Companion:
 
             # Send message with config - SDK handles automatic function calling
             response = self._chat_session.send_message(
-                user_message,
+                message_to_send,
                 config=message_config,
             )
+
+            # Extract AFC statistics from response
+            total_calls, tools_used, payload_sizes = self._extract_afc_stats(response)
 
             # Extract text from response
             if response.text:
@@ -401,11 +745,71 @@ class Companion:
                     response_text = "I processed your request but couldn't generate a text response."
 
             elapsed = time.time() - start_time
+            wall_time_ms = elapsed * 1000
+
+            # Update call stats
+            self._last_call_stats = {
+                "total_calls": total_calls,
+                "tools_used": tools_used,
+                "wall_time_ms": wall_time_ms,
+                "response_length": len(response_text),
+                "payload_sizes": payload_sizes,
+            }
+
+            # Log response completion
+            logger.info(
+                "chat_request_complete",
+                extra={
+                    "mode": "afc",
+                    "wall_time_ms": wall_time_ms,
+                    "total_tool_calls": total_calls,
+                    "tools_used": tools_used,
+                    "response_length": len(response_text),
+                    "payload_sizes": payload_sizes,
+                    "total_payload_bytes": sum(payload_sizes.values()),
+                }
+            )
+
             return response_text, elapsed
 
         except Exception as e:
             elapsed = time.time() - start_time
+            wall_time_ms = elapsed * 1000
+
+            # Reset stats on error
+            self._last_call_stats = {
+                "total_calls": 0,
+                "tools_used": [],
+                "wall_time_ms": wall_time_ms,
+                "response_length": 0,
+                "payload_sizes": {},
+                "error": str(e),
+            }
+
+            # Log error
+            logger.error(
+                "chat_request_error",
+                extra={
+                    "mode": "afc",
+                    "wall_time_ms": wall_time_ms,
+                    "error": str(e),
+                }
+            )
+
             return f"Error: {str(e)}", elapsed
+
+    def get_call_stats(self) -> dict[str, Any]:
+        """Get performance statistics from the last chat() call.
+
+        Returns:
+            Dictionary with:
+                - total_calls: number of tool calls made
+                - tools_used: list of tool names called
+                - wall_time_ms: total time in milliseconds
+                - response_length: length of final response text
+                - payload_sizes: dict mapping tool names to response sizes in bytes
+        """
+        return self._last_call_stats.copy()
 
     def clear_conversation(self) -> None:
         """Clear the conversation history by resetting the chat session."""
@@ -440,13 +844,282 @@ class Companion:
             "federation": diplomacy.get("federation"),
         }
 
+    def briefing_direct(self) -> tuple[str, float]:
+        """Get a strategic briefing with a single model call (no AFC).
+
+        This pre-computes the state snapshot and sends it directly to the model,
+        avoiding the multi-round-trip AFC loop.
+
+        Returns:
+            Tuple of (response_text, elapsed_time_seconds)
+        """
+        if not self.is_loaded:
+            return "No save file loaded. Please load a save file first.", 0.0
+
+        start_time = time.time()
+
+        # Log request start
+        logger.info(
+            "briefing_direct_start",
+            extra={
+                "timestamp": time.time(),
+                "mode": "direct",
+            }
+        )
+
+        try:
+            # Get all briefing data in one local call
+            briefing_data = self.extractor.get_full_briefing()
+            briefing_json = json.dumps(briefing_data, indent=2, default=str)
+            briefing_size = len(briefing_json)
+
+            # Create a single prompt with all data pre-injected
+            user_prompt = f"""Here is the current state of my empire:
+
+```json
+{briefing_json}
+```
+
+Based on this data, give me a strategic briefing. Cover:
+1. Military strength and any immediate threats
+2. Economic health and resource bottlenecks
+3. Diplomatic situation and key relationships
+4. Top 2-3 priorities I should focus on
+
+Format your response as:
+
+**FACTS** (from the data):
+[Key metrics and numbers from the empire data]
+
+**ANALYSIS** (your strategic assessment):
+[Your interpretation and advice based on the facts]
+
+Be concise but insightful."""
+
+            # Build config for single direct call - no tools, no AFC
+            message_config = types.GenerateContentConfig(
+                system_instruction=self.system_prompt,
+                temperature=1.0,  # Gemini 3 recommended default
+                max_output_tokens=2048,
+            )
+
+            # Add thinking config if not dynamic
+            if self._thinking_level != 'dynamic':
+                message_config.thinking_config = types.ThinkingConfig(
+                    thinking_level=self._thinking_level
+                )
+
+            # Make ONE model call with no tools
+            response = self.client.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=user_prompt,
+                config=message_config,
+            )
+
+            # Extract text from response
+            response_text = response.text if response.text else "Could not generate briefing."
+
+            elapsed = time.time() - start_time
+            wall_time_ms = elapsed * 1000
+
+            # Update call stats for direct mode
+            self._last_call_stats = {
+                "total_calls": 1,  # Single direct call
+                "tools_used": ["briefing_direct"],
+                "wall_time_ms": wall_time_ms,
+                "response_length": len(response_text),
+                "payload_sizes": {"briefing_data": briefing_size},
+            }
+
+            # Log response completion
+            logger.info(
+                "briefing_direct_complete",
+                extra={
+                    "mode": "direct",
+                    "wall_time_ms": wall_time_ms,
+                    "briefing_data_size": briefing_size,
+                    "response_length": len(response_text),
+                }
+            )
+
+            return response_text, elapsed
+
+        except Exception as e:
+            elapsed = time.time() - start_time
+            wall_time_ms = elapsed * 1000
+
+            # Reset stats on error
+            self._last_call_stats = {
+                "total_calls": 0,
+                "tools_used": [],
+                "wall_time_ms": wall_time_ms,
+                "response_length": 0,
+                "payload_sizes": {},
+                "error": str(e),
+            }
+
+            # Log error
+            logger.error(
+                "briefing_direct_error",
+                extra={
+                    "mode": "direct",
+                    "wall_time_ms": wall_time_ms,
+                    "error": str(e),
+                }
+            )
+
+            return f"Error: {str(e)}", elapsed
+
+    def ask_simple(self, question: str, include_snapshot: bool = True) -> tuple[str, float]:
+        """Ask a question with minimal or no AFC.
+
+        Args:
+            question: User's question
+            include_snapshot: If True, pre-inject snapshot data
+
+        Returns:
+            Tuple of (response_text, elapsed_time_seconds)
+        """
+        if not self.is_loaded:
+            return "No save file loaded. Please load a save file first.", 0.0
+
+        start_time = time.time()
+        truncated_question = question[:100] + "..." if len(question) > 100 else question
+
+        # Log request start
+        logger.info(
+            "ask_simple_start",
+            extra={
+                "timestamp": time.time(),
+                "mode": "afc",  # Still uses AFC but limited
+                "include_snapshot": include_snapshot,
+                "question_preview": truncated_question,
+                "question_length": len(question),
+            }
+        )
+
+        try:
+            # Pre-inject briefing data if requested
+            if include_snapshot:
+                briefing_data = self.extractor.get_full_briefing()
+                briefing_json = json.dumps(briefing_data, indent=2, default=str)
+                snapshot_size = len(briefing_json)
+
+                user_prompt = f"""Here is the current state of my empire for context:
+
+```json
+{briefing_json}
+```
+
+Question: {question}"""
+            else:
+                user_prompt = question
+                snapshot_size = 0
+
+            # Create chat session if needed
+            if self._chat_session is None:
+                self._chat_session = self.client.chats.create(
+                    model="gemini-3-flash-preview",
+                )
+
+            # Use minimal tools - just search_save_file as escape hatch
+            # (snapshot data is pre-injected, so get_snapshot() isn't needed)
+            minimal_tools = [self.search_save_file]
+
+            # Build config with reduced AFC
+            message_config = {
+                'system_instruction': self.system_prompt,
+                'tools': minimal_tools,
+                'temperature': 1.0,  # Gemini 3 recommended default
+                'max_output_tokens': 2048,
+                # Strictly cap AFC calls
+                'automatic_function_calling': types.AutomaticFunctionCallingConfig(
+                    maximum_remote_calls=3,
+                ),
+            }
+
+            # Add thinking config if not dynamic
+            if self._thinking_level != 'dynamic':
+                message_config['thinking_config'] = types.ThinkingConfig(
+                    thinking_level=self._thinking_level
+                )
+
+            # Send message
+            response = self._chat_session.send_message(
+                user_prompt,
+                config=message_config,
+            )
+
+            # Extract AFC statistics
+            total_calls, tools_used, payload_sizes = self._extract_afc_stats(response)
+
+            # Add snapshot size to payload tracking
+            if include_snapshot:
+                payload_sizes["snapshot_data"] = snapshot_size
+
+            # Extract text from response
+            response_text = response.text if response.text else "Could not generate response."
+
+            elapsed = time.time() - start_time
+            wall_time_ms = elapsed * 1000
+
+            # Update call stats
+            self._last_call_stats = {
+                "total_calls": total_calls,
+                "tools_used": tools_used,
+                "wall_time_ms": wall_time_ms,
+                "response_length": len(response_text),
+                "payload_sizes": payload_sizes,
+            }
+
+            # Log response completion
+            logger.info(
+                "ask_simple_complete",
+                extra={
+                    "mode": "afc",
+                    "wall_time_ms": wall_time_ms,
+                    "total_tool_calls": total_calls,
+                    "tools_used": tools_used,
+                    "include_snapshot": include_snapshot,
+                    "snapshot_size": snapshot_size,
+                    "response_length": len(response_text),
+                }
+            )
+
+            return response_text, elapsed
+
+        except Exception as e:
+            elapsed = time.time() - start_time
+            wall_time_ms = elapsed * 1000
+
+            # Reset stats on error
+            self._last_call_stats = {
+                "total_calls": 0,
+                "tools_used": [],
+                "wall_time_ms": wall_time_ms,
+                "response_length": 0,
+                "payload_sizes": {},
+                "error": str(e),
+            }
+
+            # Log error
+            logger.error(
+                "ask_simple_error",
+                extra={
+                    "mode": "afc",
+                    "wall_time_ms": wall_time_ms,
+                    "error": str(e),
+                }
+            )
+
+            return f"Error: {str(e)}", elapsed
+
     def get_briefing(self) -> tuple[str, float]:
         """Get a strategic briefing from the advisor.
 
-        This is a convenience method that asks the advisor for a full briefing.
+        Uses the fast single-call direct path instead of AFC.
 
         Returns:
             Tuple of (briefing_text, elapsed_time_seconds)
         """
-        return self.chat("Give me a strategic briefing on the current state of my empire. "
-                        "Cover military strength, economy, diplomacy, and any pressing concerns.")
+        return self.briefing_direct()

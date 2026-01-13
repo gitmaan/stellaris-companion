@@ -318,35 +318,73 @@ class SaveExtractor:
         return result
 
     def get_wars(self) -> dict:
-        """Get all active wars.
+        """Get all active wars involving the player.
 
         Returns:
             Dict with war information including:
-            - wars: List of war names (used by get_situation for at_war check)
-            - count: Number of wars found
-            - active_war_ids: IDs of active wars if found
+            - wars: List of war names the player is involved in
+            - count: Number of wars the player is in
+            - player_at_war: Boolean indicating if player is at war
+            - all_wars_count: Total number of wars in the galaxy
         """
-        result = {'wars': [], 'count': 0}
+        result = {'wars': [], 'count': 0, 'player_at_war': False, 'all_wars_count': 0}
 
-        # Search for war data in gamestate
-        # Wars are usually near "active_wars" or in a "war" section
+        player_id = self.get_player_empire_id()
+
+        # First, check the player's country block for active_wars list
+        # This is the most reliable way to know if the player is at war
+        country_match = re.search(r'^country=\s*\{', self.gamestate, re.MULTILINE)
+        if country_match:
+            start = country_match.start()
+            player_match = re.search(r'\n\t0=\s*\{', self.gamestate[start:start + 1000000])
+            if player_match:
+                player_start = start + player_match.start()
+                player_chunk = self.gamestate[player_start:player_start + 50000]
+
+                # Look for active_wars list in player country block
+                active_wars_match = re.search(r'active_wars\s*=\s*\{([^}]+)\}', player_chunk)
+                if active_wars_match:
+                    war_ids = re.findall(r'\d+', active_wars_match.group(1))
+                    # Filter out null values (4294967295)
+                    war_ids = [wid for wid in war_ids if wid != '4294967295']
+                    if war_ids:
+                        result['player_at_war'] = True
+                        result['active_war_ids'] = war_ids
+
+        # Search for all war data in gamestate to get war names
+        # Look for war blocks with name= inside
         war_pattern = r'war\s*=\s*\{[^}]*name\s*=\s*"([^"]+)"'
         war_matches = re.findall(war_pattern, self.gamestate)
 
         if war_matches:
-            result['count'] = len(war_matches)
-            # Populate 'wars' list (used by get_situation for at_war detection)
-            result['wars'] = war_matches[:10]  # First 10
+            result['all_wars_count'] = len(war_matches)
 
-        # Try to find detailed war section
-        # Look for active wars involving player
-        player_id = self.get_player_empire_id()
+        # Now find wars that involve the player by checking attackers/defenders lists
+        # Pattern: war={ ... attackers={ country=0 ... } ... } or defenders
+        player_wars = []
 
-        # Search for war entries
-        war_section_match = re.search(r'active_wars\s*=\s*\{([^}]+)\}', self.gamestate)
+        # Find war section
+        war_section_match = re.search(r'^war=\s*\{', self.gamestate, re.MULTILINE)
         if war_section_match:
-            war_ids = re.findall(r'\d+', war_section_match.group(1))
-            result['active_war_ids'] = war_ids
+            war_start = war_section_match.start()
+            war_chunk = self.gamestate[war_start:war_start + 2000000]
+
+            # Find individual war blocks and check for player involvement
+            # Each war has attackers={} and defenders={} with country=X entries
+            war_block_pattern = r'name\s*=\s*"([^"]+)"[^}]*?(?:attackers|defenders)\s*=\s*\{[^}]*country=' + str(player_id) + r'\b'
+
+            for match in re.finditer(war_block_pattern, war_chunk, re.DOTALL):
+                war_name = match.group(1)
+                if war_name not in player_wars:
+                    player_wars.append(war_name)
+
+        # Populate result
+        result['wars'] = player_wars[:10]  # First 10 player wars
+        result['count'] = len(player_wars)
+
+        # Set player_at_war based on actual involvement
+        if player_wars or result.get('player_at_war'):
+            result['player_at_war'] = True
 
         return result
 
@@ -1062,27 +1100,44 @@ class SaveExtractor:
 
         return result
 
-    def search(self, query: str, max_results: int = 5, context_chars: int = 1000) -> dict:
+    def search(self, query: str, max_results: int = 5, context_chars: int = 500) -> dict:
         """Search the full gamestate for specific text.
 
         Args:
             query: Text to search for
-            max_results: Maximum number of results to return
-            context_chars: Characters of context around each match
+            max_results: Maximum number of results to return (capped at 10)
+            context_chars: Characters of context around each match (capped at 500)
 
         Returns:
-            Dict with search results
+            Dict with search results (total output capped at ~4000 chars)
         """
+        # Cap parameters to prevent context overflow
+        max_results = min(max_results, 10)
+        context_chars = min(context_chars, 500)
+        MAX_TOTAL_OUTPUT = 4000  # Hard limit on total context returned
+
         result = {
             'query': query,
             'matches': [],
             'total_found': 0
         }
 
-        query_lower = query.lower()
+        # Sanitize query - remove any potential injection characters
+        # Allow only alphanumeric, spaces, underscores, and common punctuation
+        sanitized_query = ''.join(
+            c for c in query
+            if c.isalnum() or c in ' _-.,\'"'
+        )
+        if not sanitized_query:
+            result['error'] = 'Query contains no valid search characters'
+            return result
+
+        query_lower = sanitized_query.lower()
         gamestate_lower = self.gamestate.lower()
 
+        total_context_size = 0
         start = 0
+
         while len(result['matches']) < max_results:
             pos = gamestate_lower.find(query_lower, start)
             if pos == -1:
@@ -1096,6 +1151,17 @@ class SaveExtractor:
 
             context = self.gamestate[context_start:context_end]
 
+            # Sanitize context output - escape special characters that could
+            # be interpreted as instructions
+            context = context.replace('{{', '{ {').replace('}}', '} }')
+
+            # Check if adding this context would exceed our limit
+            if total_context_size + len(context) > MAX_TOTAL_OUTPUT:
+                result['truncated'] = True
+                break
+
+            total_context_size += len(context)
+
             result['matches'].append({
                 'position': pos,
                 'context': context
@@ -1103,7 +1169,7 @@ class SaveExtractor:
 
             start = pos + 1
 
-        # Count total matches
+        # Count total matches (without retrieving context)
         while True:
             pos = gamestate_lower.find(query_lower, start)
             if pos == -1:
@@ -1209,13 +1275,13 @@ class SaveExtractor:
                 'summary': diplomacy.get('summary', {}),
             },
             'defense': {
-                'starbase_count': starbases.get('starbase_count'),
-                'starbases_by_level': starbases.get('starbases_by_level', {}),
+                'count': starbases.get('count'),
+                'by_level': starbases.get('by_level', {}),
                 'starbases': starbases.get('starbases', []),
             },
             'leadership': {
-                'leader_count': leaders.get('leader_count'),
-                'leaders_by_class': leaders.get('leaders_by_class', {}),
+                'count': leaders.get('count'),
+                'by_class': leaders.get('by_class', {}),
                 'leaders': leaders.get('leaders', [])[:15],  # Top 15 leaders
             },
         }
@@ -1330,6 +1396,94 @@ class SaveExtractor:
 
         return result
 
+    def get_details(self, category: str, limit: int = 10) -> dict:
+        """Get detailed information for a specific category.
+
+        This is a unified drill-down tool that replaces multiple narrow tools.
+        Use get_full_briefing() first to get the overview, then use this
+        for additional details on specific categories.
+
+        Args:
+            category: One of "leaders", "planets", "starbases", "technology",
+                     "wars", "fleets", "resources", "diplomacy"
+            limit: Max items to return (default 10, capped at 50)
+
+        Returns:
+            Category-specific details with items limited to the specified count
+        """
+        # Validate category
+        valid_categories = [
+            "leaders", "planets", "starbases", "technology",
+            "wars", "fleets", "resources", "diplomacy"
+        ]
+
+        if category not in valid_categories:
+            return {
+                "error": f"Invalid category '{category}'. Must be one of: {', '.join(valid_categories)}"
+            }
+
+        # Cap limit to prevent excessive output
+        limit = min(max(1, limit), 50)
+
+        # Dispatch to appropriate method
+        if category == "leaders":
+            result = self.get_leaders()
+            # Apply limit to leaders list
+            if 'leaders' in result:
+                result['leaders'] = result['leaders'][:limit]
+            return result
+
+        elif category == "planets":
+            result = self.get_planets()
+            # Apply limit to planets list
+            if 'planets' in result:
+                result['planets'] = result['planets'][:limit]
+            return result
+
+        elif category == "starbases":
+            result = self.get_starbases()
+            # Apply limit to starbases list
+            if 'starbases' in result:
+                result['starbases'] = result['starbases'][:limit]
+            return result
+
+        elif category == "technology":
+            result = self.get_technology()
+            # Apply limit to sample technologies
+            if 'sample_technologies' in result:
+                result['sample_technologies'] = result['sample_technologies'][:limit]
+            if 'completed_technologies' in result:
+                result['completed_technologies'] = result['completed_technologies'][:limit]
+            return result
+
+        elif category == "wars":
+            result = self.get_wars()
+            # Apply limit to wars list
+            if 'wars' in result:
+                result['wars'] = result['wars'][:limit]
+            return result
+
+        elif category == "fleets":
+            result = self.get_fleets()
+            # Apply limit to fleet names
+            if 'fleet_names' in result:
+                result['fleet_names'] = result['fleet_names'][:limit]
+            return result
+
+        elif category == "resources":
+            # Resources doesn't have a list to limit, return as-is
+            return self.get_resources()
+
+        elif category == "diplomacy":
+            result = self.get_diplomacy()
+            # Apply limit to relations list
+            if 'relations' in result:
+                result['relations'] = result['relations'][:limit]
+            return result
+
+        # Should never reach here due to validation above
+        return {"error": "Unknown category"}
+
     def get_situation(self) -> dict:
         """Analyze current game situation for personality tone modifiers.
 
@@ -1372,11 +1526,11 @@ class SaveExtractor:
         except (ValueError, IndexError):
             pass
 
-        # Check war status
+        # Check war status - use the improved player-specific war detection
         wars = self.get_wars()
-        war_list = wars.get('wars', [])
-        result['war_count'] = len(war_list)
-        result['at_war'] = len(war_list) > 0
+        result['war_count'] = wars.get('count', 0)
+        result['at_war'] = wars.get('player_at_war', False)
+        result['wars'] = wars.get('wars', [])
 
         # Check diplomatic situation
         diplomacy = self.get_diplomacy()
