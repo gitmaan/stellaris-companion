@@ -970,12 +970,14 @@ Be concise but insightful."""
 
             return f"Error: {str(e)}", elapsed
 
-    def ask_simple(self, question: str, include_snapshot: bool = True) -> tuple[str, float]:
-        """Ask a question with minimal or no AFC.
+    def ask_simple(self, question: str) -> tuple[str, float]:
+        """Ask a question with a single model call (no AFC, no tools).
+
+        Pre-injects empire snapshot data and answers from that context.
+        This is the fastest path for most questions.
 
         Args:
             question: User's question
-            include_snapshot: If True, pre-inject snapshot data
 
         Returns:
             Tuple of (response_text, elapsed_time_seconds)
@@ -991,71 +993,49 @@ Be concise but insightful."""
             "ask_simple_start",
             extra={
                 "timestamp": time.time(),
-                "mode": "afc",  # Still uses AFC but limited
-                "include_snapshot": include_snapshot,
+                "mode": "direct",  # No AFC - single call
                 "question_preview": truncated_question,
                 "question_length": len(question),
             }
         )
 
         try:
-            # Pre-inject briefing data if requested
-            if include_snapshot:
-                briefing_data = self.extractor.get_full_briefing()
-                briefing_json = json.dumps(briefing_data, indent=2, default=str)
-                snapshot_size = len(briefing_json)
+            # Pre-inject all briefing data
+            briefing_data = self.extractor.get_full_briefing()
+            briefing_json = json.dumps(briefing_data, indent=2, default=str)
+            snapshot_size = len(briefing_json)
 
-                user_prompt = f"""Here is the current state of my empire for context:
+            # Build prompt with data and question
+            user_prompt = f"""Here is the current state of my empire:
 
 ```json
 {briefing_json}
 ```
 
-Question: {question}"""
-            else:
-                user_prompt = question
-                snapshot_size = 0
+Based on this data, please answer the following question:
+{question}
 
-            # Create chat session if needed
-            if self._chat_session is None:
-                self._chat_session = self.client.chats.create(
-                    model="gemini-3-flash-preview",
-                )
+Answer using ONLY the data provided above. If the information isn't in the data, say so."""
 
-            # Use minimal tools - just search_save_file as escape hatch
-            # (snapshot data is pre-injected, so get_snapshot() isn't needed)
-            minimal_tools = [self.search_save_file]
-
-            # Build config with reduced AFC
-            message_config = {
-                'system_instruction': self.system_prompt,
-                'tools': minimal_tools,
-                'temperature': 1.0,  # Gemini 3 recommended default
-                'max_output_tokens': 2048,
-                # Strictly cap AFC calls
-                'automatic_function_calling': types.AutomaticFunctionCallingConfig(
-                    maximum_remote_calls=3,
-                ),
-            }
+            # Build config for single direct call - NO TOOLS, NO AFC
+            message_config = types.GenerateContentConfig(
+                system_instruction=self.system_prompt,
+                temperature=1.0,  # Gemini 3 recommended default
+                max_output_tokens=2048,
+            )
 
             # Add thinking config if not dynamic
             if self._thinking_level != 'dynamic':
-                message_config['thinking_config'] = types.ThinkingConfig(
+                message_config.thinking_config = types.ThinkingConfig(
                     thinking_level=self._thinking_level
                 )
 
-            # Send message
-            response = self._chat_session.send_message(
-                user_prompt,
+            # Make ONE model call with no tools
+            response = self.client.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=user_prompt,
                 config=message_config,
             )
-
-            # Extract AFC statistics
-            total_calls, tools_used, payload_sizes = self._extract_afc_stats(response)
-
-            # Add snapshot size to payload tracking
-            if include_snapshot:
-                payload_sizes["snapshot_data"] = snapshot_size
 
             # Extract text from response
             response_text = response.text if response.text else "Could not generate response."
@@ -1063,24 +1043,23 @@ Question: {question}"""
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
 
-            # Update call stats
+            # Update call stats (no tool calls in direct mode)
             self._last_call_stats = {
-                "total_calls": total_calls,
-                "tools_used": tools_used,
+                "total_calls": 0,
+                "tools_used": [],
                 "wall_time_ms": wall_time_ms,
                 "response_length": len(response_text),
-                "payload_sizes": payload_sizes,
+                "payload_sizes": {"snapshot_data": snapshot_size},
             }
 
             # Log response completion
             logger.info(
                 "ask_simple_complete",
                 extra={
-                    "mode": "afc",
+                    "mode": "direct",
                     "wall_time_ms": wall_time_ms,
-                    "total_tool_calls": total_calls,
-                    "tools_used": tools_used,
-                    "include_snapshot": include_snapshot,
+                    "total_tool_calls": 0,
+                    "tools_used": [],
                     "snapshot_size": snapshot_size,
                     "response_length": len(response_text),
                 }
