@@ -971,10 +971,11 @@ Be concise but insightful."""
             return f"Error: {str(e)}", elapsed
 
     def ask_simple(self, question: str) -> tuple[str, float]:
-        """Ask a question with a single model call (no AFC, no tools).
+        """Ask a question using the 4 consolidated tools.
 
-        Pre-injects empire snapshot data and answers from that context.
-        This is the fastest path for most questions.
+        Uses get_snapshot(), get_details(), search_save_file(), and get_empire_details().
+        The system prompt instructs the model to call get_snapshot() first, which
+        should provide enough data for most questions in a single call.
 
         Args:
             question: User's question
@@ -993,74 +994,89 @@ Be concise but insightful."""
             "ask_simple_start",
             extra={
                 "timestamp": time.time(),
-                "mode": "direct",  # No AFC - single call
+                "mode": "afc",
                 "question_preview": truncated_question,
                 "question_length": len(question),
             }
         )
 
         try:
-            # Pre-inject all briefing data
-            briefing_data = self.extractor.get_full_briefing()
-            briefing_json = json.dumps(briefing_data, indent=2, default=str)
-            snapshot_size = len(briefing_json)
+            # Create chat session if needed
+            if self._chat_session is None:
+                self._chat_session = self.client.chats.create(
+                    model="gemini-3-flash-preview",
+                )
 
-            # Build prompt with data and question
-            user_prompt = f"""Here is the current state of my empire:
+            # Use all 4 consolidated tools
+            tools = self._get_tools_list("full")
 
-```json
-{briefing_json}
-```
-
-Based on this data, please answer the following question:
-{question}
-
-Answer using ONLY the data provided above. If the information isn't in the data, say so."""
-
-            # Build config for single direct call - NO TOOLS, NO AFC
-            message_config = types.GenerateContentConfig(
-                system_instruction=self.system_prompt,
-                temperature=1.0,  # Gemini 3 recommended default
-                max_output_tokens=2048,
-            )
+            # Build config with consolidated tools
+            message_config = {
+                'system_instruction': self.system_prompt,
+                'tools': tools,
+                'temperature': 1.0,  # Gemini 3 recommended default
+                'max_output_tokens': 2048,
+                # Allow enough calls: 1 for snapshot + 1-2 for details if needed
+                'automatic_function_calling': types.AutomaticFunctionCallingConfig(
+                    maximum_remote_calls=4,
+                ),
+            }
 
             # Add thinking config if not dynamic
             if self._thinking_level != 'dynamic':
-                message_config.thinking_config = types.ThinkingConfig(
+                message_config['thinking_config'] = types.ThinkingConfig(
                     thinking_level=self._thinking_level
                 )
 
-            # Make ONE model call with no tools
-            response = self.client.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=user_prompt,
+            # Send message
+            response = self._chat_session.send_message(
+                question,
                 config=message_config,
             )
 
+            # Extract AFC statistics
+            total_calls, tools_used, payload_sizes = self._extract_afc_stats(response)
+
             # Extract text from response
-            response_text = response.text if response.text else "Could not generate response."
+            if response.text:
+                response_text = response.text
+            else:
+                # Check if we hit AFC limit
+                has_pending_calls = False
+                if response.candidates and response.candidates[0].content:
+                    for part in response.candidates[0].content.parts:
+                        if hasattr(part, 'function_call') and part.function_call:
+                            has_pending_calls = True
+                            break
+
+                if has_pending_calls:
+                    response_text = (
+                        "I gathered data but need more processing. "
+                        "Try asking a more specific question."
+                    )
+                else:
+                    response_text = "Could not generate response."
 
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
 
-            # Update call stats (no tool calls in direct mode)
+            # Update call stats
             self._last_call_stats = {
-                "total_calls": 0,
-                "tools_used": [],
+                "total_calls": total_calls,
+                "tools_used": tools_used,
                 "wall_time_ms": wall_time_ms,
                 "response_length": len(response_text),
-                "payload_sizes": {"snapshot_data": snapshot_size},
+                "payload_sizes": payload_sizes,
             }
 
             # Log response completion
             logger.info(
                 "ask_simple_complete",
                 extra={
-                    "mode": "direct",
+                    "mode": "afc",
                     "wall_time_ms": wall_time_ms,
-                    "total_tool_calls": 0,
-                    "tools_used": [],
-                    "snapshot_size": snapshot_size,
+                    "total_tool_calls": total_calls,
+                    "tools_used": tools_used,
                     "response_length": len(response_text),
                 }
             )
