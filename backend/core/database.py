@@ -537,6 +537,62 @@ class GameDatabase:
             events=payloads,
         )
 
+    # --- Queries for Milestone 4 (/history + reports) ---
+
+    def get_active_or_latest_session_id(self, *, save_id: str) -> str | None:
+        """Return the active session id for this save_id, else the most recent ended session."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT id
+                FROM sessions
+                WHERE save_id = ?
+                ORDER BY (ended_at IS NULL) DESC, started_at DESC
+                LIMIT 1;
+                """,
+                (save_id,),
+            ).fetchone()
+            return str(row["id"]) if row else None
+
+    def get_recent_events(self, *, session_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        lim = max(1, min(int(limit), 100))
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT id, captured_at, game_date, event_type, summary, data_json
+                FROM events
+                WHERE session_id = ?
+                ORDER BY captured_at DESC, id DESC
+                LIMIT ?;
+                """,
+                (session_id, lim),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_first_last_snapshot_rows(self, *, session_id: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        with self._lock:
+            first = self._conn.execute(
+                """
+                SELECT id, captured_at, game_date, full_briefing_json
+                FROM snapshots
+                WHERE session_id = ?
+                ORDER BY captured_at ASC, id ASC
+                LIMIT 1;
+                """,
+                (session_id,),
+            ).fetchone()
+            last = self._conn.execute(
+                """
+                SELECT id, captured_at, game_date, full_briefing_json
+                FROM snapshots
+                WHERE session_id = ?
+                ORDER BY captured_at DESC, id DESC
+                LIMIT 1;
+                """,
+                (session_id,),
+            ).fetchone()
+            return (dict(first) if first else None, dict(last) if last else None)
+
 
 _default_db: GameDatabase | None = None
 

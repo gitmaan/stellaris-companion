@@ -101,12 +101,13 @@ class StellarisBot(commands.Bot):
     async def setup_hook(self) -> None:
         """Called when the bot is starting up."""
         # Import and register commands
-        from backend.bot.commands import setup_ask, setup_status, setup_briefing, setup_end_session
+        from backend.bot.commands import setup_ask, setup_status, setup_briefing, setup_end_session, setup_history
 
         setup_ask(self)
         setup_status(self)
         setup_briefing(self)
         setup_end_session(self)
+        setup_history(self)
 
         logger.info("Commands registered")
 

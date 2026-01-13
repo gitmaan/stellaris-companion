@@ -9,5 +9,6 @@ from .ask import setup as setup_ask
 from .status import setup as setup_status
 from .briefing import setup as setup_briefing
 from .end_session import setup as setup_end_session
+from .history import setup as setup_history
 
-__all__ = ["setup_ask", "setup_status", "setup_briefing", "setup_end_session"]
+__all__ = ["setup_ask", "setup_status", "setup_briefing", "setup_end_session", "setup_history"]

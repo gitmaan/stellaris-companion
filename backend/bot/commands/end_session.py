@@ -13,6 +13,7 @@ from pathlib import Path
 import discord
 
 from backend.core.database import get_default_db
+from backend.core.reporting import build_session_report_text
 from backend.core.history import (
     compute_save_id,
     extract_campaign_id_from_gamestate,
@@ -101,6 +102,21 @@ def setup(bot) -> None:
 
             await interaction.followup.send(msg)
 
+            # Post deterministic session report (Phase 3 Milestone 4)
+            try:
+                report = build_session_report_text(db=db, session_id=active_session_id, max_events=20)
+                if bot.notification_channel_id:
+                    channel = bot.get_channel(bot.notification_channel_id)
+                    if channel and isinstance(channel, discord.TextChannel):
+                        # Keep it within Discord limits (split if needed)
+                        for chunk in _split_chunks(report, max_len=1900):
+                            await channel.send(chunk)
+                else:
+                    for chunk in _split_chunks(report, max_len=1900):
+                        await interaction.followup.send(chunk)
+            except Exception as e:
+                logger.warning(f"/end_session: failed to build/post session report: {e}")
+
         except Exception as e:
             logger.error(f"Error in /end_session command: {e}")
             await interaction.followup.send(
@@ -108,3 +124,19 @@ def setup(bot) -> None:
             )
 
     logger.info("/end_session command registered")
+
+
+def _split_chunks(text: str, max_len: int = 1900) -> list[str]:
+    if len(text) <= max_len:
+        return [text]
+    chunks: list[str] = []
+    remaining = text
+    while len(remaining) > max_len:
+        cut = remaining.rfind("\n", 0, max_len)
+        if cut < max_len * 0.5:
+            cut = max_len
+        chunks.append(remaining[:cut].rstrip())
+        remaining = remaining[cut:].lstrip()
+    if remaining:
+        chunks.append(remaining)
+    return chunks
