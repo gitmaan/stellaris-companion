@@ -11,6 +11,9 @@ import logging
 import discord
 from discord import app_commands
 
+from backend.core.database import get_default_db
+from backend.core.history_context import build_history_context_for_companion, should_include_history
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,9 +98,17 @@ def setup(bot) -> None:
         await interaction.response.defer(thinking=True)
 
         try:
+            history_context = None
+            if should_include_history(question):
+                try:
+                    db = get_default_db()
+                    history_context = build_history_context_for_companion(db=db, companion=bot.companion)
+                except Exception:
+                    history_context = None
+
             # Get response from companion using ask_simple (pre-injects data, 3 AFC max)
             # This is faster than chat() which allows 8 AFC calls
-            response_text, elapsed = await asyncio.to_thread(bot.companion.ask_simple, question)
+            response_text, elapsed = await asyncio.to_thread(bot.companion.ask_simple, question, history_context)
 
             # Split into multiple messages if needed
             chunks = split_response(response_text)

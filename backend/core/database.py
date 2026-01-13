@@ -593,6 +593,22 @@ class GameDatabase:
             ).fetchone()
             return (dict(first) if first else None, dict(last) if last else None)
 
+    def get_recent_snapshot_points(self, *, session_id: str, limit: int = 8) -> list[dict[str, Any]]:
+        """Return a small set of snapshot metric points for trend questions."""
+        lim = max(1, min(int(limit), 50))
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT id, captured_at, game_date, military_power, colony_count, wars_count, energy_net, alloys_net
+                FROM snapshots
+                WHERE session_id = ?
+                ORDER BY captured_at DESC, id DESC
+                LIMIT ?;
+                """,
+                (session_id, lim),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
 
 _default_db: GameDatabase | None = None
 

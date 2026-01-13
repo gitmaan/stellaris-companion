@@ -1053,7 +1053,7 @@ Be concise but insightful."""
 
             return f"Error: {str(e)}", elapsed
 
-    def ask_simple(self, question: str) -> tuple[str, float]:
+    def ask_simple(self, question: str, history_context: str | None = None) -> tuple[str, float]:
         """Ask a question using the 4 consolidated tools.
 
         Uses get_snapshot(), get_details(), search_save_file(), and get_empire_details().
@@ -1062,6 +1062,7 @@ Be concise but insightful."""
 
         Args:
             question: User's question
+            history_context: Optional compact history context for trend/delta questions.
 
         Returns:
             Tuple of (response_text, elapsed_time_seconds)
@@ -1101,6 +1102,16 @@ Be concise but insightful."""
                 "```json\n"
                 f"{snapshot_json}\n"
                 "```\n\n"
+            )
+
+            if history_context:
+                # Keep small and deterministic: recent derived events + a few timeline points.
+                user_prompt += (
+                    "HISTORY CONTEXT (only use if the question asks about changes over time):\n"
+                    f"{history_context[:3500]}\n\n"
+                )
+
+            user_prompt += (
                 "USER_QUESTION:\n"
                 f"{question}\n\n"
                 "RULES:\n"
