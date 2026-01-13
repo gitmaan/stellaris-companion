@@ -1,0 +1,95 @@
+{
+  "snapshot_type": "slim",
+  "snapshot_size": 1542,
+  "results": [
+    {
+      "question": "What is my military power?",
+      "expected": "SNAPSHOT",
+      "status": "\u2705 CORRECTLY USED SNAPSHOT",
+      "tools": [],
+      "time": 4.783336877822876,
+      "response": "President Liqeerudh,\n\nWhile our citizens enjoy the fruits of a true meritocracy and the stability of our idealistic"
+    },
+    {
+      "question": "How many colonies do I have?",
+      "expected": "SNAPSHOT",
+      "status": "\u26a0\ufe0f USED TOOLS (unnecessary)",
+      "tools": [
+        "get_details(['planets'])"
+      ],
+      "time": 8.991464853286743,
+      "response": "President Liqeerudh,\n\nOur grand experiment in liberty has flourished across the stars! We currently oversee a total of **31 colonies**. \n\nWhile our core worlds remain the beating heart of the United Nations of Earth 2, we have truly embraced the \"Beacon of Liberty\" by expanding into the void itself. Here is the breakdown of our sovereign territories:\n\n*   **14 Planetary Bodies:** This includes our cradle, **Earth**, and the red sands of **Mars**, alongside 12 other worlds ranging from tropical paradises like **Proxima Centauri b** to the frigid reaches of **St. Caspar**.\n*   **17 Orbital Habitats:** Our commitment to providing a home for all\u2014regardless of their origin\u2014is best seen in our extensive habitat network. These stations house a significant portion of our citizenry and ensure that no star system is left without the light of democracy.\n\n**Strategic Observation:**\nPresident, while 31 colonies is a testament to our meritocratic efficiency, I must point out that as we sit in the year 2450, our expansion has become heavily reliant on these habitats. They are excellent for specialized production, but their stability varies wildly\u2014some, like the habitat in the **10509** sector, are hovering at a precarious **49% stability**. \n\nWith the endgame approaching and 53 contacts across the galaxy, we must ensure these smaller outposts are not just \"houses in the stars,\" but fortified bastions of our ideals. We have the alloys and the influence; perhaps it is time to further integrate these habitats or look toward the \"Interstellar Assembly\" we are currently researching to solidify our diplomatic hegemony.\n\nHow shall we proceed with the next phase of our manifest destiny?"
+    },
+    {
+      "question": "What am I researching in physics?",
+      "expected": "SNAPSHOT",
+      "status": "\u2705 CORRECTLY USED SNAPSHOT",
+      "tools": [],
+      "time": 5.195876121520996,
+      "response": "President Liqeerudh, it is an honor to provide this briefing.\n\nOur brightest minds in the Physics division are currently focused on **Gateway Activation**. \n\nFrom a strategic standpoint, this is a pivotal moment for the United Nations of Earth 2. As we stand"
+    },
+    {
+      "question": "Who is my highest level admiral and what traits do they have?",
+      "expected": "TOOLS_REQUIRED",
+      "status": "\u2705 CORRECTLY USED TOOLS",
+      "tools": [
+        "get_details(['leaders'])"
+      ],
+      "time": 6.093219041824341,
+      "response": "President Liqeerudh,\n\nIn these times of galactic uncertainty, the strength of our fleet rests upon the shoulders"
+    },
+    {
+      "question": "List all my scientists",
+      "expected": "TOOLS_REQUIRED",
+      "status": "\u2705 CORRECTLY USED TOOLS",
+      "tools": [
+        "get_details(['leaders'])"
+      ],
+      "time": 6.98258900642395,
+      "response": "President, our commitment to the pursuit of knowledge remains the bedrock of the United Nations of Earth 2. As"
+    },
+    {
+      "question": "What buildings are on Earth?",
+      "expected": "TOOLS_REQUIRED",
+      "status": "\u2705 CORRECTLY USED TOOLS",
+      "tools": [
+        "get_details(['planets'])"
+      ],
+      "time": 7.524946212768555,
+      "response": "President,\n\nOur cradle, Earth, remains the shining jewel of the United Nations of Earth 2. While its stability"
+    },
+    {
+      "question": "What are the opinion modifiers with my allies?",
+      "expected": "TOOLS_REQUIRED",
+      "status": "\u2705 CORRECTLY USED TOOLS",
+      "tools": [
+        "get_details(['diplomacy'])",
+        "get_details(['empires'])",
+        "search(country_id: 1)",
+        "search(United Nations of Earth)"
+      ],
+      "time": 14.322767734527588,
+      "response": "[No response]"
+    }
+  ],
+  "ground_truth": {
+    "highest_admiral": {
+      "id": "167773133",
+      "class": "commander",
+      "name": "Manon",
+      "level": 5,
+      "age": 0,
+      "traits": [
+        "subclass_commander_admiral",
+        "leader_trait_artillerist",
+        "leader_trait_cautious",
+        "leader_trait_resilient",
+        "leader_trait_adaptable",
+        "leader_trait_reclusive"
+      ],
+      "experience": 4620.01896
+    },
+    "total_leaders": 36,
+    "total_planets": 31
+  }
+}

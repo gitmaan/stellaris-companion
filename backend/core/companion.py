@@ -1090,24 +1090,24 @@ Be concise but insightful."""
                     model="gemini-3-flash-preview",
                 )
 
-            # Always pre-inject a snapshot to avoid spending tool calls on basics.
-            # This keeps /ask flexible while reducing tool-chaining and latency.
-            snapshot_data = self.extractor.get_full_briefing()
+            # Use slim snapshot (summaries only, no truncated lists) to prevent hallucination.
+            # Model must call get_details() for specific leader/planet/diplomacy info.
+            snapshot_data = self.extractor.get_slim_briefing()
             snapshot_json = json.dumps(snapshot_data, separators=(",", ":"), default=str)
             snapshot_size = len(snapshot_json)
 
             user_prompt = (
-                "CURRENT_GAME_STATE (authoritative JSON; use it for all numbers):\n"
+                "GAME STATE SUMMARY (counts and headlines only):\n"
                 "```json\n"
                 f"{snapshot_json}\n"
                 "```\n\n"
                 "USER_QUESTION:\n"
                 f"{question}\n\n"
                 "RULES:\n"
-                "- Use the JSON above for facts and numbers. If a number isn't present, say 'unknown'.\n"
-                "- Do NOT call get_snapshot(); the snapshot is already provided.\n"
-                "- If you need more detail, prefer ONE get_details() call with multiple categories.\n"
-                "- Use search_save_file() only for edge cases not covered by get_details().\n"
+                "- The snapshot above contains SUMMARIES only (counts, totals, capital, ruler).\n"
+                "- For specific leaders, planets, starbases, or diplomacy details: call get_details().\n"
+                "- Example: get_details(['leaders']) for admiral traits, get_details(['planets']) for buildings.\n"
+                "- Do NOT guess or make up details not in the snapshot - use tools instead.\n"
             )
 
             # Expose only drill-down tools for /ask; snapshot is injected above.
@@ -1126,14 +1126,12 @@ Be concise but insightful."""
             # Build config with consolidated tools
             ask_system_prompt = (
                 f"{self.system_prompt}\n\n"
-                "ASK MODE OVERRIDES:\n"
-                "- The current game state snapshot is included in the user message.\n"
-                "- Never request get_snapshot(); it is not available in this mode.\n"
-                "- Minimize tool usage: usually 0-1 tool calls.\n"
-                "- If you must call tools, batch categories in one get_details call.\n"
-                "- After gathering enough info, stop calling tools and answer.\n"
-                "- IMPORTANT: Maintain your full personality, colorful language, and in-character voice. "
-                "Being efficient with tools does NOT mean being terse - express yourself!\n"
+                "ASK MODE:\n"
+                "- A game state SUMMARY is in the user message (counts, totals, headlines).\n"
+                "- For SPECIFIC details (leader traits, planet buildings, diplomacy), USE get_details().\n"
+                "- Batch categories when possible: get_details(['leaders', 'planets']).\n"
+                "- Do NOT make up details - if it's not in the summary, call tools.\n"
+                "- Maintain your full personality and colorful language - be an advisor, not a data dump!\n"
             )
             message_config = {
                 'system_instruction': ask_system_prompt,

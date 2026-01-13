@@ -1361,6 +1361,98 @@ class SaveExtractor:
             },
         }
 
+    def get_slim_briefing(self) -> dict:
+        """Get slim empire snapshot with NO truncated lists.
+
+        Unlike get_full_briefing(), this only includes COMPLETE data:
+        - Summary counts (leaders, planets, starbases)
+        - Key numbers (military power, economy)
+        - Headlines (capital planet, ruler, current research)
+        - NO truncated lists that could cause hallucination
+
+        This forces the model to call get_details() for specific information
+        about leaders, planets, diplomacy, etc.
+
+        Returns:
+            Dictionary with ~1.5KB of complete summary data
+        """
+        player = self.get_player_status()
+        resources = self.get_resources()
+        diplomacy = self.get_diplomacy()
+        planets = self.get_planets()
+        starbases = self.get_starbases()
+        leaders = self.get_leaders()
+        technology = self.get_technology()
+
+        # Find capital planet (first planet, usually homeworld)
+        all_planets = planets.get('planets', [])
+        capital = all_planets[0] if all_planets else {}
+
+        # Find ruler (official class leader, or first leader)
+        all_leaders = leaders.get('leaders', [])
+        ruler = next(
+            (l for l in all_leaders if l.get('class') == 'official'),
+            all_leaders[0] if all_leaders else {}
+        )
+
+        return {
+            'meta': {
+                'empire_name': player.get('empire_name'),
+                'date': player.get('date'),
+            },
+            'military': {
+                'power': player.get('military_power'),
+                'fleet_count': player.get('fleet_count'),
+                'fleet_size': player.get('fleet_size'),
+            },
+            'economy': {
+                'power': player.get('economy_power'),
+                'tech_power': player.get('tech_power'),
+                'net_monthly': resources.get('net_monthly', {}),
+            },
+            'territory': {
+                'total_colonies': player.get('colonies', {}).get('total', 0),
+                'habitats': player.get('colonies', {}).get('habitats', 0),
+                'by_type': planets.get('by_type', {}),
+                # HEADLINE: Capital only (not all planets)
+                'capital': {
+                    'name': capital.get('name'),
+                    'type': capital.get('type'),
+                    'population': capital.get('population'),
+                    'stability': capital.get('stability'),
+                } if capital else None,
+            },
+            'leadership': {
+                'total_count': leaders.get('count'),
+                'by_class': leaders.get('by_class', {}),
+                # HEADLINE: Ruler only (not all leaders)
+                'ruler': {
+                    'name': ruler.get('name'),
+                    'class': ruler.get('class'),
+                    'level': ruler.get('level'),
+                    'traits': ruler.get('traits', []),
+                } if ruler else None,
+                # NO leaders list - forces tool use for details
+            },
+            'diplomacy': {
+                'contact_count': diplomacy.get('relation_count'),
+                'ally_count': len(diplomacy.get('allies', [])),
+                'rival_count': len(diplomacy.get('rivals', [])),
+                'federation': diplomacy.get('federation'),
+                # NO relations list - forces tool use for details
+            },
+            'defense': {
+                'starbase_count': starbases.get('count'),
+                'by_level': starbases.get('by_level', {}),
+                # NO starbases list - forces tool use for details
+            },
+            'technology': {
+                'current_research': technology.get('current_research', {}),
+                'tech_count': technology.get('tech_count', 0),
+                'by_category': technology.get('by_category', {}),
+            },
+        }
+
     def get_empire_identity(self) -> dict:
         """Extract static empire identity for personality generation.
 
