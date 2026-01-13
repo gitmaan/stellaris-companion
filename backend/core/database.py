@@ -14,6 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
+import json
+
+from backend.core.events import compute_events
+
 
 DEFAULT_DB_FILENAME = "stellaris_history.db"
 ENV_DB_PATH = "STELLARIS_DB_PATH"
@@ -426,6 +430,112 @@ class GameDatabase:
                 "first_game_date": row["first_game_date"],
                 "last_game_date": row["last_game_date"],
             }
+
+    # --- Phase 3 Milestone 3: events ---
+
+    def get_snapshot_row(self, snapshot_id: int) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT id, session_id, captured_at, game_date, save_hash,
+                       military_power, colony_count, wars_count, energy_net, alloys_net,
+                       full_briefing_json
+                FROM snapshots
+                WHERE id = ?;
+                """,
+                (int(snapshot_id),),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_previous_snapshot_id(self, *, session_id: str, before_snapshot_id: int) -> int | None:
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT id
+                FROM snapshots
+                WHERE session_id = ? AND id < ?
+                ORDER BY id DESC
+                LIMIT 1;
+                """,
+                (session_id, int(before_snapshot_id)),
+            ).fetchone()
+            return int(row["id"]) if row else None
+
+    def insert_events(
+        self,
+        *,
+        session_id: str,
+        captured_at: int | None,
+        game_date: str | None,
+        events: list[dict[str, Any]],
+    ) -> int:
+        if not events:
+            return 0
+        rows = []
+        for e in events:
+            rows.append(
+                (
+                    session_id,
+                    int(captured_at) if captured_at is not None else None,
+                    game_date,
+                    e["event_type"],
+                    e["summary"],
+                    json.dumps(e.get("data") or {}, ensure_ascii=False, separators=(",", ":")),
+                )
+            )
+        with self._lock:
+            self._conn.executemany(
+                """
+                INSERT INTO events (session_id, captured_at, game_date, event_type, summary, data_json)
+                VALUES (?, COALESCE(?, strftime('%s','now')), ?, ?, ?, ?);
+                """,
+                rows,
+            )
+        return len(rows)
+
+    def record_events_for_new_snapshot(
+        self,
+        *,
+        session_id: str,
+        snapshot_id: int,
+        current_briefing: dict[str, Any],
+    ) -> int:
+        """Compute and store events for a newly inserted snapshot.
+
+        Uses the previous snapshot in the same session as the baseline.
+        """
+        prev_id = self.get_previous_snapshot_id(session_id=session_id, before_snapshot_id=int(snapshot_id))
+        if prev_id is None:
+            return 0
+
+        prev_row = self.get_snapshot_row(prev_id)
+        curr_row = self.get_snapshot_row(int(snapshot_id))
+        if not prev_row or not curr_row:
+            return 0
+
+        prev_json = prev_row.get("full_briefing_json")
+        if not isinstance(prev_json, str) or not prev_json:
+            return 0
+
+        try:
+            prev_briefing = json.loads(prev_json)
+        except Exception:
+            return 0
+
+        detected = compute_events(
+            prev=prev_briefing if isinstance(prev_briefing, dict) else {},
+            curr=current_briefing if isinstance(current_briefing, dict) else {},
+            from_snapshot_id=int(prev_id),
+            to_snapshot_id=int(snapshot_id),
+        )
+        payloads = [{"event_type": e.event_type, "summary": e.summary, "data": e.data} for e in detected]
+
+        return self.insert_events(
+            session_id=session_id,
+            captured_at=curr_row.get("captured_at"),
+            game_date=curr_row.get("game_date"),
+            events=payloads,
+        )
 
 
 _default_db: GameDatabase | None = None
