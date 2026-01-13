@@ -97,6 +97,221 @@ def extract_player_wars_from_gamestate(*, gamestate: str | None, player_id: int 
     return result
 
 
+def extract_galaxy_settings_from_gamestate(gamestate: str | None) -> dict[str, Any] | None:
+    """Extract a few stable galaxy/game settings used for milestone events."""
+    if not gamestate:
+        return None
+
+    start = gamestate.find("\ngalaxy=")
+    if start == -1:
+        if gamestate.startswith("galaxy="):
+            start = 0
+        else:
+            return None
+
+    window = gamestate[start : start + 25000]
+
+    def _find_int(key: str) -> int | None:
+        import re
+
+        m = re.search(rf"\b{key}\s*=\s*(\d+)\b", window)
+        return int(m.group(1)) if m else None
+
+    def _find_str(key: str) -> str | None:
+        import re
+
+        m = re.search(rf'\b{key}\s*=\s*"([^"]+)"', window)
+        return m.group(1).strip() if m and m.group(1).strip() else None
+
+    return {
+        "galaxy_name": _find_str("name"),
+        "mid_game_start": _find_int("mid_game_start"),
+        "end_game_start": _find_int("end_game_start"),
+        "victory_year": _find_int("victory_year"),
+        "ironman": _find_str("ironman"),
+        "difficulty": _find_str("difficulty"),
+        "crisis_type": _find_str("crisis_type"),
+    }
+
+
+def extract_player_leaders_from_gamestate(*, gamestate: str | None, player_id: int | None) -> dict[str, Any] | None:
+    """Extract a minimal leader roster for the player for diffing (hire/death/changes)."""
+    if not gamestate or player_id is None:
+        return None
+
+    pid = int(player_id)
+    leaders_start = gamestate.find("\nleaders=")
+    if leaders_start == -1:
+        if gamestate.startswith("leaders="):
+            leaders_start = 0
+        else:
+            return None
+
+    leaders_chunk = gamestate[leaders_start : leaders_start + 4000000]  # up to 4MB
+
+    import re
+
+    leader_start_pattern = r"\n\t(\d+)=\s*\{\s*\n\t\tname="
+    leaders: list[dict[str, Any]] = []
+
+    for m in re.finditer(leader_start_pattern, leaders_chunk):
+        leader_id = m.group(1)
+        block_start = m.start() + 1
+
+        brace_count = 0
+        started = False
+        block_end = None
+        # Bound scanning per leader block.
+        for i, ch in enumerate(leaders_chunk[block_start : block_start + 8000], block_start):
+            if ch == "{":
+                brace_count += 1
+                started = True
+            elif ch == "}":
+                brace_count -= 1
+                if started and brace_count == 0:
+                    block_end = i + 1
+                    break
+
+        if block_end is None:
+            continue
+
+        block = leaders_chunk[block_start:block_end]
+        cm = re.search(r"\n\s*country=(\d+)", block)
+        if not cm:
+            continue
+        if int(cm.group(1)) != pid:
+            continue
+
+        class_m = re.search(r'class="([^"]+)"', block)
+        level_m = re.search(r"\n\s*level=(\d+)", block)
+        death_m = re.search(r'death_date=\s*"(\d{4}\.\d{2}\.\d{2})"', block)
+        added_m = re.search(r'date_added=\s*"(\d{4}\.\d{2}\.\d{2})"', block)
+        recruit_m = re.search(r'recruitment_date=\s*"(\d{4}\.\d{2}\.\d{2})"', block)
+        # Name key is usually stable even when localized.
+        name_key_m = re.search(r'\bkey="([^"]+)"', block)
+
+        leaders.append(
+            {
+                "id": int(leader_id),
+                "class": class_m.group(1) if class_m else None,
+                "level": int(level_m.group(1)) if level_m else None,
+                "death_date": death_m.group(1) if death_m else None,
+                "date_added": added_m.group(1) if added_m else None,
+                "recruitment_date": recruit_m.group(1) if recruit_m else None,
+                "name_key": name_key_m.group(1) if name_key_m else None,
+            }
+        )
+
+        # Keep it bounded; player leader counts are typically small.
+        if len(leaders) >= 100:
+            break
+
+    return {"player_id": pid, "leaders": leaders, "count": len(leaders)}
+
+
+def extract_player_diplomacy_from_gamestate(*, gamestate: str | None, player_id: int | None) -> dict[str, Any] | None:
+    """Extract a minimal diplomacy state for diffing (allies/rivals/treaties)."""
+    if not gamestate or player_id is None:
+        return None
+
+    pid = int(player_id)
+    country_start = gamestate.find("\ncountry=")
+    if country_start == -1:
+        return None
+
+    # Grab a bounded window around the country section; player block is early within it.
+    chunk = gamestate[country_start : country_start + 900000]
+    player_block_pos = chunk.find("\n\t0=")
+    if player_block_pos == -1:
+        return None
+
+    player_chunk = chunk[player_block_pos : player_block_pos + 400000]
+    rel_mgr_pos = player_chunk.find("relations_manager=")
+    if rel_mgr_pos == -1:
+        return None
+
+    rel_chunk = player_chunk[rel_mgr_pos : rel_mgr_pos + 250000]
+
+    import re
+
+    relation_marker = "relation="
+    idx = 0
+    allies: set[int] = set()
+    rivals: set[int] = set()
+    treaties: dict[str, set[int]] = {
+        "research_agreement": set(),
+        "commercial_pact": set(),
+        "migration_treaty": set(),
+        "non_aggression_pact": set(),
+        "defensive_pact": set(),
+        "embassy": set(),
+        "truce": set(),
+    }
+
+    while True:
+        idx = rel_chunk.find(relation_marker, idx)
+        if idx == -1:
+            break
+
+        brace_start = rel_chunk.find("{", idx)
+        if brace_start == -1:
+            break
+
+        brace_count = 0
+        started = False
+        end = None
+        for j, ch in enumerate(rel_chunk[brace_start : brace_start + 12000], brace_start):
+            if ch == "{":
+                brace_count += 1
+                started = True
+            elif ch == "}":
+                brace_count -= 1
+                if started and brace_count == 0:
+                    end = j + 1
+                    break
+
+        if end is None:
+            idx = brace_start + 1
+            continue
+
+        block = rel_chunk[brace_start:end]
+        owner_m = re.search(r"\bowner=(\d+)\b", block)
+        if not owner_m or int(owner_m.group(1)) != pid:
+            idx = end
+            continue
+
+        country_m = re.search(r"\bcountry=(\d+)\b", block)
+        if not country_m:
+            idx = end
+            continue
+        other_id = int(country_m.group(1))
+
+        def has_yes(key: str) -> bool:
+            return re.search(rf"\b{re.escape(key)}=yes\b", block) is not None
+
+        if has_yes("alliance") or has_yes("defensive_pact"):
+            allies.add(other_id)
+        if has_yes("rivalry") or has_yes("rival") or has_yes("is_rival"):
+            rivals.add(other_id)
+
+        for key in list(treaties.keys()):
+            if key == "truce":
+                if re.search(r"\btruce=\d+\b", block):
+                    treaties["truce"].add(other_id)
+                continue
+            if has_yes(key):
+                treaties[key].add(other_id)
+
+        idx = end
+
+    return {
+        "player_id": pid,
+        "allies": sorted(allies),
+        "rivals": sorted(rivals),
+        "treaties": {k: sorted(v) for k, v in treaties.items() if v},
+    }
+
+
 def compute_save_id(
     *,
     campaign_id: str | None,
@@ -191,11 +406,23 @@ def record_snapshot_from_companion(
     resolved_player_id = player_id if player_id is not None else metrics.get("player_id")
 
     wars = extract_player_wars_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    leaders = extract_player_leaders_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    diplomacy = extract_player_diplomacy_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    galaxy = extract_galaxy_settings_from_gamestate(gamestate)
 
     # Avoid mutating the live snapshot object used by /ask; store extras in a copy.
     briefing_for_storage = dict(briefing)
+    history: dict[str, Any] = {}
     if wars:
-        briefing_for_storage["history"] = {"wars": wars}
+        history["wars"] = wars
+    if leaders:
+        history["leaders"] = leaders
+    if diplomacy:
+        history["diplomacy"] = diplomacy
+    if galaxy:
+        history["galaxy"] = galaxy
+    if history:
+        briefing_for_storage["history"] = history
 
     session_id = db.get_or_create_active_session(
         save_id=compute_save_id(
