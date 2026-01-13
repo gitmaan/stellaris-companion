@@ -145,8 +145,8 @@ class StellarisBot(commands.Bot):
         logger.info(f"New save detected: {save_path.name}")
 
         try:
-            # Reload the companion
-            identity_changed = self.companion.reload_save()
+            # Reload the companion with the new save path
+            identity_changed = self.companion.reload_save(new_path=save_path)
 
             message = f"Save file updated: **{save_path.name}**\n"
             message += f"Empire: {self.companion.metadata.get('name', 'Unknown')}\n"

@@ -208,12 +208,22 @@ class Companion:
         current_mtime = self.save_path.stat().st_mtime
         return current_mtime != self.last_modified
 
-    def reload_save(self) -> bool:
+    def reload_save(self, new_path: Path | None = None) -> bool:
         """Reload the save file and rebuild personality.
+
+        Args:
+            new_path: Optional new path to switch to. If None, reloads from current path.
+                      Use this when the save watcher detects a new file (e.g., new autosave).
 
         Returns:
             True if identity changed, False otherwise
         """
+        if new_path is not None:
+            if not new_path.exists():
+                logger.warning(f"New save path does not exist: {new_path}")
+                return False
+            self.save_path = new_path
+
         if not self.save_path:
             return False
 
@@ -1122,6 +1132,8 @@ Be concise but insightful."""
                 "- Minimize tool usage: usually 0-1 tool calls.\n"
                 "- If you must call tools, batch categories in one get_details call.\n"
                 "- After gathering enough info, stop calling tools and answer.\n"
+                "- IMPORTANT: Maintain your full personality, colorful language, and in-character voice. "
+                "Being efficient with tools does NOT mean being terse - express yourself!\n"
             )
             message_config = {
                 'system_instruction': ask_system_prompt,
