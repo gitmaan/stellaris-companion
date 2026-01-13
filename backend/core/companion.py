@@ -498,14 +498,14 @@ class Companion:
         """
         return self.extractor.get_full_briefing()
 
-    def get_details(self, category: str, limit: int = 10) -> dict:
-        """Get detailed information for a specific category - use AFTER get_snapshot().
+    def get_details(self, categories: list[str], limit: int = 10) -> dict:
+        """Get detailed information for one or more categories - use AFTER get_snapshot().
 
         This is a drill-down tool for when get_snapshot() doesn't have enough detail.
         Only call this if you need MORE information than what get_snapshot() provides.
 
         Args:
-            category: One of:
+            categories: List of categories to return. Valid items:
                 - "leaders" - Full leader list with traits, levels, ages
                 - "planets" - Full planet list with stability, amenities, size
                 - "starbases" - Full starbase list with modules and buildings
@@ -517,9 +517,9 @@ class Companion:
             limit: Max items to return (default 10, max 50)
 
         Returns:
-            Category-specific details
+            Dictionary with per-category details (batched)
         """
-        return self.extractor.get_details(category, limit)
+        return self.extractor.get_details(categories, limit)
 
     def get_full_briefing(self) -> dict:
         """DEPRECATED: Use get_snapshot() instead. Kept for backwards compatibility."""
@@ -627,6 +627,47 @@ class Companion:
                 logger.debug(f"Could not extract AFC history: {e}")
 
         return total_calls, tools_used, payload_sizes
+
+    def _response_has_pending_function_call(self, response: Any) -> bool:
+        """Return True if the response contains a function_call part."""
+        try:
+            if not getattr(response, "candidates", None):
+                return False
+            candidate = response.candidates[0]
+            content = getattr(candidate, "content", None)
+            parts = getattr(content, "parts", None)
+            if not parts:
+                return False
+            for part in parts:
+                if hasattr(part, "function_call") and part.function_call:
+                    return True
+            return False
+        except Exception:
+            return False
+
+    def _extract_new_tool_payloads(self, history_before: int) -> dict[str, Any]:
+        """Extract tool payloads from chat history entries added since history_before."""
+        if self._chat_session is None:
+            return {}
+        try:
+            history = self._chat_session.get_history()
+        except Exception:
+            return {}
+
+        new_entries = history[history_before:] if isinstance(history, list) else []
+        tool_payloads: dict[str, Any] = {}
+
+        for content in new_entries:
+            parts = getattr(content, "parts", None)
+            if not parts:
+                continue
+            for part in parts:
+                if hasattr(part, "function_response") and part.function_response:
+                    name = getattr(part.function_response, "name", "unknown_tool")
+                    payload = getattr(part.function_response, "response", None)
+                    tool_payloads[name] = payload
+
+        return tool_payloads
 
     def chat(self, user_message: str, tool_mode: str = "full") -> tuple[str, float]:
         """Send a message and get a response using automatic function calling.
@@ -1007,18 +1048,57 @@ Be concise but insightful."""
                     model="gemini-3-flash-preview",
                 )
 
-            # Use all 4 consolidated tools
-            tools = self._get_tools_list("full")
+            # Always pre-inject a snapshot to avoid spending tool calls on basics.
+            # This keeps /ask flexible while reducing tool-chaining and latency.
+            snapshot_data = self.extractor.get_full_briefing()
+            snapshot_json = json.dumps(snapshot_data, separators=(",", ":"), default=str)
+            snapshot_size = len(snapshot_json)
+
+            user_prompt = (
+                "CURRENT_GAME_STATE (authoritative JSON; use it for all numbers):\n"
+                "```json\n"
+                f"{snapshot_json}\n"
+                "```\n\n"
+                "USER_QUESTION:\n"
+                f"{question}\n\n"
+                "RULES:\n"
+                "- Use the JSON above for facts and numbers. If a number isn't present, say 'unknown'.\n"
+                "- Do NOT call get_snapshot(); the snapshot is already provided.\n"
+                "- If you need more detail, prefer ONE get_details() call with multiple categories.\n"
+                "- Use search_save_file() only for edge cases not covered by get_details().\n"
+            )
+
+            # Expose only drill-down tools for /ask; snapshot is injected above.
+            tools = [
+                self.get_details,
+                self.search_save_file,
+                self.get_empire_details,
+            ]
+
+            # Capture history length so we can extract tool payloads added by this request
+            try:
+                history_before = len(self._chat_session.get_history())
+            except Exception:
+                history_before = 0
 
             # Build config with consolidated tools
+            ask_system_prompt = (
+                f"{self.system_prompt}\n\n"
+                "ASK MODE OVERRIDES:\n"
+                "- The current game state snapshot is included in the user message.\n"
+                "- Never request get_snapshot(); it is not available in this mode.\n"
+                "- Minimize tool usage: usually 0-1 tool calls.\n"
+                "- If you must call tools, batch categories in one get_details call.\n"
+                "- After gathering enough info, stop calling tools and answer.\n"
+            )
             message_config = {
-                'system_instruction': self.system_prompt,
+                'system_instruction': ask_system_prompt,
                 'tools': tools,
                 'temperature': 1.0,  # Gemini 3 recommended default
                 'max_output_tokens': 2048,
-                # Allow enough calls: 1 for snapshot + 1-2 for details if needed
+                # Allow a couple drill-down calls without reintroducing long AFC chains.
                 'automatic_function_calling': types.AutomaticFunctionCallingConfig(
-                    maximum_remote_calls=4,
+                    maximum_remote_calls=6,
                 ),
             }
 
@@ -1030,32 +1110,71 @@ Be concise but insightful."""
 
             # Send message
             response = self._chat_session.send_message(
-                question,
+                user_prompt,
                 config=message_config,
             )
 
             # Extract AFC statistics
             total_calls, tools_used, payload_sizes = self._extract_afc_stats(response)
 
-            # Extract text from response
-            if response.text:
-                response_text = response.text
-            else:
-                # Check if we hit AFC limit
-                has_pending_calls = False
-                if response.candidates and response.candidates[0].content:
-                    for part in response.candidates[0].content.parts:
-                        if hasattr(part, 'function_call') and part.function_call:
-                            has_pending_calls = True
-                            break
+            # If the model hit the AFC cap and left a pending function_call, do a final
+            # tools-disabled call using whatever tool outputs we already gathered.
+            has_pending_calls = self._response_has_pending_function_call(response)
 
-                if has_pending_calls:
-                    response_text = (
-                        "I gathered data but need more processing. "
-                        "Try asking a more specific question."
+            if has_pending_calls:
+                tool_payloads = self._extract_new_tool_payloads(history_before)
+                tool_payload_json = json.dumps(tool_payloads, separators=(",", ":"), default=str)
+                # Keep the finalization prompt bounded
+                if len(tool_payload_json) > 12000:
+                    tool_payload_json = tool_payload_json[:12000] + "...TRUNCATED"
+
+                finalize_prompt = (
+                    "You previously attempted to answer but ran out of tool steps.\n"
+                    "Answer now using ONLY the data below. Do NOT call tools.\n\n"
+                    "SNAPSHOT_JSON:\n"
+                    "```json\n"
+                    f"{snapshot_json}\n"
+                    "```\n\n"
+                    "TOOL_OUTPUTS_JSON (may be partial):\n"
+                    "```json\n"
+                    f"{tool_payload_json}\n"
+                    "```\n\n"
+                    "QUESTION:\n"
+                    f"{question}\n\n"
+                    "RULES:\n"
+                    "- All numbers must come from the JSON provided. If missing, say 'unknown'.\n"
+                    "- If the question can't be fully answered from the data, ask one clarifying question.\n"
+                )
+
+                direct_config = types.GenerateContentConfig(
+                    system_instruction=ask_system_prompt,
+                    temperature=1.0,
+                    max_output_tokens=2048,
+                )
+                if self._thinking_level != 'dynamic':
+                    direct_config.thinking_config = types.ThinkingConfig(
+                        thinking_level=self._thinking_level
                     )
-                else:
-                    response_text = "Could not generate response."
+
+                direct_response = self.client.models.generate_content(
+                    model="gemini-3-flash-preview",
+                    contents=finalize_prompt,
+                    config=direct_config,
+                )
+                response_text = direct_response.text or (
+                    "I gathered data but couldn't produce a final answer. "
+                    "Try asking a more specific question."
+                )
+
+                # Update stats to reflect the extra direct call
+                total_calls = max(total_calls, 0)
+                tools_used = list(dict.fromkeys(tools_used + ["finalize_no_tools"]))
+                payload_sizes = dict(payload_sizes)
+                payload_sizes["snapshot_json"] = snapshot_size
+                payload_sizes["finalize_tool_outputs"] = len(tool_payload_json)
+
+            else:
+                response_text = response.text or "Could not generate response."
 
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
@@ -1066,7 +1185,10 @@ Be concise but insightful."""
                 "tools_used": tools_used,
                 "wall_time_ms": wall_time_ms,
                 "response_length": len(response_text),
-                "payload_sizes": payload_sizes,
+                "payload_sizes": {
+                    **payload_sizes,
+                    "snapshot_json": snapshot_size,
+                },
             }
 
             # Log response completion

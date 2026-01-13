@@ -1396,93 +1396,110 @@ class SaveExtractor:
 
         return result
 
-    def get_details(self, category: str, limit: int = 10) -> dict:
-        """Get detailed information for a specific category.
+    def get_details(self, categories: list[str], limit: int = 10) -> dict:
+        """Get detailed information for one or more categories.
 
         This is a unified drill-down tool that replaces multiple narrow tools.
-        Use get_full_briefing() first to get the overview, then use this
+        Use get_full_briefing() first to get the overview, then use this tool
         for additional details on specific categories.
 
+        This function supports batching: request multiple categories in one call
+        to reduce LLM tool round-trips.
+
         Args:
-            category: One of "leaders", "planets", "starbases", "technology",
-                     "wars", "fleets", "resources", "diplomacy"
-            limit: Max items to return (default 10, capped at 50)
+            categories: List of categories to return. Each item must be one of:
+                - "leaders"
+                - "planets"
+                - "starbases"
+                - "technology"
+                - "wars"
+                - "fleets"
+                - "resources"
+                - "diplomacy"
+            limit: Max items to return for list-like fields (default 10, capped at 50)
 
         Returns:
-            Category-specific details with items limited to the specified count
+            Dictionary mapping each category to its detailed data.
+            If any categories are invalid, an "errors" field is included.
         """
-        # Validate category
-        valid_categories = [
+        valid_categories = {
             "leaders", "planets", "starbases", "technology",
-            "wars", "fleets", "resources", "diplomacy"
-        ]
+            "wars", "fleets", "resources", "diplomacy",
+        }
 
-        if category not in valid_categories:
-            return {
-                "error": f"Invalid category '{category}'. Must be one of: {', '.join(valid_categories)}"
-            }
+        if not isinstance(categories, list) or not categories:
+            return {"error": "categories must be a non-empty list of strings"}
 
         # Cap limit to prevent excessive output
         limit = min(max(1, limit), 50)
 
-        # Dispatch to appropriate method
-        if category == "leaders":
-            result = self.get_leaders()
-            # Apply limit to leaders list
-            if 'leaders' in result:
-                result['leaders'] = result['leaders'][:limit]
-            return result
+        results: dict[str, dict] = {}
+        errors: dict[str, str] = {}
 
-        elif category == "planets":
-            result = self.get_planets()
-            # Apply limit to planets list
-            if 'planets' in result:
-                result['planets'] = result['planets'][:limit]
-            return result
+        for category in categories:
+            if category not in valid_categories:
+                errors[category] = f"Invalid category. Must be one of: {', '.join(sorted(valid_categories))}"
+                continue
 
-        elif category == "starbases":
-            result = self.get_starbases()
-            # Apply limit to starbases list
-            if 'starbases' in result:
-                result['starbases'] = result['starbases'][:limit]
-            return result
+            if category == "leaders":
+                data = self.get_leaders()
+                if 'leaders' in data:
+                    data['leaders'] = data['leaders'][:limit]
+                results[category] = data
+                continue
 
-        elif category == "technology":
-            result = self.get_technology()
-            # Apply limit to sample technologies
-            if 'sample_technologies' in result:
-                result['sample_technologies'] = result['sample_technologies'][:limit]
-            if 'completed_technologies' in result:
-                result['completed_technologies'] = result['completed_technologies'][:limit]
-            return result
+            if category == "planets":
+                data = self.get_planets()
+                if 'planets' in data:
+                    data['planets'] = data['planets'][:limit]
+                results[category] = data
+                continue
 
-        elif category == "wars":
-            result = self.get_wars()
-            # Apply limit to wars list
-            if 'wars' in result:
-                result['wars'] = result['wars'][:limit]
-            return result
+            if category == "starbases":
+                data = self.get_starbases()
+                if 'starbases' in data:
+                    data['starbases'] = data['starbases'][:limit]
+                results[category] = data
+                continue
 
-        elif category == "fleets":
-            result = self.get_fleets()
-            # Apply limit to fleet names
-            if 'fleet_names' in result:
-                result['fleet_names'] = result['fleet_names'][:limit]
-            return result
+            if category == "technology":
+                data = self.get_technology()
+                if 'sample_technologies' in data:
+                    data['sample_technologies'] = data['sample_technologies'][:limit]
+                if 'completed_technologies' in data:
+                    data['completed_technologies'] = data['completed_technologies'][:limit]
+                results[category] = data
+                continue
 
-        elif category == "resources":
-            # Resources doesn't have a list to limit, return as-is
-            return self.get_resources()
+            if category == "wars":
+                data = self.get_wars()
+                if 'wars' in data:
+                    data['wars'] = data['wars'][:limit]
+                results[category] = data
+                continue
 
-        elif category == "diplomacy":
-            result = self.get_diplomacy()
-            # Apply limit to relations list
-            if 'relations' in result:
-                result['relations'] = result['relations'][:limit]
-            return result
+            if category == "fleets":
+                data = self.get_fleets()
+                if 'fleet_names' in data:
+                    data['fleet_names'] = data['fleet_names'][:limit]
+                results[category] = data
+                continue
 
-        # Should never reach here due to validation above
-        return {"error": "Unknown category"}
+            if category == "resources":
+                results[category] = self.get_resources()
+                continue
+
+            if category == "diplomacy":
+                data = self.get_diplomacy()
+                if 'relations' in data:
+                    data['relations'] = data['relations'][:limit]
+                results[category] = data
+                continue
+
+        out: dict = {"results": results, "limit": limit}
+        if errors:
+            out["errors"] = errors
+        return out
 
     def get_situation(self) -> dict:
         """Analyze current game situation for personality tone modifiers.
