@@ -38,6 +38,7 @@ except ImportError:
 
 from backend.core.companion import Companion
 from backend.core.database import get_default_db
+from backend.core.history import record_snapshot_from_companion
 from backend.core.save_watcher import SaveWatcher
 from backend.bot.discord_bot import create_bot
 
@@ -155,6 +156,19 @@ def main():
         if companion.is_loaded:
             logger.info(f"Companion loaded: {companion.metadata.get('name', 'Unknown')}")
             logger.info(f"Personality: {companion.personality_summary}")
+            try:
+                inserted, snapshot_id, session_id = record_snapshot_from_companion(
+                    db=db,
+                    save_path=companion.save_path,
+                    save_hash=getattr(companion, "_save_hash", None),
+                    briefing=getattr(companion, "_current_snapshot", None) or companion.get_snapshot(),
+                )
+                if inserted:
+                    logger.info(f"Recorded initial snapshot (session={session_id}, snapshot_id={snapshot_id})")
+                else:
+                    logger.info(f"Initial snapshot already recorded (session={session_id})")
+            except Exception as e:
+                logger.warning(f"Failed to record initial snapshot: {e}")
     except Exception as e:
         logger.error(f"Failed to initialize companion: {e}")
         sys.exit(1)

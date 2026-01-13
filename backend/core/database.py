@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import threading
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -189,6 +190,180 @@ class GameDatabase:
                 except Exception:
                     self._conn.execute("ROLLBACK;")
                     raise
+
+    # --- Phase 3 Milestone 1: sessions + snapshot writes ---
+
+    def get_active_session_id(self, save_id: str) -> str | None:
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT id
+                FROM sessions
+                WHERE save_id = ? AND ended_at IS NULL
+                ORDER BY started_at DESC
+                LIMIT 1;
+                """,
+                (save_id,),
+            ).fetchone()
+            return str(row["id"]) if row else None
+
+    def create_session(
+        self,
+        *,
+        save_id: str,
+        save_path: str | None = None,
+        empire_name: str | None = None,
+        last_game_date: str | None = None,
+    ) -> str:
+        session_id = uuid.uuid4().hex
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO sessions (id, save_id, save_path, empire_name, last_game_date, last_updated_at)
+                VALUES (?, ?, ?, ?, ?, strftime('%s','now'));
+                """,
+                (session_id, save_id, save_path, empire_name, last_game_date),
+            )
+        return session_id
+
+    def get_or_create_active_session(
+        self,
+        *,
+        save_id: str,
+        save_path: str | None = None,
+        empire_name: str | None = None,
+        last_game_date: str | None = None,
+    ) -> str:
+        existing = self.get_active_session_id(save_id)
+        if existing:
+            self.update_session(
+                session_id=existing,
+                save_path=save_path,
+                empire_name=empire_name,
+                last_game_date=last_game_date,
+            )
+            return existing
+        return self.create_session(
+            save_id=save_id,
+            save_path=save_path,
+            empire_name=empire_name,
+            last_game_date=last_game_date,
+        )
+
+    def update_session(
+        self,
+        *,
+        session_id: str,
+        save_path: str | None = None,
+        empire_name: str | None = None,
+        last_game_date: str | None = None,
+    ) -> None:
+        with self._lock:
+            self._conn.execute(
+                """
+                UPDATE sessions
+                SET
+                    save_path = COALESCE(?, save_path),
+                    empire_name = COALESCE(?, empire_name),
+                    last_game_date = COALESCE(?, last_game_date),
+                    last_updated_at = strftime('%s','now')
+                WHERE id = ?;
+                """,
+                (save_path, empire_name, last_game_date, session_id),
+            )
+
+    def get_latest_snapshot_identity(self, session_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT id, captured_at, game_date, save_hash
+                FROM snapshots
+                WHERE session_id = ?
+                ORDER BY captured_at DESC, id DESC
+                LIMIT 1;
+                """,
+                (session_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def insert_snapshot(
+        self,
+        *,
+        session_id: str,
+        game_date: str | None,
+        save_hash: str | None,
+        military_power: int | None,
+        colony_count: int | None,
+        wars_count: int | None,
+        energy_net: float | None,
+        alloys_net: float | None,
+        full_briefing_json: str | None,
+    ) -> int:
+        with self._lock:
+            cur = self._conn.execute(
+                """
+                INSERT INTO snapshots (
+                    session_id,
+                    game_date,
+                    save_hash,
+                    military_power,
+                    colony_count,
+                    wars_count,
+                    energy_net,
+                    alloys_net,
+                    full_briefing_json
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    session_id,
+                    game_date,
+                    save_hash,
+                    military_power,
+                    colony_count,
+                    wars_count,
+                    energy_net,
+                    alloys_net,
+                    full_briefing_json,
+                ),
+            )
+            return int(cur.lastrowid)
+
+    def insert_snapshot_if_new(
+        self,
+        *,
+        session_id: str,
+        game_date: str | None,
+        save_hash: str | None,
+        military_power: int | None,
+        colony_count: int | None,
+        wars_count: int | None,
+        energy_net: float | None,
+        alloys_net: float | None,
+        full_briefing_json: str | None,
+    ) -> tuple[bool, int | None]:
+        latest = self.get_latest_snapshot_identity(session_id)
+        if latest:
+            latest_hash = latest.get("save_hash")
+            latest_date = latest.get("game_date")
+            if save_hash and latest_hash == save_hash:
+                return False, None
+            if (save_hash is None) and game_date and latest_date == game_date:
+                return False, None
+
+        snapshot_id = self.insert_snapshot(
+            session_id=session_id,
+            game_date=game_date,
+            save_hash=save_hash,
+            military_power=military_power,
+            colony_count=colony_count,
+            wars_count=wars_count,
+            energy_net=energy_net,
+            alloys_net=alloys_net,
+            full_briefing_json=full_briefing_json,
+        )
+        self.update_session(session_id=session_id, last_game_date=game_date)
+        return True, snapshot_id
 
 
 _default_db: GameDatabase | None = None
