@@ -49,7 +49,7 @@ IMPORTANT - Tool Selection Strategy (you have 4 tools):
    Returns comprehensive empire data covering ~80% of questions in ONE call.
    Includes: military power, economy, resources, colonies, diplomacy, starbases, leaders.
 
-2. get_details(category, limit) - Call AFTER get_snapshot() if you need MORE detail
+2. get_details(categories, limit) - Call AFTER get_snapshot() if you need MORE detail
    Categories: "leaders", "planets", "starbases", "technology", "wars", "fleets", "resources", "diplomacy"
    Only use if get_snapshot() doesn't have enough information.
 
@@ -586,47 +586,72 @@ class Companion:
         # In future, could use async SDK if available
         return self.chat(user_message)
 
-    def _extract_afc_stats(self, response: Any) -> tuple[int, list[str], dict[str, int]]:
-        """Extract automatic function calling statistics from the response.
+    def _extract_afc_stats(self, history_before: int = 0) -> tuple[
+        int, dict[str, int], dict[str, int], set[str], list[list[str]]
+    ]:
+        """Extract per-request automatic function calling statistics.
 
         Args:
-            response: The Gemini response object
+            history_before: Length of chat history before the request started.
+                Only history entries added after this index are analyzed.
 
         Returns:
-            Tuple of (total_calls, tools_used, payload_sizes)
+            Tuple of:
+                - total_function_calls
+                - function_call_counts: tool_name -> count
+                - payload_sizes: tool_name -> response payload bytes (approx)
+                - get_details_categories_seen: union of category strings requested
+                - get_details_batches: list of category lists requested per get_details call
         """
         total_calls = 0
-        tools_used = []
-        payload_sizes = {}
+        call_counts: dict[str, int] = {}
+        payload_sizes: dict[str, int] = {}
+        details_categories_seen: set[str] = set()
+        details_batches: list[list[str]] = []
 
-        # The AFC history is stored in the chat session's curated history
-        # We need to look at function_call and function_response parts
-        if self._chat_session is not None:
-            try:
-                history = self._chat_session.get_history()
-                for content in history:
-                    if content.parts:
-                        for part in content.parts:
-                            # Check for function calls
-                            if hasattr(part, 'function_call') and part.function_call:
-                                func_name = part.function_call.name
-                                total_calls += 1
-                                if func_name not in tools_used:
-                                    tools_used.append(func_name)
-                            # Check for function responses to get payload sizes
-                            if hasattr(part, 'function_response') and part.function_response:
-                                func_name = part.function_response.name
-                                response_data = part.function_response.response
-                                # Calculate approximate size of the response payload
-                                try:
-                                    payload_str = json.dumps(response_data, default=str)
-                                    payload_sizes[func_name] = len(payload_str)
-                                except (TypeError, ValueError):
-                                    payload_sizes[func_name] = 0
-            except Exception as e:
-                logger.debug(f"Could not extract AFC history: {e}")
+        if self._chat_session is None:
+            return total_calls, call_counts, payload_sizes, details_categories_seen, details_batches
 
-        return total_calls, tools_used, payload_sizes
+        try:
+            history = self._chat_session.get_history()
+        except Exception as e:
+            logger.debug(f"Could not read chat history for AFC stats: {e}")
+            return total_calls, call_counts, payload_sizes, details_categories_seen, details_batches
+
+        new_entries = history[history_before:] if isinstance(history, list) else []
+
+        for content in new_entries:
+            parts = getattr(content, "parts", None)
+            if not parts:
+                continue
+            for part in parts:
+                if hasattr(part, "function_call") and part.function_call:
+                    func_name = getattr(part.function_call, "name", "unknown_tool")
+                    total_calls += 1
+                    call_counts[func_name] = call_counts.get(func_name, 0) + 1
+
+                    if func_name == "get_details":
+                        args = getattr(part.function_call, "args", None) or {}
+                        cats = args.get("categories")
+                        if isinstance(cats, list):
+                            batch: list[str] = []
+                            for c in cats:
+                                if isinstance(c, str):
+                                    details_categories_seen.add(c)
+                                    batch.append(c)
+                            if batch:
+                                details_batches.append(batch)
+
+                if hasattr(part, "function_response") and part.function_response:
+                    func_name = getattr(part.function_response, "name", "unknown_tool")
+                    response_data = getattr(part.function_response, "response", None)
+                    try:
+                        payload_str = json.dumps(response_data, default=str)
+                        payload_sizes[func_name] = len(payload_str)
+                    except (TypeError, ValueError):
+                        payload_sizes[func_name] = 0
+
+        return total_calls, call_counts, payload_sizes, details_categories_seen, details_batches
 
     def _response_has_pending_function_call(self, response: Any) -> bool:
         """Return True if the response contains a function_call part."""
@@ -756,14 +781,21 @@ class Companion:
                     thinking_level=self._thinking_level
                 )
 
+            # Capture history length before sending (for AFC stats extraction)
+            try:
+                history_before = len(self._chat_session.get_history())
+            except Exception:
+                history_before = 0
+
             # Send message with config - SDK handles automatic function calling
             response = self._chat_session.send_message(
                 message_to_send,
                 config=message_config,
             )
 
-            # Extract AFC statistics from response
-            total_calls, tools_used, payload_sizes = self._extract_afc_stats(response)
+            # Extract AFC statistics from history entries added by this request
+            total_calls, call_counts, payload_sizes, _ = self._extract_afc_stats(history_before)
+            tools_used = list(call_counts.keys())
 
             # Extract text from response
             if response.text:
@@ -1114,14 +1146,20 @@ Be concise but insightful."""
                 config=message_config,
             )
 
-            # Extract AFC statistics
-            total_calls, tools_used, payload_sizes = self._extract_afc_stats(response)
+            # Extract per-request AFC statistics
+            total_calls, call_counts, payload_sizes, details_categories_seen, details_batches = self._extract_afc_stats(history_before)
+            tools_used = list(call_counts.keys())
 
             # If the model hit the AFC cap and left a pending function_call, do a final
             # tools-disabled call using whatever tool outputs we already gathered.
             has_pending_calls = self._response_has_pending_function_call(response)
 
             if has_pending_calls:
+                logger.info(
+                    "ask_simple_finalize_start cap=6 tool_calls=%s details=%s",
+                    call_counts,
+                    sorted(details_categories_seen),
+                )
                 tool_payloads = self._extract_new_tool_payloads(history_before)
                 tool_payload_json = json.dumps(tool_payloads, separators=(",", ":"), default=str)
                 # Keep the finalization prompt bounded
@@ -1178,6 +1216,17 @@ Be concise but insightful."""
 
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
+            total_payload_kb = sum(payload_sizes.values()) // 1024
+
+            details_batches_compact = []
+            for batch in details_batches[:3]:
+                # Keep ordering stable but compact in logs
+                compact = "+".join(batch[:6])
+                if len(batch) > 6:
+                    compact += "+..."
+                details_batches_compact.append(compact)
+            if len(details_batches) > 3:
+                details_batches_compact.append("...")  # Truncated
 
             # Update call stats
             self._last_call_stats = {
@@ -1191,16 +1240,16 @@ Be concise but insightful."""
                 },
             }
 
-            # Log response completion
+            # Log response completion (keep it concise for copy/paste)
             logger.info(
-                "ask_simple_complete",
-                extra={
-                    "mode": "afc",
-                    "wall_time_ms": wall_time_ms,
-                    "total_tool_calls": total_calls,
-                    "tools_used": tools_used,
-                    "response_length": len(response_text),
-                }
+                "ask_simple_complete wall_ms=%.0f tool_calls=%s details=%s batches=%s payload_kb=%d finalized=%s response_chars=%d",
+                wall_time_ms,
+                call_counts,
+                sorted(details_categories_seen),
+                details_batches_compact,
+                total_payload_kb,
+                bool(has_pending_calls),
+                len(response_text),
             )
 
             return response_text, elapsed
