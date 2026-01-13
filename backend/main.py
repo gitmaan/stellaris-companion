@@ -161,6 +161,8 @@ def main():
                     db=db,
                     save_path=companion.save_path,
                     save_hash=getattr(companion, "_save_hash", None),
+                    gamestate=getattr(companion.extractor, "gamestate", None) if companion.extractor else None,
+                    player_id=companion.extractor.get_player_empire_id() if companion.extractor else None,
                     briefing=getattr(companion, "_current_snapshot", None) or companion.get_snapshot(),
                 )
                 if inserted:

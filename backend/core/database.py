@@ -365,6 +365,68 @@ class GameDatabase:
         self.update_session(session_id=session_id, last_game_date=game_date)
         return True, snapshot_id
 
+    def end_session(self, *, session_id: str, ended_at: int | None = None) -> None:
+        """Mark a session as ended."""
+        with self._lock:
+            self._conn.execute(
+                """
+                UPDATE sessions
+                SET
+                    ended_at = COALESCE(?, strftime('%s','now')),
+                    last_updated_at = strftime('%s','now')
+                WHERE id = ? AND ended_at IS NULL;
+                """,
+                (ended_at, session_id),
+            )
+
+    def end_active_sessions_for_save(self, *, save_id: str, ended_at: int | None = None) -> list[str]:
+        """End any active sessions for a given save_id (should normally be 0 or 1)."""
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT id
+                FROM sessions
+                WHERE save_id = ? AND ended_at IS NULL
+                ORDER BY started_at DESC;
+                """,
+                (save_id,),
+            ).fetchall()
+            session_ids = [str(r["id"]) for r in rows]
+            for sid in session_ids:
+                self._conn.execute(
+                    """
+                    UPDATE sessions
+                    SET
+                        ended_at = COALESCE(?, strftime('%s','now')),
+                        last_updated_at = strftime('%s','now')
+                    WHERE id = ? AND ended_at IS NULL;
+                    """,
+                    (ended_at, sid),
+                )
+            return session_ids
+
+    def get_session_snapshot_stats(self, session_id: str) -> dict[str, Any]:
+        """Get basic snapshot stats for a session (count and date range)."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT
+                    COUNT(*) AS snapshot_count,
+                    MIN(game_date) AS first_game_date,
+                    MAX(game_date) AS last_game_date
+                FROM snapshots
+                WHERE session_id = ?;
+                """,
+                (session_id,),
+            ).fetchone()
+            if not row:
+                return {"snapshot_count": 0, "first_game_date": None, "last_game_date": None}
+            return {
+                "snapshot_count": int(row["snapshot_count"]),
+                "first_game_date": row["first_game_date"],
+                "last_game_date": row["last_game_date"],
+            }
+
 
 _default_db: GameDatabase | None = None
 

@@ -101,11 +101,12 @@ class StellarisBot(commands.Bot):
     async def setup_hook(self) -> None:
         """Called when the bot is starting up."""
         # Import and register commands
-        from backend.bot.commands import setup_ask, setup_status, setup_briefing
+        from backend.bot.commands import setup_ask, setup_status, setup_briefing, setup_end_session
 
         setup_ask(self)
         setup_status(self)
         setup_briefing(self)
+        setup_end_session(self)
 
         logger.info("Commands registered")
 
@@ -157,6 +158,8 @@ class StellarisBot(commands.Bot):
                     db=db,
                     save_path=self.companion.save_path,
                     save_hash=getattr(self.companion, "_save_hash", None),
+                    gamestate=getattr(self.companion.extractor, "gamestate", None) if self.companion.extractor else None,
+                    player_id=self.companion.extractor.get_player_empire_id() if self.companion.extractor else None,
                     briefing=getattr(self.companion, "_current_snapshot", None) or self.companion.get_snapshot(),
                 )
                 if inserted:
