@@ -28,6 +28,34 @@ class SaveExtractor:
 
         # Cache for parsed sections
         self._section_cache = {}
+        self._building_types = None  # Lazy-loaded building ID→type map
+
+    def _get_building_types(self) -> dict:
+        """Parse the global buildings section to get ID→type mapping.
+
+        Returns:
+            Dict mapping building IDs (as strings) to building type names
+        """
+        if self._building_types is not None:
+            return self._building_types
+
+        self._building_types = {}
+
+        # Find the top-level buildings section (near end of file)
+        match = re.search(r'^buildings=\s*\{', self.gamestate, re.MULTILINE)
+        if not match:
+            return self._building_types
+
+        start = match.start()
+        # Parse entries like: 50331648={ type="building_ministry_production" position=0 }
+        chunk = self.gamestate[start:start + 5000000]  # Buildings section can be large
+
+        for m in re.finditer(r'(\d+)=\s*\{\s*type="([^"]+)"', chunk):
+            building_id = m.group(1)
+            building_type = m.group(2)
+            self._building_types[building_id] = building_type
+
+        return self._building_types
 
     def _load_save(self):
         """Extract gamestate and meta from the save file."""
@@ -609,18 +637,28 @@ class SaveExtractor:
             'engineering_related': len(engineering_techs)
         }
 
-        # Look for current research projects
-        # Search for active research queues
-        current_physics = re.search(r'physics\s*=\s*\{[^}]*technology="([^"]+)"', player_chunk)
-        current_society = re.search(r'society\s*=\s*\{[^}]*technology="([^"]+)"', player_chunk)
-        current_engineering = re.search(r'engineering\s*=\s*\{[^}]*technology="([^"]+)"', player_chunk)
+        # Look for current research projects in the queue format
+        # Format: physics_queue={ { progress=X technology="tech_name" date="Y" } }
+        # Note: progress comes BEFORE technology in the save format
+        physics_queue = re.search(r'physics_queue=\s*\{[^}]*progress=([\d.]+)[^}]*technology="([^"]+)"', player_chunk)
+        society_queue = re.search(r'society_queue=\s*\{[^}]*progress=([\d.]+)[^}]*technology="([^"]+)"', player_chunk)
+        engineering_queue = re.search(r'engineering_queue=\s*\{[^}]*progress=([\d.]+)[^}]*technology="([^"]+)"', player_chunk)
 
-        if current_physics:
-            result['current_research']['physics'] = current_physics.group(1)
-        if current_society:
-            result['current_research']['society'] = current_society.group(1)
-        if current_engineering:
-            result['current_research']['engineering'] = current_engineering.group(1)
+        if physics_queue:
+            result['current_research']['physics'] = {
+                'technology': physics_queue.group(2),
+                'progress': float(physics_queue.group(1))
+            }
+        if society_queue:
+            result['current_research']['society'] = {
+                'technology': society_queue.group(2),
+                'progress': float(society_queue.group(1))
+            }
+        if engineering_queue:
+            result['current_research']['engineering'] = {
+                'technology': engineering_queue.group(2),
+                'progress': float(engineering_queue.group(1))
+            }
 
         # Get sample of recent/notable techs
         result['sample_technologies'] = technologies[-20:] if len(technologies) > 20 else technologies
@@ -969,6 +1007,37 @@ class SaveExtractor:
             if amenities_match:
                 planet_info['amenities'] = float(amenities_match.group(1))
 
+            # Extract buildings - resolve IDs to building type names
+            # Planet format: buildings={ { buildings={ ID1 ID2 ... } } }
+            # These IDs reference the global buildings section
+            building_types = self._get_building_types()
+            buildings_match = re.search(r'buildings=\s*\{[^}]*buildings=\s*\{([^}]+)\}', planet_block)
+            if buildings_match:
+                building_ids = re.findall(r'\d+', buildings_match.group(1))
+                resolved_buildings = []
+                for bid in building_ids:
+                    if bid in building_types:
+                        resolved_buildings.append(building_types[bid].replace('building_', ''))
+                if resolved_buildings:
+                    planet_info['buildings'] = resolved_buildings
+
+            # Extract districts info
+            # Format: districts={ 0 59 60 61 } (numeric indices)
+            districts_match = re.search(r'districts=\s*\{([^}]+)\}', planet_block)
+            if districts_match:
+                districts_block = districts_match.group(1)
+                district_ids = re.findall(r'\d+', districts_block)
+                planet_info['district_count'] = len(district_ids)
+
+            # Extract last building/district changed for context
+            last_building = re.search(r'last_building_changed="([^"]+)"', planet_block)
+            if last_building:
+                planet_info['last_building'] = last_building.group(1)
+
+            last_district = re.search(r'last_district_changed="([^"]+)"', planet_block)
+            if last_district:
+                planet_info['last_district'] = last_district.group(1)
+
             planets_found.append(planet_info)
 
         result['planets'] = planets_found[:50]  # Limit to 50 planets
@@ -1231,6 +1300,7 @@ class SaveExtractor:
         planets = self.get_planets()
         starbases = self.get_starbases()
         leaders = self.get_leaders()
+        technology = self.get_technology()
 
         # Strip raw_data_preview fields to reduce context size
         player_clean = self._strip_previews(player)
@@ -1283,6 +1353,11 @@ class SaveExtractor:
                 'count': leaders.get('count'),
                 'by_class': leaders.get('by_class', {}),
                 'leaders': leaders.get('leaders', [])[:15],  # Top 15 leaders
+            },
+            'technology': {
+                'current_research': technology.get('current_research', {}),
+                'tech_count': technology.get('tech_count', 0),
+                'by_category': technology.get('by_category', {}),
             },
         }
 

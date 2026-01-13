@@ -1,0 +1,70 @@
+{
+  "summary": {
+    "current_avg_time": 11.94350677728653,
+    "clean_avg_time": 2.077059745788574,
+    "current_avg_tools": 0.5,
+    "clean_avg_tools": 0.0
+  },
+  "results": [
+    {
+      "question": "What is my current military power?",
+      "current": {
+        "time": 7.473592042922974,
+        "tools": 0,
+        "response": "Greetings, President! It\u2019s a pleasure to give you the rundown on our defensive capabilities. We believe in peace and cooperation here in the United Nations of Earth 2, but as they say, the price of liberty is eternal vigilance\u2014and a very large fleet.\n\nAccording to our latest sensor sweeps and naval registries for the year 2431, our **current military power stands at 125,210.14**.\n\nWe\u2019ve currently got **965 ships** organized into our various task forces, with a total **fleet size of 360**. While that\u2019s a formidable wall of steel protecting our 29 colonies, I should point out that maintaining such a massive peacekeeping force is putting a bit of a strain on the budget. We\u2019re currently seeing a monthly **energy deficit of -346.76**, likely due to the sheer cost of keeping those reactors running and the crews fed. \n\nStill, it\u2019s a small price to pay to ensure that every citizen, from Earth to the furthest habitat, can sleep soundly knowing we have the strength to defend our idealistic foundations! Is there anything else you need, President? Perhaps a look at how our allies view this impressive display of democratic might?",
+        "word_count": 189
+      },
+      "clean": {
+        "time": 1.7555856704711914,
+        "tools": 0,
+        "response": "By the Great Spirit, President, our military strength is considerable! Our military power stands at a formidable 125210.14. With a fleet of 965 vessels and a fleet size of 360, we are a force for peace and freedom in this galaxy! Let's keep it that way!\n",
+        "word_count": 46
+      }
+    },
+    {
+      "question": "How many colonies do I have?",
+      "current": {
+        "time": 7.64632511138916,
+        "tools": 0,
+        "response": "Hello, President! It is a pleasure to provide you with the latest data from our glorious union.\n\nOur commitment to liberty and the pursuit of excellence has led to a truly impressive expansion across the stars! Currently, we have **29 colonies** flourishing under the banner of the United Nations of Earth 2.\n\nTo break that down for you:\n*   **14** are beautiful, thriving **planets**.\n*   **15** are our state-of-the-art **habitats**, proving that the human spirit (and that of our many allies!) can prosper even in the vacuum of space.\n\nWith over a thousand citizens\u20141,072 to be exact\u2014contributing their talents to our society, our beacon of liberty is shining brighter than ever! We do have some minor energy and mineral deficits to address to keep everything running smoothly, but for a civilization of this scale, it\u2019s nothing a little meritocratic ingenuity can\u2019t solve.",
+        "word_count": 142
+      },
+      "clean": {
+        "time": 1.5813488960266113,
+        "tools": 0,
+        "response": "President, glory to the United Nations of Earth 2!\n\nThe data indicates we have a total of 29 colonies, encompassing both planets and habitats. Of those, 14 are planets and 15 are habitats. We must ensure each colony flourishes as a beacon of liberty and prosperity!\n",
+        "word_count": 46
+      }
+    },
+    {
+      "question": "What is the state of my economy?",
+      "current": {
+        "time": 16.63352608680725,
+        "tools": 1,
+        "response": "President, I\u2019ve crunched the numbers from the Department of the Treasury, and I have to be blunt: while our ideals are soaring, our bank accounts are currently on life support. We are facing a significant liquidity crisis that requires your immediate attention!\n\n### **The Critical Alert: A Looming Blackout**\nWe are currently bleeding **346.76 Energy Credits** and **7.07 Minerals** every month. Normally, a prosperous democracy like ours could weather a dip, but our reserves are practically non-existent:\n*   **Energy Stockpile:** 17 (Yes, just seventeen credits.)\n*   **Mineral Stockpile:** 20\n*   **Alloy Stockpile:** 5\n\nAt our current burn rate, **the Federation\u2019s power grid will fail within 30 days.** If we hit zero, our buildings will shut down, our fleets will lose combat effectiveness, and our citizens\u2019 happiness\u2014the very foundation of our Republic\u2014will plummet.\n\n### **The Silver Lining: Our Industrial Might**\nIt\u2019s not all doom and gloom! Our workers are incredibly efficient, and our foundries are humming with the spirit of meritocracy. Our production of advanced goods is world-class:\n*   **Alloys:** +634.59 monthly\n*   **Consumer Goods:** +412.99 monthly\n*   **Strategic Resources:** We have healthy surpluses of Exotic Gases (+52.76) and Rare Crystals (+41.87).\n\nOur **Research** is also robust at **3,020.3 total monthly output**, and our **Unity** is fantastic at **+2,467.6**, proving that the United Nations of Earth 2 remains a beacon of liberty in the galaxy.\n\n### **Strategic Recommendations**\nWe don't need a miracle; we just need a trip to the Galactic Market.\n1.  **Market Liquidation:** Sell a portion of our monthly Alloy or Consumer Goods surplus immediately. Even selling 200 Alloys a month would more than stabilize our energy deficit.\n2.  **Strategic Resource Trading:** With +52 Exotic Gases, we are producing far more than we need for our current infrastructure. Trading these to our allies (we have 19 positive relations!) would net us a massive amount of energy.\n3.  **Fleet Logistics:** Check if our 965 ships are currently docked at Starbases with **Crew Quarters**. With our energy expenses at 4,448, keeping the fleet in orbit during peacetime is likely what's draining the treasury.\n\nThe state of the economy is **fragile but salvageable**, President. We have the goods; we just need to balance the books before the lights go out on Earth! What would you like to prioritize?",
+        "word_count": 376
+      },
+      "clean": {
+        "time": 2.172132730484009,
+        "tools": 0,
+        "response": "President, a full economic report is as follows. Our economy is currently generating 17124.4 power, fueled by a tech power of 16165.0. Our monthly resource balance shows strong gains in unity (2467.6), engineering research (1020.0), consumer goods (413.0), volatile motes (2.9), rare crystals (41.9), influence (6.0), exotic gases (52.8), alloys (634.6), food (345.7), society research (1019.4), and physics research (980.9).\n\nHowever, we are currently experiencing deficits in energy (-346.8) and minerals (-7.1). Our total research output is a respectable 3020.3.\n",
+        "word_count": 80
+      }
+    },
+    {
+      "question": "Give me a brief strategic assessment.",
+      "current": {
+        "time": 16.020583868026733,
+        "tools": 1,
+        "response": "President, it is an honor to present this strategic briefing for the United Nations of Earth 2. As we sit in the year 2431, our \"Beacon of Liberty\" shines bright across 29 colonies, but the winds of the late-game are picking up. Here is my assessment of our Great Society:\n\n### **1. The Energy Leak (Priority Alpha)**\nWe have a serious drain on our power grid, President. We are currently sitting at a **monthly deficit of -346.76 energy credits**. While our mineral deficit of **-7.07** is negligible, the energy situation will eventually shutter our labs and stall our fleets. \n*   **Advice:** We have a healthy surplus of **412.99 Consumer Goods** and **634.59 Alloys**. I recommend setting up monthly internal market trades or selling these surpluses to our many galactic friends to stabilize the budget. We shouldn't let our citizens sit in the dark while we have warehouses full of luxury goods!\n\n### **2. Defense and the 2430 Threshold**\nOur military power is recorded at **125,210**, which is respectable, but as we enter the endgame window, we must be wary of \"outside context threats.\" \n*   **Tactical Note:** Our fleet count is listed at **965**, yet our fleet size capacity is **360**. This suggests our naval forces are heavily fragmented into hundreds of small detachments. As a meritocracy, we should consolidate these into cohesive strike forces under our best Commanders (like Natacha, who is already a Level 5 Psionic veteran) to ensure maximum tactical efficiency. \n\n### **3. Diplomatic Standing**\nAs Xenophiles, we\u2019ve done a masterful job making friends. We have **52 known contacts** and **19 positive relationships**. We are currently allied with two other powers, but I note the absence of a formal Federation. \n*   **Strategic Opportunity:** With our high trust scores (reaching **150-190** with our closest neighbors), we are in a prime position to formalize a Galactic Union. Why stand alone against the coming darkness when we can lead a coalition of free worlds?\n\n### **4. Civilian Life and Innovation**\nOur colonies are, frankly, paradises. **Earth** boasts a stability of **87.96%** and an amenities surplus that is\u2014frankly\u2014unprecedented (**10,384**). Our people are happy, free, and incredibly well-catered to.\n*   **Research:** We are currently pushing the boundaries of Physics with repeatable energy weapon research. Given our alloy surplus, we should continue to transition our fleet to high-tier energy armaments to capitalize on these breakthroughs.\n\n**Summary:** We are wealthy in spirit and alloys, but poor in raw juice. Fix the energy deficit, consolidate the \"thousand-ship\" fleet, and consider forming a Federation to secure our place as the guardians of galactic liberty. \n\nHow would you like to proceed, President?",
+        "word_count": 434
+      },
+      "clean": {
+        "time": 2.7991716861724854,
+        "tools": 0,
+        "response": "President, we face a mixed situation in this year of 2431! Our economy, while powerful at 17124.396, is showing some concerning deficits. We are short on Energy (-346.76) and Minerals (-7.07). This is unacceptable! A prosperous society needs a solid foundation of resources.\n\nOn the bright side, our research is strong, with a total output of 3020.3, fueled by dedicated scientists like Carizac and Ursula! Our fleet is also a force to be reckoned with, boasting a military power of 125210.141.\n\nDiplomatically, we maintain numerous contacts (52), with allies such as 1 and 16777227. Our beacon_of_liberty and idealistic_foundation civics surely attract friends!\n\nHowever, those deficits must be addressed immediately, or our momentum will stall! We must prioritize energy and mineral production.\n",
+        "word_count": 121
+      }
+    }
+  ]
+}

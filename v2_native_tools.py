@@ -32,7 +32,7 @@ except ImportError:
     sys.exit(1)
 
 from save_extractor import SaveExtractor
-from personality import build_personality_prompt_v2, get_personality_summary
+from personality import build_optimized_prompt, get_personality_summary
 
 
 # Fallback system prompt (used if personality generation fails)
@@ -85,12 +85,12 @@ class StellarisCompanion:
     def _build_personality(self):
         """Build the dynamic personality prompt from empire data.
 
-        Uses v2 Gemini-interpreted approach which passes raw empire data
-        and lets Gemini's knowledge of Stellaris generate the personality.
-        This handles ALL civics including DLC and mods without hardcoding.
+        Uses optimized prompt (625 chars) that trusts Gemini's Stellaris knowledge.
+        Only hardcodes address style (model can't infer). Handles all empire types
+        including gestalts, machines, and hive minds.
         """
         try:
-            self.system_prompt = build_personality_prompt_v2(self.identity, self.situation)
+            self.system_prompt = build_optimized_prompt(self.identity, self.situation)
             self.personality_summary = get_personality_summary(self.identity, self.situation)
         except Exception as e:
             print(f"Warning: Failed to build personality ({e}), using fallback")

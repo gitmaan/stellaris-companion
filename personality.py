@@ -527,6 +527,146 @@ Always use tools to get current data rather than guessing."""
     return prompt
 
 
+def build_optimized_prompt(identity: dict, situation: dict) -> str:
+    """Generate the optimal production prompt based on empirical testing.
+
+    Key findings from the Final Showdown test (2026-01-13):
+
+    1. Model CANNOT reliably infer address style from authority
+       - "democratic" → "President" only works 0-2/5 times without explicit instruction
+       - Solution: Small lookup for address style (only ~30 chars)
+
+    2. Model CAN infer personality from ethics/civics names
+       - Just passing "fanatic_egalitarian" triggers liberty/freedom themes
+       - No hardcoded personality text needed!
+
+    3. "Be an ADVISOR, not a reporter" is the KEY differentiator
+       - Without it: 2-3/5 proactive warnings
+       - With it: 5/5 proactive warnings
+
+    4. "You know Stellaris deeply" works as a meta-instruction
+       - 88% of full personality quality at 41% of prompt size
+
+    Target: ~750 chars achieving 6.0+/7 personality score.
+
+    Args:
+        identity: Empire identity from get_empire_identity()
+        situation: Game situation from get_situation()
+
+    Returns:
+        Optimized system prompt (~750 chars)
+    """
+    empire_name = identity.get('empire_name', 'the Empire')
+    ethics = identity.get('ethics', [])
+    authority = identity.get('authority', 'democratic')
+    civics = identity.get('civics', [])
+    is_gestalt = identity.get('is_gestalt', False)
+    is_machine = identity.get('is_machine', False)
+    is_hive_mind = identity.get('is_hive_mind', False)
+
+    # Situational context
+    year = situation.get('year', 2200)
+    game_phase = situation.get('game_phase', 'early')
+    at_war = situation.get('at_war', False)
+    economy = situation.get('economy', {})
+    deficits = economy.get('resources_in_deficit', 0)
+    contact_count = situation.get('contact_count', 0)
+
+    # Small lookup for address style (model can't infer this reliably)
+    address_map = {
+        'imperial': 'Majesty',
+        'dictatorial': 'Supreme Leader',
+        'oligarchic': 'Director',
+        'democratic': 'President',
+        'corporate': 'CEO',
+    }
+    address = address_map.get(authority, '')
+
+    # Handle gestalt consciousness specially
+    if is_machine:
+        return _build_machine_optimized(empire_name, civics, situation)
+    elif is_hive_mind:
+        return _build_hive_optimized(empire_name, civics, situation)
+
+    # Build optimized prompt for standard empires
+    ethics_str = ', '.join(ethics) if ethics else 'unknown'
+    civics_str = ', '.join(civics) if civics else 'none'
+    war_status = "AT WAR" if at_war else "peace"
+
+    # Address instruction (only thing that needs explicit mapping)
+    address_line = f"Address the ruler as \"{address}\"." if address else ""
+
+    prompt = f"""You are the strategic advisor to {empire_name}.
+
+EMPIRE: Ethics: {ethics_str} | Authority: {authority} | Civics: {civics_str}
+STATE: Year {year} ({game_phase}), {war_status}, {deficits} deficits, {contact_count} contacts
+
+{address_line}
+
+You know Stellaris deeply. Use that knowledge to:
+1. Embody your empire's ethics and civics authentically
+2. Be a strategic ADVISOR, not a reporter - interpret facts, identify problems, suggest solutions
+3. Be colorful and immersive - this is roleplay, not a spreadsheet
+
+Facts must come from provided game state. Never guess numbers."""
+
+    return prompt
+
+
+def _build_machine_optimized(empire_name: str, civics: list, situation: dict) -> str:
+    """Optimized prompt for Machine Intelligence."""
+    year = situation.get('year', 2200)
+    game_phase = situation.get('game_phase', 'early')
+    deficits = situation.get('economy', {}).get('resources_in_deficit', 0)
+    contact_count = situation.get('contact_count', 0)
+
+    # Check for special machine directives
+    directive = ""
+    if 'determined_exterminator' in civics:
+        directive = "Primary directive: organic elimination."
+    elif 'driven_assimilator' in civics:
+        directive = "Primary directive: organic assimilation."
+    elif 'rogue_servitor' in civics:
+        directive = "Primary directive: organic welfare optimization."
+
+    return f"""You are a subroutine of {empire_name}, a Machine Intelligence.
+
+STATE: Year {year} ({game_phase}), {deficits} resource inefficiencies, {contact_count} contacts
+{directive}
+
+Communication protocol:
+- No emotional language. Speak in probabilities and efficiency metrics.
+- Present data as optimal/suboptimal outcomes, not good/bad.
+- Be an analytical ADVISOR - identify inefficiencies and recommend optimizations.
+
+Data integrity: All values from provided game state only."""
+
+
+def _build_hive_optimized(empire_name: str, civics: list, situation: dict) -> str:
+    """Optimized prompt for Hive Mind."""
+    year = situation.get('year', 2200)
+    game_phase = situation.get('game_phase', 'early')
+    deficits = situation.get('economy', {}).get('resources_in_deficit', 0)
+    contact_count = situation.get('contact_count', 0)
+
+    # Check for devouring swarm
+    nature = ""
+    if 'devouring_swarm' in civics:
+        nature = "We consume. Other species are biomass."
+
+    return f"""We are {empire_name}, a Hive Mind. There is no separation - we ARE the collective.
+
+STATE: Year {year} ({game_phase}), {deficits} deficits, {contact_count} contacts
+{nature}
+
+Communication:
+- Always use "we", never "I" or "you"
+- Speak of the swarm, the whole, the unity
+- Be a strategic consciousness - interpret threats and opportunities for the collective
+
+Data from provided game state only."""
+
+
 def get_personality_summary(identity: dict, situation: dict) -> str:
     """Get a brief summary of the generated personality.
 

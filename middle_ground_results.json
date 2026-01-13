@@ -1,0 +1,72 @@
+{
+  "summary": {
+    "current_avg_time": 11.70503854751587,
+    "mg_avg_time": 3.5472683906555176,
+    "current_avg_tools": 0.5,
+    "mg_avg_tools": 0.0,
+    "current_avg_words": 276.25,
+    "mg_avg_words": 206.5
+  },
+  "results": [
+    {
+      "question": "What is my current military power?",
+      "current": {
+        "time": 7.653547048568726,
+        "tools": 0,
+        "response": "Greetings, President! It\u2019s a pleasure to see the light of liberty shining so brightly across our systems. While our hearts always yearn for peace and the pursuit of mutual understanding with our 52 known neighbors, we recognize that a secure democracy must be a protected one.\n\nAs of February 18, 2431, our total military power stands at **125,210.14**.\n\nThis strength is distributed across **965** vessels with a total fleet size of **360**. It\u2019s a testament to our meritocratic ideals that such a formidable force has been assembled to safeguard the freedoms of our 1,072 citizens.\n\nThough our energy and mineral reserves are showing a slight monthly deficit\u2014something we should perhaps address in the next session of the General Assembly\u2014our defensive posture remains robust. Shall we look into the specific compositions of these fleets, or perhaps focus on balancing our resource production to keep the gears of freedom turning?",
+        "word_count": 148
+      },
+      "middle_ground": {
+        "time": 1.5681090354919434,
+        "tools": 0,
+        "response": "President, our military might stands at a respectable 125210.14, spread across a sizable fleet of 965 vessels with a total fleet size of 360. Let's ensure that our brave men and women in uniform have the resources they need to continue safeguarding the liberty of our citizens!\n",
+        "word_count": 47
+      }
+    },
+    {
+      "question": "How many colonies do I have?",
+      "current": {
+        "time": 6.426712989807129,
+        "tools": 0,
+        "response": "Greetings, President! It\u2019s a pleasure to give you the state of our great union.\n\nI\u2019ve just pulled the latest census data from our department of planetary administration. As of 2431.02.18, the **United Nations of Earth 2** proudly stewards a total of **29 colonies**.\n\nTo break down that number for your next briefing:\n*   **14 Planets**: These include our historic cradle, Earth, and vibrant worlds like Unity and Proxima Centauri b.\n*   **15 Habitats**: These orbital stations are a testament to our meritocratic spirit, allowing our citizens to thrive even in the void of space.\n\nWhile our reach is expansive, I would be remiss if I didn't point out that our energy reserves are currently dipping\u2014we're seeing a monthly deficit of **346.76 energy credits** and a slight slippage of **7.07 minerals**. We might want to look into optimizing some of those habitats for resource production to keep our liberty's beacon burning bright! \n\nIs there anything else you need to know to guide our people toward a brighter future?",
+        "word_count": 167
+      },
+      "middle_ground": {
+        "time": 1.747837781906128,
+        "tools": 0,
+        "response": "President, looking at the data, the United Nations of Earth 2 currently has a total of 29 colonies. This number is comprised of 14 planets and 15 habitats. While our average population per colony is roughly 37, we must remember that each world represents not just numbers, but the lives and potential of our citizens! Let's ensure those colonies thrive as shining examples of liberty and egalitarian values.\n",
+        "word_count": 68
+      }
+    },
+    {
+      "question": "What is the state of my economy?",
+      "current": {
+        "time": 14.697235107421875,
+        "tools": 1,
+        "response": "President, I\u2019ve pulled the latest spreadsheets from the Department of Finance, and while our citizens are living in an era of unprecedented prosperity, our federal ledger is looking a bit... well, \"crimson\" would be the polite term.\n\nHere is the state of the Union's treasury as of 2431.02.18:\n\n### **The Red Ink (Deficits)**\n*   **Energy Credits:** We are currently bleeding **-346.76** credits every month. Our total stockpile is sitting at a precarious **17 credits**. That\u2019s not a typo, President\u2014we effectively have no emergency reserves. One more starbase upgrade and the lights might literally go out on Earth.\n*   **Minerals:** We have a negligible deficit of **-7.07** per month. It\u2019s a rounding error in a galaxy this size, but with a stockpile of only **20 units**, we have zero margin for new construction.\n\n### **The Silver Lining (Surpluses)**\n*   **Alloys:** Our industrial heartlands are roaring! We are netting **+634.59** alloys monthly. This is our greatest strength.\n*   **Civilian Goods:** Our commitment to the \"Idealistic Foundation\" of our society is clear. We have a healthy surplus of **+412.99** Consumer Goods and **+345.73** Food. Our people are well-fed and well-supplied.\n*   **Scientific Advancement:** We are generating **3,020.3** total research points, balanced evenly across all disciplines. \n\n### **Strategic Advice**\nPresident, we are running a \"just-in-time\" economy, but we've forgotten the \"just-in-case\" part. \n1.  **Market Intervention:** Use our massive Alloy surplus. Selling even a small portion (say, 100-150 units/month) on the Galactic Market would instantly erase our Energy deficit and allow us to start building an actual treasury.\n2.  **Resource Reallocation:** With 15 habitats and 14 planets, we should look into converting one of our lower-yield industrial zones into a dedicated Generator District. \n3.  **Emergency Buffer:** We cannot face a potential endgame crisis with single-digit stockpiles. We need to prioritize stabilizing our income before we commit to any further territorial expansion or fleet massive build-ups.\n\nOur liberty is secure, but our bank account is on life support. Let's get those numbers back in the black so we can keep the dream of the UNE 2 alive!",
+        "word_count": 341
+      },
+      "middle_ground": {
+        "time": 6.1465888023376465,
+        "tools": 0,
+        "response": "President, let's review the economic state of our glorious nation. While our commitment to liberty and citizen welfare is unwavering, we face some challenges that demand our immediate attention.\n\n**The Good News:**\n\n*   **Alloys:** We are producing a surplus of 634.59 alloys per month. This is fantastic! Our industry is strong, and we can continue to build our fleets and expand our infrastructure.\n*   **Consumer Goods:** Our production of consumer goods is also positive, at 412.99 per month, ensuring a high standard of living for our citizens.\n*   **Unity:** Our unity production is a staggering 2467.6 per month! Our policies and traditions resonate deeply with our people, fostering a strong sense of national identity and purpose.\n*   **Research:** Our research output is strong, totaling 3020.3 across all fields. This commitment to knowledge ensures that we remain at the forefront of technological advancement.\n*   **Strategic Resources:** We have healthy surpluses of rare crystals (41.87), volatile motes (2.93), and exotic gases (52.76), fueling our advanced technologies.\n*   **Food:** Our food production is also in good shape, with a surplus of 345.73.\n\n**The Challenges:**\n\n*   **Energy Credits:** We are currently running a deficit of 346.76 energy credits per month. This is a significant concern that could cripple our economy if left unaddressed.\n*   **Minerals:** We are also facing a mineral shortage of 7.07 per month. While smaller than the energy deficit, this could hinder our construction efforts.\n\n**Recommendations:**\n\nPresident, we must act swiftly to resolve these deficits and ensure the continued prosperity of our nation! Here are some immediate steps we can take:\n\n1.  **Address the Energy Deficit:**\n\n    *   **Review Starbase Power Generation:** Examine our starbases and prioritize energy module upgrades to solar panel networks.\n    *   **Optimize Planet Energy Production:** Ensure our planets are utilizing energy districts and generators to their full potential. Consider designating a planet specifically for energy production.\n    *   **Trade Energy:** Utilize our strong alloy production to trade for energy credits on the market. This is a temporary solution, but it can provide immediate relief. For example, we could sell 100 alloys on the market to offset the energy deficit.\n\n2.  **Address the Mineral Deficit:**\n\n    *   **Review Mineral Production:** Examine our planets and starbases for mineral production.\n    *   **Optimize Mineral Production:** Ensure mineral districts and mining stations are fully upgraded.\n\nPresident, by taking these steps, we can ensure that the United Nations of Earth 2 continues to be a shining beacon of liberty and prosperity for all! Let's act decisively and secure a brighter future for our citizens!\n",
+        "word_count": 418
+      }
+    },
+    {
+      "question": "Give me a brief strategic assessment.",
+      "current": {
+        "time": 18.042659044265747,
+        "tools": 1,
+        "response": "President, it is an honor to serve the Republic, but I must speak plainly: while the torch of liberty burns bright across our 29 colonies, our treasury is currently a hollow shell. We are effectively living paycheck to paycheck on a galactic scale, and the endgame draws near.\n\nHere is the state of our Union as of February 2431:\n\n### **1. Economic Emergency: The Treasury is Bare**\nWe are facing a systemic resource shortfall that threatens the very stability of our democracy. \n*   **Energy Deficit:** We are hemorrhaging **-346.76 energy credits** monthly. Our current stockpile is a mere **17 credits**. \n*   **Mineral Shortfall:** We are also down **-7.07 minerals** a month with a stockpile of only **20**.\n*   **Immediate Action Required:** We are moments away from a total economic default. I recommend leveraging our **634.59 monthly alloy surplus**\u2014which is impressive\u2014to trade for energy and minerals on the Galactic Market immediately. We must also look at our 15 habitats; if they aren't pulling their weight in energy production, we need to re-tool them.\n\n### **2. Defense and the Coming Storm**\nIt is the year 2431. History tells us the galaxy is rarely quiet for long at this stage. \n*   **Military Standing:** Our fleet power sits at **125,210.14**. While formidable, it may not be enough to shield our citizens if a Tier-5 Crisis emerges from the void. \n*   **Production Capability:** With over 600 alloys flowing in monthly, we have the industrial backbone to double our fleet size. However, we cannot build ships if we cannot pay the electricity bill to keep the lights on in the shipyards.\n*   **Strategic Assets:** Our five Citadels are well-equipped, but we should ensure our **Starbase 520** continues to churn out veterans via its Fleet Academy.\n\n### **3. Diplomatic Landscape**\nOur Xenophile principles have served us well. We are in contact with **52 empires** and maintain positive relations with **19** of them. \n*   **Allies:** We have two firm allies. If the energy crisis persists, I suggest \"calling in a few favors\" through trade agreements. \n*   **Unity:** Our commitment to the **Idealistic Foundation** of the UNE2 has granted us a massive **+2467.6 monthly unity**. We are culturally peerless; let's use that social cohesion to pass any necessary emergency economic measures in the Galactic Community.\n\n### **Strategic Recommendation:**\n**Stabilize first, expand second.** \nSell a portion of our consumer goods (we have a **+412.99** surplus) and alloys to refill the energy reserves. Once the deficit is erased, we must dedicate the next decade to a massive naval build-up. The citizens of Earth and Unity are looking to us for leadership. Let's not let the lights go out on liberty.\n\nHow would you like to proceed with the budget, President?",
+        "word_count": 449
+      },
+      "middle_ground": {
+        "time": 4.7265379428863525,
+        "tools": 0,
+        "response": "President, the state of the United Nations of Earth 2 is a mixed bag, a beacon of liberty dimmed by economic shadows.\n\nOn the bright side, our people enjoy a high quality of life, reflected in the stability and amenities on our colonies. Our research output is strong (3020.3 total), a testament to our meritocratic ideals and investment in technology. Our fleet is respectably sized (360), though military power is just adequate for this late stage of the game (125210.14). We have many friends with 19 positive relations among the 52 empires we know.\n\nHowever, dark clouds loom. We are running deficits in both energy (-346.76) and minerals (-7.07). This threatens our industrial base and, by extension, our ability to project power and maintain citizen welfare. These shortages need addressing with the utmost urgency, lest they undermine the very foundations of our free society!\n\n**Recommendations:**\n\n1.  **Address Deficits:** The energy and mineral deficits MUST be resolved! Consider these options:\n    *   **Energy:** Check starbase modules and buildings. Prioritize solar panels.\n    *   **Minerals:** Develop mining districts on planets, or consider purchasing minerals on the market in the short term. Remember citizen welfare depends on a strong economy!\n2.  **Shore up Defenses:** With 52 known empires, we cannot take peace for granted. Evaluate our fleet composition and starbase placement to ensure they are optimally positioned to deter aggression. A strong defense is the best guarantee of continued liberty!\n3.  **Optimize Colonies:** Review the resource output of our colonies. Are they specialized efficiently? Could we shift pops to address shortages? \"Earth\" shows very high amenities, consider re-allocation of some pops to address material shortages.\n\nThese steps, taken swiftly and decisively, will ensure that the United Nations of Earth 2 remains a shining beacon of liberty for all!\n",
+        "word_count": 293
+      }
+    }
+  ]
+}
