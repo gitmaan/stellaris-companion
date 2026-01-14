@@ -306,6 +306,104 @@ class DiplomacyMixin:
 
         return result
 
+    def get_galactic_community(
+        self,
+        limit_members: int = 50,
+        limit_resolutions: int = 25,
+        limit_council: int = 10,
+    ) -> dict:
+        """Get a compact summary of the Galactic Community and Council."""
+        result = {
+            "members": [],
+            "members_count": 0,
+            "player_is_member": False,
+            "council_members": [],
+            "council_positions": None,
+            "council_veto": None,
+            "emissaries_count": 0,
+            "voting_resolution_id": None,
+            "last_resolution_id": None,
+            "days_until_election": None,
+            "community_formed": None,
+            "council_established": None,
+            "proposed_count": 0,
+            "passed_count": 0,
+            "failed_count": 0,
+            "resolutions": {
+                "proposed": [],
+                "passed": [],
+                "failed": [],
+            },
+        }
+
+        section = self._extract_section("galactic_community")
+        if not section:
+            return result
+
+        def parse_int_list(block_key: str) -> list[int]:
+            block = self._extract_braced_block(section, block_key)
+            if not block:
+                return []
+            open_brace = block.find("{")
+            close_brace = block.rfind("}")
+            if open_brace == -1 or close_brace == -1 or close_brace <= open_brace:
+                return []
+            values = [int(x) for x in re.findall(r"\d+", block[open_brace + 1 : close_brace])]
+            return [v for v in values if v != 4294967295]
+
+        members = parse_int_list("members")
+        council = parse_int_list("council")
+        proposed = parse_int_list("proposed")
+        passed = parse_int_list("passed")
+        failed = parse_int_list("failed")
+
+        result["members_count"] = len(members)
+        result["members"] = members[: max(0, int(limit_members))]
+        result["council_members"] = council[: max(0, int(limit_council))]
+
+        player_id = self.get_player_empire_id()
+        result["player_is_member"] = player_id in members
+
+        result["proposed_count"] = len(proposed)
+        result["passed_count"] = len(passed)
+        result["failed_count"] = len(failed)
+        result["resolutions"]["proposed"] = proposed[: max(0, int(limit_resolutions))]
+        result["resolutions"]["passed"] = passed[: max(0, int(limit_resolutions))]
+        result["resolutions"]["failed"] = failed[: max(0, int(limit_resolutions))]
+
+        voting_match = re.search(r"\bvoting=(\d+)", section)
+        if voting_match:
+            result["voting_resolution_id"] = int(voting_match.group(1))
+
+        last_match = re.search(r"\blast=(\d+)", section)
+        if last_match:
+            result["last_resolution_id"] = int(last_match.group(1))
+
+        days_match = re.search(r"\bdays=(\d+)", section)
+        if days_match:
+            result["days_until_election"] = int(days_match.group(1))
+
+        formed_match = re.search(r'\bcommunity_formed\s*=\s*"([^"]+)"', section)
+        if formed_match:
+            result["community_formed"] = formed_match.group(1)
+
+        established_match = re.search(r'\bcouncil_established\s*=\s*"([^"]+)"', section)
+        if established_match:
+            result["council_established"] = established_match.group(1)
+
+        positions_match = re.search(r"\bcouncil_positions=(\d+)", section)
+        if positions_match:
+            result["council_positions"] = int(positions_match.group(1))
+
+        veto_match = re.search(r"\bcouncil_veto=(yes|no)\b", section)
+        if veto_match:
+            result["council_veto"] = veto_match.group(1) == "yes"
+
+        emissaries = parse_int_list("emissaries")
+        result["emissaries_count"] = len(emissaries)
+
+        return result
+
     def get_fallen_empires(self) -> dict:
         """Get information about all Fallen Empires in the galaxy (both dormant and awakened).
 
