@@ -8,6 +8,27 @@ from pathlib import Path
 class MilitaryMixin:
     """Domain methods extracted from the original SaveExtractor."""
 
+    def _extract_braced_block(self, content: str, key: str) -> str | None:
+        """Extract the full `key={...}` block from a larger text chunk."""
+        match = re.search(rf'\b{re.escape(key)}\s*=\s*\{{', content)
+        if not match:
+            return None
+
+        start = match.start()
+        brace_count = 0
+        started = False
+
+        for i, char in enumerate(content[start:], start):
+            if char == '{':
+                brace_count += 1
+                started = True
+            elif char == '}':
+                brace_count -= 1
+                if started and brace_count == 0:
+                    return content[start : i + 1]
+
+        return None
+
     def get_wars(self) -> dict:
         """Get all active wars involving the player with detailed information.
 
@@ -176,6 +197,144 @@ class MilitaryMixin:
 
         return result
 
+    def get_fleet_composition(self, limit: int = 50) -> dict:
+        """Get ship class composition across the player's fleets.
+
+        Returns:
+            Dict with:
+              - fleets: list[{fleet_id, name, ship_classes, total_ships}]
+              - by_class_total: dict[str,int]
+              - fleet_count: int
+        """
+        result = {
+            "fleets": [],
+            "by_class_total": {},
+            "fleet_count": 0,
+        }
+
+        player_id = self.get_player_empire_id()
+        country_content = self._find_player_country_content(player_id)
+        if not country_content:
+            return result
+
+        owned_fleet_ids = self._get_owned_fleet_ids(country_content)
+        if not owned_fleet_ids:
+            return result
+
+        fleet_section = self._extract_section("fleet")
+        ships_section = self._extract_section("ships")
+        designs_section = self._extract_section("ship_design")
+        if not fleet_section or not ships_section or not designs_section:
+            return result
+
+        design_to_size: dict[str, str] = {}
+        for m in re.finditer(r'\n\t(\d+)=\n\t\{', designs_section):
+            design_id = m.group(1)
+            snippet = designs_section[m.start() : m.start() + 2500]
+            size_m = re.search(r'\bship_size="([^"]+)"', snippet)
+            if size_m:
+                design_to_size[design_id] = size_m.group(1)
+
+        ship_to_design: dict[str, str] = {}
+        for m in re.finditer(r'\n\t(\d+)=\n\t\{', ships_section):
+            ship_id = m.group(1)
+            snippet = ships_section[m.start() : m.start() + 3000]
+            impl_m = re.search(r'\bship_design_implementation\s*=\s*\{[^}]*\bdesign\s*=\s*(\d+)', snippet)
+            if impl_m:
+                ship_to_design[ship_id] = impl_m.group(1)
+                continue
+
+            design_m = re.search(r'\bship_design\s*=\s*(\d+)', snippet)
+            if design_m:
+                ship_to_design[ship_id] = design_m.group(1)
+
+        owned_set = set(owned_fleet_ids)
+        fleets: list[dict] = []
+        by_class_total: dict[str, int] = {}
+
+        for match in re.finditer(r'\n\t(\d+)=\n\t\{', fleet_section):
+            fleet_id = match.group(1)
+            if fleet_id not in owned_set:
+                continue
+
+            start = match.start()
+            brace_count = 0
+            end = None
+            for i, char in enumerate(fleet_section[start:], start):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end = i + 1
+                        break
+            if end is None:
+                continue
+
+            fleet_block = fleet_section[start:end]
+            header = fleet_block[:2500]
+
+            if "station=yes" in header:
+                continue
+            if "civilian=yes" in header:
+                continue
+
+            mp_match = re.search(r'\bmilitary_power=([\d.]+)', header)
+            military_power = float(mp_match.group(1)) if mp_match else 0.0
+            if military_power <= 100:
+                continue
+
+            name_value = None
+            name_block = self._extract_braced_block(fleet_block, "name")
+            if name_block:
+                key_match = re.search(r'\bkey="([^"]+)"', name_block)
+                if key_match:
+                    name_value = key_match.group(1)
+            if not name_value:
+                name_match = re.search(r'\bname="([^"]+)"', header)
+                if name_match:
+                    name_value = name_match.group(1)
+
+            if name_value and name_value.startswith("shipclass_"):
+                name_value = name_value.replace("shipclass_", "").replace("_name", "").title()
+
+            ships_block = self._extract_braced_block(fleet_block, "ships")
+            if not ships_block:
+                continue
+
+            open_brace = ships_block.find("{")
+            close_brace = ships_block.rfind("}")
+            if open_brace == -1 or close_brace == -1 or close_brace <= open_brace:
+                continue
+
+            ship_ids = re.findall(r"\d+", ships_block[open_brace + 1 : close_brace])
+            ship_classes: dict[str, int] = {}
+
+            for ship_id in ship_ids:
+                design_id = ship_to_design.get(ship_id)
+                ship_size = design_to_size.get(design_id or "", "") if design_id else ""
+                ship_size = ship_size.strip() if ship_size else "unknown"
+
+                ship_classes[ship_size] = ship_classes.get(ship_size, 0) + 1
+                by_class_total[ship_size] = by_class_total.get(ship_size, 0) + 1
+
+            total_ships = sum(ship_classes.values())
+            fleets.append(
+                {
+                    "fleet_id": str(fleet_id),
+                    "name": name_value,
+                    "ship_classes": ship_classes,
+                    "total_ships": total_ships,
+                }
+            )
+
+        fleets.sort(key=lambda f: f.get("total_ships", 0), reverse=True)
+
+        result["fleet_count"] = len(fleets)
+        result["by_class_total"] = by_class_total
+        result["fleets"] = fleets[: max(0, int(limit))]
+        return result
+
     def get_starbases(self) -> dict:
         """Get the player's starbase information.
 
@@ -289,4 +448,3 @@ class MilitaryMixin:
         result['starbase_ids'] = player_starbase_ids[:100]
 
         return result
-
