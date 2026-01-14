@@ -34,7 +34,7 @@ This document analyzes what our save_extractor.py currently extracts vs. what im
 | `get_diplomacy()` | Relations, treaties, allies, rivals, federation, opinion scores |
 | `get_planets()` | Planet details, population, stability, buildings, districts |
 | `get_starbases()` | Starbase levels, modules, buildings |
-| `get_awakened_empires()` | Awakened FE detection, War in Heaven, threat assessment |
+| `get_fallen_empires()` | All Fallen Empires (dormant + awakened), War in Heaven |
 | `get_empire_identity()` | Ethics, government, civics, authority, species, gestalt flags |
 | `get_full_briefing()` | Aggregated overview of all major data |
 | `get_situation()` | Game phase, war status, crisis status, key metrics |
@@ -451,6 +451,119 @@ All 123 sections found in save file with line numbers:
 | market | 5281472 | High |
 | galactic_community | 5282005 | High |
 | first_contacts | 5282088 | Low |
+
+---
+
+## Implementation Patterns (from stellaris-dashboard)
+
+These are concrete extraction patterns learned from stellaris-dashboard source code.
+
+### Traditions - EASY
+**Location:** Inside country dict under `"traditions"` key
+**Format:** Simple list of strings
+```python
+# In the parsed country dict:
+traditions = country_dict.get("traditions", [])
+# Returns: ["tr_discovery_adopt", "tr_discovery_science_division", "tr_discovery_finish", ...]
+```
+**Implementation:** Iterate the list, each item is a tradition ID string like `"tr_discovery_adopt"`.
+
+### Ascension Perks - EASY
+**Location:** Inside country dict under `"ascension_perks"` key
+**Format:** Simple list of strings
+```python
+ascension_perks = country_dict.get("ascension_perks", [])
+# Returns: ["ap_technological_ascendancy", "ap_one_vision", ...]
+```
+**Implementation:** Same pattern as traditions. List of perk ID strings.
+
+### Factions - MEDIUM
+**Location:** Top-level `pop_factions` section (NOT inside country)
+**Format:** Dict keyed by faction ID
+```python
+for faction_id, faction_dict in gamestate.get("pop_factions", {}).items():
+    country_id = faction_dict.get("country")      # Owner country
+    faction_name = faction_dict.get("name")       # Display name
+    faction_type = faction_dict.get("type")       # e.g., "prosperity", "supremacist"
+    leader_id = faction_dict.get("leader", -1)    # Leader pop ID
+    support = faction_dict.get("support")         # Support percentage
+    approval = faction_dict.get("faction_approval") # Happiness 0-1
+```
+**Edge Cases:**
+- Pseudo-faction IDs: `-1` (no faction), `-2` (slaves), `-3` (purged), `-4` (non-sentient robots)
+- Only exists for non-gestalt empires
+
+### Fleet Composition - MEDIUM
+**Requires following 3 references:**
+```
+fleet section → ships list → ships section → ship_design ID → ship_design section → ship_size
+```
+```python
+# 1. Get fleet
+fleet_dict = gamestate["fleet"][fleet_id]
+ship_ids = fleet_dict.get("ships", [])  # List of ship IDs
+
+# 2. For each ship, get its design
+for ship_id in ship_ids:
+    ship_dict = gamestate["ships"][ship_id]
+    design_id = ship_dict.get("ship_design")
+
+    # 3. Get ship class from design
+    design_dict = gamestate["ship_design"][design_id]
+    ship_class = design_dict.get("ship_size")  # "corvette", "destroyer", "cruiser", "battleship", "titan", "colossus"
+```
+**Ship Classes:** `corvette`, `destroyer`, `cruiser`, `battleship`, `titan`, `colossus`, `science`, `constructor`, `colonizer`
+
+### Federation - MEDIUM (Dashboard has limited support)
+**Location:** Top-level `federation` section
+```python
+for fed_id, fed_dict in gamestate.get("federation", {}).items():
+    name = fed_dict.get("name")
+    members = fed_dict.get("members", [])  # List of country IDs
+    federation_type = fed_dict.get("type")
+    leader = fed_dict.get("leader")        # Current president country ID
+    cohesion = fed_dict.get("cohesion")    # 0-100
+    experience = fed_dict.get("experience")
+    laws = fed_dict.get("federation_law", {})  # Dict of law settings
+```
+**Note:** stellaris-dashboard has minimal federation parsing - we can do better.
+
+### Common Gotchas
+1. **Null IDs:** `4294967295` (max uint32) means null/none - check for this
+2. **Dict validation:** Always `isinstance(x, dict)` before accessing - some entries are non-dict
+3. **Name encoding:** Names may be `{key="value"}` structures needing cleanup
+4. **Mod compatibility:** Unknown ship_size values from mods - handle gracefully
+
+---
+
+## For Our Regex-Based Parser
+
+Since we use regex on raw gamestate text (not parsed dicts), here's how to adapt:
+
+### Traditions (in country block)
+```python
+# Find traditions block in player's country section
+# Pattern: traditions={ tr_xxx tr_yyy tr_zzz }
+traditions_m = re.search(r'traditions=\s*\{([^}]+)\}', player_chunk)
+if traditions_m:
+    traditions = re.findall(r'(tr_\w+)', traditions_m.group(1))
+```
+
+### Ascension Perks (in country block)
+```python
+# Pattern: ascension_perks={ ap_xxx ap_yyy }
+perks_m = re.search(r'ascension_perks=\s*\{([^}]+)\}', player_chunk)
+if perks_m:
+    perks = re.findall(r'(ap_\w+)', perks_m.group(1))
+```
+
+### Factions (top-level section)
+```python
+# Find pop_factions section, then iterate entries
+# Pattern: pop_factions={ 0={ country=X type="..." support=0.5 ... } 1={...} }
+faction_section_start = gamestate.find('\npop_factions=')
+# Then parse each numbered entry
+```
 
 ---
 
