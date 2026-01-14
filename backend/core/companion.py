@@ -776,7 +776,7 @@ class Companion:
                 'system_instruction': self.system_prompt,
                 'tools': tools if tools else None,  # None if empty list (no tools mode)
                 'temperature': 1.0,  # Gemini 3 recommended default
-                'max_output_tokens': 2048,
+                'max_output_tokens': 4096,
             }
 
             # Only add AFC config if we have tools
@@ -983,7 +983,7 @@ Be concise but insightful."""
             message_config = types.GenerateContentConfig(
                 system_instruction=self.system_prompt,
                 temperature=1.0,  # Gemini 3 recommended default
-                max_output_tokens=2048,
+                max_output_tokens=4096,
             )
 
             # Add thinking config if not dynamic
@@ -1148,7 +1148,7 @@ Be concise but insightful."""
                 'system_instruction': ask_system_prompt,
                 'tools': tools,
                 'temperature': 1.0,  # Gemini 3 recommended default
-                'max_output_tokens': 2048,
+                'max_output_tokens': 4096,
                 # Allow a couple drill-down calls without reintroducing long AFC chains.
                 'automatic_function_calling': types.AutomaticFunctionCallingConfig(
                     maximum_remote_calls=6,
@@ -1208,7 +1208,7 @@ Be concise but insightful."""
                 direct_config = types.GenerateContentConfig(
                     system_instruction=ask_system_prompt,
                     temperature=1.0,
-                    max_output_tokens=2048,
+                    max_output_tokens=4096,
                 )
                 if self._thinking_level != 'dynamic':
                     direct_config.thinking_config = types.ThinkingConfig(
@@ -1220,10 +1220,32 @@ Be concise but insightful."""
                     contents=finalize_prompt,
                     config=direct_config,
                 )
+
+                # Log finish reason for debugging truncation issues
+                finish_reason = None
+                if direct_response.candidates:
+                    finish_reason = getattr(direct_response.candidates[0], 'finish_reason', None)
+                    if finish_reason and str(finish_reason) != "STOP":
+                        logger.warning(
+                            "ask_simple_finalize_finish_reason=%s (may indicate truncation)",
+                            finish_reason,
+                        )
+
                 response_text = direct_response.text or (
                     "I gathered data but couldn't produce a final answer. "
                     "Try asking a more specific question."
                 )
+
+                # Warn if response seems truncated (ends mid-sentence)
+                if response_text and len(response_text) > 50:
+                    last_char = response_text.rstrip()[-1] if response_text.rstrip() else ''
+                    if last_char not in '.!?")\']':
+                        logger.warning(
+                            "ask_simple_possible_truncation finish_reason=%s last_char='%s' response_len=%d",
+                            finish_reason,
+                            last_char,
+                            len(response_text),
+                        )
 
                 # Update stats to reflect the extra direct call
                 total_calls = max(total_calls, 0)
@@ -1233,7 +1255,28 @@ Be concise but insightful."""
                 payload_sizes["finalize_tool_outputs"] = len(tool_payload_json)
 
             else:
+                # Log finish reason for non-finalized responses too
+                finish_reason = None
+                if response.candidates:
+                    finish_reason = getattr(response.candidates[0], 'finish_reason', None)
+                    if finish_reason and str(finish_reason) != "STOP":
+                        logger.warning(
+                            "ask_simple_afc_finish_reason=%s (may indicate truncation)",
+                            finish_reason,
+                        )
+
                 response_text = response.text or "Could not generate response."
+
+                # Warn if response seems truncated
+                if response_text and len(response_text) > 50:
+                    last_char = response_text.rstrip()[-1] if response_text.rstrip() else ''
+                    if last_char not in '.!?")\']':
+                        logger.warning(
+                            "ask_simple_possible_truncation finish_reason=%s last_char='%s' response_len=%d",
+                            finish_reason,
+                            last_char,
+                            len(response_text),
+                        )
 
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
