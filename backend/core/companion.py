@@ -27,7 +27,7 @@ except ImportError:
     raise ImportError("google-genai package not installed. Run: pip install google-genai")
 
 from save_extractor import SaveExtractor
-from personality import build_personality_prompt_v2, get_personality_summary
+from personality import build_optimized_prompt, get_personality_summary
 
 
 # Configure dedicated logger for companion performance metrics
@@ -163,8 +163,8 @@ class Companion:
     def _build_personality(self) -> None:
         """Build the dynamic personality prompt from empire data.
 
-        Uses v2 Gemini-interpreted approach which passes raw empire data
-        and lets Gemini's knowledge of Stellaris generate the personality.
+        Uses optimized prompt (625 chars) that trusts Gemini's Stellaris knowledge.
+        Only hardcodes address style (model can't infer). Handles all empire types.
         """
         if not self.identity or not self.situation:
             self.system_prompt = FALLBACK_SYSTEM_PROMPT
@@ -172,7 +172,7 @@ class Companion:
             return
 
         try:
-            self.system_prompt = build_personality_prompt_v2(self.identity, self.situation)
+            self.system_prompt = build_optimized_prompt(self.identity, self.situation)
             self.personality_summary = get_personality_summary(self.identity, self.situation)
         except Exception as e:
             print(f"Warning: Failed to build personality ({e}), using fallback")
@@ -804,7 +804,7 @@ class Companion:
             )
 
             # Extract AFC statistics from history entries added by this request
-            total_calls, call_counts, payload_sizes, _ = self._extract_afc_stats(history_before)
+            total_calls, call_counts, payload_sizes, _, _ = self._extract_afc_stats(history_before)
             tools_used = list(call_counts.keys())
 
             # Extract text from response
