@@ -1,0 +1,60 @@
+[
+  {
+    "question": "What buildings are on Earth?",
+    "expected": "SNAPSHOT_HAS",
+    "status": "\u26a0\ufe0f USED TOOLS (unnecessary)",
+    "tools": [
+      "get_details(['planets'])",
+      "search(id=3)",
+      "search(name=\"Earth\")",
+      "search(3={)",
+      "search(building_foundry_2)",
+      "search(Earth)"
+    ],
+    "time": 26.16221308708191,
+    "response": "[No response]"
+  },
+  {
+    "question": "What technology am I researching in physics?",
+    "expected": "SNAPSHOT_HAS",
+    "status": "\u2705 CORRECTLY USED SNAPSHOT",
+    "tools": [],
+    "time": 4.583967924118042,
+    "response": "President, our brightest minds in the Physics division are currently finalizing the protocols for **Gateway Activation**. \n\nThis is a monumental step for the United Nations of Earth 2. As we stand in the year 2450, the ability to bridge the vast distances of the cosmos instantaneously is not merely a scientific triumph; it is a moral imperative. By stabilizing these ancient megastructures, we aren't just moving ships\u2014we are weaving the galaxy closer together, ensuring that our message of liberty and cooperation can reach even the most distant star systems in a heartbeat.\n\nStrategically, this will allow our fleets\u2014currently totaling over 100k in power\u2014to respond to any threat against our 53 contacts with unprecedented speed. In an era where the endgame looms, mobility is our greatest safeguard for peace."
+  },
+  {
+    "question": "Who is my highest level admiral and what are their traits?",
+    "expected": "NEEDS_TOOLS",
+    "status": "\u2705 CORRECTLY USED TOOLS",
+    "tools": [
+      "get_details(['leaders'])"
+    ],
+    "time": 9.202173233032227,
+    "response": "President,\n\nIn these uncertain times as we approach the mid-point of the 25th century, the defense of our egalitarian values rests upon the shoulders"
+  },
+  {
+    "question": "List ALL my admirals with their levels",
+    "expected": "NEEDS_TOOLS",
+    "status": "\u2705 CORRECTLY USED TOOLS",
+    "tools": [
+      "get_details(['leaders'])"
+    ],
+    "time": 7.8338470458984375,
+    "response": "President, our military leadership is the backbone of our liberty. As of 2450.07.01, here is the roster of our Commanders standing ready to defend the United Nations of Earth 2:\n\n*   **Admiral Manon**: Level 5 (Our most seasoned veteran, an Artillerist and Cautious strategist)\n*   **Commander Yi**: Level 2\n"
+  },
+  {
+    "question": "What are the specific opinion modifiers with empire ID 1?",
+    "expected": "NEEDS_TOOLS",
+    "status": "\u2705 CORRECTLY USED TOOLS",
+    "tools": [
+      "get_details(['diplomacy'])",
+      "search(country=1)",
+      "search(opinion_modifiers)",
+      "search(opinion)",
+      "search(trust=150)",
+      "search(trust=)"
+    ],
+    "time": 14.83610200881958,
+    "response": "[No response]"
+  }
+]

@@ -859,6 +859,9 @@ Implemented Tools (v2_native_tools.py):
 
 **Total: 12 tools implemented**
 
+**Discord bot note:** the in-game `/ask` path (see `backend/core/companion.py`) uses a consolidated 4-tool surface:
+`get_snapshot()`, `get_details(categories, limit)`, `get_empire_details(name)`, and `search_save_file(query)`. For `/ask`, a snapshot is pre-injected (from `get_full_briefing()`), and the model only calls drill-down tools when needed.
+
 ### Mega-Tool Optimization (2025-01-12)
 
 Added `get_full_briefing()` to reduce latency for broad questions:
@@ -1248,7 +1251,7 @@ Full design document vision - build when core is solid.
 | Feature | Description | Priority |
 |---------|-------------|----------|
 | **Steam Cloud Sync** | Auto-download new saves | Deferred |
-| **File Watcher** | Detect save changes | Deferred |
+| **File Watcher** | Detect save changes | Implemented (Discord bot: watchdog) |
 | **Web Dashboard** | Visual interface | Future |
 | **Multi-save Support** | Compare different playthroughs | Future |
 

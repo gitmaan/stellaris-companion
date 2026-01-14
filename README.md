@@ -4,12 +4,16 @@ AI-powered strategic advisor for Stellaris using Gemini 3 Flash. Chat with an in
 
 ## Features
 
-- **12 Data Extraction Tools** - Military, economy, diplomacy, leaders, planets, starbases, technology
+- **Fast /ask (Consolidated Tools)** - Snapshot + drill-down tools to minimize tool-chaining and latency
+- **Deep Extraction Coverage** - Detailed categories for military, economy, diplomacy, leaders, planets, starbases, technology
 - **Dynamic Personality** - Advisor tone adapts to your empire's ethics, government, and civics
 - **Efficient Architecture** - Lean + Tools approach minimizes token usage (~85% cheaper than full-context)
 - **Auto Save Detection** - Automatically finds your most recent Stellaris save
+- **Discord Bot** - In-game friendly interface via Discord overlay
 
 ## Quick Start
+
+### CLI (local terminal)
 
 ```bash
 # Clone and setup
@@ -23,6 +27,22 @@ export GOOGLE_API_KEY="your-gemini-api-key"
 
 # Run the companion
 python v2_native_tools.py
+```
+
+### Discord Bot (recommended for in-game use)
+
+Create a Discord bot token and set:
+- `DISCORD_BOT_TOKEN` (required)
+- `GOOGLE_API_KEY` (required)
+- `NOTIFICATION_CHANNEL_ID` (optional, for save change notifications)
+
+```bash
+source venv/bin/activate
+export DISCORD_BOT_TOKEN="your-discord-bot-token"
+export GOOGLE_API_KEY="your-gemini-api-key"
+
+# Start the bot (optionally provide a .sav path)
+python backend/main.py
 ```
 
 ## Getting a Gemini API Key
@@ -54,6 +74,8 @@ Save files are automatically detected from:
 
 ## Usage
 
+### CLI
+
 ```bash
 # Auto-detect most recent save
 python v2_native_tools.py
@@ -84,6 +106,10 @@ python v2_native_tools.py /path/to/save.sav
 
 ## Architecture
 
+The project supports two main interfaces:
+- **CLI**: direct tool calling (more granular tools)
+- **Discord bot**: `/ask` optimized around a consolidated tool interface (snapshot + drill-down)
+
 ```
 User Question
      │
@@ -95,7 +121,8 @@ User Question
          │
          ▼
 ┌─────────────────┐
-│  12 Data Tools  │ ◄── Query save file on demand
+│ Snapshot +      │ ◄── Query save file on demand
+│ Drill-down      │     (consolidated tool surface)
 │  (on-demand)    │     (not pre-loaded into context)
 └────────┬────────┘
          │
@@ -107,6 +134,19 @@ User Question
 ```
 
 ## Available Tools
+
+### Discord `/ask` tool surface (consolidated)
+
+The Discord bot’s `/ask` is optimized to answer most questions from a single snapshot, only drilling down when needed:
+
+| Tool | Description |
+|------|-------------|
+| `get_snapshot()` | One-call overview of your current empire state (backed by `get_full_briefing()`) |
+| `get_details(categories, limit)` | Batched drill-down for specific categories (leaders, planets, starbases, technology, wars, fleets, resources, diplomacy) |
+| `get_empire_details(name)` | Lookup another empire by name |
+| `search_save_file(query)` | Raw text search escape hatch |
+
+### CLI tools (more granular)
 
 | Tool | Description |
 |------|-------------|
@@ -134,6 +174,8 @@ Currently operates in **Omniscient Mode** - the advisor can see all data in your
 ```
 stellaris-companion/
 ├── v2_native_tools.py   # Main CLI interface
+├── backend/main.py      # Discord bot entry point
+├── backend/             # Discord bot + shared core
 ├── save_extractor.py    # Save file parser with tools
 ├── save_loader.py       # Save file discovery
 ├── personality.py       # Dynamic advisor personality

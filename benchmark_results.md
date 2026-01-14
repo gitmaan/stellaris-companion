@@ -11,7 +11,7 @@
 | Avg Response Time | 15.1s | 16.3s | -9% |
 | Avg Tool Calls | 3.6 | 2.1 | +41% |
 | Avg Quality Score | 4.1/5 | 4.8/5 | +16% |
-| Total Time | 136s | 147s | -12s saved |
+| Total Time | 136s | 147s | 11s slower |
 
 ## Detailed Results
 

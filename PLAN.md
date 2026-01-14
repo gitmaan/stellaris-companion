@@ -1,6 +1,6 @@
 # Stellaris LLM Companion - Comprehensive Plan
 
-> **Status:** Phase 1 Complete (CLI), Phase 2 In Progress (Distribution)
+> **Status:** Phase 1 Complete (CLI), Phase 2 In Progress (Discord bot stabilization), Phase 3 Planned (History + reports)
 > **Last Updated:** 2026-01-13
 > **Related Docs:** [FINDINGS.md](./FINDINGS.md) | [Design Doc](../stellaris-llm-companion-design.md)
 
@@ -20,9 +20,9 @@ Building an AI-powered Stellaris companion that:
 |-----------|--------|-------|
 | Save Parser | ✅ Complete | 12 tools, handles 70MB saves |
 | CLI Interface | ✅ Complete | `v2_native_tools.py` with dynamic personality |
-| Discord Bot | 🔄 Next | Primary in-game interface |
+| Discord Bot | 🟡 Stabilizing | Implemented under `backend/` (slash commands + save watcher) |
 | Desktop App | 📋 Planned | Electron with web dashboard |
-| Historical Data | 📋 Planned | SQLite for timeline tracking |
+| Historical Data | 📋 Planned | SQLite for session/timeline tracking and end-of-session reports |
 
 ---
 
@@ -476,6 +476,12 @@ CREATE TABLE events (
 
 **Goal:** Chat with your advisor while playing via Discord overlay.
 
+**Implemented (stabilizing):**
+- Bot entry point + config loading: `backend/main.py`
+- Slash commands: `/ask`, `/status`, `/briefing`
+- Save watcher with debounce + optional notifications
+- `/ask` optimized via consolidated tool surface (snapshot + drill-down)
+
 | Task | Priority | Complexity | Dependencies |
 |------|----------|------------|--------------|
 | Basic Discord bot setup | P0 | Low | None |
@@ -534,18 +540,126 @@ async def status(interaction: discord.Interaction):
 
 ### Phase 3: Historical Data & Dashboard
 
-**Goal:** Track empire over time, show graphs, session summaries.
+**Goal:** Track empire over time to improve `/ask` and generate an end-of-session report when the game is closed.
+
+Phase 3 should be built so that:
+- `/ask` stays fast by default (current snapshot), only querying history when the user asks about trends/changes.
+- The “game closed” report is generated from bounded local history (no need to reparse saves).
+
+#### Phase 3 Implementation Checklist (Concrete)
+
+**Guiding constraints**
+- `/ask` remains the primary feature: history is **opt-in** (only used when asked or when generating the end-of-session report).
+- History should be **cheap to write** (on save change) and **cheap to read** (simple queries for last-N events or timeline metrics).
+- Prefer **no new Discord `/ask` tools**: integrate history by injecting a small “history context” block into the prompt when relevant.
+
+**Milestone 0 — DB foundation (P0)**
+- [ ] Decide DB location + config:
+  - Default: `stellaris_history.db` in repo/workdir (Phase 2 dev), later move to per-user app data directory (Electron).
+  - Add env/config: `STELLARIS_DB_PATH` (optional).
+- [ ] Add `backend/core/database.py` with:
+  - `init_schema()` (idempotent)
+  - `schema_version` table (and a simple migration mechanism)
+  - connection settings (WAL mode, foreign keys, row factory)
+- [ ] Implement schema (minimum viable):
+  - `sessions`: `id`, `save_id` (hash or path key), `empire_name`, `started_at`, `ended_at`, `last_game_date`, `last_updated_at`
+  - `snapshots`: `id`, `session_id`, `captured_at`, `game_date`, selected metrics columns, `full_briefing_json`
+  - `events`: `id`, `session_id`, `game_date`, `captured_at`, `event_type`, `summary`, `data_json`
+  - indexes: `(session_id, captured_at)`, `(session_id, game_date)`, `(session_id, event_type)`
+- [ ] Acceptance criteria:
+  - A fresh run creates the DB and tables automatically.
+  - DB file is stable across restarts and readable with `sqlite3 stellaris_history.db .schema`.
+
+**Milestone 1 — Snapshot recording pipeline (P0)**
+- [ ] Wire snapshot recording into the existing watcher flow:
+  - Entry points to consider: `backend/core/save_watcher.py` (on debounced save change) and/or `backend/core/companion.py` (on “new save loaded”).
+  - Ensure there is exactly **one** parse per save change; DB writes should reuse the already-produced `get_full_briefing()` output.
+- [ ] Implement `record_snapshot(...)`:
+  - Determine/lookup active session (`get_or_create_session(...)`)
+  - Extract a small set of timeline metrics from `get_full_briefing()` (date, military power, colonies, economy net, wars count, etc.)
+  - Store `full_briefing_json` (for future deep queries / debugging) with a size cap option if needed.
+  - Deduplicate: don’t insert if `save_hash`/`game_date` hasn’t changed.
+- [ ] Acceptance criteria:
+  - After playing for ~10 minutes (multiple autosaves), DB has multiple snapshots in one session.
+  - Snapshot write does not noticeably slow `/ask` latency.
+
+**Milestone 2 — Session boundaries + “game closed” heuristic (P1)**
+- [ ] Define a session boundary rule (Phase 2 / Discord-only baseline):
+  - If no new save changes for `N` minutes (e.g., 15–30), consider the session ended.
+  - Add manual override command: `/end_session` (optional but useful during dev).
+- [ ] Implement:
+  - `maybe_end_session(now)` that marks `ended_at`
+  - “closing” callback that triggers report generation
+  - Rate-limit so it only fires once per session
+- [ ] Acceptance criteria:
+  - Leaving the game (no autosaves) triggers exactly one session report.
+  - Restarting the game later creates a new session.
+
+**Milestone 3 — Delta detection → event generation (P1)**
+- [ ] Create a stable “metrics extraction” function (single source of truth):
+  - `extract_timeline_metrics(briefing) -> dict` and `extract_event_features(briefing) -> dict`
+  - This avoids key drift between `save_extractor.py` and delta logic.
+- [ ] Implement `compute_events(prev_snapshot, next_snapshot)`:
+  - Wars: started/ended
+  - Colonies: founded/lost, count changes
+  - Economy: big net swings (thresholded)
+  - Military: big power swings (thresholded)
+  - Optional (later): leader died/hired, tech completed (if extractor exposes reliable identifiers)
+- [ ] Store events in `events` table with:
+  - `summary` (human readable, short)
+  - `data_json` (structured details for richer reports)
+- [ ] Acceptance criteria:
+  - `/history` can show 5–20 meaningful events after a typical session.
+  - False positives are tolerable but not spammy (thresholds + coalescing).
+
+**Milestone 4 — Discord UX: `/history` + session report delivery (P1)**
+- [ ] Add `/history` slash command:
+  - File: `backend/bot/commands/history.py`
+  - Output: last `N` events (default 10) from current session + “since when” header (game date range)
+  - Keep within Discord message limits; prefer concise bullet list.
+- [ ] Add end-of-session report posting:
+  - Post to `NOTIFICATION_CHANNEL_ID` if set; otherwise DM the invoking user (or log-only in dev).
+  - Report structure: “biggest changes”, “top risks/opportunities”, “suggested next actions”.
+  - Prefer deterministic summary from events; optionally ask Gemini for narrative polish as a second step.
+- [ ] Acceptance criteria:
+  - `/history` works while game is running.
+  - Session report reliably appears when the session ends (and doesn’t double-post).
+
+**Milestone 5 — `/ask` + history integration (P1)**
+- [ ] Add lightweight detection for history-needed questions:
+  - Keywords: “since”, “last”, “recent”, “trend”, “over time”, “compared to”, “what changed”, “delta”
+  - If triggered, fetch a compact history context: latest snapshot + last-N events + a few timeline points.
+- [ ] Inject history context into the `/ask` prompt (not as a new tool):
+  - Keep it small (e.g., <= 2–4 KB) to protect latency and token cost.
+  - If the user explicitly asks for deep history, allow a second fetch (timeline) but cap it.
+- [ ] Acceptance criteria:
+  - “What changed since last autosave?” is answered with concrete deltas.
+  - Normal questions (“What should I do next?”) don’t pay the history cost.
+
+**Milestone 6 — Optional dashboard plumbing (P2/P3)**
+- [ ] FastAPI server skeleton: `backend/api/server.py`
+- [ ] Routes for `GET /sessions`, `GET /sessions/{id}/timeline`, `GET /sessions/{id}/events`
+- [ ] Acceptance criteria:
+  - Endpoints return JSON fast enough for a simple Chart.js view later (Phase 4).
+
+**User journeys enabled by Phase 3**
+- “After I close Stellaris, give me a report of what happened this session and what I should do next.”
+- “During play, show me what changed since the last autosave / last 30 minutes.”
+- “Is my economy (energy/alloys) trending up or down this session?”
+- “Did any wars start/stop recently, and which side is winning?”
+- “Summarize the session in one screen (later: dashboard timeline).”
 
 | Task | Priority | Complexity | Dependencies |
 |------|----------|------------|--------------|
 | SQLite database setup | P0 | Low | None |
 | Snapshot on save detection | P0 | Medium | DB + Watcher |
-| Event detection (war, leader death) | P1 | Medium | DB |
-| FastAPI server | P1 | Medium | None |
-| Timeline data endpoint | P1 | Low | FastAPI |
-| Basic dashboard (Chart.js) | P1 | Medium | FastAPI |
-| Session summary generation | P2 | Medium | Events |
-| `/history` Discord command | P2 | Low | Events |
+| Session boundaries (start/stop heuristics) | P1 | Medium | DB |
+| Delta + event detection (wars/resources/colonies) | P1 | Medium | DB |
+| Session summary generation (“game closed report”) | P1 | Medium | DB + Events |
+| `/history` Discord command (recent changes) | P1 | Low | DB + Events |
+| FastAPI server (optional, for dashboards) | P2 | Medium | DB |
+| Timeline data endpoint | P2 | Low | FastAPI |
+| Basic dashboard (Chart.js) | P3 | Medium | FastAPI |
 
 **New Files:**
 ```
@@ -574,19 +688,23 @@ class GameDatabase:
     def record_snapshot(self, session_id: str, extractor):
         """Called when new save detected."""
         briefing = extractor.get_full_briefing()
+        game_date = briefing.get("meta", {}).get("date")
+        military_power = briefing.get("military", {}).get("military_power")
+        colony_count = briefing.get("territory", {}).get("colonies", {}).get("total_count")
+        energy_net = briefing.get("economy", {}).get("net_monthly", {}).get("energy")
         self.conn.execute("""
             INSERT INTO snapshots
-            (session_id, game_date, military_power, colony_count, ...)
-            VALUES (?, ?, ?, ?, ...)
-        """, (session_id, briefing['date'], ...))
+            (session_id, captured_at, game_date, military_power, colony_count, energy_net)
+            VALUES (?, strftime('%s','now'), ?, ?, ?, ?)
+        """, (session_id, game_date, military_power, colony_count, energy_net))
         self.conn.commit()
 
     def get_timeline(self, session_id: str) -> list[dict]:
         """For dashboard graphs."""
         cursor = self.conn.execute("""
-            SELECT game_date, military_power, colony_count, energy_income
+            SELECT captured_at, game_date, military_power, colony_count, energy_net
             FROM snapshots WHERE session_id = ?
-            ORDER BY game_days
+            ORDER BY captured_at
         """, (session_id,))
         return [dict(row) for row in cursor.fetchall()]
 ```
@@ -864,15 +982,18 @@ DISCORD_CHANNEL_ID=optional-channel-id
 ## Next Steps
 
 1. **Immediate (This Week):**
-   - [ ] Create Discord bot with /ask, /status commands
-   - [ ] Add save watcher with watchdog
+   - [x] Create Discord bot with `/ask`, `/status`, `/briefing`
+   - [x] Add save watcher with `watchdog`
+   - [ ] Stabilize `/ask` behavior (latency, tool caps, retries)
    - [ ] Test Discord overlay while gaming
 
 2. **Short Term (2 Weeks):**
    - [ ] Add SQLite database
    - [ ] Implement snapshot recording
-   - [ ] Create FastAPI server
-   - [ ] Basic dashboard with timeline
+   - [ ] Implement end-of-session report (“game closed” heuristic)
+   - [ ] Add `/history` (recent changes since last save/session)
+   - [ ] Create FastAPI server (optional, for dashboards)
+   - [ ] Basic dashboard with timeline (optional)
 
 3. **Medium Term (1 Month):**
    - [ ] Electron app scaffold

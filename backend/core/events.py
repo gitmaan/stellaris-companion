@@ -226,13 +226,13 @@ def _extract_crisis(briefing: dict[str, Any]) -> dict[str, Any]:
     return crisis
 
 
-def _extract_awakened_empires(briefing: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Extract awakened fallen empires keyed by name."""
+def _extract_fallen_empires(briefing: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Extract all fallen empires keyed by name."""
     history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
-    awakened = history.get("awakened_empires") if isinstance(history, dict) else None
-    if not isinstance(awakened, dict):
+    fe_data = history.get("fallen_empires") if isinstance(history, dict) else None
+    if not isinstance(fe_data, dict):
         return {}
-    empire_list = awakened.get("awakened_empires") or []
+    empire_list = fe_data.get("fallen_empires") or []
     if not isinstance(empire_list, list):
         return {}
     result: dict[str, dict[str, Any]] = {}
@@ -731,40 +731,44 @@ def compute_events(
             )
         )
 
-    # Awakened Fallen Empire detection
-    prev_awakened = _extract_awakened_empires(prev)
-    curr_awakened = _extract_awakened_empires(curr)
-    new_awakened = set(curr_awakened.keys()) - set(prev_awakened.keys())
-    for name in sorted(new_awakened):
-        empire = curr_awakened[name]
-        original_type = empire.get("original_type", "Unknown")
-        military_power = empire.get("military_power")
-        power_text = f" ({military_power:,.0f} power)" if military_power else ""
-        events.append(
-            DetectedEvent(
-                event_type="fallen_empire_awakened",
-                summary=f"Fallen Empire awakened: {name} ({original_type}){power_text}",
-                data={
-                    "name": name,
-                    "original_type": original_type,
-                    "ethics": empire.get("ethics"),
-                    "military_power": military_power,
-                    "from_snapshot_id": from_snapshot_id,
-                    "to_snapshot_id": to_snapshot_id,
-                },
-            )
-        )
+    # Fallen Empire awakening detection
+    prev_fe = _extract_fallen_empires(prev)
+    curr_fe = _extract_fallen_empires(curr)
+
+    # Detect when a fallen empire changes from dormant to awakened
+    for name, empire in curr_fe.items():
+        if empire.get("status") == "awakened":
+            prev_empire = prev_fe.get(name, {})
+            if prev_empire.get("status") == "dormant":
+                archetype = empire.get("archetype", "Unknown")
+                military_power = empire.get("military_power")
+                power_text = f" ({military_power:,.0f} power)" if military_power else ""
+                events.append(
+                    DetectedEvent(
+                        event_type="fallen_empire_awakened",
+                        summary=f"Fallen Empire awakened: {name} ({archetype}){power_text}",
+                        data={
+                            "name": name,
+                            "archetype": archetype,
+                            "ethics": empire.get("ethics"),
+                            "military_power": military_power,
+                            "from_snapshot_id": from_snapshot_id,
+                            "to_snapshot_id": to_snapshot_id,
+                        },
+                    )
+                )
 
     # War in Heaven detection (two awakened empires fighting)
-    prev_war_in_heaven = prev.get("history", {}).get("awakened_empires", {}).get("war_in_heaven", False)
-    curr_war_in_heaven = curr.get("history", {}).get("awakened_empires", {}).get("war_in_heaven", False)
+    prev_war_in_heaven = prev.get("history", {}).get("fallen_empires", {}).get("war_in_heaven", False)
+    curr_war_in_heaven = curr.get("history", {}).get("fallen_empires", {}).get("war_in_heaven", False)
     if not prev_war_in_heaven and curr_war_in_heaven:
+        awakened_names = [name for name, e in curr_fe.items() if e.get("status") == "awakened"]
         events.append(
             DetectedEvent(
                 event_type="war_in_heaven_started",
                 summary="War in Heaven has begun! Two Awakened Empires are at war.",
                 data={
-                    "awakened_empires": list(curr_awakened.keys()),
+                    "awakened_empires": awakened_names,
                     "from_snapshot_id": from_snapshot_id,
                     "to_snapshot_id": to_snapshot_id,
                 },

@@ -1,0 +1,26 @@
+[
+  {
+    "question": "What buildings are on Earth?",
+    "category": "IN_SNAPSHOT",
+    "status": "FROM_SNAPSHOT",
+    "tools": [],
+    "time": 4.437917232513428,
+    "response": "President,\n\nOur cradle, Earth, remains the shining jewel of the United Nations of Earth"
+  },
+  {
+    "question": "What am I currently researching?",
+    "category": "IN_SNAPSHOT",
+    "status": "FROM_SNAPSHOT",
+    "tools": [],
+    "time": 4.209794998168945,
+    "response": "President, it is a privilege to provide this briefing as we stand at the threshold of the galactic endgame. Our commitment to liberty and cooperation remains the envy of the stars.\n\nRegarding our current scientific endeavors, our brightest minds\u2014selected through our rigorous **Meritocracy**\u2014are focused on projects that will cement our role as the galaxy\u2019s premier **Xenophile** power:\n\n*   **Physics Department:** We are currently finalizing **Gateway Activation** (Progress: 17,007). This is a monumental step for the"
+  },
+  {
+    "question": "What traits does my highest level admiral have?",
+    "category": "NEEDS_TOOLS",
+    "status": "CHECK_HALLUCINATION",
+    "tools": [],
+    "time": 3.7426018714904785,
+    "response": "President,\n\nIn our meritocratic society, every leader is given the opportunity to rise based on their"
+  }
+]
