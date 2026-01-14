@@ -404,6 +404,185 @@ class DiplomacyMixin:
 
         return result
 
+    def get_subjects(self, limit: int = 25) -> dict:
+        """Get subject/overlord agreements involving the player.
+
+        Parses the top-level `agreements` section (Overlord DLC style).
+        Returns compact summaries only (no huge discrete term payloads).
+        """
+        result = {
+            "player_id": self.get_player_empire_id(),
+            "as_overlord": {"subjects": [], "count": 0},
+            "as_subject": {"overlords": [], "count": 0},
+            "count": 0,
+        }
+
+        agreements_section = self._extract_section("agreements")
+        if not agreements_section:
+            return result
+
+        inner_match = re.search(r"\n\tagreements\s*=\s*\{", agreements_section)
+        if not inner_match:
+            inner_match = re.search(r"\bagreements\s*=\s*\{", agreements_section)
+        if not inner_match:
+            return result
+
+        start = inner_match.start() + (1 if agreements_section[inner_match.start()] == "\n" else 0)
+        brace_count = 0
+        end = None
+        for i, char in enumerate(agreements_section[start:], start):
+            if char == "{":
+                brace_count += 1
+            elif char == "}":
+                brace_count -= 1
+                if brace_count == 0:
+                    end = i + 1
+                    break
+
+        if end is None:
+            return result
+
+        agreements_block = agreements_section[start:end]
+        player_id = result["player_id"]
+
+        overlord_entries: list[dict] = []
+        subject_entries: list[dict] = []
+
+        def parse_terms(term_data_block: str) -> dict:
+            terms: dict = {}
+
+            def parse_yes_no(key: str) -> None:
+                m = re.search(rf"\b{re.escape(key)}=(yes|no)\b", term_data_block)
+                if m:
+                    terms[key] = m.group(1) == "yes"
+
+            for bool_key in [
+                "can_subject_be_integrated",
+                "can_subject_do_diplomacy",
+                "can_subject_vote",
+                "has_access",
+                "has_sensors",
+                "has_cooldown_on_first_renegotiation",
+            ]:
+                parse_yes_no(bool_key)
+
+            for str_key in [
+                "joins_overlord_wars",
+                "calls_overlord_to_war",
+                "subject_expansion_type",
+            ]:
+                m = re.search(rf"\b{re.escape(str_key)}=([A-Za-z0-9_]+)\b", term_data_block)
+                if m:
+                    terms[str_key] = m.group(1)
+
+            preset_match = re.search(r'\bagreement_preset="([^"]+)"', term_data_block)
+            if preset_match:
+                terms["agreement_preset"] = preset_match.group(1)
+
+            fil_match = re.search(r"\bforced_initial_loyalty=([-\d]+)", term_data_block)
+            if fil_match:
+                terms["forced_initial_loyalty"] = int(fil_match.group(1))
+
+            discrete_terms_block = self._extract_braced_block(term_data_block, "discrete_terms")
+            if discrete_terms_block:
+                pairs = re.findall(r"\bkey=([A-Za-z0-9_]+)\s*value=([A-Za-z0-9_]+)", discrete_terms_block)
+                if pairs:
+                    terms["discrete_terms"] = {k: v for k, v in pairs}
+
+            resource_terms_block = self._extract_braced_block(term_data_block, "resource_terms")
+            if resource_terms_block:
+                pairs = re.findall(r"\bkey=([A-Za-z0-9_]+)\s*value=([-\d.]+)", resource_terms_block)
+                if pairs:
+                    parsed: dict[str, float] = {}
+                    for k, v in pairs:
+                        try:
+                            parsed[k] = float(v)
+                        except ValueError:
+                            continue
+                    if parsed:
+                        terms["resource_terms"] = parsed
+
+            return terms
+
+        for match in re.finditer(r"\n\t\t(\d+)\s*=\s*\{", agreements_block):
+            agreement_id = match.group(1)
+            entry_start = match.start()
+
+            brace_count = 0
+            entry_end = None
+            for i, char in enumerate(agreements_block[entry_start:], entry_start):
+                if char == "{":
+                    brace_count += 1
+                elif char == "}":
+                    brace_count -= 1
+                    if brace_count == 0:
+                        entry_end = i + 1
+                        break
+            if entry_end is None:
+                continue
+
+            block = agreements_block[entry_start:entry_end]
+
+            owner_match = re.search(r"\bowner=(\d+)", block)
+            target_match = re.search(r"\btarget=(\d+)", block)
+            if not owner_match or not target_match:
+                continue
+
+            owner_id = int(owner_match.group(1))
+            target_id = int(target_match.group(1))
+
+            if owner_id == 4294967295 or target_id == 4294967295:
+                continue
+
+            status_match = re.search(r"\bactive_status=([A-Za-z0-9_]+)", block)
+            date_added_match = re.search(r'\bdate_added=\s*"([^"]+)"', block)
+            date_changed_match = re.search(r'\bdate_changed=\s*"([^"]+)"', block)
+
+            term_data = {}
+            term_block = self._extract_braced_block(block, "term_data")
+            if term_block:
+                term_data = parse_terms(term_block)
+
+            specialization = None
+            spec_level = None
+            spec_block = self._extract_braced_block(block, "subject_specialization")
+            if spec_block:
+                stype_match = re.search(r'\bspecialist_type="([^"]+)"', spec_block)
+                if stype_match:
+                    specialization = stype_match.group(1)
+                slevel_match = re.search(r"\blevel=(\d+)", spec_block)
+                if slevel_match:
+                    spec_level = int(slevel_match.group(1))
+
+            entry = {
+                "agreement_id": str(agreement_id),
+                "owner_id": owner_id,
+                "target_id": target_id,
+                "active_status": status_match.group(1) if status_match else None,
+                "date_added": date_added_match.group(1) if date_added_match else None,
+                "date_changed": date_changed_match.group(1) if date_changed_match else None,
+                "preset": term_data.get("agreement_preset"),
+                "specialization": specialization,
+                "specialization_level": spec_level,
+                "terms": term_data,
+            }
+
+            if owner_id == player_id:
+                overlord_entries.append(entry)
+            if target_id == player_id:
+                subject_entries.append(entry)
+
+        overlord_entries.sort(key=lambda e: (e.get("preset") or "", e.get("target_id", 0)))
+        subject_entries.sort(key=lambda e: (e.get("preset") or "", e.get("owner_id", 0)))
+
+        result["as_overlord"]["count"] = len(overlord_entries)
+        result["as_overlord"]["subjects"] = overlord_entries[: max(0, min(int(limit), 50))]
+        result["as_subject"]["count"] = len(subject_entries)
+        result["as_subject"]["overlords"] = subject_entries[: max(0, min(int(limit), 50))]
+        result["count"] = result["as_overlord"]["count"] + result["as_subject"]["count"]
+
+        return result
+
     def get_fallen_empires(self) -> dict:
         """Get information about all Fallen Empires in the galaxy (both dormant and awakened).
 
