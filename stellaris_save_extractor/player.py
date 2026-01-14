@@ -8,6 +8,56 @@ from pathlib import Path
 class PlayerMixin:
     """Domain methods extracted from the original SaveExtractor."""
 
+    def _extract_braced_block(self, content: str, key: str) -> str | None:
+        """Extract the full `key={...}` block from a larger text chunk."""
+        match = re.search(rf'\b{re.escape(key)}\s*=\s*\{{', content)
+        if not match:
+            return None
+
+        start = match.start()
+        brace_count = 0
+        started = False
+
+        for i, char in enumerate(content[start:], start):
+            if char == '{':
+                brace_count += 1
+                started = True
+            elif char == '}':
+                brace_count -= 1
+                if started and brace_count == 0:
+                    return content[start : i + 1]
+
+        return None
+
+    def _parse_simple_string_list_block(self, block: str, prefix: str | None = None) -> list[str]:
+        """Parse a simple `{ "a" "b" }` or `{ a b }` block into a de-duped list."""
+        if not block:
+            return []
+
+        open_brace = block.find('{')
+        close_brace = block.rfind('}')
+        if open_brace == -1 or close_brace == -1 or close_brace <= open_brace:
+            return []
+
+        inner = block[open_brace + 1 : close_brace]
+
+        items = re.findall(r'"([^"]+)"', inner)
+        if not items:
+            if prefix:
+                items = re.findall(rf'\b({re.escape(prefix)}[A-Za-z0-9_]+)\b', inner)
+            else:
+                items = re.findall(r'\b([A-Za-z0-9_]+)\b', inner)
+
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for item in items:
+            if item in seen:
+                continue
+            seen.add(item)
+            deduped.append(item)
+
+        return deduped
+
     def get_player_empire_id(self) -> int:
         """Get the player's country ID.
 
@@ -287,3 +337,71 @@ class PlayerMixin:
 
         return result
 
+    def get_traditions(self) -> dict:
+        """Extract picked traditions and summarize progress by tree.
+
+        Returns:
+            Dict with:
+              - traditions: list[str]
+              - by_tree: dict[str, {picked: list[str], adopted: bool, finished: bool}]
+              - count: int
+        """
+        result = {
+            "traditions": [],
+            "by_tree": {},
+            "count": 0,
+        }
+
+        player_id = self.get_player_empire_id()
+        country_content = self._find_player_country_content(player_id)
+        if not country_content:
+            return result
+
+        block = self._extract_braced_block(country_content, "traditions")
+        traditions = self._parse_simple_string_list_block(block or "", prefix="tr_")
+
+        by_tree: dict[str, dict] = {}
+        for tradition_id in traditions:
+            tree = "unknown"
+            if tradition_id.startswith("tr_"):
+                remainder = tradition_id[3:]
+                parts = remainder.split("_", 1)
+                if parts and parts[0]:
+                    tree = parts[0]
+
+            entry = by_tree.setdefault(tree, {"picked": [], "adopted": False, "finished": False})
+            entry["picked"].append(tradition_id)
+            if tradition_id.endswith("_adopt"):
+                entry["adopted"] = True
+            if tradition_id.endswith("_finish"):
+                entry["finished"] = True
+
+        result["traditions"] = traditions
+        result["by_tree"] = by_tree
+        result["count"] = len(traditions)
+        return result
+
+    def get_ascension_perks(self) -> dict:
+        """Extract picked ascension perks.
+
+        Returns:
+            Dict with:
+              - ascension_perks: list[str]
+              - count: int
+        """
+        result = {
+            "ascension_perks": [],
+            "count": 0,
+        }
+
+        player_id = self.get_player_empire_id()
+        country_content = self._find_player_country_content(player_id)
+        if not country_content:
+            return result
+
+        block = self._extract_braced_block(country_content, "ascension_perks")
+        perks = self._parse_simple_string_list_block(block or "", prefix="ap_")
+
+        result["ascension_perks"] = perks
+        result["count"] = len(perks)
+        return result
