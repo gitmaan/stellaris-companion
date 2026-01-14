@@ -8,6 +8,128 @@ from pathlib import Path
 class EconomyMixin:
     """Domain methods extracted from the original SaveExtractor."""
 
+    # Observed (Corvus v4.2.4) market arrays include 25 slots, but only 11 are
+    # non-zero / tradable in `test_save.sav`. The save does not include a
+    # resource-name list for these indices, so we map the commonly-traded set
+    # by their observed indices (used consistently across fluctuations/bought/sold).
+    _MARKET_RESOURCE_BY_INDEX = {
+        0: 'energy',
+        1: 'minerals',
+        2: 'food',
+        9: 'consumer_goods',
+        10: 'alloys',
+        11: 'volatile_motes',
+        12: 'exotic_gases',
+        13: 'rare_crystals',
+        14: 'sr_living_metal',
+        15: 'sr_zro',
+        16: 'sr_dark_matter',
+    }
+
+    _BUDGET_TRACKED_RESOURCES = [
+        'energy',
+        'minerals',
+        'food',
+        'consumer_goods',
+        'alloys',
+        'unity',
+        'influence',
+        'physics_research',
+        'society_research',
+        'engineering_research',
+        'volatile_motes',
+        'exotic_gases',
+        'rare_crystals',
+        'sr_living_metal',
+        'sr_zro',
+        'sr_dark_matter',
+        'minor_artifacts',
+        'astral_threads',
+        # Appears inside the budget's `trade_policy={...}` breakdown.
+        'trade',
+    ]
+
+    def _extract_braced_block(self, content: str, key: str) -> str | None:
+        """Extract the full `key={...}` block from a larger text chunk."""
+        match = re.search(rf'\b{re.escape(key)}\s*=\s*\{{', content)
+        if not match:
+            return None
+
+        start = match.start()
+        brace_count = 0
+        started = False
+
+        for i, char in enumerate(content[start:], start):
+            if char == '{':
+                brace_count += 1
+                started = True
+            elif char == '}':
+                brace_count -= 1
+                if started and brace_count == 0:
+                    return content[start : i + 1]
+
+        return None
+
+    def _parse_number_list_block(self, block: str) -> list[float]:
+        """Parse a simple `{ 1 2.5 -3 }` list into floats."""
+        if not block:
+            return []
+        open_brace = block.find('{')
+        close_brace = block.rfind('}')
+        if open_brace == -1 or close_brace == -1 or close_brace <= open_brace:
+            return []
+        inner = block[open_brace + 1 : close_brace]
+        nums: list[float] = []
+        for token in inner.split():
+            try:
+                nums.append(float(token))
+            except ValueError:
+                continue
+        return nums
+
+    def _parse_country_amount_arrays(self, block: str) -> dict[int, list[int]]:
+        """Parse `country=N amount={ ... }` entries into a map."""
+        result: dict[int, list[int]] = {}
+        if not block:
+            return result
+        for m in re.finditer(
+            r'\bcountry=(\d+)\s*amount=\s*\{\s*([^}]+?)\s*\}',
+            block,
+            re.DOTALL,
+        ):
+            try:
+                country_id = int(m.group(1))
+            except ValueError:
+                continue
+            nums: list[int] = []
+            for token in m.group(2).split():
+                try:
+                    nums.append(int(token))
+                except ValueError:
+                    continue
+            if nums:
+                result[country_id] = nums
+        return result
+
+    def _parse_resource_amounts_block(self, block: str) -> dict[str, float]:
+        """Parse `{ energy=1 minerals=2.5 }` into a float map (best-effort)."""
+        amounts: dict[str, float] = {}
+        if not block:
+            return amounts
+        for key, value in re.findall(r'\b([a-z_]+)=([\d.-]+)', block):
+            try:
+                amounts[key] = float(value)
+            except ValueError:
+                continue
+        return amounts
+
+    def _extract_block_inner(self, block: str) -> str:
+        open_brace = block.find('{')
+        close_brace = block.rfind('}')
+        if open_brace == -1 or close_brace == -1 or close_brace <= open_brace:
+            return ''
+        return block[open_brace + 1 : close_brace]
+
     def get_pop_statistics(self) -> dict:
         """Get detailed population statistics for the player's empire.
 
@@ -326,3 +448,300 @@ class EconomyMixin:
 
         return result
 
+    def get_market(self, top_n: int = 5) -> dict:
+        """Get galactic/internal market overview (prices as fluctuations + volumes).
+
+        The save does not embed base prices, so we expose:
+        - global fluctuation values (proxy for price pressure)
+        - galactic-market availability flags
+        - global + player traded volumes (from resources_bought/resources_sold arrays)
+        - internal market per-country fluctuation overrides (if present)
+        """
+        top_n = max(1, min(int(top_n or 5), 10))
+
+        result = {
+            'enabled': False,
+            'galactic_market_host_country_id': None,
+            'player_has_galactic_access': None,
+            'resources': {},
+            'top_overpriced': [],
+            'top_underpriced': [],
+            'internal_market_fluctuations': {},
+        }
+
+        market = self._extract_section('market')
+        if not market:
+            result['error'] = 'Could not find market section'
+            return result
+
+        enabled_match = re.search(r'\benabled=(yes|no)\b', market)
+        if enabled_match:
+            result['enabled'] = enabled_match.group(1) == 'yes'
+
+        host_match = re.search(r'\n\tcountry=(\d+)\n\}', market)
+        if host_match:
+            result['galactic_market_host_country_id'] = int(host_match.group(1))
+
+        fluctuations = self._parse_number_list_block(self._extract_braced_block(market, 'fluctuations') or '')
+        galactic_flags = self._parse_number_list_block(
+            self._extract_braced_block(market, 'galactic_market_resources') or ''
+        )
+
+        # Map access by ID list (id[i] -> access[i]).
+        ids = self._parse_number_list_block(self._extract_braced_block(market, 'id') or '')
+        access_flags = self._parse_number_list_block(self._extract_braced_block(market, 'galactic_market_access') or '')
+        player_id = self.get_player_empire_id()
+        try:
+            id_to_access = {
+                int(ids[i]): int(access_flags[i]) if i < len(access_flags) else 0
+                for i in range(len(ids))
+                if int(ids[i]) != -1
+            }
+            result['player_has_galactic_access'] = bool(id_to_access.get(player_id, 0))
+        except Exception:
+            result['player_has_galactic_access'] = None
+
+        bought_block = self._extract_braced_block(market, 'resources_bought') or ''
+        sold_block = self._extract_braced_block(market, 'resources_sold') or ''
+        bought_by_country = self._parse_country_amount_arrays(bought_block)
+        sold_by_country = self._parse_country_amount_arrays(sold_block)
+
+        # Compute global totals and player totals for the mapped resources.
+        def sum_by_index(country_map: dict[int, list[int]]) -> dict[int, int]:
+            totals: dict[int, int] = {}
+            for _, nums in country_map.items():
+                for i, v in enumerate(nums):
+                    if v == 0:
+                        continue
+                    totals[i] = totals.get(i, 0) + int(v)
+            return totals
+
+        global_bought = sum_by_index(bought_by_country)
+        global_sold = sum_by_index(sold_by_country)
+        player_bought = bought_by_country.get(player_id, [])
+        player_sold = sold_by_country.get(player_id, [])
+
+        for idx, resource in self._MARKET_RESOURCE_BY_INDEX.items():
+            fluct = None
+            if idx < len(fluctuations):
+                fluct = float(fluctuations[idx])
+            is_galactic = None
+            if idx < len(galactic_flags):
+                is_galactic = bool(int(galactic_flags[idx]))
+
+            result['resources'][resource] = {
+                'fluctuation': fluct,
+                'is_galactic': is_galactic,
+                'global_bought': int(global_bought.get(idx, 0)),
+                'global_sold': int(global_sold.get(idx, 0)),
+                'player_bought': int(player_bought[idx]) if idx < len(player_bought) else 0,
+                'player_sold': int(player_sold[idx]) if idx < len(player_sold) else 0,
+            }
+
+        # Internal market per-country overrides (if present).
+        internal_block = self._extract_braced_block(market, 'internal_market_fluctuations') or ''
+        if internal_block:
+            # Find player's entry: country=<id> resources={ ... }
+            m = re.search(
+                rf'\bcountry={player_id}\b\s*resources=\s*\{{([^}}]*)\}}',
+                internal_block,
+                re.DOTALL,
+            )
+            if m:
+                result['internal_market_fluctuations'] = self._parse_resource_amounts_block(m.group(1))
+
+        # Rank by fluctuation if available.
+        sortable = [
+            (k, v.get('fluctuation'))
+            for k, v in result['resources'].items()
+            if isinstance(v.get('fluctuation'), (int, float))
+        ]
+        sortable = [(k, float(v)) for k, v in sortable if v is not None]
+        sortable.sort(key=lambda kv: kv[1], reverse=True)
+        result['top_overpriced'] = [{'resource': k, 'fluctuation': v} for k, v in sortable[:top_n]]
+        result['top_underpriced'] = [{'resource': k, 'fluctuation': v} for k, v in sorted(sortable, key=lambda kv: kv[1])[:top_n]]
+
+        return result
+
+    def get_trade_value(self) -> dict:
+        """Get trade policy/conversion and a lightweight collection summary."""
+        result = {
+            'trade_policy': None,
+            'trade_conversions': {},
+            'trade_policy_income': {},
+            'trade_value': None,
+            'collection': {
+                'starbases_scanned': 0,
+                'trade_hub_modules': 0,
+                'offworld_trading_companies': 0,
+            },
+        }
+
+        player_id = self.get_player_empire_id()
+        country_content = self._find_player_country_content(player_id)
+        if not country_content:
+            result['error'] = 'Could not find player country block'
+            return result
+
+        # Policy selection appears in the policies list.
+        policy_match = re.search(
+            r'policy="trade_policy"\s*[\r\n\t ]*selected="([^"]+)"',
+            country_content,
+        )
+        if policy_match:
+            result['trade_policy'] = policy_match.group(1)
+
+        # Conversions stored as trade_conversions={ energy=... unity=... trade=... consumer_goods=... }
+        conversions_block = self._extract_braced_block(country_content, 'trade_conversions') or ''
+        if conversions_block:
+            inner = self._extract_block_inner(conversions_block)
+            for k, v in re.findall(r'\b([a-z_]+)=([\d.-]+)', inner):
+                try:
+                    result['trade_conversions'][k] = float(v)
+                except ValueError:
+                    continue
+
+        # Budget contains a `trade_policy={...}` category with monthly amounts.
+        budget_block = self._extract_braced_block(country_content, 'budget') or ''
+        if budget_block:
+            income_block = self._extract_braced_block(budget_block, 'income') or ''
+            trade_policy_block = self._extract_braced_block(income_block, 'trade_policy') or ''
+            if trade_policy_block:
+                amounts = self._parse_resource_amounts_block(trade_policy_block)
+                result['trade_policy_income'] = amounts
+                if 'trade' in amounts:
+                    result['trade_value'] = amounts.get('trade')
+
+        # Trade collection summary from starbases (best-effort).
+        starbases = self.get_starbases()
+        sb_list = starbases.get('starbases', []) if isinstance(starbases, dict) else []
+        result['collection']['starbases_scanned'] = len(sb_list)
+        hub_count = 0
+        offworld_count = 0
+        for sb in sb_list:
+            modules = sb.get('modules', []) if isinstance(sb, dict) else []
+            buildings = sb.get('buildings', []) if isinstance(sb, dict) else []
+            hub_count += sum(1 for m in modules if isinstance(m, str) and 'trading_hub' in m)
+            offworld_count += sum(1 for b in buildings if isinstance(b, str) and 'offworld_trading_company' in b)
+        result['collection']['trade_hub_modules'] = hub_count
+        result['collection']['offworld_trading_companies'] = offworld_count
+
+        return result
+
+    def get_budget_breakdown(self, top_n_sources: int = 5) -> dict:
+        """Get budget totals + top sources per resource (compact, non-snapshot)."""
+        top_n_sources = max(1, min(int(top_n_sources or 5), 10))
+
+        result = {
+            'by_resource': {},
+            'tracked_resources': list(self._BUDGET_TRACKED_RESOURCES),
+            'income_source_count': 0,
+            'expense_source_count': 0,
+        }
+
+        player_id = self.get_player_empire_id()
+        country_content = self._find_player_country_content(player_id)
+        if not country_content:
+            result['error'] = 'Could not find player country block'
+            return result
+
+        budget_block = self._extract_braced_block(country_content, 'budget')
+        if not budget_block:
+            result['error'] = 'Could not find budget block'
+            return result
+
+        income_block = self._extract_braced_block(budget_block, 'income') or ''
+        expenses_block = self._extract_braced_block(budget_block, 'expenses') or ''
+
+        tracked = set(self._BUDGET_TRACKED_RESOURCES)
+
+        def extract_top_level_categories(block: str) -> dict[str, dict[str, float]]:
+            categories: dict[str, dict[str, float]] = {}
+            if not block:
+                return categories
+            inner = self._extract_block_inner(block)
+            if not inner:
+                return categories
+
+            candidates = list(re.finditer(r'\n\s*([A-Za-z0-9_]+)\s*=\s*\{', inner))
+            pos = 0
+            depth = 0
+
+            def extract_block_from(start_idx: int) -> tuple[str, int]:
+                brace_count = 0
+                started = False
+                for i, ch in enumerate(inner[start_idx:], start_idx):
+                    if ch == '{':
+                        brace_count += 1
+                        started = True
+                    elif ch == '}':
+                        brace_count -= 1
+                        if started and brace_count == 0:
+                            return inner[start_idx : i + 1], i + 1
+                return inner[start_idx:], len(inner)
+
+            for m in candidates:
+                if m.start() < pos:
+                    continue
+                depth += inner[pos : m.start()].count('{') - inner[pos : m.start()].count('}')
+                pos = m.start()
+                if depth != 0:
+                    continue
+
+                category = m.group(1)
+                cat_block, end_pos = extract_block_from(pos)
+                pos = end_pos
+                depth = 0
+
+                amounts: dict[str, float] = {}
+                for res, val in re.findall(r'\b([a-z_]+)=([\d.-]+)', cat_block):
+                    if res not in tracked:
+                        continue
+                    try:
+                        amounts[res] = amounts.get(res, 0.0) + float(val)
+                    except ValueError:
+                        continue
+                if amounts:
+                    categories[category] = amounts
+
+            return categories
+
+        income_by_cat = extract_top_level_categories(income_block)
+        expenses_by_cat = extract_top_level_categories(expenses_block)
+        result['income_source_count'] = len(income_by_cat)
+        result['expense_source_count'] = len(expenses_by_cat)
+
+        for resource in self._BUDGET_TRACKED_RESOURCES:
+            income_total = sum(v.get(resource, 0.0) for v in income_by_cat.values())
+            expense_total = sum(v.get(resource, 0.0) for v in expenses_by_cat.values())
+            net = round(income_total - expense_total, 2)
+
+            top_income = sorted(
+                (
+                    {'source': src, 'amount': round(vals.get(resource, 0.0), 2)}
+                    for src, vals in income_by_cat.items()
+                    if vals.get(resource, 0.0) != 0.0
+                ),
+                key=lambda d: d['amount'],
+                reverse=True,
+            )[:top_n_sources]
+
+            top_expenses = sorted(
+                (
+                    {'source': src, 'amount': round(vals.get(resource, 0.0), 2)}
+                    for src, vals in expenses_by_cat.items()
+                    if vals.get(resource, 0.0) != 0.0
+                ),
+                key=lambda d: d['amount'],
+                reverse=True,
+            )[:top_n_sources]
+
+            result['by_resource'][resource] = {
+                'income_total': round(income_total, 2),
+                'expenses_total': round(expense_total, 2),
+                'net': net,
+                'top_income_sources': top_income,
+                'top_expense_sources': top_expenses,
+            }
+
+        return result
