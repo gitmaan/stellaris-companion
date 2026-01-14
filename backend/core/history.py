@@ -312,6 +312,242 @@ def extract_player_diplomacy_from_gamestate(*, gamestate: str | None, player_id:
     }
 
 
+def extract_player_techs_from_gamestate(*, gamestate: str | None, player_id: int | None) -> dict[str, Any] | None:
+    """Extract the list of completed technologies for diffing individual tech completion."""
+    if not gamestate or player_id is None:
+        return None
+
+    pid = int(player_id)
+    country_start = gamestate.find("\ncountry=")
+    if country_start == -1:
+        return None
+
+    chunk = gamestate[country_start : country_start + 900000]
+    player_block_pos = chunk.find("\n\t0=")
+    if player_block_pos == -1:
+        return None
+
+    player_chunk = chunk[player_block_pos : player_block_pos + 400000]
+    tech_status_pos = player_chunk.find("tech_status=")
+    if tech_status_pos == -1:
+        return None
+
+    import re
+
+    tech_chunk = player_chunk[tech_status_pos : tech_status_pos + 100000]
+
+    # Find technology={ ... } block containing completed tech names
+    tech_block_match = re.search(r'technology=\s*\{([^}]+)\}', tech_chunk)
+    techs: list[str] = []
+    if tech_block_match:
+        block = tech_block_match.group(1)
+        # Techs are bare identifiers, one per line
+        for line in block.split('\n'):
+            t = line.strip()
+            if t and not t.startswith('#'):
+                techs.append(t)
+
+    return {"player_id": pid, "techs": sorted(techs), "count": len(techs)}
+
+
+def extract_player_policies_from_gamestate(*, gamestate: str | None, player_id: int | None) -> dict[str, Any] | None:
+    """Extract active policies for the player empire."""
+    if not gamestate or player_id is None:
+        return None
+
+    pid = int(player_id)
+    country_start = gamestate.find("\ncountry=")
+    if country_start == -1:
+        return None
+
+    chunk = gamestate[country_start : country_start + 900000]
+    player_block_pos = chunk.find("\n\t0=")
+    if player_block_pos == -1:
+        return None
+
+    player_chunk = chunk[player_block_pos : player_block_pos + 400000]
+
+    import re
+
+    policies: dict[str, str] = {}
+
+    # Look for policy flags like: economic_policy=civilian_economy
+    policy_patterns = [
+        r'\n\t*economic_policy\s*=\s*"?(\w+)"?',
+        r'\n\t*war_philosophy\s*=\s*"?(\w+)"?',
+        r'\n\t*orbital_bombardment\s*=\s*"?(\w+)"?',
+        r'\n\t*slavery\s*=\s*"?(\w+)"?',
+        r'\n\t*purge\s*=\s*"?(\w+)"?',
+        r'\n\t*resettlement\s*=\s*"?(\w+)"?',
+        r'\n\t*population_controls\s*=\s*"?(\w+)"?',
+        r'\n\t*robots_policy\s*=\s*"?(\w+)"?',
+        r'\n\t*ai_rights\s*=\s*"?(\w+)"?',
+        r'\n\t*trade_policy\s*=\s*"?(\w+)"?',
+        r'\n\t*diplomatic_stance\s*=\s*"?(\w+)"?',
+        r'\n\t*food_policy\s*=\s*"?(\w+)"?',
+        r'\n\t*leader_enhancement\s*=\s*"?(\w+)"?',
+        r'\n\t*first_contact_protocol\s*=\s*"?(\w+)"?',
+    ]
+
+    for pat in policy_patterns:
+        m = re.search(pat, player_chunk)
+        if m:
+            policy_name = pat.split(r'\s*=')[0].replace(r'\n\t*', '').strip()
+            policies[policy_name] = m.group(1)
+
+    return {"player_id": pid, "policies": policies}
+
+
+def extract_player_edicts_from_gamestate(*, gamestate: str | None, player_id: int | None) -> dict[str, Any] | None:
+    """Extract active edicts for the player empire."""
+    if not gamestate or player_id is None:
+        return None
+
+    pid = int(player_id)
+    country_start = gamestate.find("\ncountry=")
+    if country_start == -1:
+        return None
+
+    chunk = gamestate[country_start : country_start + 900000]
+    player_block_pos = chunk.find("\n\t0=")
+    if player_block_pos == -1:
+        return None
+
+    player_chunk = chunk[player_block_pos : player_block_pos + 400000]
+
+    import re
+
+    edicts: list[str] = []
+
+    # Find active_edicts block
+    edicts_match = re.search(r'active_edicts=\s*\{([^}]+)\}', player_chunk)
+    if edicts_match:
+        block = edicts_match.group(1)
+        # Edicts can be: edict="edict_name" or just edict identifiers
+        for m in re.finditer(r'edict\s*=\s*"?(\w+)"?', block):
+            edicts.append(m.group(1))
+
+    return {"player_id": pid, "edicts": sorted(set(edicts)), "count": len(set(edicts))}
+
+
+def extract_megastructures_from_gamestate(*, gamestate: str | None, player_id: int | None) -> dict[str, Any] | None:
+    """Extract megastructure status for the player."""
+    if not gamestate or player_id is None:
+        return None
+
+    pid = int(player_id)
+
+    import re
+
+    mega_start = gamestate.find("\nmegastructures=")
+    if mega_start == -1:
+        if gamestate.startswith("megastructures="):
+            mega_start = 0
+        else:
+            return None
+
+    mega_chunk = gamestate[mega_start : mega_start + 2000000]
+
+    structures: list[dict[str, Any]] = []
+
+    # Find entries: 0={ type="..." owner=X ... }
+    for m in re.finditer(r'\n\t(\d+)=\s*\{', mega_chunk):
+        struct_id = m.group(1)
+        start = m.start() + 1
+        # Extract a bounded block
+        block = mega_chunk[start : start + 2000]
+
+        # Check if owned by player
+        owner_m = re.search(r'\n\t*owner=(\d+)', block)
+        if not owner_m or int(owner_m.group(1)) != pid:
+            continue
+
+        type_m = re.search(r'\n\t*type="([^"]+)"', block)
+        stage_m = re.search(r'\n\t*stage=(\d+)', block)
+        progress_m = re.search(r'\n\t*upgrade_progress=([\d.]+)', block)
+
+        if type_m:
+            structures.append({
+                "id": int(struct_id),
+                "type": type_m.group(1),
+                "stage": int(stage_m.group(1)) if stage_m else 0,
+                "progress": float(progress_m.group(1)) if progress_m else 0.0,
+            })
+
+        if len(structures) >= 50:  # Bound
+            break
+
+    return {"player_id": pid, "megastructures": structures, "count": len(structures)}
+
+
+def extract_crisis_from_gamestate(gamestate: str | None) -> dict[str, Any] | None:
+    """Extract crisis status from gamestate."""
+    if not gamestate:
+        return None
+
+    import re
+
+    result: dict[str, Any] = {"active": False, "type": None, "progress": None}
+
+    # Look for crisis-related global variables or sections
+    # The crisis section varies by type but often has markers like:
+    # crisis_stage, prethoryn, contingency, unbidden
+
+    # Check for global crisis markers
+    crisis_patterns = [
+        (r'prethoryn_invasion_stage\s*=\s*(\d+)', "prethoryn"),
+        (r'contingency_stage\s*=\s*(\d+)', "contingency"),
+        (r'unbidden_stage\s*=\s*(\d+)', "unbidden"),
+        (r'aberrant_stage\s*=\s*(\d+)', "aberrant"),
+        (r'vehement_stage\s*=\s*(\d+)', "vehement"),
+        (r'ai_crisis_stage\s*=\s*(\d+)', "ai_uprising"),
+        (r'crisis_spawn_chance\s*>', "pending"),  # Crisis about to spawn
+    ]
+
+    for pattern, crisis_type in crisis_patterns:
+        m = re.search(pattern, gamestate)
+        if m:
+            result["active"] = True
+            result["type"] = crisis_type
+            if m.groups():
+                result["progress"] = int(m.group(1))
+            break
+
+    return result
+
+
+def extract_system_count_from_gamestate(*, gamestate: str | None, player_id: int | None) -> dict[str, Any] | None:
+    """Extract total system count for the player (beyond just colonies)."""
+    if not gamestate or player_id is None:
+        return None
+
+    pid = int(player_id)
+    country_start = gamestate.find("\ncountry=")
+    if country_start == -1:
+        return None
+
+    chunk = gamestate[country_start : country_start + 900000]
+    player_block_pos = chunk.find("\n\t0=")
+    if player_block_pos == -1:
+        return None
+
+    player_chunk = chunk[player_block_pos : player_block_pos + 400000]
+
+    import re
+
+    # Look for owned_systems or similar in the player's country block
+    systems_m = re.search(r'\n\t*owned_systems\s*=\s*(\d+)', player_chunk)
+    if systems_m:
+        return {"player_id": pid, "system_count": int(systems_m.group(1))}
+
+    # Fallback: count from celestial_bodies_in_territory if available
+    celestial_m = re.search(r'\n\t*celestial_bodies_in_territory\s*=\s*(\d+)', player_chunk)
+    if celestial_m:
+        return {"player_id": pid, "celestial_bodies": int(celestial_m.group(1))}
+
+    return None
+
+
 def compute_save_id(
     *,
     campaign_id: str | None,
@@ -410,6 +646,14 @@ def record_snapshot_from_companion(
     diplomacy = extract_player_diplomacy_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
     galaxy = extract_galaxy_settings_from_gamestate(gamestate)
 
+    # Phase 6: Additional extractions for expanded event detection
+    techs = extract_player_techs_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    policies = extract_player_policies_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    edicts = extract_player_edicts_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    megastructures = extract_megastructures_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    crisis = extract_crisis_from_gamestate(gamestate)
+    systems = extract_system_count_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+
     # Avoid mutating the live snapshot object used by /ask; store extras in a copy.
     briefing_for_storage = dict(briefing)
     history: dict[str, Any] = {}
@@ -421,6 +665,19 @@ def record_snapshot_from_companion(
         history["diplomacy"] = diplomacy
     if galaxy:
         history["galaxy"] = galaxy
+    # Phase 6 additions
+    if techs:
+        history["techs"] = techs
+    if policies:
+        history["policies"] = policies
+    if edicts:
+        history["edicts"] = edicts
+    if megastructures:
+        history["megastructures"] = megastructures
+    if crisis:
+        history["crisis"] = crisis
+    if systems:
+        history["systems"] = systems
     if history:
         briefing_for_storage["history"] = history
 

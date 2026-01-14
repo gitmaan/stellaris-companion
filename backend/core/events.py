@@ -144,6 +144,88 @@ def _extract_galaxy_settings(briefing: dict[str, Any]) -> dict[str, Any]:
     return galaxy if isinstance(galaxy, dict) else {}
 
 
+# ===== PHASE 6 HELPER FUNCTIONS =====
+
+def _extract_tech_list(briefing: dict[str, Any]) -> set[str]:
+    """Extract the set of completed technology names."""
+    history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
+    techs = history.get("techs") if isinstance(history, dict) else None
+    if not isinstance(techs, dict):
+        return set()
+    tech_list = techs.get("techs") or []
+    if not isinstance(tech_list, list):
+        return set()
+    return {str(t).strip() for t in tech_list if str(t).strip()}
+
+
+def _extract_system_count(briefing: dict[str, Any]) -> int | None:
+    """Extract the total system count."""
+    history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
+    systems = history.get("systems") if isinstance(history, dict) else None
+    if not isinstance(systems, dict):
+        return None
+    count = systems.get("system_count") or systems.get("celestial_bodies")
+    try:
+        return int(count) if count is not None else None
+    except Exception:
+        return None
+
+
+def _extract_policies(briefing: dict[str, Any]) -> dict[str, str]:
+    """Extract policy settings."""
+    history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
+    policies = history.get("policies") if isinstance(history, dict) else None
+    if not isinstance(policies, dict):
+        return {}
+    policy_dict = policies.get("policies") or {}
+    if not isinstance(policy_dict, dict):
+        return {}
+    return {str(k): str(v) for k, v in policy_dict.items()}
+
+
+def _extract_edicts(briefing: dict[str, Any]) -> set[str]:
+    """Extract active edict names."""
+    history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
+    edicts = history.get("edicts") if isinstance(history, dict) else None
+    if not isinstance(edicts, dict):
+        return set()
+    edict_list = edicts.get("edicts") or []
+    if not isinstance(edict_list, list):
+        return set()
+    return {str(e).strip() for e in edict_list if str(e).strip()}
+
+
+def _extract_megastructures(briefing: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    """Extract megastructure data keyed by ID."""
+    history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
+    megas = history.get("megastructures") if isinstance(history, dict) else None
+    if not isinstance(megas, dict):
+        return {}
+    mega_list = megas.get("megastructures") or []
+    if not isinstance(mega_list, list):
+        return {}
+    result: dict[int, dict[str, Any]] = {}
+    for m in mega_list:
+        if not isinstance(m, dict):
+            continue
+        mid = m.get("id")
+        try:
+            mid_int = int(mid)
+        except Exception:
+            continue
+        result[mid_int] = m
+    return result
+
+
+def _extract_crisis(briefing: dict[str, Any]) -> dict[str, Any]:
+    """Extract crisis status."""
+    history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
+    crisis = history.get("crisis") if isinstance(history, dict) else None
+    if not isinstance(crisis, dict):
+        return {"active": False, "type": None}
+    return crisis
+
+
 def compute_events(
     *,
     prev: dict[str, Any],
@@ -500,5 +582,133 @@ def compute_events(
                     data={"milestone_year": end_year, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
                 )
             )
+
+    # ===== PHASE 6 EXPANDED EVENTS =====
+
+    # Technology researched (individual techs, not just count)
+    prev_techs = _extract_tech_list(prev)
+    curr_techs = _extract_tech_list(curr)
+    new_techs = sorted(curr_techs - prev_techs)[:10]  # Cap at 10 to avoid noise
+    for tech in new_techs:
+        # Format tech name for display (tech_lasers_1 -> Lasers 1)
+        display_name = tech.replace("tech_", "").replace("_", " ").title()
+        events.append(
+            DetectedEvent(
+                event_type="technology_researched",
+                summary=f"Researched: {display_name}",
+                data={"tech": tech, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+            )
+        )
+
+    # System count changes (conquered/lost)
+    prev_systems = _extract_system_count(prev)
+    curr_systems = _extract_system_count(curr)
+    if prev_systems is not None and curr_systems is not None and prev_systems != curr_systems:
+        diff = curr_systems - prev_systems
+        if diff > 0:
+            events.append(
+                DetectedEvent(
+                    event_type="systems_gained",
+                    summary=f"Gained {diff} system{'s' if diff != 1 else ''} ({prev_systems} → {curr_systems})",
+                    data={"before": prev_systems, "after": curr_systems, "delta": diff, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                )
+            )
+        else:
+            events.append(
+                DetectedEvent(
+                    event_type="systems_lost",
+                    summary=f"Lost {-diff} system{'s' if diff != -1 else ''} ({prev_systems} → {curr_systems})",
+                    data={"before": prev_systems, "after": curr_systems, "delta": diff, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                )
+            )
+
+    # Policy changes
+    prev_policies = _extract_policies(prev)
+    curr_policies = _extract_policies(curr)
+    for policy, new_val in curr_policies.items():
+        old_val = prev_policies.get(policy)
+        if old_val is not None and old_val != new_val:
+            events.append(
+                DetectedEvent(
+                    event_type="policy_changed",
+                    summary=f"Policy changed: {policy} ({old_val} → {new_val})",
+                    data={"policy": policy, "before": old_val, "after": new_val, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                )
+            )
+
+    # Edict changes
+    prev_edicts = _extract_edicts(prev)
+    curr_edicts = _extract_edicts(curr)
+    activated = sorted(curr_edicts - prev_edicts)[:5]
+    expired = sorted(prev_edicts - curr_edicts)[:5]
+    for edict in activated:
+        display_name = edict.replace("edict_", "").replace("_", " ").title()
+        events.append(
+            DetectedEvent(
+                event_type="edict_activated",
+                summary=f"Edict activated: {display_name}",
+                data={"edict": edict, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+            )
+        )
+    for edict in expired:
+        display_name = edict.replace("edict_", "").replace("_", " ").title()
+        events.append(
+            DetectedEvent(
+                event_type="edict_expired",
+                summary=f"Edict expired: {display_name}",
+                data={"edict": edict, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+            )
+        )
+
+    # Megastructure progress
+    prev_megas = _extract_megastructures(prev)
+    curr_megas = _extract_megastructures(curr)
+    for mega_id, curr_mega in curr_megas.items():
+        prev_mega = prev_megas.get(mega_id)
+        mega_type = curr_mega.get("type", "megastructure")
+        display_type = mega_type.replace("_", " ").title()
+
+        if prev_mega is None:
+            # New megastructure started
+            events.append(
+                DetectedEvent(
+                    event_type="megastructure_started",
+                    summary=f"Megastructure started: {display_type}",
+                    data={"mega_id": mega_id, "type": mega_type, "stage": curr_mega.get("stage", 0), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                )
+            )
+        else:
+            prev_stage = prev_mega.get("stage", 0)
+            curr_stage = curr_mega.get("stage", 0)
+            if curr_stage > prev_stage:
+                events.append(
+                    DetectedEvent(
+                        event_type="megastructure_upgraded",
+                        summary=f"Megastructure upgraded: {display_type} (stage {prev_stage} → {curr_stage})",
+                        data={"mega_id": mega_id, "type": mega_type, "prev_stage": prev_stage, "stage": curr_stage, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    )
+                )
+
+    # Crisis events
+    prev_crisis = _extract_crisis(prev)
+    curr_crisis = _extract_crisis(curr)
+    if not prev_crisis.get("active") and curr_crisis.get("active"):
+        crisis_type = curr_crisis.get("type", "unknown")
+        events.append(
+            DetectedEvent(
+                event_type="crisis_started",
+                summary=f"Crisis begun: {crisis_type.replace('_', ' ').title()}",
+                data={"crisis_type": crisis_type, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+            )
+        )
+    elif prev_crisis.get("active") and not curr_crisis.get("active"):
+        crisis_type = prev_crisis.get("type", "unknown")
+        events.append(
+            DetectedEvent(
+                event_type="crisis_defeated",
+                summary=f"Crisis defeated: {crisis_type.replace('_', ' ').title()}",
+                data={"crisis_type": crisis_type, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+            )
+        )
 
     return events

@@ -610,75 +610,175 @@ class SaveExtractor:
         return result
 
     def get_wars(self) -> dict:
-        """Get all active wars involving the player.
+        """Get all active wars involving the player with detailed information.
 
         Returns:
-            Dict with war information including:
-            - wars: List of war names the player is involved in
-            - count: Number of wars the player is in
+            Dict with detailed war information including:
+            - wars: List of detailed war objects with name, dates, exhaustion, participants
             - player_at_war: Boolean indicating if player is at war
-            - all_wars_count: Total number of wars in the galaxy
+            - active_war_count: Number of wars the player is in
         """
-        result = {'wars': [], 'count': 0, 'player_at_war': False, 'all_wars_count': 0}
+        from date_utils import days_between
+
+        result = {'wars': [], 'player_at_war': False, 'active_war_count': 0}
 
         player_id = self.get_player_empire_id()
+        current_date = self.get_metadata().get('date', '')
 
-        # First, check the player's country block for active_wars list
-        # This is the most reliable way to know if the player is at war
-        country_match = re.search(r'^country=\s*\{', self.gamestate, re.MULTILINE)
-        if country_match:
-            start = country_match.start()
-            player_match = re.search(r'\n\t0=\s*\{', self.gamestate[start:start + 1000000])
-            if player_match:
-                player_start = start + player_match.start()
-                player_chunk = self.gamestate[player_start:player_start + 50000]
-
-                # Look for active_wars list in player country block
-                active_wars_match = re.search(r'active_wars\s*=\s*\{([^}]+)\}', player_chunk)
-                if active_wars_match:
-                    war_ids = re.findall(r'\d+', active_wars_match.group(1))
-                    # Filter out null values (4294967295)
-                    war_ids = [wid for wid in war_ids if wid != '4294967295']
-                    if war_ids:
-                        result['player_at_war'] = True
-                        result['active_war_ids'] = war_ids
-
-        # Search for all war data in gamestate to get war names
-        # Look for war blocks with name= inside
-        war_pattern = r'war\s*=\s*\{[^}]*name\s*=\s*"([^"]+)"'
-        war_matches = re.findall(war_pattern, self.gamestate)
-
-        if war_matches:
-            result['all_wars_count'] = len(war_matches)
-
-        # Now find wars that involve the player by checking attackers/defenders lists
-        # Pattern: war={ ... attackers={ country=0 ... } ... } or defenders
-        player_wars = []
+        # Build a country ID -> name mapping for lookups
+        country_names = self._get_country_names_map()
 
         # Find war section
-        war_section_match = re.search(r'^war=\s*\{', self.gamestate, re.MULTILINE)
-        if war_section_match:
-            war_start = war_section_match.start()
-            war_chunk = self.gamestate[war_start:war_start + 2000000]
+        war_section_match = re.search(r'\nwar=\n\{', self.gamestate)
+        if not war_section_match:
+            return result
 
-            # Find individual war blocks and check for player involvement
-            # Each war has attackers={} and defenders={} with country=X entries
-            war_block_pattern = r'name\s*=\s*"([^"]+)"[^}]*?(?:attackers|defenders)\s*=\s*\{[^}]*country=' + str(player_id) + r'\b'
+        war_start = war_section_match.start() + 1
+        war_chunk = self.gamestate[war_start:war_start + 5000000]  # Wars can be large
 
-            for match in re.finditer(war_block_pattern, war_chunk, re.DOTALL):
-                war_name = match.group(1)
-                if war_name not in player_wars:
-                    player_wars.append(war_name)
+        # Parse individual war blocks
+        # Each war entry starts with a pattern like \n\t0=\n\t{
+        war_entry_pattern = r'\n\t(\d+)=\n\t\{'
+        war_entries = list(re.finditer(war_entry_pattern, war_chunk))
 
-        # Populate result
-        result['wars'] = player_wars[:10]  # First 10 player wars
-        result['count'] = len(player_wars)
+        for i, entry_match in enumerate(war_entries):
+            # Determine the end of this war block
+            entry_start = entry_match.start()
+            if i + 1 < len(war_entries):
+                entry_end = war_entries[i + 1].start()
+            else:
+                # Find closing brace for last entry
+                entry_end = min(entry_start + 100000, len(war_chunk))
 
-        # Set player_at_war based on actual involvement
-        if player_wars or result.get('player_at_war'):
-            result['player_at_war'] = True
+            war_block = war_chunk[entry_start:entry_end]
+
+            # Extract war name
+            name_match = re.search(r'name\s*=\s*"([^"]+)"', war_block)
+            if not name_match:
+                continue
+            war_name = name_match.group(1)
+
+            # Extract start date
+            start_date_match = re.search(r'start_date\s*=\s*"?([0-9.]+)"?', war_block)
+            start_date = start_date_match.group(1) if start_date_match else None
+
+            # Extract exhaustion values
+            attacker_exhaustion_match = re.search(r'attacker_war_exhaustion\s*=\s*([\d.]+)', war_block)
+            defender_exhaustion_match = re.search(r'defender_war_exhaustion\s*=\s*([\d.]+)', war_block)
+            attacker_exhaustion = float(attacker_exhaustion_match.group(1)) if attacker_exhaustion_match else 0.0
+            defender_exhaustion = float(defender_exhaustion_match.group(1)) if defender_exhaustion_match else 0.0
+
+            # Extract war goal
+            war_goal_match = re.search(r'war_goal\s*=\s*\{[^}]*type\s*=\s*"?([^"\s}]+)"?', war_block, re.DOTALL)
+            war_goal = war_goal_match.group(1) if war_goal_match else "unknown"
+
+            # Extract attacker country IDs
+            attacker_ids = []
+            attackers_match = re.search(r'attackers\s*=\s*\{(.*?)\n\t\}', war_block, re.DOTALL)
+            if attackers_match:
+                attacker_ids = re.findall(r'country\s*=\s*(\d+)', attackers_match.group(1))
+
+            # Extract defender country IDs
+            defender_ids = []
+            defenders_match = re.search(r'defenders\s*=\s*\{(.*?)\n\t\}', war_block, re.DOTALL)
+            if defenders_match:
+                defender_ids = re.findall(r'country\s*=\s*(\d+)', defenders_match.group(1))
+
+            # Check if player is involved and determine side
+            player_id_str = str(player_id)
+            player_is_attacker = player_id_str in attacker_ids
+            player_is_defender = player_id_str in defender_ids
+
+            if not player_is_attacker and not player_is_defender:
+                continue  # Player not involved in this war
+
+            # Build war info
+            our_side = "attacker" if player_is_attacker else "defender"
+            our_exhaustion = attacker_exhaustion if player_is_attacker else defender_exhaustion
+            their_exhaustion = defender_exhaustion if player_is_attacker else attacker_exhaustion
+
+            # Resolve country names
+            attacker_names = [country_names.get(int(cid), f"Empire {cid}") for cid in attacker_ids]
+            defender_names = [country_names.get(int(cid), f"Empire {cid}") for cid in defender_ids]
+
+            # Calculate duration
+            duration_days = None
+            if start_date and current_date:
+                duration_days = days_between(start_date, current_date)
+
+            war_info = {
+                'name': war_name,
+                'start_date': start_date,
+                'duration_days': duration_days,
+                'our_side': our_side,
+                'our_exhaustion': round(our_exhaustion, 1),
+                'their_exhaustion': round(their_exhaustion, 1),
+                'participants': {
+                    'attackers': attacker_names,
+                    'defenders': defender_names
+                },
+                'war_goal': war_goal,
+                'status': 'in_progress'  # All wars in the war section are active
+            }
+
+            result['wars'].append(war_info)
+
+        result['active_war_count'] = len(result['wars'])
+        result['count'] = len(result['wars'])  # Backward compatibility
+        result['player_at_war'] = len(result['wars']) > 0
 
         return result
+
+    def _get_country_names_map(self) -> dict:
+        """Build a mapping of country ID -> country name for all empires.
+
+        Returns:
+            Dict mapping integer country IDs to their empire names
+        """
+        country_names = {}
+
+        country_start = self._find_country_section_start()
+        if country_start == -1:
+            return country_names
+
+        # Get a chunk of the country section
+        country_chunk = self.gamestate[country_start:country_start + 10000000]
+
+        # Find entries like \n\t0=\n\t{ ... name="United Nations of Earth" ... }
+        # Parse each country block to extract ID and name
+        country_entry_pattern = r'\n\t(\d+)=\n\t\{'
+        entries = list(re.finditer(country_entry_pattern, country_chunk))
+
+        for i, entry_match in enumerate(entries[:200]):  # Limit to first 200 countries for performance
+            country_id = int(entry_match.group(1))
+            entry_start = entry_match.start()
+
+            # Determine block end
+            if i + 1 < len(entries):
+                entry_end = entries[i + 1].start()
+            else:
+                entry_end = min(entry_start + 50000, len(country_chunk))
+
+            block = country_chunk[entry_start:entry_end]
+
+            # Extract name - can be either:
+            # 1. name="Direct Name" (simple string)
+            # 2. name={ key="LOCALIZATION_KEY" } (localization reference)
+            # First try direct string format
+            name_match = re.search(r'\n\t\tname\s*=\s*"([^"]+)"', block)
+            if name_match:
+                country_names[country_id] = name_match.group(1)
+            else:
+                # Try localization key format: name={ key="..." }
+                key_match = re.search(r'\n\t\tname\s*=\s*\{\s*key\s*=\s*"([^"]+)"', block)
+                if key_match:
+                    # Use the key as a fallback, cleaned up for readability
+                    key = key_match.group(1)
+                    # Convert EMPIRE_DESIGN_humans1 to "Humans 1" for readability
+                    readable = key.replace('EMPIRE_DESIGN_', '').replace('_', ' ').title()
+                    country_names[country_id] = readable
+
+        return country_names
 
     def _analyze_player_fleets(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
         """Analyze player's fleet IDs to categorize them properly.
@@ -948,12 +1048,31 @@ class SaveExtractor:
         """Get the player's technology research status.
 
         Returns:
-            Dict with completed technologies and current research
+            Dict with detailed technology tracking including:
+            - completed_count: Number of researched technologies
+            - researched_techs: List of completed tech names
+            - in_progress: Current research for each category with progress details
+            - research_speed: Monthly research income by category
+            - available_techs: Technologies available for research by category
         """
         result = {
-            'completed_technologies': [],
-            'current_research': {},
-            'tech_count': 0
+            'completed_count': 0,
+            'researched_techs': [],
+            'in_progress': {
+                'physics': None,
+                'society': None,
+                'engineering': None
+            },
+            'research_speed': {
+                'physics': 0,
+                'society': 0,
+                'engineering': 0
+            },
+            'available_techs': {
+                'physics': [],
+                'society': [],
+                'engineering': []
+            }
         }
 
         player_id = self.get_player_empire_id()
@@ -980,7 +1099,7 @@ class SaveExtractor:
             result['error'] = "Could not find tech_status section"
             return result
 
-        # Extract tech_status block
+        # Extract tech_status block using brace matching
         tech_start = tech_match.start()
         brace_count = 0
         tech_end = tech_start
@@ -996,47 +1115,413 @@ class SaveExtractor:
         tech_block = player_chunk[tech_start:tech_end]
 
         # Extract completed technologies
+        # Format: technology="tech_name" level=1 (repeated for each tech)
+        # The techs are listed as individual technology="..." entries, not in a { } block
         tech_pattern = r'technology="([^"]+)"'
         technologies = re.findall(tech_pattern, tech_block)
-        result['completed_technologies'] = technologies
-        result['tech_count'] = len(technologies)
+        result['researched_techs'] = sorted(list(set(technologies)))
+        result['completed_count'] = len(result['researched_techs'])
 
-        # Categorize technologies
-        physics_techs = [t for t in technologies if any(x in t for x in ['physics', 'laser', 'shield', 'sensor', 'power', 'ftl', 'hyper'])]
-        society_techs = [t for t in technologies if any(x in t for x in ['society', 'genome', 'gene', 'xeno', 'psi', 'health', 'food', 'colonization'])]
-        engineering_techs = [t for t in technologies if any(x in t for x in ['engineering', 'mining', 'ship', 'armor', 'weapon', 'thruster', 'starbase', 'missile', 'torpedo'])]
+        # Extract current research for each category
+        # Format in tech_status:
+        # physics={ level=5 progress=1234.5 tech=tech_name leader=5 }
+        for category in ['physics', 'society', 'engineering']:
+            # Match the category block within tech_status
+            cat_match = re.search(rf'\b{category}=\s*\{{([^}}]+)\}}', tech_block)
+            if cat_match:
+                cat_content = cat_match.group(1)
 
-        result['by_category'] = {
-            'physics_related': len(physics_techs),
-            'society_related': len(society_techs),
-            'engineering_related': len(engineering_techs)
+                # Extract tech name (can be quoted or bare)
+                tech_name_match = re.search(r'tech=(?:"([^"]+)"|(\w+))', cat_content)
+                progress_match = re.search(r'progress=([\d.]+)', cat_content)
+                leader_match = re.search(r'leader=(\d+)', cat_content)
+
+                if tech_name_match:
+                    tech_name = tech_name_match.group(1) or tech_name_match.group(2)
+                    progress = float(progress_match.group(1)) if progress_match else 0.0
+                    leader_id = int(leader_match.group(1)) if leader_match else None
+
+                    # Try to get tech cost - this would require additional lookup
+                    # For now, we'll estimate or leave as None
+                    # Cost data isn't directly in tech_status, would need tech definitions
+                    result['in_progress'][category] = {
+                        'tech': tech_name,
+                        'progress': progress,
+                        'cost': None,  # Would need tech definitions to get actual cost
+                        'percent_complete': None,  # Can't calculate without cost
+                        'leader_id': leader_id
+                    }
+
+        # Also check the queue format for current research (alternative location)
+        # Format: physics_queue={ { progress=X technology="tech_name" date="Y" } }
+        for category in ['physics', 'society', 'engineering']:
+            if result['in_progress'][category] is None:
+                queue_match = re.search(
+                    rf'{category}_queue=\s*\{{[^}}]*progress=([\d.]+)[^}}]*technology="([^"]+)"',
+                    player_chunk
+                )
+                if queue_match:
+                    result['in_progress'][category] = {
+                        'tech': queue_match.group(2),
+                        'progress': float(queue_match.group(1)),
+                        'cost': None,
+                        'percent_complete': None,
+                        'leader_id': None
+                    }
+
+        # Extract available techs by category
+        # There are two possible locations:
+        # 1. A section with physics={ "tech_a" "tech_b" } society={...} engineering={...}
+        #    (contains the tech options for current research choices)
+        # 2. potential={ "tech_name"="weight" ... } (weighted tech pool)
+        #
+        # Look for the category blocks that contain quoted tech names (research options)
+        for category in ['physics', 'society', 'engineering']:
+            # Match category={ "tech_..." "tech_..." } pattern
+            # Use a pattern that matches a block containing only quoted tech names
+            cat_match = re.search(rf'{category}=\s*\{{\s*("[^"]+"\s*)+\}}', tech_block)
+            if cat_match:
+                cat_content = cat_match.group(0)
+                # Extract quoted tech names from the block
+                quoted = re.findall(r'"(tech_[^"]+)"', cat_content)
+                result['available_techs'][category] = sorted(list(set(quoted)))
+
+        # Get research speed from monthly income
+        # This requires extracting from the budget section
+        budget_match = re.search(r'budget=\s*\{', player_chunk)
+        if budget_match:
+            budget_start = budget_match.start()
+            # Extract budget block
+            brace_count = 0
+            budget_end = budget_start
+            for i, char in enumerate(player_chunk[budget_start:budget_start + 100000], budget_start):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        budget_end = i + 1
+                        break
+
+            budget_block = player_chunk[budget_start:budget_end]
+
+            # Parse income section for research resources
+            income_section_match = re.search(r'income=\s*\{(.+?)\}\s*expenses=', budget_block, re.DOTALL)
+            if income_section_match:
+                income_section = income_section_match.group(1)
+
+                # Sum up research income from all sources
+                for category, resource in [
+                    ('physics', 'physics_research'),
+                    ('society', 'society_research'),
+                    ('engineering', 'engineering_research')
+                ]:
+                    matches = re.findall(rf'{resource}=([\d.]+)', income_section)
+                    if matches:
+                        result['research_speed'][category] = round(sum(float(m) for m in matches), 2)
+
+        # Calculate percent_complete for in-progress research if we have research speed
+        # Using a rough estimate: typical tech cost = 1000-10000 depending on tier
+        # This is an approximation since actual cost requires tech definitions
+        for category in ['physics', 'society', 'engineering']:
+            if result['in_progress'][category] and result['research_speed'][category] > 0:
+                progress = result['in_progress'][category]['progress']
+                speed = result['research_speed'][category]
+                # Rough estimate: if we know progress and speed, we can estimate months remaining
+                # but without cost, we can't calculate percentage
+                # Leave as None unless we have actual cost data
+
+        return result
+
+    def _get_species_names(self) -> dict:
+        """Build a mapping of species IDs to their display names.
+
+        Returns:
+            Dict mapping species ID (as string) to species name
+        """
+        species_names = {}
+
+        # Find the species_db section (near start of file)
+        species_match = re.search(r'^species_db=\s*\{', self.gamestate, re.MULTILINE)
+        if not species_match:
+            # Fallback: try older format
+            species_match = re.search(r'^species=\s*\{', self.gamestate, re.MULTILINE)
+            if not species_match:
+                return species_names
+
+        start = species_match.start()
+        # Species section is usually within first 2MB
+        species_chunk = self.gamestate[start:start + 2000000]
+
+        # Parse species entries: ID={ ... name="Species Name" ... }
+        # Format: \n\tID=\n\t{ ... name="Name" ...
+        species_pattern = r'\n\t(\d+)=\s*\{'
+        for match in re.finditer(species_pattern, species_chunk):
+            species_id = match.group(1)
+            block_start = match.start()
+
+            # Get a chunk for this species entry (they're typically < 1000 chars)
+            block_chunk = species_chunk[block_start:block_start + 1500]
+
+            # Extract name
+            name_match = re.search(r'name="([^"]+)"', block_chunk)
+            if name_match:
+                species_names[species_id] = name_match.group(1)
+            else:
+                # Fallback: use species class as name
+                class_match = re.search(r'class="([^"]+)"', block_chunk)
+                if class_match:
+                    species_names[species_id] = class_match.group(1)
+
+        return species_names
+
+    def _get_player_planet_ids(self) -> list[str]:
+        """Get IDs of all planets owned by the player.
+
+        Returns:
+            List of planet ID strings
+        """
+        player_id = self.get_player_empire_id()
+        planet_ids = []
+
+        # Find the planets section
+        planets_match = re.search(r'^planets=\s*\{\s*planet=\s*\{', self.gamestate, re.MULTILINE)
+        if not planets_match:
+            return planet_ids
+
+        start = planets_match.start()
+        planets_chunk = self.gamestate[start:start + 20000000]  # 20MB for planets
+
+        # Find each planet and check ownership
+        planet_start_pattern = r'\n\t\t(\d+)=\s*\{'
+        for match in re.finditer(planet_start_pattern, planets_chunk):
+            planet_id = match.group(1)
+            block_start = match.start() + 1
+
+            # Get first 3000 chars to find owner (owner is near start of block)
+            block_chunk = planets_chunk[block_start:block_start + 3000]
+
+            # Check if owned by player
+            owner_match = re.search(r'\n\s*owner=(\d+)', block_chunk)
+            if owner_match and int(owner_match.group(1)) == player_id:
+                planet_ids.append(planet_id)
+
+        return planet_ids
+
+    def _get_pop_ids_for_planets(self, planet_ids: list[str]) -> list[str]:
+        """Get all pop IDs from the specified planets.
+
+        Args:
+            planet_ids: List of planet ID strings to get pops from
+
+        Returns:
+            List of pop ID strings
+        """
+        pop_ids = []
+
+        # Find the planets section
+        planets_match = re.search(r'^planets=\s*\{\s*planet=\s*\{', self.gamestate, re.MULTILINE)
+        if not planets_match:
+            return pop_ids
+
+        start = planets_match.start()
+        planets_chunk = self.gamestate[start:start + 20000000]
+
+        planet_id_set = set(planet_ids)
+
+        # Find each planet block and extract pop_jobs
+        planet_start_pattern = r'\n\t\t(\d+)=\s*\{'
+        for match in re.finditer(planet_start_pattern, planets_chunk):
+            planet_id = match.group(1)
+            if planet_id not in planet_id_set:
+                continue
+
+            block_start = match.start() + 1
+
+            # Find end of planet block (they can be large with pop data)
+            brace_count = 0
+            block_end = block_start
+            started = False
+            for i, char in enumerate(planets_chunk[block_start:block_start + 30000], block_start):
+                if char == '{':
+                    brace_count += 1
+                    started = True
+                elif char == '}':
+                    brace_count -= 1
+                    if started and brace_count == 0:
+                        block_end = i + 1
+                        break
+
+            planet_block = planets_chunk[block_start:block_end]
+
+            # Extract pop_jobs list
+            pop_jobs_match = re.search(r'pop_jobs=\s*\{([^}]+)\}', planet_block)
+            if pop_jobs_match:
+                ids = re.findall(r'\d+', pop_jobs_match.group(1))
+                pop_ids.extend(ids)
+
+        return pop_ids
+
+    def get_pop_statistics(self) -> dict:
+        """Get detailed population statistics for the player's empire.
+
+        Aggregates pop data across all player-owned planets including:
+        - Total pop count
+        - Breakdown by species
+        - Breakdown by job category (ruler/specialist/worker)
+        - Breakdown by stratum
+        - Average happiness
+        - Employment statistics
+
+        Returns:
+            Dict with population statistics:
+            {
+                "total_pops": 1250,
+                "by_species": {"Human": 800, "Blorg": 300, ...},
+                "by_job_category": {"ruler": 50, "specialist": 400, ...},
+                "by_stratum": {"ruler": 50, "specialist": 400, ...},
+                "happiness_avg": 68.5,
+                "employed_pops": 1050,
+                "unemployed_pops": 200
+            }
+        """
+        result = {
+            'total_pops': 0,
+            'by_species': {},
+            'by_job_category': {},
+            'by_stratum': {},
+            'happiness_avg': 0.0,
+            'employed_pops': 0,
+            'unemployed_pops': 0,
         }
 
-        # Look for current research projects in the queue format
-        # Format: physics_queue={ { progress=X technology="tech_name" date="Y" } }
-        # Note: progress comes BEFORE technology in the save format
-        physics_queue = re.search(r'physics_queue=\s*\{[^}]*progress=([\d.]+)[^}]*technology="([^"]+)"', player_chunk)
-        society_queue = re.search(r'society_queue=\s*\{[^}]*progress=([\d.]+)[^}]*technology="([^"]+)"', player_chunk)
-        engineering_queue = re.search(r'engineering_queue=\s*\{[^}]*progress=([\d.]+)[^}]*technology="([^"]+)"', player_chunk)
+        # Step 1: Get player's planet IDs (as integers for comparison)
+        planet_ids = self._get_player_planet_ids()
+        if not planet_ids:
+            return result
 
-        if physics_queue:
-            result['current_research']['physics'] = {
-                'technology': physics_queue.group(2),
-                'progress': float(physics_queue.group(1))
-            }
-        if society_queue:
-            result['current_research']['society'] = {
-                'technology': society_queue.group(2),
-                'progress': float(society_queue.group(1))
-            }
-        if engineering_queue:
-            result['current_research']['engineering'] = {
-                'technology': engineering_queue.group(2),
-                'progress': float(engineering_queue.group(1))
-            }
+        player_planet_set = set(int(pid) for pid in planet_ids)
 
-        # Get sample of recent/notable techs
-        result['sample_technologies'] = technologies[-20:] if len(technologies) > 20 else technologies
+        # Step 2: Build species ID to name mapping
+        species_names = self._get_species_names()
+
+        # Step 3: Find pop_groups section (this is where actual pop data lives)
+        # Structure: pop_groups=\n{\n\tID=\n\t{ key={ species=X category="Y" } planet=Z size=N happiness=H ... }
+        pop_groups_match = re.search(r'\npop_groups=\n\{', self.gamestate)
+        if not pop_groups_match:
+            # Fallback: try alternate format
+            pop_groups_match = re.search(r'^pop_groups=\s*\{', self.gamestate, re.MULTILINE)
+            if not pop_groups_match:
+                result['error'] = "Could not find pop_groups section"
+                return result
+
+        pop_start = pop_groups_match.start()
+        # Pop groups section can be large in late game
+        pop_chunk = self.gamestate[pop_start:pop_start + 50000000]  # Up to 50MB
+
+        # Tracking for statistics
+        species_counts = {}
+        job_category_counts = {}
+        stratum_counts = {}
+        happiness_values = []
+        total_pops = 0
+
+        # Parse pop groups - each group represents multiple pops of same type
+        # Format: \n\tID=\n\t{ ... key={ species=X category="Y" } ... planet=Z size=N ...
+        pop_pattern = r'\n\t(\d+)=\n\t\{'
+        groups_processed = 0
+        max_groups = 50000  # Safety limit
+
+        for match in re.finditer(pop_pattern, pop_chunk):
+            if groups_processed >= max_groups:
+                result['_note'] = f'Processed {max_groups} pop groups (limit reached)'
+                break
+
+            groups_processed += 1
+            block_start = match.start() + 1
+
+            # Get pop group block content
+            block_chunk = pop_chunk[block_start:block_start + 2500]
+
+            # Find end of this pop group's block
+            brace_count = 0
+            block_end = 0
+            started = False
+            for i, char in enumerate(block_chunk):
+                if char == '{':
+                    brace_count += 1
+                    started = True
+                elif char == '}':
+                    brace_count -= 1
+                    if started and brace_count == 0:
+                        block_end = i + 1
+                        break
+
+            pop_block = block_chunk[:block_end] if block_end > 0 else block_chunk
+
+            # Check if this pop group is on a player-owned planet
+            planet_match = re.search(r'\n\s*planet=(\d+)', pop_block)
+            if not planet_match:
+                continue
+
+            planet_id = int(planet_match.group(1))
+            if planet_id not in player_planet_set:
+                continue
+
+            # Get the size of this pop group (number of pops)
+            size_match = re.search(r'\n\s*size=(\d+)', pop_block)
+            if not size_match:
+                continue
+
+            pop_size = int(size_match.group(1))
+            if pop_size == 0:
+                continue
+
+            total_pops += pop_size
+
+            # Extract species from key={ species=X ... } block
+            # Species is inside the nested key block
+            key_match = re.search(r'key=\s*\{([^}]+)\}', pop_block)
+            if key_match:
+                key_block = key_match.group(1)
+
+                # Extract species ID
+                species_match = re.search(r'species=(\d+)', key_block)
+                if species_match:
+                    species_id = species_match.group(1)
+                    species_name = species_names.get(species_id, f"Species_{species_id}")
+                    species_counts[species_name] = species_counts.get(species_name, 0) + pop_size
+
+                # Extract category (job category: ruler, specialist, worker, slave, etc.)
+                category_match = re.search(r'category="([^"]+)"', key_block)
+                if category_match:
+                    category = category_match.group(1)
+                    job_category_counts[category] = job_category_counts.get(category, 0) + pop_size
+                    # Use category as stratum (they're equivalent in Stellaris)
+                    stratum_counts[category] = stratum_counts.get(category, 0) + pop_size
+
+            # Extract happiness (0.0 to 1.0 scale in save, convert to percentage)
+            # Weight by pop size for accurate average
+            happiness_match = re.search(r'\n\s*happiness=([\d.]+)', pop_block)
+            if happiness_match:
+                happiness = float(happiness_match.group(1))
+                # Add each pop's happiness (weighted by size)
+                happiness_values.extend([happiness * 100] * pop_size)
+
+        # Finalize results
+        result['total_pops'] = total_pops
+        result['by_species'] = species_counts
+        result['by_job_category'] = job_category_counts
+        result['by_stratum'] = stratum_counts
+
+        # Employed pops = total minus unemployed category
+        unemployed = job_category_counts.get('unemployed', 0)
+        result['employed_pops'] = total_pops - unemployed
+        result['unemployed_pops'] = unemployed
+
+        # Calculate average happiness
+        if happiness_values:
+            result['happiness_avg'] = round(sum(happiness_values) / len(happiness_values), 1)
 
         return result
 
@@ -1091,32 +1576,66 @@ class SaveExtractor:
 
         budget_block = player_chunk[budget_start:budget_end]
 
-        # Extract income section
-        income_match = re.search(r'income=\s*\{', budget_block)
-        if income_match:
-            # Find country_base income (the base resources)
-            base_match = re.search(r'country_base=\s*\{([^}]+)\}', budget_block)
-            if base_match:
-                base_block = base_match.group(1)
-                for resource in ['energy', 'minerals', 'food', 'consumer_goods', 'alloys',
-                                'physics_research', 'society_research', 'engineering_research',
-                                'influence', 'unity']:
-                    res_match = re.search(rf'{resource}=([\d.]+)', base_block)
+        # All tracked resources including strategic resources (defined here for stockpiles)
+        STOCKPILE_RESOURCES = [
+            'energy', 'minerals', 'food', 'consumer_goods', 'alloys',
+            'physics_research', 'society_research', 'engineering_research',
+            'influence', 'unity', 'volatile_motes', 'exotic_gases', 'rare_crystals',
+            'sr_living_metal', 'sr_zro', 'sr_dark_matter', 'minor_artifacts', 'astral_threads'
+        ]
+
+        # Extract stockpiles from current_month last_month balance section
+        # This gives actual stockpile values, not just income base
+        last_month_match = re.search(r'last_month=\s*\{', budget_block)
+        if last_month_match:
+            lm_start = last_month_match.start()
+            lm_chunk = budget_block[lm_start:lm_start + 10000]
+            balance_match = re.search(r'balance=\s*\{([^}]+)\}', lm_chunk)
+            if balance_match:
+                balance_block = balance_match.group(1)
+                for resource in STOCKPILE_RESOURCES:
+                    res_match = re.search(rf'{resource}=([\d.-]+)', balance_block)
                     if res_match:
                         result['stockpiles'][resource] = float(res_match.group(1))
+
+        # Fallback: Extract from country_base income if stockpiles not found
+        if not result['stockpiles']:
+            income_match = re.search(r'income=\s*\{', budget_block)
+            if income_match:
+                base_match = re.search(r'country_base=\s*\{([^}]+)\}', budget_block)
+                if base_match:
+                    base_block = base_match.group(1)
+                    for resource in STOCKPILE_RESOURCES:
+                        res_match = re.search(rf'{resource}=([\d.]+)', base_block)
+                        if res_match:
+                            result['stockpiles'][resource] = float(res_match.group(1))
 
         # Extract total income from various sources
         income_resources = {}
         expenses_resources = {}
+
+        # All tracked resources including strategic resources
+        ALL_RESOURCES = [
+            # Basic resources
+            'energy', 'minerals', 'food', 'consumer_goods', 'alloys',
+            # Research
+            'physics_research', 'society_research', 'engineering_research',
+            # Influence/Unity
+            'influence', 'unity',
+            # Exotic resources
+            'volatile_motes', 'exotic_gases', 'rare_crystals',
+            # Strategic resources (late-game)
+            'sr_living_metal', 'sr_zro', 'sr_dark_matter',
+            # Special resources (DLC-dependent)
+            'minor_artifacts', 'astral_threads'
+        ]
 
         # Parse income section more thoroughly
         income_section_match = re.search(r'income=\s*\{(.+?)\}\s*expenses=', budget_block, re.DOTALL)
         if income_section_match:
             income_section = income_section_match.group(1)
             # Sum up resources from all income sources
-            for resource in ['energy', 'minerals', 'food', 'consumer_goods', 'alloys',
-                            'physics_research', 'society_research', 'engineering_research',
-                            'influence', 'unity', 'volatile_motes', 'exotic_gases', 'rare_crystals']:
+            for resource in ALL_RESOURCES:
                 matches = re.findall(rf'{resource}=([\d.]+)', income_section)
                 if matches:
                     income_resources[resource] = sum(float(m) for m in matches)
@@ -1127,9 +1646,7 @@ class SaveExtractor:
         expenses_match = re.search(r'expenses=\s*\{(.+?)\}\s*(?:balance|$)', budget_block, re.DOTALL)
         if expenses_match:
             expenses_section = expenses_match.group(1)
-            for resource in ['energy', 'minerals', 'food', 'consumer_goods', 'alloys',
-                            'physics_research', 'society_research', 'engineering_research',
-                            'influence', 'unity', 'volatile_motes', 'exotic_gases', 'rare_crystals']:
+            for resource in ALL_RESOURCES:
                 matches = re.findall(rf'{resource}=([\d.]+)', expenses_section)
                 if matches:
                     expenses_resources[resource] = sum(float(m) for m in matches)
@@ -1151,8 +1668,26 @@ class SaveExtractor:
             'consumer_goods_net': result['net_monthly'].get('consumer_goods', 0),
             'research_total': (result['net_monthly'].get('physics_research', 0) +
                               result['net_monthly'].get('society_research', 0) +
-                              result['net_monthly'].get('engineering_research', 0))
+                              result['net_monthly'].get('engineering_research', 0)),
+            # Exotic resources (mid-game)
+            'volatile_motes_net': result['net_monthly'].get('volatile_motes', 0),
+            'exotic_gases_net': result['net_monthly'].get('exotic_gases', 0),
+            'rare_crystals_net': result['net_monthly'].get('rare_crystals', 0),
+            # Strategic resources (late-game) - only include if non-zero
+            'living_metal_net': result['net_monthly'].get('sr_living_metal', 0),
+            'zro_net': result['net_monthly'].get('sr_zro', 0),
+            'dark_matter_net': result['net_monthly'].get('sr_dark_matter', 0),
+            # Special resources
+            'minor_artifacts': result['stockpiles'].get('minor_artifacts', 0),
         }
+
+        # Add strategic resource stockpiles (only if present)
+        strategic = {}
+        for res in ['sr_living_metal', 'sr_zro', 'sr_dark_matter']:
+            if res in result['stockpiles'] and result['stockpiles'][res] > 0:
+                strategic[res.replace('sr_', '')] = result['stockpiles'][res]
+        if strategic:
+            result['strategic_stockpiles'] = strategic
 
         return result
 
@@ -2277,6 +2812,22 @@ def get_starbases(extractor: SaveExtractor) -> dict:
         Dict with starbase details
     """
     return extractor.get_starbases()
+
+
+def get_pop_statistics(extractor: SaveExtractor) -> dict:
+    """Get detailed population statistics for the player's empire.
+
+    Aggregates pop data across all player-owned planets including
+    breakdowns by species, job category, stratum, and employment.
+
+    Args:
+        extractor: SaveExtractor instance
+
+    Returns:
+        Dict with population statistics including by_species, by_job_category,
+        by_stratum, happiness_avg, employed_pops, unemployed_pops
+    """
+    return extractor.get_pop_statistics()
 
 
 if __name__ == "__main__":
