@@ -7,12 +7,40 @@
 
 ## Executive Summary
 
-This document analyzes what our save_extractor.py currently extracts vs. what important Stellaris mechanics we're missing. Research includes:
+This document analyzes what our `stellaris_save_extractor/` package currently extracts vs. what important Stellaris mechanics we're missing. Research includes:
 - Analysis of 123 unique data sections in save files
 - Comparison with stellaris-dashboard project
 - Review of critical Stellaris game mechanics
 
 **Key Finding:** We're missing several high-impact strategic systems including political factions, traditions/ascension perks, fleet composition by ship class, federation details, and galactic community data.
+
+### Package Structure (for implementation reference)
+
+```
+stellaris_save_extractor/
+├── base.py        # I/O, caching, shared parsing helpers
+├── briefing.py    # Aggregators: get_full_briefing, get_slim_briefing, get_situation
+├── diplomacy.py   # Relations, treaties, fallen empires
+├── economy.py     # Resources, stockpiles
+├── military.py    # Fleets, starbases
+├── player.py      # Player status, empire identity
+├── planets.py     # Planets, pops
+├── leaders.py     # Leaders, traits
+├── technology.py  # Tech, research
+├── metadata.py    # Basic metadata
+└── extractor.py   # Composes SaveExtractor from mixins
+```
+
+### Implementation Notes (post-refactor)
+
+This project intentionally uses **regex/text scanning** over `self.gamestate` (a large string), not a fully-parsed Clausewitz dict. Code snippets copied from other projects that do `gamestate.get(...)` are **reference-only** and must be adapted.
+
+Practical guidance for implementing the gaps in this doc:
+- Prefer `SaveExtractorBase._extract_section("<top_level_key>")` to avoid repeatedly searching the full ~70MB gamestate.
+- For nested blocks, follow existing **brace-counting loops** used in current mixins (e.g. `stellaris_save_extractor/diplomacy.py`) rather than relying on non-existent helpers.
+- **Module policy (recommended):** keep domain boundaries crisp for LLM agents. If a feature is primarily *internal politics* (factions, stability drivers, elections/agendas, ethics drift indicators), implement it in a new `stellaris_save_extractor/politics.py` mixin rather than adding to `diplomacy.py`.
+  - Wiring step: add `from .politics import PoliticsMixin` and include `PoliticsMixin` in `stellaris_save_extractor/extractor.py` inheritance so `SaveExtractor` exposes the new methods.
+- Line numbers in this document are **observations from `test_save.sav` only**; do not code against them.
 
 ---
 
@@ -391,27 +419,74 @@ archaeological_sites (Line 5276904)
 
 ## Implementation Roadmap
 
+Each new extractor should be added to the appropriate module in `stellaris_save_extractor/`.
+
+For a coding-agent-friendly breakdown into small, shippable sprints, see `CODING_AGENT_SPRINTS.md`.
+
 ### Phase 1: Core Strategic Gaps (Highest Impact)
-1. **`get_factions()`** - Political faction support, approval, demands
-2. **`get_traditions()`** - Completed traditions, tree progress
-3. **`get_ascension_perks()`** - Perks taken, slots available
-4. **`get_fleet_composition()`** - Ship counts by class
-5. **`get_federation_details()`** - Type, laws, cohesion, experience
+
+| Method | Module | Description |
+|--------|--------|-------------|
+| `get_traditions()` | `player.py` | Completed traditions, tree progress |
+| `get_ascension_perks()` | `player.py` | Perks taken, slots available |
+| `get_factions()` | `politics.py` (new) | Political faction support, approval, membership counts |
+| `get_fleet_composition()` | `military.py` | Ship counts by class (extends `get_fleets()`) |
+| `get_federation_details()` | `diplomacy.py` | Type, laws, cohesion, experience |
 
 ### Phase 2: Diplomacy & Politics
-6. **`get_galactic_community()`** - Council, resolutions, voting power
-7. **`get_subjects()`** - Vassals, specializations, loyalty
-8. **Enhanced `get_diplomacy()`** - Add 6 missing relation types
+
+| Method | Module | Description |
+|--------|--------|-------------|
+| `get_galactic_community()` | `diplomacy.py` | Council, resolutions, voting power |
+| `get_subjects()` | `diplomacy.py` | Vassals, specializations, loyalty |
+| Enhanced `get_diplomacy()` | `diplomacy.py` | Add 6 missing relation types |
 
 ### Phase 3: Economy Deep Dive
-9. **`get_market()`** - Current prices, trading volume
-10. **`get_trade_value()`** - Trade policy, collection
-11. **`get_budget_breakdown()`** - Income/expense by source
+
+| Method | Module | Description |
+|--------|--------|-------------|
+| `get_market()` | `economy.py` | Current prices, trading volume |
+| `get_trade_value()` | `economy.py` | Trade policy, collection |
+| `get_budget_breakdown()` | `economy.py` | Income/expense by source |
 
 ### Phase 4: Specialty Systems
-12. **`get_espionage()`** - Spy networks, operations
-13. **`get_relics()`** - Owned relics, cooldowns
-14. **`get_archaeology()`** - Dig sites, completion status
+
+| Method | Module | Description |
+|--------|--------|-------------|
+| `get_espionage()` | `diplomacy.py` | Spy networks, operations |
+| `get_relics()` | `player.py` | Owned relics, cooldowns |
+| `get_archaeology()` | `planets.py` | Dig sites, completion status |
+
+**Note:** After adding a method to a mixin module, ensure it's exposed through the `SaveExtractor` class in `extractor.py` (automatic via mixin inheritance).
+
+### Output Schemas + Integration Points (contract)
+
+To keep downstream tools stable (Discord bot, `/ask`, history tracking), each new method should return a **small, explicit schema** with:
+- top-level lists/maps sized for context safety (avoid returning massive raw lists like pop IDs)
+- summary counts and flags
+- stable keys and types
+
+Recommended minimal contracts:
+
+- `get_traditions()` (in `player.py`)
+  - Returns: `{ "traditions": [<tradition_id>...], "by_tree": { "<tree>": { "picked": [..], "adopted": bool, "finished": bool } }, "count": int }`
+  - Integration: optionally included in `get_full_briefing()` under `"player"` or `"economy"` as a small summary (`count`, `adopted/finished` flags), and used by `/ask` only when the question targets progression/unity.
+
+- `get_ascension_perks()` (in `player.py`)
+  - Returns: `{ "ascension_perks": [<perk_id>...], "count": int }` (optionally later: `slots_total`, `slots_used` if we can extract reliably)
+  - Integration: small summary in `get_full_briefing()` / `get_situation()`; useful for build/strategy questions.
+
+- `get_factions()` (in `politics.py`, new)
+  - Returns: `{ "is_gestalt": bool, "factions": [ { "id": str, "country_id": int, "type": str, "name": str, "support_percent": float, "support_power": float, "approval": float, "members_count": int }... ], "count": int }`
+  - Integration: not required for `get_slim_briefing()`; can be pulled on-demand for stability/happiness questions.
+
+- `get_fleet_composition()` (in `military.py`)
+  - Returns: `{ "fleets": [ { "fleet_id": str, "name": str|None, "ship_classes": { "<ship_size>": int }, "total_ships": int }... ], "by_class_total": { "<ship_size>": int }, "fleet_count": int }`
+  - Integration: optional inclusion in `get_full_briefing()` as totals only (`by_class_total`) to keep the briefing small; detailed per-fleet only on demand.
+
+- `get_federation_details()` (in `diplomacy.py`)
+  - Returns: `{ "federation_id": int|None, "type": str|None, "level": int|None, "cohesion": float|int|None, "experience": float|int|None, "laws": { ... }, "members": [int...], "president": int|None }`
+  - Integration: complements existing `get_diplomacy()` (`federation` ID); optionally included in `get_full_briefing()` if `federation_id` is not null.
 
 ---
 
@@ -419,17 +494,19 @@ archaeological_sites (Line 5276904)
 
 These use similar patterns to existing extractors:
 
-1. **Traditions** - Same format as technologies, different section
-2. **Ascension Perks** - String list in country block
-3. **Relics** - Enumerated list like techs
-4. **Federation** - Parse federation section by ID
-5. **Factions** - Iterate pop_factions section
+| Feature | Target Module | Pattern |
+|---------|---------------|---------|
+| Traditions | `player.py` | Same format as technologies, string list in country block |
+| Ascension Perks | `player.py` | String list in country block |
+| Relics | `player.py` | Enumerated list like techs |
+| Federation Details | `diplomacy.py` | Parse federation section by ID |
+| Factions | `politics.py` (new) | Iterate top-level `pop_factions` section (non-gestalt only) |
 
 ---
 
 ## Data Section Reference
 
-All 123 sections found in save file with line numbers:
+All 123 sections found in `test_save.sav` with observed line numbers (non-portable):
 
 | Section | Line | Priority |
 |---------|------|----------|
@@ -457,6 +534,8 @@ All 123 sections found in save file with line numbers:
 ## Implementation Patterns (from stellaris-dashboard)
 
 These are concrete extraction patterns learned from stellaris-dashboard source code.
+
+**Important:** stellaris-dashboard parses the gamestate into nested dicts and lists. This repo does not; we scan text in `self.gamestate`. Use these as conceptual references only.
 
 ### Traditions - EASY
 **Location:** Inside country dict under `"traditions"` key
@@ -538,10 +617,16 @@ for fed_id, fed_dict in gamestate.get("federation", {}).items():
 
 ## For Our Regex-Based Parser
 
-Since we use regex on raw gamestate text (not parsed dicts), here's how to adapt:
+Since we use regex on raw gamestate text (not parsed dicts), here's how to adapt the patterns above. Each snippet shows where in the modular structure it belongs.
 
-### Traditions (in country block)
+General approach for new top-level sections:
+1. Use `self._extract_section("<section_name>")` when the data is at the top level (e.g. `pop_factions`, `federation`, `galactic_community`).
+2. When you need the player country block, use `self._find_player_country_content(player_id)` (or existing `get_player_empire_id()` + current patterns in mixins).
+3. For nested blocks, use the existing brace-counting approach used throughout the codebase (there is no `_find_matching_brace()` helper today).
+
+### Traditions → `player.py`
 ```python
+# Add to stellaris_save_extractor/player.py
 # Find traditions block in player's country section
 # Pattern: traditions={ tr_xxx tr_yyy tr_zzz }
 traditions_m = re.search(r'traditions=\s*\{([^}]+)\}', player_chunk)
@@ -549,20 +634,30 @@ if traditions_m:
     traditions = re.findall(r'(tr_\w+)', traditions_m.group(1))
 ```
 
-### Ascension Perks (in country block)
+### Ascension Perks → `player.py`
 ```python
+# Add to stellaris_save_extractor/player.py
 # Pattern: ascension_perks={ ap_xxx ap_yyy }
 perks_m = re.search(r'ascension_perks=\s*\{([^}]+)\}', player_chunk)
 if perks_m:
     perks = re.findall(r'(ap_\w+)', perks_m.group(1))
 ```
 
-### Factions (top-level section)
+### Factions → `politics.py` (new)
 ```python
-# Find pop_factions section, then iterate entries
-# Pattern: pop_factions={ 0={ country=X type="..." support=0.5 ... } 1={...} }
-faction_section_start = gamestate.find('\npop_factions=')
-# Then parse each numbered entry
+# Add to stellaris_save_extractor/politics.py (new)
+# Fetch the top-level pop_factions section and iterate entries.
+# Pattern: pop_factions={ 0={ country=X type="..." support_percent=0.5 ... } 1={...} }
+factions_section = self._extract_section("pop_factions")
+# Then parse each numbered entry using the same brace-counting loop pattern used elsewhere
+# (see current mixins for examples).
+```
+
+### Fleet Composition → `military.py`
+```python
+# Add to stellaris_save_extractor/military.py (extend get_fleets)
+# Follow reference chain: fleet → ships → ship_design → ship_size
+# Use existing _extract_section() and cached lookups (e.g. reuse patterns from get_fleets()).
 ```
 
 ---
