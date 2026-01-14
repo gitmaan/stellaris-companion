@@ -184,6 +184,185 @@ class SaveExtractor:
 
         return None
 
+    def _find_country_section_start(self) -> int:
+        """Find the start of the country={} block (not country=0 simple value).
+
+        The gamestate has both:
+        - country=0 (simple value near start, ~line 10)
+        - country=\\n{\\n\\t0=... (actual countries block, deep in file)
+
+        Returns:
+            Position of 'country=' for the block, or -1 if not found
+        """
+        # Look for country= followed by newline and opening brace
+        # This distinguishes from country=0 (simple value)
+        match = re.search(r'\ncountry=\n\{', self.gamestate)
+        if match:
+            return match.start() + 1  # +1 to skip the leading \n
+        return -1
+
+    def _find_player_country_content(self, player_id: int = 0) -> str | None:
+        """Get the content of the player's country block.
+
+        Args:
+            player_id: The player's country ID (usually 0)
+
+        Returns:
+            String content of the country block, or None if not found
+        """
+        section_start = self._find_country_section_start()
+        if section_start == -1:
+            return None
+
+        # Get a large chunk starting from the country section
+        chunk = self.gamestate[section_start:section_start + 1000000]
+
+        # Find the player's country entry: \n\t{player_id}=\n\t{
+        pattern = rf'\n\t{player_id}=\n\t\{{'
+        match = re.search(pattern, chunk)
+        if not match:
+            return None
+
+        start = match.start()
+
+        # Find the next country entry to determine the end
+        next_pattern = rf'\n\t(?:{player_id + 1}|\d+)=\n\t\{{'
+        next_match = re.search(next_pattern, chunk[start + 10:])
+        if next_match:
+            end = start + 10 + next_match.start()
+        else:
+            end = min(start + 500000, len(chunk))
+
+        return chunk[start:end]
+
+    def _find_fleet_section_start(self) -> int:
+        """Find the start of the fleet={} block.
+
+        Returns:
+            Position of 'fleet=' for the block, or -1 if not found
+        """
+        # Look for fleet= followed by newline and opening brace
+        match = re.search(r'\nfleet=\n\{', self.gamestate)
+        if match:
+            return match.start() + 1
+        return -1
+
+    def _get_owned_fleet_ids(self, country_content: str) -> list[str]:
+        """Extract fleet IDs from owned_fleets section.
+
+        The country block has:
+        - fleets={...} - fleets the player can SEE (has intel on)
+        - owned_fleets={...} - fleets the player actually OWNS
+
+        Args:
+            country_content: Content of the player's country block
+
+        Returns:
+            List of fleet ID strings that the player owns
+        """
+        # Find owned_fleets section
+        owned_match = re.search(r'owned_fleets=\s*\{', country_content)
+        if not owned_match:
+            return []
+
+        # Get content after owned_fleets={
+        content = country_content[owned_match.end():]
+
+        # Extract all fleet=N values until we hit a section at lower indent
+        # The structure is: owned_fleets=\n\t\t\t{\n\t\t\t\t{\n\t\t\t\t\tfleet=0\n\t\t\t\t}\n...
+        fleet_ids = []
+        for match in re.finditer(r'fleet=(\d+)', content[:15000]):
+            fleet_ids.append(match.group(1))
+
+        return fleet_ids
+
+    def _count_player_starbases(self, owned_fleet_ids: set[str] = None) -> dict:
+        """Count player's starbases by level using galactic_object ownership.
+
+        This finds systems where inhibitor_owners contains the player ID,
+        then looks up the starbase levels from starbase_mgr.
+
+        Args:
+            owned_fleet_ids: Ignored (kept for backwards compatibility)
+
+        Returns:
+            Dict with starbase counts by level and totals
+        """
+        result = {
+            'citadels': 0,
+            'star_fortresses': 0,
+            'starholds': 0,
+            'starports': 0,
+            'outposts': 0,
+            'orbital_rings': 0,
+            'total_upgraded': 0,  # Non-outpost starbases
+            'total_systems': 0,   # Systems owned
+            'total': 0,
+        }
+
+        player_id = self.get_player_empire_id()
+
+        # Find galactic_object section
+        galactic_match = re.search(r'^galactic_object=\s*\{', self.gamestate, re.MULTILINE)
+        if not galactic_match:
+            return result
+
+        go_chunk = self.gamestate[galactic_match.start():galactic_match.start() + 15000000]
+
+        # Find all systems owned by player (inhibitor_owners={player_id})
+        owner_pattern = rf'inhibitor_owners=\s*\{{\s*{player_id}\s*\}}'
+        owner_matches = list(re.finditer(owner_pattern, go_chunk))
+        result['total_systems'] = len(owner_matches)
+
+        # Extract starbase IDs from each owned system
+        starbase_ids = set()
+        for m in owner_matches:
+            # Look backwards to find starbases= block
+            start = max(0, m.start() - 5000)
+            context = go_chunk[start:m.end()]
+            sb_matches = list(re.finditer(r'starbases=\s*\{([^}]*)\}', context))
+            if sb_matches:
+                last_sb = sb_matches[-1]
+                ids = re.findall(r'\d+', last_sb.group(1))
+                for sb_id in ids:
+                    if sb_id != '4294967295':
+                        starbase_ids.add(sb_id)
+
+        # Find starbase_mgr section for level lookup
+        starbase_match = re.search(r'^starbase_mgr=\s*\{', self.gamestate, re.MULTILINE)
+        if not starbase_match:
+            return result
+
+        sb_chunk = self.gamestate[starbase_match.start():starbase_match.start() + 3000000]
+
+        # Get levels for each starbase
+        for sb_id in starbase_ids:
+            pattern = rf'\n\t\t{sb_id}=\s*\{{\s*\n\t\t\tlevel="([^"]+)"'
+            match = re.search(pattern, sb_chunk)
+            if match:
+                level = match.group(1)
+                result['total'] += 1
+
+                if 'citadel' in level:
+                    result['citadels'] += 1
+                    result['total_upgraded'] += 1
+                elif 'starfortress' in level:
+                    result['star_fortresses'] += 1
+                    result['total_upgraded'] += 1
+                elif 'starhold' in level:
+                    result['starholds'] += 1
+                    result['total_upgraded'] += 1
+                elif 'starport' in level:
+                    result['starports'] += 1
+                    result['total_upgraded'] += 1
+                elif 'orbital_ring' in level:
+                    result['orbital_rings'] += 1
+                    result['total_upgraded'] += 1
+                elif 'outpost' in level:
+                    result['outposts'] += 1
+
+        return result
+
     def get_player_empire_id(self) -> int:
         """Get the player's country ID.
 
@@ -211,15 +390,11 @@ class SaveExtractor:
             'date': self.get_metadata().get('date', 'Unknown'),
         }
 
-        # Find the country section (it's deep in the file, ~21MB in)
-        country_match = re.search(r'^country=\s*\{', self.gamestate, re.MULTILINE)
+        # Get the player's country block using proper section detection
+        country_content = self._find_player_country_content(player_id)
 
-        if country_match:
-            # Get a large chunk from country section to find player data
-            start = country_match.start()
-            country_chunk = self.gamestate[start:start + 500000]  # 500k chars
-
-            # Extract metrics - these appear in order for country 0
+        if country_content:
+            # Extract metrics from the player's country block
             metrics = {
                 'military_power': r'military_power\s*=\s*([\d.]+)',
                 'economy_power': r'economy_power\s*=\s*([\d.]+)',
@@ -229,19 +404,31 @@ class SaveExtractor:
             }
 
             for key, pattern in metrics.items():
-                match = re.search(pattern, country_chunk)
+                match = re.search(pattern, country_content)
                 if match:
                     value = match.group(1)
                     result[key] = float(value) if '.' in value else int(value)
 
-            # Find fleets list
-            fleets_match = re.search(r'fleets\s*=\s*\{([^}]+)\}', country_chunk)
-            if fleets_match:
-                fleet_ids = re.findall(r'\d+', fleets_match.group(1))
-                result['fleet_count'] = len(fleet_ids)
+            # Get OWNED fleets (not just visible fleets)
+            owned_fleet_ids = self._get_owned_fleet_ids(country_content)
+            owned_set = set(owned_fleet_ids)
+
+            if owned_fleet_ids:
+                # Analyze the owned fleets
+                fleet_analysis = self._analyze_player_fleets(owned_fleet_ids)
+                result['military_fleet_count'] = fleet_analysis['military_fleet_count']
+                result['military_ships'] = fleet_analysis['military_ships']
+                # Keep fleet_count for backwards compatibility
+                result['fleet_count'] = fleet_analysis['military_fleet_count']
+
+                # Get accurate starbase count from starbase_mgr
+                starbase_info = self._count_player_starbases(owned_set)
+                result['starbase_count'] = starbase_info['total_upgraded']
+                result['outpost_count'] = starbase_info['outposts']
+                result['starbases'] = starbase_info
 
             # Find controlled planets (all celestial bodies in territory)
-            controlled_match = re.search(r'controlled_planets\s*=\s*\{([^}]+)\}', country_chunk)
+            controlled_match = re.search(r'controlled_planets\s*=\s*\{([^}]+)\}', country_content)
             if controlled_match:
                 planet_ids = re.findall(r'\d+', controlled_match.group(1))
                 result['celestial_bodies_in_territory'] = len(planet_ids)
@@ -416,33 +603,144 @@ class SaveExtractor:
 
         return result
 
-    def get_fleets(self) -> dict:
-        """Get player's fleet information.
+    def _analyze_player_fleets(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
+        """Analyze player's fleet IDs to categorize them properly.
+
+        This distinguishes between:
+        - Starbases (station=yes)
+        - Military fleets (non-station, military_power > 0)
+        - Civilian fleets (science ships, construction ships, transports)
+
+        Args:
+            fleet_ids: List of fleet ID strings from player's country block
+            max_to_analyze: Max fleets to analyze in detail (for performance)
 
         Returns:
-            Dict with fleet details
+            Dict with categorized fleet counts and details
         """
-        result = {'fleets': [], 'count': 0}
+        result = {
+            'total_fleet_ids': len(fleet_ids),
+            'starbase_count': 0,
+            'military_fleet_count': 0,
+            'civilian_fleet_count': 0,
+            'military_ships': 0,
+            'total_military_power': 0.0,
+            'military_fleets': [],  # List of military fleet details
+        }
 
+        # Find the fleet section using robust detection
+        fleet_section_start = self._find_fleet_section_start()
+        if fleet_section_start == -1:
+            return result
+
+        fleet_section = self.gamestate[fleet_section_start:]
+
+        # Analyze fleets (limit for performance in huge saves)
+        analyzed = 0
+        for fid in fleet_ids:
+            if analyzed >= max_to_analyze:
+                # Estimate remaining based on ratios
+                ratio = len(fleet_ids) / max_to_analyze
+                result['starbase_count'] = int(result['starbase_count'] * ratio)
+                result['military_fleet_count'] = int(result['military_fleet_count'] * ratio)
+                result['civilian_fleet_count'] = int(result['civilian_fleet_count'] * ratio)
+                result['_note'] = f'Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs'
+                break
+
+            # Pattern must match fleet ID at start of line with tab indent
+            # This avoids matching ship IDs inside other fleet blocks
+            pattern = rf'\n\t{fid}=\n\t\{{'
+            match = re.search(pattern, fleet_section)
+            if not match:
+                continue
+
+            fleet_data = fleet_section[match.start():match.start() + 2500]
+            analyzed += 1
+
+            is_station = 'station=yes' in fleet_data
+            is_civilian = 'civilian=yes' in fleet_data
+
+            # Count ships
+            ships_match = re.search(r'ships=\s*\{([^}]+)\}', fleet_data)
+            ship_count = len(ships_match.group(1).split()) if ships_match else 0
+
+            # Get military power
+            mp_match = re.search(r'military_power=([\d.]+)', fleet_data)
+            mp = float(mp_match.group(1)) if mp_match else 0.0
+
+            if is_station:
+                result['starbase_count'] += 1
+            elif is_civilian:
+                result['civilian_fleet_count'] += 1
+            elif mp > 100:  # Threshold filters out space creatures with tiny mp
+                result['military_fleet_count'] += 1
+                result['military_ships'] += ship_count
+                result['total_military_power'] += mp
+
+                # Extract fleet name for military fleets
+                name_match = re.search(r'key="([^"]+)"', fleet_data)
+                fleet_name = name_match.group(1) if name_match else f"Fleet {fid}"
+                # Clean up localization keys
+                if fleet_name.startswith('shipclass_'):
+                    fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
+
+                if len(result['military_fleets']) < 20:  # Keep top 20
+                    result['military_fleets'].append({
+                        'id': fid,
+                        'name': fleet_name,
+                        'ships': ship_count,
+                        'military_power': round(mp, 0),
+                    })
+            else:
+                result['civilian_fleet_count'] += 1
+
+        return result
+
+    def get_fleets(self) -> dict:
+        """Get player's fleet information with proper categorization.
+
+        Returns:
+            Dict with military fleets, starbases, and civilian fleet counts.
+            The 'fleets' list contains actual military combat fleets, not starbases
+            or civilian ships (science, construction, transport).
+        """
+        result = {
+            'fleets': [],
+            'count': 0,
+            'military_fleet_count': 0,
+            'starbase_count': 0,
+            'civilian_fleet_count': 0,
+            'military_ships': 0,
+            'total_military_power': 0.0,
+        }
+
+        # Get the player's country block using proper section detection
         player_id = self.get_player_empire_id()
+        country_content = self._find_player_country_content(player_id)
+        if not country_content:
+            return result
 
-        # Find fleets owned by player
-        fleet_pattern = rf'owner\s*=\s*{player_id}[^}}]*name\s*=\s*"([^"]+)"'
+        # Get OWNED fleets (not just visible fleets)
+        owned_fleet_ids = self._get_owned_fleet_ids(country_content)
+        if not owned_fleet_ids:
+            return result
 
-        # Search in chunks to avoid regex issues with huge strings
-        chunk_size = 1000000
-        fleet_names = []
+        # Analyze the owned fleets
+        analysis = self._analyze_player_fleets(owned_fleet_ids)
 
-        for i in range(0, len(self.gamestate), chunk_size):
-            chunk = self.gamestate[i:i + chunk_size + 10000]  # Overlap
-            matches = re.findall(fleet_pattern, chunk)
-            fleet_names.extend(matches)
+        result['count'] = analysis['military_fleet_count']
+        result['military_fleet_count'] = analysis['military_fleet_count']
+        result['civilian_fleet_count'] = analysis['civilian_fleet_count']
+        result['military_ships'] = analysis['military_ships']
+        result['total_military_power'] = analysis['total_military_power']
+        result['fleets'] = analysis['military_fleets']
+        result['fleet_names'] = [f['name'] for f in analysis['military_fleets']]
 
-        # Deduplicate
-        fleet_names = list(set(fleet_names))
-
-        result['count'] = len(fleet_names)
-        result['fleet_names'] = fleet_names[:20]  # First 20
+        # Get accurate starbase count from starbase_mgr
+        owned_set = set(owned_fleet_ids)
+        starbase_info = self._count_player_starbases(owned_set)
+        result['starbase_count'] = starbase_info['total_upgraded']
+        result['starbases'] = starbase_info
 
         return result
 
@@ -1314,8 +1612,9 @@ class SaveExtractor:
             },
             'military': {
                 'military_power': player_clean.get('military_power'),
-                'fleet_count': player_clean.get('fleet_count'),
-                'fleet_size': player_clean.get('fleet_size'),
+                'military_fleets': player_clean.get('military_fleet_count'),
+                'military_ships': player_clean.get('military_ships'),
+                'starbases': player_clean.get('starbase_count'),
             },
             'economy': {
                 'economy_power': player_clean.get('economy_power'),
@@ -1402,8 +1701,9 @@ class SaveExtractor:
             },
             'military': {
                 'power': player.get('military_power'),
-                'fleet_count': player.get('fleet_count'),
-                'fleet_size': player.get('fleet_size'),
+                'military_fleets': player.get('military_fleet_count'),
+                'military_ships': player.get('military_ships'),
+                'starbases': player.get('starbase_count'),
             },
             'economy': {
                 'power': player.get('economy_power'),
