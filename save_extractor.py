@@ -276,14 +276,87 @@ class SaveExtractor:
 
         return fleet_ids
 
-    def _count_player_starbases(self, owned_fleet_ids: set[str] = None) -> dict:
-        """Count player's starbases by level using galactic_object ownership.
+    def _get_ship_to_fleet_mapping(self) -> dict[str, str]:
+        """Build a mapping of ship IDs to their fleet IDs.
 
-        This finds systems where inhibitor_owners contains the player ID,
-        then looks up the starbase levels from starbase_mgr.
+        Returns:
+            Dict mapping ship_id (str) -> fleet_id (str)
+        """
+        ships_match = re.search(r'^ships=\s*\{', self.gamestate, re.MULTILINE)
+        if not ships_match:
+            return {}
+
+        ship_to_fleet = {}
+        ships_chunk = self.gamestate[ships_match.start():ships_match.start() + 80000000]
+
+        # Find each ship entry and extract its fleet ID
+        # Ships may have auras={} or other blocks before fleet=
+        ship_entries = list(re.finditer(r'\n\t(\d+)=\n\t\{', ships_chunk))
+
+        for i, entry in enumerate(ship_entries):
+            ship_id = entry.group(1)
+
+            # Get content until next ship entry or 3000 chars
+            start = entry.start() + 1
+            if i + 1 < len(ship_entries):
+                end = min(ship_entries[i + 1].start(), start + 3000)
+            else:
+                end = start + 3000
+
+            content = ships_chunk[start:end]
+
+            # Find fleet= anywhere in this ship's content
+            fleet_m = re.search(r'\n\t\tfleet=(\d+)', content)
+            if fleet_m:
+                ship_to_fleet[ship_id] = fleet_m.group(1)
+
+        return ship_to_fleet
+
+    def _get_player_owned_fleet_ids(self) -> set[str]:
+        """Get all fleet IDs owned by the player.
+
+        Uses fleets_manager.owned_fleets from the player's country data.
+
+        Returns:
+            Set of fleet ID strings owned by the player
+        """
+        owned_fleet_ids = set()
+
+        # Find country section
+        country_match = re.search(r'\ncountry=\n\{', self.gamestate)
+        if not country_match:
+            return owned_fleet_ids
+
+        country_start = country_match.start() + 1
+        country_chunk = self.gamestate[country_start:country_start + 2000000]
+
+        # Find player country (usually 0=)
+        player_id = self.get_player_empire_id()
+        player_pattern = rf'\n\t{player_id}=\n\t\{{'
+        player_match = re.search(player_pattern, country_chunk)
+        if not player_match:
+            return owned_fleet_ids
+
+        player_content = country_chunk[player_match.start():player_match.start() + 500000]
+
+        # Find fleets_manager.owned_fleets
+        fleets_mgr_match = re.search(r'fleets_manager=\s*\{', player_content)
+        if not fleets_mgr_match:
+            return owned_fleet_ids
+
+        content = player_content[fleets_mgr_match.start():fleets_mgr_match.start() + 50000]
+        for m in re.finditer(r'fleet=(\d+)', content):
+            owned_fleet_ids.add(m.group(1))
+
+        return owned_fleet_ids
+
+    def _count_player_starbases(self, owned_fleet_ids: set[str] = None) -> dict:
+        """Count player's starbases by level using ship→fleet ownership chain.
+
+        Traces ownership: starbase.station (ship ID) → ship.fleet → player's owned_fleets
 
         Args:
-            owned_fleet_ids: Ignored (kept for backwards compatibility)
+            owned_fleet_ids: Optional pre-computed set of player fleet IDs
 
         Returns:
             Dict with starbase counts by level and totals
@@ -295,71 +368,75 @@ class SaveExtractor:
             'starports': 0,
             'outposts': 0,
             'orbital_rings': 0,
-            'total_upgraded': 0,  # Non-outpost starbases
-            'total_systems': 0,   # Systems owned
-            'total': 0,
+            'total_upgraded': 0,  # Non-outpost, non-orbital starbases (count against capacity)
+            'total_systems': 0,   # Systems owned (starbases excluding orbital rings)
+            'total': 0,           # All starbases including orbital rings
         }
 
-        player_id = self.get_player_empire_id()
+        # Get player's owned fleet IDs
+        if owned_fleet_ids is None:
+            owned_fleet_ids = self._get_player_owned_fleet_ids()
 
-        # Find galactic_object section
-        galactic_match = re.search(r'^galactic_object=\s*\{', self.gamestate, re.MULTILINE)
-        if not galactic_match:
+        if not owned_fleet_ids:
             return result
 
-        go_chunk = self.gamestate[galactic_match.start():galactic_match.start() + 15000000]
+        # Build ship→fleet mapping
+        ship_to_fleet = self._get_ship_to_fleet_mapping()
+        if not ship_to_fleet:
+            return result
 
-        # Find all systems owned by player (inhibitor_owners={player_id})
-        owner_pattern = rf'inhibitor_owners=\s*\{{\s*{player_id}\s*\}}'
-        owner_matches = list(re.finditer(owner_pattern, go_chunk))
-        result['total_systems'] = len(owner_matches)
-
-        # Extract starbase IDs from each owned system
-        starbase_ids = set()
-        for m in owner_matches:
-            # Look backwards to find starbases= block
-            start = max(0, m.start() - 5000)
-            context = go_chunk[start:m.end()]
-            sb_matches = list(re.finditer(r'starbases=\s*\{([^}]*)\}', context))
-            if sb_matches:
-                last_sb = sb_matches[-1]
-                ids = re.findall(r'\d+', last_sb.group(1))
-                for sb_id in ids:
-                    if sb_id != '4294967295':
-                        starbase_ids.add(sb_id)
-
-        # Find starbase_mgr section for level lookup
+        # Find starbase_mgr section
         starbase_match = re.search(r'^starbase_mgr=\s*\{', self.gamestate, re.MULTILINE)
         if not starbase_match:
             return result
 
-        sb_chunk = self.gamestate[starbase_match.start():starbase_match.start() + 3000000]
+        sb_chunk = self.gamestate[starbase_match.start():starbase_match.start() + 5000000]
 
-        # Get levels for each starbase
-        for sb_id in starbase_ids:
-            pattern = rf'\n\t\t{sb_id}=\s*\{{\s*\n\t\t\tlevel="([^"]+)"'
-            match = re.search(pattern, sb_chunk)
-            if match:
-                level = match.group(1)
-                result['total'] += 1
+        # Parse each starbase entry
+        for m in re.finditer(r'\n\t\t(\d+)=\n\t\t\{', sb_chunk):
+            sb_id = m.group(1)
+            content = sb_chunk[m.start():m.start() + 2000]
 
-                if 'citadel' in level:
-                    result['citadels'] += 1
-                    result['total_upgraded'] += 1
-                elif 'starfortress' in level:
-                    result['star_fortresses'] += 1
-                    result['total_upgraded'] += 1
-                elif 'starhold' in level:
-                    result['starholds'] += 1
-                    result['total_upgraded'] += 1
-                elif 'starport' in level:
-                    result['starports'] += 1
-                    result['total_upgraded'] += 1
-                elif 'orbital_ring' in level:
-                    result['orbital_rings'] += 1
-                    result['total_upgraded'] += 1
-                elif 'outpost' in level:
-                    result['outposts'] += 1
+            # Get level and station (ship ID)
+            level_m = re.search(r'level="([^"]+)"', content)
+            station_m = re.search(r'\n\t\t\tstation=(\d+)\n', content)
+
+            if not station_m:
+                continue
+
+            ship_id = station_m.group(1)
+            level = level_m.group(1) if level_m else 'unknown'
+
+            # Trace ownership: ship → fleet → player?
+            fleet_id = ship_to_fleet.get(ship_id)
+            if not fleet_id or fleet_id not in owned_fleet_ids:
+                continue
+
+            # This starbase belongs to the player
+            result['total'] += 1
+
+            if 'citadel' in level:
+                result['citadels'] += 1
+                result['total_upgraded'] += 1
+                result['total_systems'] += 1
+            elif 'starfortress' in level:
+                result['star_fortresses'] += 1
+                result['total_upgraded'] += 1
+                result['total_systems'] += 1
+            elif 'starhold' in level:
+                result['starholds'] += 1
+                result['total_upgraded'] += 1
+                result['total_systems'] += 1
+            elif 'starport' in level:
+                result['starports'] += 1
+                result['total_upgraded'] += 1
+                result['total_systems'] += 1
+            elif 'orbital_ring' in level:
+                result['orbital_rings'] += 1
+                # Orbital rings don't count against starbase capacity or as systems
+            elif 'outpost' in level:
+                result['outposts'] += 1
+                result['total_systems'] += 1
 
         return result
 
