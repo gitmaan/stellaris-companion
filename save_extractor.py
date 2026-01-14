@@ -1553,7 +1553,8 @@ class SaveExtractor:
             return result
 
         player_start = start + player_match.start()
-        player_chunk = self.gamestate[player_start:player_start + 200000]
+        # Need larger chunk to reach standard_economy_module (around offset 300k+)
+        player_chunk = self.gamestate[player_start:player_start + 400000]
 
         # Find budget section
         budget_match = re.search(r'budget=\s*\{', player_chunk)
@@ -1576,7 +1577,7 @@ class SaveExtractor:
 
         budget_block = player_chunk[budget_start:budget_end]
 
-        # All tracked resources including strategic resources (defined here for stockpiles)
+        # All tracked resources including strategic resources
         STOCKPILE_RESOURCES = [
             'energy', 'minerals', 'food', 'consumer_goods', 'alloys',
             'physics_research', 'society_research', 'engineering_research',
@@ -1584,31 +1585,19 @@ class SaveExtractor:
             'sr_living_metal', 'sr_zro', 'sr_dark_matter', 'minor_artifacts', 'astral_threads'
         ]
 
-        # Extract stockpiles from current_month last_month balance section
-        # This gives actual stockpile values, not just income base
-        last_month_match = re.search(r'last_month=\s*\{', budget_block)
-        if last_month_match:
-            lm_start = last_month_match.start()
-            lm_chunk = budget_block[lm_start:lm_start + 10000]
-            balance_match = re.search(r'balance=\s*\{([^}]+)\}', lm_chunk)
-            if balance_match:
-                balance_block = balance_match.group(1)
+        # Extract ACTUAL stockpiles from standard_economy_module.resources
+        # This is where Stellaris stores the current accumulated resource values
+        econ_module_match = re.search(r'standard_economy_module=\s*\{', player_chunk)
+        if econ_module_match:
+            econ_start = econ_module_match.start()
+            econ_chunk = player_chunk[econ_start:econ_start + 3000]
+            resources_match = re.search(r'resources=\s*\{([^}]+)\}', econ_chunk)
+            if resources_match:
+                resources_block = resources_match.group(1)
                 for resource in STOCKPILE_RESOURCES:
-                    res_match = re.search(rf'{resource}=([\d.-]+)', balance_block)
+                    res_match = re.search(rf'{resource}=([\d.-]+)', resources_block)
                     if res_match:
                         result['stockpiles'][resource] = float(res_match.group(1))
-
-        # Fallback: Extract from country_base income if stockpiles not found
-        if not result['stockpiles']:
-            income_match = re.search(r'income=\s*\{', budget_block)
-            if income_match:
-                base_match = re.search(r'country_base=\s*\{([^}]+)\}', budget_block)
-                if base_match:
-                    base_block = base_match.group(1)
-                    for resource in STOCKPILE_RESOURCES:
-                        res_match = re.search(rf'{resource}=([\d.]+)', base_block)
-                        if res_match:
-                            result['stockpiles'][resource] = float(res_match.group(1))
 
         # Extract total income from various sources
         income_resources = {}
