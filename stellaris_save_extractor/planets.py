@@ -158,3 +158,135 @@ class PlanetsMixin:
 
         return result
 
+    def get_archaeology(self, limit: int = 25) -> dict:
+        """Get archaeological dig sites and progress (summary-first, capped)."""
+        limit = max(1, min(int(limit or 25), 50))
+
+        result = {
+            'sites': [],
+            'count': 0,
+        }
+
+        section = self._extract_section('archaeological_sites')
+        if not section:
+            result['error'] = 'Could not find archaeological_sites section'
+            return result
+
+        # Extract sites={ ... } block.
+        sites_match = re.search(r'\bsites\s*=\s*\{', section)
+        if not sites_match:
+            return result
+
+        sites_start = sites_match.start()
+        brace_count = 0
+        sites_end = None
+        started = False
+        for i, ch in enumerate(section[sites_start:], sites_start):
+            if ch == '{':
+                brace_count += 1
+                started = True
+            elif ch == '}':
+                brace_count -= 1
+                if started and brace_count == 0:
+                    sites_end = i + 1
+                    break
+        if sites_end is None:
+            return result
+
+        sites_block = section[sites_start:sites_end]
+
+        site_pattern = r'\n\t\t(\d+)=\n\t\t\{'
+        sites_found: list[dict] = []
+
+        def extract_key_block(text: str, key: str) -> str | None:
+            m = re.search(rf'\b{re.escape(key)}\s*=\s*\{{', text)
+            if not m:
+                return None
+            start = m.start()
+            brace_count = 0
+            started = False
+            for i, ch in enumerate(text[start:], start):
+                if ch == '{':
+                    brace_count += 1
+                    started = True
+                elif ch == '}':
+                    brace_count -= 1
+                    if started and brace_count == 0:
+                        return text[start : i + 1]
+            return None
+
+        for match in re.finditer(site_pattern, sites_block):
+            site_id = match.group(1)
+            block_start = match.start() + 1
+
+            brace_count = 0
+            block_end = None
+            started = False
+            for i, ch in enumerate(sites_block[block_start:], block_start):
+                if ch == '{':
+                    brace_count += 1
+                    started = True
+                elif ch == '}':
+                    brace_count -= 1
+                    if started and brace_count == 0:
+                        block_end = i + 1
+                        break
+            if block_end is None:
+                continue
+
+            site_block = sites_block[block_start:block_end]
+
+            entry = {
+                'site_id': site_id,
+                'type': None,
+                'location': None,
+                'index': None,
+                'clues': None,
+                'difficulty': None,
+                'days_left': None,
+                'locked': None,
+                'last_excavator_country': None,
+                'excavator_fleet': None,
+                'completed_count': 0,
+                'last_completed_date': None,
+                'events_count': 0,
+                'active_events_count': 0,
+            }
+
+            type_match = re.search(r'\btype="([^"]+)"', site_block)
+            if type_match:
+                entry['type'] = type_match.group(1)
+
+            location_match = re.search(r'\blocation\s*=\s*\{\s*type=(\d+)\s*id=(\d+)\s*\}', site_block)
+            if location_match:
+                entry['location'] = {'type': int(location_match.group(1)), 'id': int(location_match.group(2))}
+
+            for key in ['index', 'clues', 'difficulty', 'days_left', 'last_excavator_country', 'excavator_fleet']:
+                m = re.search(rf'\b{key}=([-\d]+)', site_block)
+                if m:
+                    entry[key] = int(m.group(1))
+
+            locked_match = re.search(r'\blocked=(yes|no)\b', site_block)
+            if locked_match:
+                entry['locked'] = locked_match.group(1) == 'yes'
+
+            completed_block = extract_key_block(site_block, 'completed') or ''
+            if completed_block:
+                entry['completed_count'] = len(re.findall(r'\bcountry=(\d+)', completed_block))
+                dates = re.findall(r'\bdate=\s*"(\d+\.\d+\.\d+)"', completed_block)
+                if dates:
+                    entry['last_completed_date'] = dates[-1]
+
+            events_block = extract_key_block(site_block, 'events') or ''
+            if events_block:
+                event_ids = re.findall(r'\bevent_id="([^"]+)"', events_block)
+                entry['events_count'] = len(event_ids)
+                entry['active_events_count'] = len(re.findall(r'\bexpired=no\b', events_block))
+
+            sites_found.append(entry)
+            if len(sites_found) >= limit:
+                break
+
+        result['sites'] = sites_found
+        result['count'] = len(sites_found)
+        return result

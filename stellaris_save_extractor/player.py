@@ -405,3 +405,76 @@ class PlayerMixin:
         result["ascension_perks"] = perks
         result["count"] = len(perks)
         return result
+
+    def get_relics(self) -> dict:
+        """Extract owned relics and activation cooldown (best-effort).
+
+        Returns:
+            Dict with:
+              - relics: list[str]
+              - count: int
+              - last_activated_relic: str|None
+              - last_received_relic: str|None
+              - activation_cooldown_days: int|None
+        """
+        result = {
+            "relics": [],
+            "count": 0,
+            "last_activated_relic": None,
+            "last_received_relic": None,
+            "activation_cooldown_days": None,
+        }
+
+        player_id = self.get_player_empire_id()
+        country_section = self._extract_section("country")
+        if not country_section:
+            return result
+
+        entry_match = re.search(rf"\n\t{player_id}=\n\t\{{", country_section)
+        if not entry_match:
+            entry_match = re.search(rf"\n\t{player_id}\s*=\s*\{{", country_section)
+        if not entry_match:
+            return result
+
+        start = entry_match.start() + 1
+        brace_count = 0
+        started = False
+        end = None
+        for i, ch in enumerate(country_section[start:], start):
+            if ch == "{":
+                brace_count += 1
+                started = True
+            elif ch == "}":
+                brace_count -= 1
+                if started and brace_count == 0:
+                    end = i + 1
+                    break
+        if end is None:
+            return result
+
+        player_block = country_section[start:end]
+
+        relics_block = self._extract_braced_block(player_block, "relics")
+        relics = self._parse_simple_string_list_block(relics_block or "", prefix="r_")
+        result["relics"] = relics
+        result["count"] = len(relics)
+
+        last_activated = re.search(r'\blast_activated_relic="([^"]+)"', player_block)
+        if last_activated:
+            result["last_activated_relic"] = last_activated.group(1)
+
+        last_received = re.search(r'\blast_received_relic="([^"]+)"', player_block)
+        if last_received:
+            result["last_received_relic"] = last_received.group(1)
+
+        cooldown = re.search(
+            r'modifier="relic_activation_cooldown"[\s\S]{0,200}?\bdays=([-\d]+)',
+            player_block,
+        )
+        if cooldown:
+            try:
+                result["activation_cooldown_days"] = int(cooldown.group(1))
+            except ValueError:
+                result["activation_cooldown_days"] = None
+
+        return result

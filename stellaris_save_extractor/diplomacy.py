@@ -723,3 +723,103 @@ class DiplomacyMixin:
         result['total_count'] = len(result['fallen_empires'])
 
         return result
+
+    def get_espionage(self, limit: int = 20) -> dict:
+        """Get active espionage operations (summary-first, capped)."""
+        limit = max(1, min(int(limit or 20), 50))
+
+        result = {
+            'player_id': self.get_player_empire_id(),
+            'operations': [],
+            'count': 0,
+        }
+
+        section = self._extract_section('espionage_operations')
+        if not section:
+            result['error'] = 'Could not find espionage_operations section'
+            return result
+
+        operations_block = self._extract_braced_block(section, 'operations') or ''
+        if not operations_block:
+            return result
+
+        op_pattern = r'\n\t\t(\d+)=\n\t\t\{'
+        operations_found: list[dict] = []
+
+        for match in re.finditer(op_pattern, operations_block):
+            op_id = match.group(1)
+            block_start = match.start() + 1
+
+            brace_count = 0
+            block_end = None
+            started = False
+            for i, ch in enumerate(operations_block[block_start:], block_start):
+                if ch == '{':
+                    brace_count += 1
+                    started = True
+                elif ch == '}':
+                    brace_count -= 1
+                    if started and brace_count == 0:
+                        block_end = i + 1
+                        break
+            if block_end is None:
+                continue
+
+            op_block = operations_block[block_start:block_end]
+
+            entry = {
+                'operation_id': op_id,
+                'target_country_id': None,
+                'spy_network_id': None,
+                'type': None,
+                'difficulty': None,
+                'days_left': None,
+                'info': None,
+                'log_entries': 0,
+                'last_log': None,
+            }
+
+            target_block = self._extract_braced_block(op_block, 'target') or ''
+            if target_block:
+                target_id = re.search(r'\bid=(\d+)', target_block)
+                if target_id:
+                    entry['target_country_id'] = int(target_id.group(1))
+
+            spy_network = re.search(r'\bspy_network=(\d+)', op_block)
+            if spy_network:
+                entry['spy_network_id'] = int(spy_network.group(1))
+
+            type_match = re.search(r'\btype="([^"]+)"', op_block)
+            if type_match:
+                entry['type'] = type_match.group(1)
+
+            for key in ['difficulty', 'days_left', 'info']:
+                m = re.search(rf'\b{key}=([-\d]+)', op_block)
+                if m:
+                    entry[key] = int(m.group(1))
+
+            log_block = self._extract_braced_block(op_block, 'log') or ''
+            if log_block:
+                dates = re.findall(r'\bdate=\s*"(\d+\.\d+\.\d+)"', log_block)
+                rolls = re.findall(r'\broll=([-\d]+)', log_block)
+                skills = re.findall(r'\bskill=([-\d]+)', log_block)
+                infos = re.findall(r'\binfo=([-\d]+)', log_block)
+                diffs = re.findall(r'\bdifficulty=([-\d]+)', log_block)
+
+                entry['log_entries'] = len(rolls) if rolls else max(len(dates), 0)
+                if dates or rolls:
+                    entry['last_log'] = {
+                        'date': dates[-1] if dates else None,
+                        'roll': int(rolls[-1]) if rolls else None,
+                        'skill': int(skills[-1]) if skills else None,
+                        'info': int(infos[-1]) if infos else None,
+                        'difficulty': int(diffs[-1]) if diffs else None,
+                    }
+
+            operations_found.append(entry)
+            if len(operations_found) >= limit:
+                break
+
+        result['operations'] = operations_found
+        result['count'] = len(operations_found)
+        return result
