@@ -226,6 +226,26 @@ def _extract_crisis(briefing: dict[str, Any]) -> dict[str, Any]:
     return crisis
 
 
+def _extract_awakened_empires(briefing: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Extract awakened fallen empires keyed by name."""
+    history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
+    awakened = history.get("awakened_empires") if isinstance(history, dict) else None
+    if not isinstance(awakened, dict):
+        return {}
+    empire_list = awakened.get("awakened_empires") or []
+    if not isinstance(empire_list, list):
+        return {}
+    result: dict[str, dict[str, Any]] = {}
+    for e in empire_list:
+        if not isinstance(e, dict):
+            continue
+        name = e.get("name")
+        if not name:
+            continue
+        result[str(name)] = e
+    return result
+
+
 def compute_events(
     *,
     prev: dict[str, Any],
@@ -708,6 +728,46 @@ def compute_events(
                 event_type="crisis_defeated",
                 summary=f"Crisis defeated: {crisis_type.replace('_', ' ').title()}",
                 data={"crisis_type": crisis_type, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+            )
+        )
+
+    # Awakened Fallen Empire detection
+    prev_awakened = _extract_awakened_empires(prev)
+    curr_awakened = _extract_awakened_empires(curr)
+    new_awakened = set(curr_awakened.keys()) - set(prev_awakened.keys())
+    for name in sorted(new_awakened):
+        empire = curr_awakened[name]
+        original_type = empire.get("original_type", "Unknown")
+        military_power = empire.get("military_power")
+        power_text = f" ({military_power:,.0f} power)" if military_power else ""
+        events.append(
+            DetectedEvent(
+                event_type="fallen_empire_awakened",
+                summary=f"Fallen Empire awakened: {name} ({original_type}){power_text}",
+                data={
+                    "name": name,
+                    "original_type": original_type,
+                    "ethics": empire.get("ethics"),
+                    "military_power": military_power,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
+            )
+        )
+
+    # War in Heaven detection (two awakened empires fighting)
+    prev_war_in_heaven = prev.get("history", {}).get("awakened_empires", {}).get("war_in_heaven", False)
+    curr_war_in_heaven = curr.get("history", {}).get("awakened_empires", {}).get("war_in_heaven", False)
+    if not prev_war_in_heaven and curr_war_in_heaven:
+        events.append(
+            DetectedEvent(
+                event_type="war_in_heaven_started",
+                summary="War in Heaven has begun! Two Awakened Empires are at war.",
+                data={
+                    "awakened_empires": list(curr_awakened.keys()),
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
 

@@ -548,6 +548,80 @@ def extract_system_count_from_gamestate(*, gamestate: str | None, player_id: int
     return None
 
 
+def extract_awakened_empires_from_gamestate(gamestate: str | None) -> dict[str, Any] | None:
+    """Extract awakened fallen empire information for event detection."""
+    if not gamestate:
+        return None
+
+    import re
+
+    # Find all awakened fallen empires by type
+    awakened_positions = [m.start() for m in re.finditer(r'type="awakened_fallen_empire"', gamestate)]
+    if not awakened_positions:
+        return {"awakened_empires": [], "count": 0, "war_in_heaven": False}
+
+    awakened_empires: list[dict[str, Any]] = []
+
+    # Fallen empire type mapping based on ethics
+    FE_TYPE_MAP = {
+        "xenophile": "Benevolent Interventionists",
+        "xenophobe": "Militant Isolationists",
+        "materialist": "Ancient Caretakers",
+        "spiritualist": "Holy Guardians",
+    }
+
+    for pos in awakened_positions:
+        # Find the country block containing this awakened empire
+        country_start = gamestate.rfind("\n\t", max(0, pos - 500000), pos)
+        if country_start == -1:
+            continue
+
+        # Extract a bounded chunk around the country
+        chunk_start = max(0, country_start - 1000)
+        chunk = gamestate[chunk_start : pos + 200000]
+
+        # Find empire name
+        name_match = re.search(r'name="([^"]+)"', chunk)
+        name = name_match.group(1) if name_match else "Unknown Awakened Empire"
+
+        # Find military power
+        mil_match = re.search(r'\n\t*military_power=([\d.]+)', chunk)
+        military_power = float(mil_match.group(1)) if mil_match else None
+
+        # Find ethics (need to search deeper in the country block for ethos={})
+        ethics = []
+        ethos_match = re.search(r'ethos=\s*\{([^}]+)\}', chunk)
+        if ethos_match:
+            ethos_block = ethos_match.group(1)
+            for e in re.finditer(r'ethic="([^"]+)"', ethos_block):
+                ethics.append(e.group(1))
+
+        # Determine original FE type from ethics
+        original_type = "Unknown"
+        for ethic in ethics:
+            ethic_lower = ethic.lower()
+            for key, fe_type in FE_TYPE_MAP.items():
+                if key in ethic_lower:
+                    original_type = fe_type
+                    break
+
+        awakened_empires.append({
+            "name": name,
+            "ethics": ethics,
+            "military_power": military_power,
+            "original_type": original_type,
+        })
+
+    # Check for War in Heaven (two or more awakened empires at war)
+    war_in_heaven = len(awakened_empires) >= 2
+
+    return {
+        "awakened_empires": awakened_empires,
+        "count": len(awakened_empires),
+        "war_in_heaven": war_in_heaven,
+    }
+
+
 def compute_save_id(
     *,
     campaign_id: str | None,
@@ -653,6 +727,7 @@ def record_snapshot_from_companion(
     megastructures = extract_megastructures_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
     crisis = extract_crisis_from_gamestate(gamestate)
     systems = extract_system_count_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    awakened_empires = extract_awakened_empires_from_gamestate(gamestate)
 
     # Avoid mutating the live snapshot object used by /ask; store extras in a copy.
     briefing_for_storage = dict(briefing)
@@ -678,6 +753,8 @@ def record_snapshot_from_companion(
         history["crisis"] = crisis
     if systems:
         history["systems"] = systems
+    if awakened_empires:
+        history["awakened_empires"] = awakened_empires
     if history:
         briefing_for_storage["history"] = history
 

@@ -1804,6 +1804,153 @@ class SaveExtractor:
 
         return result
 
+    def get_awakened_empires(self) -> dict:
+        """Get information about Awakened Fallen Empires in the galaxy.
+
+        Awakened Fallen Empires are late-game threats with massive military power.
+        This method identifies them and provides threat assessment.
+
+        Returns:
+            Dict with list of awakened empires and threat level assessment
+        """
+        result = {
+            'awakened_empires': [],
+            'count': 0,
+            'war_in_heaven': False,
+            'threat_level': 'none',  # none, moderate, severe, critical
+        }
+
+        # Get player military power for comparison
+        player_status = self.get_player_status()
+        player_military = player_status.get('military_power', 0)
+
+        # Find all awakened_fallen_empire type occurrences
+        awakened_positions = [m.start() for m in re.finditer(r'type="awakened_fallen_empire"', self.gamestate)]
+
+        if not awakened_positions:
+            return result
+
+        # Find country section and build country position index
+        country_start = self._find_country_section_start()
+        if country_start == -1:
+            return result
+
+        country_chunk = self.gamestate[country_start:]
+        country_entries = [(int(m.group(1)), country_start + m.start())
+                          for m in re.finditer(r'\n\t(\d+)=\n\t\{', country_chunk)]
+
+        # Check for War in Heaven
+        if 'war_in_heaven' in self.gamestate.lower():
+            # Check if it's active (not no_war_in_heaven flag)
+            if re.search(r'(?<!no_)war_in_heaven\s*=\s*yes', self.gamestate):
+                result['war_in_heaven'] = True
+
+        # Process each awakened empire
+        for awk_pos in awakened_positions:
+            # Find which country this belongs to
+            country_id = None
+            country_pos = None
+            for cid, cpos in country_entries:
+                if cpos < awk_pos:
+                    country_id = cid
+                    country_pos = cpos
+                else:
+                    break
+
+            if country_id is None:
+                continue
+
+            # Get next country position for boundary
+            next_pos = None
+            for cid, cpos in country_entries:
+                if cpos > country_pos:
+                    next_pos = cpos
+                    break
+
+            block = self.gamestate[country_pos:next_pos] if next_pos else self.gamestate[country_pos:country_pos + 200000]
+
+            # Extract empire details
+            empire_info = {
+                'country_id': country_id,
+                'name': 'Unknown Awakened Empire',
+                'original_type': 'unknown',
+                'military_power': 0,
+                'power_ratio': 0.0,
+                'ethics': None,
+                'attitude': None,
+            }
+
+            # Get name
+            name_m = re.search(r'name=\n\t*\{[^}]*key="([^"]+)"', block)
+            if name_m:
+                raw_name = name_m.group(1)
+                # Clean up name (remove SPEC_ prefix, etc.)
+                empire_info['name'] = raw_name.replace('SPEC_', '').replace('_', ' ').title()
+
+            # Get original ethics (determines FE type)
+            # Ethics are in an ethos={} block - can be 100k+ into the country block for FEs
+            ethos_m = re.search(r'ethos=\s*\{([^}]+)\}', block[:200000])
+            if ethos_m:
+                ethos_block = ethos_m.group(1)
+                ethics_list = re.findall(r'ethic="(ethic_[^"]+)"', ethos_block)
+                if ethics_list:
+                    # Use the fanatic ethic if present, otherwise first ethic
+                    ethic = None
+                    for e in ethics_list:
+                        if 'fanatic' in e:
+                            ethic = e
+                            break
+                    if not ethic:
+                        ethic = ethics_list[0]
+
+                    empire_info['ethics'] = ethic
+
+                    # Map to FE archetype
+                    if 'xenophile' in ethic:
+                        empire_info['original_type'] = 'Benevolent Interventionists'
+                    elif 'xenophobe' in ethic:
+                        empire_info['original_type'] = 'Militant Isolationists'
+                    elif 'materialist' in ethic:
+                        empire_info['original_type'] = 'Ancient Caretakers'
+                    elif 'spiritualist' in ethic:
+                        empire_info['original_type'] = 'Holy Guardians'
+
+            # Get military power
+            mil_m = re.search(r'military_power=([\d.]+)', block)
+            if mil_m:
+                empire_info['military_power'] = float(mil_m.group(1))
+                if player_military > 0:
+                    empire_info['power_ratio'] = round(empire_info['military_power'] / player_military, 1)
+
+            # Get their opinion of player (if in contact)
+            opinion_m = re.search(r'relations_manager=.*?country=0[^}]*opinion=([-\d]+)', block[:80000], re.DOTALL)
+            if opinion_m:
+                empire_info['opinion_of_player'] = int(opinion_m.group(1))
+
+            # Check if they've demanded something from player
+            if re.search(r'subject.*?country=0', block[:50000], re.DOTALL):
+                empire_info['has_demanded_subjugation'] = True
+
+            result['awakened_empires'].append(empire_info)
+
+        result['count'] = len(result['awakened_empires'])
+
+        # Assess overall threat level
+        if result['count'] > 0:
+            max_ratio = max(e.get('power_ratio', 0) for e in result['awakened_empires'])
+            if result['war_in_heaven']:
+                result['threat_level'] = 'critical'
+            elif max_ratio >= 10:
+                result['threat_level'] = 'critical'
+            elif max_ratio >= 5:
+                result['threat_level'] = 'severe'
+            elif max_ratio >= 2:
+                result['threat_level'] = 'moderate'
+            else:
+                result['threat_level'] = 'manageable'
+
+        return result
+
     def get_planets(self) -> dict:
         """Get the player's colonized planets.
 
@@ -2663,6 +2810,23 @@ class SaveExtractor:
                            self.gamestate.lower()):
                     result['crisis_active'] = True
                     break
+
+        # Check for Awakened Fallen Empires (late-game threat)
+        awakened = self.get_awakened_empires()
+        if awakened.get('count', 0) > 0:
+            result['awakened_empires'] = {
+                'count': awakened['count'],
+                'threat_level': awakened['threat_level'],
+                'war_in_heaven': awakened['war_in_heaven'],
+                'empires': [
+                    {
+                        'name': e['name'],
+                        'type': e['original_type'],
+                        'power_ratio': e['power_ratio'],
+                    }
+                    for e in awakened['awakened_empires']
+                ]
+            }
 
         return result
 
