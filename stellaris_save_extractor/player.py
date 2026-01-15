@@ -406,6 +406,49 @@ class PlayerMixin:
         result["count"] = len(perks)
         return result
 
+    def get_naval_capacity(self) -> dict:
+        """Get the player's naval capacity usage.
+
+        Note: Stellaris does not store max naval capacity directly in saves.
+        It's calculated dynamically from starbases, techs, civics, etc.
+        We provide the used capacity and fleet size.
+
+        Returns:
+            Dict with:
+              - used: Current naval capacity in use (from used_naval_capacity)
+              - fleet_size: Total fleet size (ship count weighted by size)
+              - starbase_capacity: Max starbases allowed
+              - used_starbase_capacity: Current starbase count
+        """
+        result = {
+            "used": 0,
+            "fleet_size": 0,
+            "starbase_capacity": None,
+            "used_starbase_capacity": None,
+        }
+
+        player_id = self.get_player_empire_id()
+        country_content = self._find_player_country_content(player_id)
+        if not country_content:
+            return result
+
+        # Extract used_naval_capacity and fleet_size
+        used_match = re.search(r'\bused_naval_capacity=([\d.]+)', country_content)
+        fleet_match = re.search(r'\bfleet_size=(\d+)', country_content)
+        starbase_cap_match = re.search(r'\bstarbase_capacity=(\d+)', country_content)
+        used_starbase_match = re.search(r'\bused_starbase_capacity=(\d+)', country_content)
+
+        if used_match:
+            result["used"] = int(float(used_match.group(1)))
+        if fleet_match:
+            result["fleet_size"] = int(fleet_match.group(1))
+        if starbase_cap_match:
+            result["starbase_capacity"] = int(starbase_cap_match.group(1))
+        if used_starbase_match:
+            result["used_starbase_capacity"] = int(used_starbase_match.group(1))
+
+        return result
+
     def get_relics(self) -> dict:
         """Extract owned relics and activation cooldown (best-effort).
 

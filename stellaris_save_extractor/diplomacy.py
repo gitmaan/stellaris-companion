@@ -192,16 +192,17 @@ class DiplomacyMixin:
 
             relations_found.append(relation_info)
 
-        result['relations'] = relations_found[:30]  # Limit to 30
-        result['allies'] = allies[:50]
-        result['rivals'] = rivals[:50]
-        result['defensive_pacts'] = defensive_pacts[:50]
-        result['non_aggression_pacts'] = non_aggression_pacts[:50]
-        result['closed_borders'] = closed_borders[:50]
-        result['migration_treaties'] = migration_treaties[:50]
-        result['commercial_pacts'] = commercial_pacts[:50]
-        result['sensor_links'] = sensor_links[:50]
-        result['treaties'] = treaties[:100]
+        # Full lists (no truncation); callers that need caps should slice.
+        result['relations'] = relations_found
+        result['allies'] = allies
+        result['rivals'] = rivals
+        result['defensive_pacts'] = defensive_pacts
+        result['non_aggression_pacts'] = non_aggression_pacts
+        result['closed_borders'] = closed_borders
+        result['migration_treaties'] = migration_treaties
+        result['commercial_pacts'] = commercial_pacts
+        result['sensor_links'] = sensor_links
+        result['treaties'] = treaties
         result['relation_count'] = len(relations_found)
 
         # Check for federation membership
@@ -822,4 +823,134 @@ class DiplomacyMixin:
 
         result['operations'] = operations_found
         result['count'] = len(operations_found)
+        return result
+
+    def get_claims(self) -> dict:
+        """Get territorial claims for the player empire.
+
+        Returns:
+            Dict with:
+              - player_claims: List of systems the player has claimed
+              - claims_against_player: List of claims other empires have on player systems
+              - player_claims_count: Number of systems player has claimed
+              - claims_against_count: Number of claims against player
+        """
+        result = {
+            'player_claims': [],
+            'claims_against_player': [],
+            'player_claims_count': 0,
+            'claims_against_count': 0,
+        }
+
+        player_id = self.get_player_empire_id()
+
+        # Find galactic_object section
+        go_start = self.gamestate.find('\ngalactic_object=')
+        if go_start == -1:
+            go_start = self.gamestate.find('galactic_object=')
+        if go_start == -1:
+            return result
+
+        # Get a large chunk of the galactic_object section
+        go_section = self.gamestate[go_start:go_start + 10000000]  # 10MB should cover most saves
+
+        # Find all systems with claims
+        # Each galactic object can have a claims={ } block with multiple claim entries
+        # Format: claims={ { owner=X date="Y" claims=N } { owner=Z ... } }
+
+        # First, find systems owned by player (to detect claims against us)
+        player_systems = set()
+        # Pattern: id=X ... owner=player_id (within same galactic_object block)
+        system_pattern = r'\n\t(\d+)=\s*\{'
+
+        player_claims = []
+        claims_against = []
+
+        for match in re.finditer(system_pattern, go_section):
+            system_id = match.group(1)
+            start_pos = match.end()
+
+            # Find end of this galactic_object block
+            brace_count = 1
+            pos = start_pos
+            max_pos = min(start_pos + 10000, len(go_section))
+            while brace_count > 0 and pos < max_pos:
+                if go_section[pos] == '{':
+                    brace_count += 1
+                elif go_section[pos] == '}':
+                    brace_count -= 1
+                pos += 1
+
+            block = go_section[start_pos:pos]
+
+            # Check if this system has claims
+            claims_start = block.find('claims=')
+            if claims_start == -1:
+                continue
+
+            # Extract claims block
+            claims_section = block[claims_start:claims_start + 2000]
+            brace_pos = claims_section.find('{')
+            if brace_pos == -1:
+                continue
+
+            # Find end of claims block
+            brace_count = 1
+            cpos = brace_pos + 1
+            while brace_count > 0 and cpos < len(claims_section):
+                if claims_section[cpos] == '{':
+                    brace_count += 1
+                elif claims_section[cpos] == '}':
+                    brace_count -= 1
+                cpos += 1
+
+            claims_block = claims_section[brace_pos:cpos]
+
+            # Get system owner
+            owner_match = re.search(r'\bstarbase_owner=(\d+)', block)
+            system_owner = int(owner_match.group(1)) if owner_match else None
+
+            # Get system name
+            name_match = re.search(r'name=\s*\{[^}]*key="([^"]+)"', block)
+            if not name_match:
+                name_match = re.search(r'name="([^"]+)"', block)
+            system_name = name_match.group(1) if name_match else f"System {system_id}"
+
+            # Parse individual claims within this block
+            # Each claim is: { owner=X date="Y" claims=N }
+            claim_entries = re.findall(
+                r'\{\s*owner=(\d+)\s*(?:date="([^"]+)")?\s*(?:claims=(\d+))?\s*\}',
+                claims_block
+            )
+
+            for claim_owner, claim_date, claim_strength in claim_entries:
+                claim_owner_id = int(claim_owner)
+                strength = int(claim_strength) if claim_strength else 1
+
+                claim_info = {
+                    'system_id': system_id,
+                    'system_name': system_name,
+                    'claimant_id': claim_owner_id,
+                    'date': claim_date if claim_date else None,
+                    'strength': strength,
+                }
+
+                # Is this player claiming someone else's system?
+                if claim_owner_id == player_id:
+                    claim_info['current_owner'] = system_owner
+                    player_claims.append(claim_info)
+                # Is this someone claiming a player-owned system?
+                elif system_owner == player_id:
+                    claims_against.append(claim_info)
+
+        # Sort by system name for readability
+        player_claims.sort(key=lambda x: x.get('system_name', ''))
+        claims_against.sort(key=lambda x: x.get('system_name', ''))
+
+        # Cap results for performance
+        result['player_claims'] = player_claims[:100]
+        result['claims_against_player'] = claims_against[:100]
+        result['player_claims_count'] = len(player_claims)
+        result['claims_against_count'] = len(claims_against)
+
         return result

@@ -188,6 +188,110 @@ class BriefingMixin:
             },
         }
 
+    def get_complete_briefing(self) -> dict:
+        """Get a complete, untruncated briefing for /ask injection.
+
+        This is intended for full precompute (Option B): one background extraction
+        produces a single JSON blob that contains the full state needed to answer
+        most questions without any tool calls.
+
+        Returns:
+            Dictionary containing full lists (leaders, planets, relations, fleets,
+            starbases, wars, etc.) with no top-k truncation.
+        """
+
+        def _extract_campaign_id() -> str | None:
+            # Stellaris saves include a top-level galaxy block with name="<uuid>".
+            start = self.gamestate.find("\ngalaxy=")
+            if start == -1:
+                if self.gamestate.startswith("galaxy="):
+                    start = 0
+                else:
+                    return None
+            window = self.gamestate[start : start + 20000]
+            key = 'name="'
+            pos = window.find(key)
+            if pos == -1:
+                return None
+            end = window.find('"', pos + len(key))
+            if end == -1:
+                return None
+            value = window[pos + len(key) : end].strip()
+            return value or None
+
+        meta = self.get_metadata()
+        player = self.get_player_status()
+        identity = self.get_empire_identity()
+        situation = self.get_situation()
+        resources = self.get_resources()
+        diplomacy = self.get_diplomacy()
+        planets = self.get_planets()
+        starbases = self.get_starbases()
+        leaders = self.get_leaders()
+        technology = self.get_technology()
+        fleets = self.get_fleets()
+        wars = self.get_wars()
+        fallen = self.get_fallen_empires()
+        naval_capacity = self.get_naval_capacity()
+        megastructures = self.get_megastructures()
+        species = self.get_species_full()
+        species_rights = self.get_species_rights()
+        claims = self.get_claims()
+
+        player_clean = self._strip_previews(player)
+
+        return {
+            "meta": {
+                "empire_name": player_clean.get("empire_name") or meta.get("name"),
+                "date": player_clean.get("date") or meta.get("date"),
+                "version": meta.get("version"),
+                "player_id": player_clean.get("player_id"),
+                "campaign_id": _extract_campaign_id(),
+            },
+            "identity": identity,
+            "situation": situation,
+            # Preserve the "briefing schema" used elsewhere, but without list truncation.
+            "military": {
+                "military_power": player_clean.get("military_power"),
+                "military_fleets": player_clean.get("military_fleet_count"),
+                "military_ships": player_clean.get("military_ships"),
+                "fleet_size": player_clean.get("fleet_size"),
+                "victory_rank": player_clean.get("victory_rank"),
+                "naval_capacity": naval_capacity,
+                "fleets": fleets,
+                "wars": wars,
+                "megastructures": megastructures,
+            },
+            "economy": {
+                "economy_power": player_clean.get("economy_power"),
+                "tech_power": player_clean.get("tech_power"),
+                "resources": resources,
+                "net_monthly": resources.get("net_monthly", {}),
+                "key_resources": {
+                    "energy": resources.get("net_monthly", {}).get("energy"),
+                    "minerals": resources.get("net_monthly", {}).get("minerals"),
+                    "alloys": resources.get("net_monthly", {}).get("alloys"),
+                    "consumer_goods": resources.get("net_monthly", {}).get("consumer_goods"),
+                    "research_total": resources.get("summary", {}).get("research_total"),
+                },
+            },
+            "territory": {
+                "celestial_bodies_in_territory": player_clean.get("celestial_bodies_in_territory"),
+                "colonies": player_clean.get("colonies", {}),
+                "planets": planets,
+                "claims": claims,
+            },
+            "diplomacy": diplomacy,
+            "defense": starbases,
+            "leadership": leaders,
+            "technology": technology,
+            "fallen_empires": fallen,
+            "species": {
+                "all_species": species,
+                "rights": species_rights,
+            },
+        }
+
     def get_slim_briefing(self) -> dict:
         """Get slim empire snapshot with NO truncated lists.
 
@@ -501,4 +605,3 @@ class BriefingMixin:
             }
 
         return result
-

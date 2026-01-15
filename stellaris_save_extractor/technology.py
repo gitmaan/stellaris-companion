@@ -36,7 +36,9 @@ class TechnologyMixin:
                 'physics': [],
                 'society': [],
                 'engineering': []
-            }
+            },
+            'repeatables': {},
+            'repeatables_total_levels': 0,
         }
 
         player_id = self.get_player_empire_id()
@@ -194,6 +196,23 @@ class TechnologyMixin:
                 # Rough estimate: if we know progress and speed, we can estimate months remaining
                 # but without cost, we can't calculate percentage
                 # Leave as None unless we have actual cost data
+
+        # Extract repeatable technologies and their levels
+        # Repeatables appear as: technology="tech_repeatable_X" multiple times
+        # The count of occurrences = the level
+        from collections import Counter
+        repeatable_techs = [t for t in technologies if t.startswith('tech_repeatable_')]
+        repeatable_counts = Counter(repeatable_techs)
+
+        # Clean up the names and organize by type
+        repeatables = {}
+        for tech, level in repeatable_counts.items():
+            # Remove tech_repeatable_ prefix for cleaner names
+            clean_name = tech.replace('tech_repeatable_', '')
+            repeatables[clean_name] = level
+
+        result['repeatables'] = repeatables
+        result['repeatables_total_levels'] = sum(repeatable_counts.values())
 
         return result
 

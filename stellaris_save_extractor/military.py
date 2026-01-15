@@ -442,9 +442,131 @@ class MilitaryMixin:
                 level_counts[clean_level] = 0
             level_counts[clean_level] += 1
 
-        result['starbases'] = starbases_found[:50]  # Limit to 50
+        # Full list (no truncation); callers that need caps should slice.
+        result['starbases'] = starbases_found
         result['count'] = len(starbases_found)
         result['by_level'] = level_counts
-        result['starbase_ids'] = player_starbase_ids[:100]
+        result['starbase_ids'] = player_starbase_ids
+
+        return result
+
+    def get_megastructures(self) -> dict:
+        """Get the player's megastructures (gateways, dyson spheres, ringworlds, etc).
+
+        Returns:
+            Dict with:
+              - megastructures: List of megastructure objects with type, status
+              - count: Total count of player megastructures
+              - by_type: Dict mapping type to count
+              - ruined_available: List of ruined megastructures player could repair
+        """
+        result = {
+            'megastructures': [],
+            'count': 0,
+            'by_type': {},
+            'ruined_available': [],
+        }
+
+        player_id = self.get_player_empire_id()
+
+        # Find megastructures section
+        mega_start = self.gamestate.find('\nmegastructures=')
+        if mega_start == -1:
+            return result
+
+        # Get a large chunk for megastructures
+        mega_section = self.gamestate[mega_start:mega_start + 3000000]
+
+        # Find all megastructure entries
+        entry_pattern = r'\n\t(\d+)=\s*\{'
+        entries = list(re.finditer(entry_pattern, mega_section))
+
+        player_megas = []
+        ruined_megas = []
+        by_type: dict[str, int] = {}
+
+        for i, match in enumerate(entries):
+            mega_id = match.group(1)
+            start_pos = match.end()
+
+            # Find end of this block using brace matching
+            brace_count = 1
+            pos = start_pos
+            max_pos = min(start_pos + 2000, len(mega_section))
+            while brace_count > 0 and pos < max_pos:
+                if mega_section[pos] == '{':
+                    brace_count += 1
+                elif mega_section[pos] == '}':
+                    brace_count -= 1
+                pos += 1
+
+            block = mega_section[start_pos:pos]
+
+            # Extract fields
+            owner_match = re.search(r'\n\s*owner=(\d+)', block)
+            type_match = re.search(r'\n\s*type="([^"]+)"', block)
+            planet_match = re.search(r'\n\s*planet=(\d+)', block)
+
+            if not type_match:
+                continue
+
+            mega_type = type_match.group(1)
+            owner = int(owner_match.group(1)) if owner_match else None
+
+            # Check if this is a ruined megastructure (could be repaired)
+            is_ruined = 'ruined' in mega_type
+
+            # Track ruined megastructures that could potentially be repaired
+            if is_ruined:
+                # These could be anywhere in the galaxy
+                ruined_info = {
+                    'id': mega_id,
+                    'type': mega_type,
+                    'owner': owner,
+                }
+                if planet_match and planet_match.group(1) != '4294967295':
+                    ruined_info['planet_id'] = planet_match.group(1)
+                ruined_megas.append(ruined_info)
+
+            # Only count megastructures owned by player
+            if owner != player_id:
+                continue
+
+            # Determine status from type name
+            status = 'complete'
+            if is_ruined:
+                status = 'ruined'
+            elif '_restored' in mega_type:
+                status = 'restored'
+            elif any(x in mega_type for x in ['_0', '_1', '_2', '_3', '_4', '_site']):
+                status = 'under_construction'
+
+            # Clean up type name for display
+            display_type = mega_type
+            # Remove stage suffixes for cleaner grouping
+            for suffix in ['_ruined', '_restored', '_0', '_1', '_2', '_3', '_4', '_5', '_site']:
+                if display_type.endswith(suffix):
+                    display_type = display_type[:-len(suffix)]
+                    break
+
+            mega_info = {
+                'id': mega_id,
+                'type': mega_type,
+                'display_type': display_type,
+                'status': status,
+            }
+
+            if planet_match and planet_match.group(1) != '4294967295':
+                mega_info['planet_id'] = planet_match.group(1)
+
+            player_megas.append(mega_info)
+
+            # Count by display type
+            by_type[display_type] = by_type.get(display_type, 0) + 1
+
+        result['megastructures'] = player_megas
+        result['count'] = len(player_megas)
+        result['by_type'] = by_type
+        result['ruined_available'] = ruined_megas[:20]  # Cap ruined list
 
         return result

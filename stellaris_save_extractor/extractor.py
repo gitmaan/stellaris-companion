@@ -17,6 +17,7 @@ from .military import MilitaryMixin
 from .planets import PlanetsMixin
 from .player import PlayerMixin
 from .politics import PoliticsMixin
+from .species import SpeciesMixin
 from .technology import TechnologyMixin
 
 
@@ -31,6 +32,7 @@ class SaveExtractor(
     DiplomacyMixin,
     PoliticsMixin,
     PlanetsMixin,
+    SpeciesMixin,
     BriefingMixin,
 ):
     """Extract and query sections from a Stellaris save file."""
