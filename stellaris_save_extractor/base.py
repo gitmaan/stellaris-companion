@@ -511,9 +511,7 @@ class SaveExtractorBase:
             if not match:
                 continue
 
-            # Extract full fleet block using brace matching for location data
-            fleet_block = self._extract_fleet_block(fleet_section, match.start())
-            fleet_data = fleet_block[:2500] if fleet_block else fleet_section[match.start():match.start() + 2500]
+            fleet_data = fleet_section[match.start():match.start() + 2500]
             analyzed += 1
 
             is_station = 'station=yes' in fleet_data
@@ -543,137 +541,15 @@ class SaveExtractorBase:
                 if fleet_name.startswith('shipclass_'):
                     fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
 
-                # Extract location data from movement_manager block
-                location_data = self._extract_fleet_location(fleet_block) if fleet_block else {}
-
                 if len(result['military_fleets']) < 20:  # Keep top 20
-                    fleet_entry = {
+                    result['military_fleets'].append({
                         'id': fid,
                         'name': fleet_name,
                         'ships': ship_count,
                         'military_power': round(mp, 0),
-                    }
-                    # Add location fields
-                    fleet_entry['system_id'] = location_data.get('system_id')
-                    fleet_entry['status'] = location_data.get('status', 'unknown')
-                    fleet_entry['orbiting_planet_id'] = location_data.get('orbiting_planet_id')
-                    fleet_entry['destination_system_id'] = location_data.get('destination_system_id')
-                    result['military_fleets'].append(fleet_entry)
+                    })
             else:
                 result['civilian_fleet_count'] += 1
-
-        return result
-
-    def _extract_fleet_block(self, fleet_section: str, start_pos: int) -> str | None:
-        """Extract complete fleet block using brace matching.
-
-        Args:
-            fleet_section: The fleet section content
-            start_pos: Starting position of the fleet entry
-
-        Returns:
-            Complete fleet block string, or None if extraction fails
-        """
-        brace_count = 0
-        started = False
-        max_len = min(start_pos + 15000, len(fleet_section))  # Fleet blocks can be large
-
-        for i in range(start_pos, max_len):
-            char = fleet_section[i]
-            if char == '{':
-                brace_count += 1
-                started = True
-            elif char == '}':
-                brace_count -= 1
-                if started and brace_count == 0:
-                    return fleet_section[start_pos:i + 1]
-
-        return None
-
-    def _extract_fleet_location(self, fleet_block: str) -> dict:
-        """Extract location data from a fleet block's movement_manager.
-
-        Args:
-            fleet_block: Complete fleet block content
-
-        Returns:
-            Dict with:
-              - system_id: Current system ID (from coordinate.origin)
-              - status: 'idle', 'moving', 'in_combat', 'retreating', or 'unknown'
-              - orbiting_planet_id: Planet ID if orbiting, None otherwise
-              - destination_system_id: Target system if moving, None otherwise
-        """
-        result = {
-            'system_id': None,
-            'status': 'unknown',
-            'orbiting_planet_id': None,
-            'destination_system_id': None,
-        }
-
-        # Find movement_manager block
-        mm_match = re.search(r'movement_manager=\s*\{', fleet_block)
-        if not mm_match:
-            return result
-
-        # Extract movement_manager block using brace matching
-        mm_start = mm_match.start()
-        brace_count = 0
-        started = False
-        mm_end = mm_start
-
-        for i in range(mm_start, min(mm_start + 5000, len(fleet_block))):
-            char = fleet_block[i]
-            if char == '{':
-                brace_count += 1
-                started = True
-            elif char == '}':
-                brace_count -= 1
-                if started and brace_count == 0:
-                    mm_end = i + 1
-                    break
-
-        mm_block = fleet_block[mm_start:mm_end]
-
-        # Extract current system from coordinate.origin
-        # Pattern: coordinate=\n\t\t\t{\n\t\t\t\tx=...\n\t\t\t\ty=...\n\t\t\t\torigin=SYSTEM_ID
-        coord_match = re.search(r'coordinate=\s*\{[^}]*origin=(\d+)', mm_block)
-        if coord_match:
-            origin = int(coord_match.group(1))
-            if origin != 4294967295:  # Not null
-                result['system_id'] = origin
-
-        # Extract state and map to simplified status
-        state_match = re.search(r'\bstate=(move_\w+)', mm_block)
-        if state_match:
-            state = state_match.group(1)
-            # Map Stellaris states to simplified status
-            state_mapping = {
-                'move_idle': 'idle',
-                'move_system': 'moving',
-                'move_galaxy': 'moving',
-                'move_wind_up': 'moving',
-                'move_jump_anim': 'moving',
-                'move_to_system': 'moving',
-                'move_to_planet': 'moving',
-                'move_in_combat': 'in_combat',
-                'move_retreat': 'retreating',
-            }
-            result['status'] = state_mapping.get(state, 'unknown')
-
-        # Extract orbiting planet from orbit.orbitable.planet
-        # Pattern: orbit=\n\t\t\t{\n\t\t\t\torbitable=\n\t\t\t\t{\n\t\t\t\t\tplanet=PLANET_ID
-        orbit_match = re.search(r'orbit=\s*\{[^}]*orbitable=\s*\{[^}]*planet=(\d+)', mm_block)
-        if orbit_match:
-            planet_id = int(orbit_match.group(1))
-            if planet_id != 4294967295:  # Not null
-                result['orbiting_planet_id'] = planet_id
-
-        # Extract destination system from target_coordinate.origin
-        target_match = re.search(r'target_coordinate=\s*\{[^}]*origin=(\d+)', mm_block)
-        if target_match:
-            target_origin = int(target_match.group(1))
-            if target_origin != 4294967295:  # Not null
-                result['destination_system_id'] = target_origin
 
         return result
 
