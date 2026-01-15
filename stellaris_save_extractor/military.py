@@ -336,18 +336,42 @@ class MilitaryMixin:
         return result
 
     def get_starbases(self) -> dict:
-        """Get the player's starbase information.
+        """Get the player's starbase information with defense breakdown.
 
         Returns:
-            Dict with starbase locations, levels, and modules
+            Dict with starbase locations, levels, modules, and defense analysis:
+            - starbases: List of starbase objects with:
+                - id, level, type, modules, buildings (existing)
+                - defense_modules: list of defense module types (gun_battery, hangar_bay, missile_battery)
+                - defense_buildings: list of defense-enhancing buildings
+                - defense_platform_count: count of defense platforms
+                - defense_score: calculated defense strength score
+            - count: Total starbase count
+            - by_level: Dict of level -> count
+            - total_defense_score: Sum of all starbase defense_scores
         """
         result = {
             'starbases': [],
             'count': 0,
-            'by_level': {}
+            'by_level': {},
+            'total_defense_score': 0
         }
 
         player_id = self.get_player_empire_id()
+
+        # Defense module types to track
+        DEFENSE_MODULES = {'gun_battery', 'hangar_bay', 'missile_battery'}
+        # Defense-enhancing building types
+        DEFENSE_BUILDINGS = {'target_uplink_computer', 'defense_grid', 'command_center',
+                             'communications_jammer', 'disruption_field', 'nebula_refinery'}
+        # Level bonus for defense score
+        LEVEL_BONUS = {
+            'outpost': 0,
+            'starport': 100,
+            'starhold': 200,
+            'starfortress': 400,
+            'citadel': 800
+        }
 
         # Find which starbases belong to player by looking at galactic_object section
         # Each system has a starbases={...} list and inhibitor_owners={...} containing owner IDs
@@ -385,6 +409,7 @@ class MilitaryMixin:
 
         starbases_found = []
         level_counts = {}
+        total_defense_score = 0
 
         for match in re.finditer(starbase_pattern, starbase_chunk):
             sb_id = match.group(1)
@@ -412,9 +437,10 @@ class MilitaryMixin:
 
             sb_block = starbase_chunk[block_start:block_end]
 
+            clean_level = level.replace('starbase_level_', '')
             starbase_info = {
                 'id': sb_id,
-                'level': level.replace('starbase_level_', '')
+                'level': clean_level
             }
 
             # Extract type if present
@@ -423,21 +449,55 @@ class MilitaryMixin:
                 starbase_info['type'] = type_match.group(1)
 
             # Extract modules
+            modules = []
             modules_match = re.search(r'modules=\s*\{([^}]+)\}', sb_block)
             if modules_match:
                 modules = re.findall(r'\d+=(\w+)', modules_match.group(1))
                 starbase_info['modules'] = modules
 
             # Extract buildings
+            buildings = []
             buildings_match = re.search(r'buildings=\s*\{([^}]+)\}', sb_block)
             if buildings_match:
                 buildings = re.findall(r'\d+=(\w+)', buildings_match.group(1))
                 starbase_info['buildings'] = buildings
 
+            # Extract orbitals (defense platforms)
+            defense_platform_count = 0
+            orbitals_match = re.search(r'orbitals=\s*\{([^}]+)\}', sb_block)
+            if orbitals_match:
+                orbital_ids = re.findall(r'\d+=(\d+)', orbitals_match.group(1))
+                # Count non-null orbitals (4294967295 = empty slot)
+                defense_platform_count = sum(1 for oid in orbital_ids if oid != '4294967295')
+
+            # Calculate defense-specific fields
+            defense_modules = [m for m in modules if m in DEFENSE_MODULES]
+            defense_buildings = [b for b in buildings if b in DEFENSE_BUILDINGS]
+
+            # Calculate defense score
+            gun_batteries = modules.count('gun_battery')
+            hangar_bays = modules.count('hangar_bay')
+            missile_batteries = modules.count('missile_battery')
+            level_bonus = LEVEL_BONUS.get(clean_level, 0)
+
+            defense_score = (
+                (gun_batteries * 100) +
+                (hangar_bays * 80) +
+                (missile_batteries * 90) +
+                (defense_platform_count * 50) +
+                level_bonus
+            )
+
+            # Add defense fields to starbase info
+            starbase_info['defense_modules'] = defense_modules
+            starbase_info['defense_buildings'] = defense_buildings
+            starbase_info['defense_platform_count'] = defense_platform_count
+            starbase_info['defense_score'] = defense_score
+
             starbases_found.append(starbase_info)
+            total_defense_score += defense_score
 
             # Count by level
-            clean_level = starbase_info['level']
             if clean_level not in level_counts:
                 level_counts[clean_level] = 0
             level_counts[clean_level] += 1
@@ -447,6 +507,7 @@ class MilitaryMixin:
         result['count'] = len(starbases_found)
         result['by_level'] = level_counts
         result['starbase_ids'] = player_starbase_ids
+        result['total_defense_score'] = total_defense_score
 
         return result
 
@@ -568,5 +629,196 @@ class MilitaryMixin:
         result['count'] = len(player_megas)
         result['by_type'] = by_type
         result['ruined_available'] = ruined_megas[:20]  # Cap ruined list
+
+        return result
+
+    def get_ship_designs(self) -> dict:
+        """Get the player's unique ship designs/templates with weapon and defense loadouts.
+
+        Returns:
+            Dict with:
+              - designs: List of unique ship designs used by player with:
+                  - design_id: The design template ID
+                  - ship_class: Ship class (corvette/destroyer/cruiser/battleship etc)
+                  - weapons: List of weapon component names
+                  - defenses: List of armor/shield component names
+                  - sample_ship_id: ID of a ship using this design
+              - by_class: Dict mapping ship class to count of designs
+              - count: Total unique designs
+        """
+        result = {
+            'designs': [],
+            'by_class': {},
+            'count': 0,
+        }
+
+        player_id = self.get_player_empire_id()
+        country_content = self._find_player_country_content(player_id)
+        if not country_content:
+            return result
+
+        owned_fleet_ids = self._get_owned_fleet_ids(country_content)
+        if not owned_fleet_ids:
+            return result
+
+        fleet_section = self._extract_section("fleet")
+        ships_section = self._extract_section("ships")
+        designs_section = self._extract_section("ship_design")
+        if not fleet_section or not ships_section or not designs_section:
+            return result
+
+        owned_set = set(owned_fleet_ids)
+
+        # Step 1: Build a mapping from design_id to ship_size and extract components from designs
+        # The ship_design section has the full component loadout including utility slots (shields/armor)
+        design_to_size: dict[str, str] = {}
+        design_to_components: dict[str, dict] = {}  # design_id -> {weapons: [], defenses: []}
+
+        for m in re.finditer(r'\n\t(\d+)=\n\t\{', designs_section):
+            design_id = m.group(1)
+
+            # Find the end of this design block
+            design_start = m.start()
+            brace_count = 0
+            design_end = design_start
+            started = False
+            for i, char in enumerate(designs_section[design_start:design_start + 15000], design_start):
+                if char == '{':
+                    brace_count += 1
+                    started = True
+                elif char == '}':
+                    brace_count -= 1
+                    if started and brace_count == 0:
+                        design_end = i + 1
+                        break
+
+            design_block = designs_section[design_start:design_end]
+
+            # Extract ship_size
+            size_m = re.search(r'\bship_size="([^"]+)"', design_block)
+            if size_m:
+                design_to_size[design_id] = size_m.group(1)
+
+            # Extract all component templates from the design
+            # Pattern: component={ slot="..." template="COMPONENT_NAME" }
+            weapons = []
+            defenses = []
+            for comp_m in re.finditer(r'component\s*=\s*\{[^}]*slot="([^"]+)"[^}]*template="([^"]+)"', design_block):
+                slot = comp_m.group(1)
+                template = comp_m.group(2)
+                # Categorize by slot type
+                if 'UTILITY' in slot.upper():
+                    # Utility slots contain shields, armor, reactors, etc.
+                    if any(x in template.upper() for x in ['ARMOR', 'SHIELD', 'HULL', 'DEFLECTOR', 'CRYSTAL_ARMOR', 'DRAGON_ARMOR']):
+                        if template not in defenses:
+                            defenses.append(template)
+                elif 'GUN' in slot.upper() or 'TORPEDO' in slot.upper() or 'MISSILE' in slot.upper() or 'HANGAR' in slot.upper() or 'WEAPON' in slot.upper():
+                    # Weapon slots
+                    if template not in weapons:
+                        weapons.append(template)
+
+            design_to_components[design_id] = {'weapons': weapons, 'defenses': defenses}
+
+        # Step 2: Collect player's ship IDs from owned fleets
+        player_ship_ids: set[str] = set()
+        for match in re.finditer(r'\n\t(\d+)=\n\t\{', fleet_section):
+            fleet_id = match.group(1)
+            if fleet_id not in owned_set:
+                continue
+
+            # Get fleet block to extract ships
+            start = match.start()
+            brace_count = 0
+            end = None
+            for i, char in enumerate(fleet_section[start:], start):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        end = i + 1
+                        break
+            if end is None:
+                continue
+
+            fleet_block = fleet_section[start:end]
+            ships_block = self._extract_braced_block(fleet_block, "ships")
+            if ships_block:
+                open_brace = ships_block.find("{")
+                close_brace = ships_block.rfind("}")
+                if open_brace != -1 and close_brace > open_brace:
+                    ship_ids = re.findall(r"\d+", ships_block[open_brace + 1 : close_brace])
+                    player_ship_ids.update(ship_ids)
+
+        if not player_ship_ids:
+            return result
+
+        # Step 3: Parse ships to get design_id and link to a sample ship
+        # Track unique designs used by player (components come from design_to_components)
+        design_info: dict[str, dict] = {}  # design_id -> {sample_ship_id}
+
+        for m in re.finditer(r'\n\t(\d+)=\n\t\{', ships_section):
+            ship_id = m.group(1)
+            if ship_id not in player_ship_ids:
+                continue
+
+            # Get a chunk to find design ID
+            ship_start = m.start()
+            ship_block = ships_section[ship_start:ship_start + 3000]
+
+            # Extract design ID from ship_design_implementation
+            impl_m = re.search(r'\bship_design_implementation\s*=\s*\{[^}]*\bdesign\s*=\s*(\d+)', ship_block)
+            if impl_m:
+                design_id = impl_m.group(1)
+            else:
+                # Fallback to ship_design field
+                design_m = re.search(r'\bship_design\s*=\s*(\d+)', ship_block)
+                if design_m:
+                    design_id = design_m.group(1)
+                else:
+                    continue
+
+            # Record this design if we haven't seen it
+            if design_id not in design_info:
+                design_info[design_id] = {
+                    'sample_ship_id': ship_id,
+                }
+
+        # Step 4: Build the result with ship class information
+        by_class: dict[str, int] = {}
+        designs_list = []
+
+        for design_id, info in design_info.items():
+            ship_class = design_to_size.get(design_id, "unknown")
+
+            # Get components from the design template
+            components = design_to_components.get(design_id, {'weapons': [], 'defenses': []})
+
+            design_entry = {
+                'design_id': design_id,
+                'ship_class': ship_class,
+                'weapons': components['weapons'],
+                'defenses': components['defenses'],
+                'sample_ship_id': info['sample_ship_id'],
+            }
+            designs_list.append(design_entry)
+
+            # Count by class
+            by_class[ship_class] = by_class.get(ship_class, 0) + 1
+
+        # Sort by ship class for readability
+        class_order = ['corvette', 'frigate', 'destroyer', 'cruiser', 'battlecruiser', 'battleship', 'titan', 'colossus', 'juggernaut']
+        def class_sort_key(d):
+            ship_class = d['ship_class'].lower()
+            for i, c in enumerate(class_order):
+                if c in ship_class:
+                    return (i, ship_class)
+            return (len(class_order), ship_class)
+
+        designs_list.sort(key=class_sort_key)
+
+        result['designs'] = designs_list
+        result['by_class'] = by_class
+        result['count'] = len(designs_list)
 
         return result

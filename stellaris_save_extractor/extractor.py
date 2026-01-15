@@ -7,6 +7,7 @@ LLM context windows.
 
 from __future__ import annotations
 
+from .armies import ArmiesMixin
 from .base import SaveExtractorBase
 from .briefing import BriefingMixin
 from .diplomacy import DiplomacyMixin
@@ -26,6 +27,7 @@ class SaveExtractor(
     MetadataMixin,
     PlayerMixin,
     MilitaryMixin,
+    ArmiesMixin,
     LeadersMixin,
     TechnologyMixin,
     EconomyMixin,

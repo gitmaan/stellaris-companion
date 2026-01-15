@@ -237,6 +237,8 @@ class BriefingMixin:
         species = self.get_species_full()
         species_rights = self.get_species_rights()
         claims = self.get_claims()
+        ship_designs = self.get_ship_designs()
+        armies = self.get_armies()
 
         player_clean = self._strip_previews(player)
 
@@ -261,6 +263,8 @@ class BriefingMixin:
                 "fleets": fleets,
                 "wars": wars,
                 "megastructures": megastructures,
+                "ship_designs": ship_designs,
+                "armies": armies,
             },
             "economy": {
                 "economy_power": player_clean.get("economy_power"),
