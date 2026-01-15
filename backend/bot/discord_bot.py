@@ -6,6 +6,7 @@ Main Discord bot class with slash commands.
 Uses discord.py with app_commands for slash command support.
 """
 
+import asyncio
 import sys
 import logging
 from pathlib import Path
@@ -21,8 +22,6 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.core.companion import Companion
-from backend.core.database import get_default_db
-from backend.core.history import record_snapshot_from_companion
 from backend.core.save_watcher import SaveWatcher
 
 logger = logging.getLogger(__name__)
@@ -149,24 +148,8 @@ class StellarisBot(commands.Bot):
         logger.info(f"New save detected: {save_path.name}")
 
         try:
-            # Reload the companion with the new save path
-            identity_changed = self.companion.reload_save(new_path=save_path)
-
-            # Record history snapshot (Phase 3 Milestone 1) using cached briefing from reload_save()
-            try:
-                db = get_default_db()
-                inserted, snapshot_id, session_id = record_snapshot_from_companion(
-                    db=db,
-                    save_path=self.companion.save_path,
-                    save_hash=getattr(self.companion, "_save_hash", None),
-                    gamestate=getattr(self.companion.extractor, "gamestate", None) if self.companion.extractor else None,
-                    player_id=self.companion.extractor.get_player_empire_id() if self.companion.extractor else None,
-                    briefing=getattr(self.companion, "_current_snapshot", None) or self.companion.get_snapshot(),
-                )
-                if inserted:
-                    logger.info(f"Recorded snapshot (session={session_id}, snapshot_id={snapshot_id})")
-            except Exception as e:
-                logger.warning(f"Failed to record snapshot: {e}")
+            # Reload quickly, then start background precompute (handled inside Companion).
+            identity_changed = await asyncio.to_thread(self.companion.reload_save, new_path=save_path)
 
             message = f"Save file updated: **{save_path.name}**\n"
             message += f"Empire: {self.companion.metadata.get('name', 'Unknown')}\n"
