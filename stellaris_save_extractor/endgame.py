@@ -239,3 +239,93 @@ class EndgameMixin:
                 result['crisis_level'] = int(crisis_level_match.group(1))
 
         return result
+
+    def get_great_khan(self) -> dict:
+        """Get Great Khan / Marauder status.
+
+        The Great Khan is a mid-game crisis where marauder clans unify under
+        a single leader and begin conquering the galaxy.
+
+        Returns:
+            Dict with:
+              - marauders_present: Whether marauder empires exist
+              - marauder_count: Number of marauder factions
+              - khan_risen: Whether the Great Khan has spawned
+              - khan_status: Current state (active, defeated, etc.)
+              - khan_country_id: Country ID of the Khan's empire if active
+        """
+        result = {
+            'marauders_present': False,
+            'marauder_count': 0,
+            'khan_risen': False,
+            'khan_status': None,
+            'khan_country_id': None,
+        }
+
+        # Check for marauder countries
+        # Marauders have type="dormant_marauders" or similar
+        marauder_patterns = [
+            r'type="dormant_marauders"',
+            r'type="marauder"',
+            r'type="marauder_raiders"',
+            r'key="NAME_Marauder"',
+        ]
+
+        marauder_count = 0
+        for pattern in marauder_patterns:
+            matches = re.findall(pattern, self.gamestate)
+            if matches:
+                result['marauders_present'] = True
+                marauder_count += len(matches)
+
+        # Dedupe - NAME_Marauder appears multiple times per empire
+        # Estimate actual marauder empires (usually 1-3)
+        if marauder_count > 0:
+            result['marauder_count'] = min(marauder_count, 3)  # Cap at realistic number
+
+        # Check for Great Khan rising
+        # The Khan has specific country type and event flags
+        khan_patterns = [
+            (r'type="awakened_marauders"', 'active'),
+            (r'type="marauder_empire"', 'active'),
+            (r'great_khan_risen', 'active'),
+            (r'great_khan=yes', 'active'),
+            (r'khan_country', 'active'),
+        ]
+
+        for pattern, status in khan_patterns:
+            if re.search(pattern, self.gamestate):
+                result['khan_risen'] = True
+                result['khan_status'] = status
+                break
+
+        # Check for Khan defeated
+        khan_defeated_patterns = [
+            r'great_khan_dead',
+            r'great_khan_defeated',
+            r'khan_successor',  # Khan died, successors fighting
+        ]
+
+        for pattern in khan_defeated_patterns:
+            if re.search(pattern, self.gamestate):
+                result['khan_risen'] = True  # Was risen at some point
+                result['khan_status'] = 'defeated'
+                break
+
+        # Try to find Khan's country ID if active
+        if result['khan_risen'] and result['khan_status'] == 'active':
+            # Look for awakened_marauders country
+            country_section_start = self._find_country_section_start()
+            if country_section_start != -1:
+                country_chunk = self.gamestate[country_section_start:country_section_start + 10000000]
+
+                for match in re.finditer(r'\n\t(\d+)=\n\t\{', country_chunk):
+                    country_id = int(match.group(1))
+                    start = match.start()
+                    block = country_chunk[start:start + 5000]
+
+                    if 'type="awakened_marauders"' in block or 'type="marauder_empire"' in block:
+                        result['khan_country_id'] = country_id
+                        break
+
+        return result
