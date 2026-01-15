@@ -238,6 +238,9 @@ class BriefingMixin:
         species_rights = self.get_species_rights()
         claims = self.get_claims()
         armies = self.get_armies()
+        crisis = self.get_crisis_status()
+        lgate = self.get_lgate_status()
+        menace = self.get_menace()
 
         player_clean = self._strip_previews(player)
 
@@ -291,6 +294,11 @@ class BriefingMixin:
             "species": {
                 "all_species": species,
                 "rights": species_rights,
+            },
+            "endgame": {
+                "crisis": crisis,
+                "lgate": lgate,
+                "menace": menace,
             },
         }
 
@@ -577,15 +585,12 @@ class BriefingMixin:
 
         result['economy']['resources_in_deficit'] = negative_resources
 
-        # Check for crisis (search for crisis-related content)
-        crisis_keywords = ['prethoryn', 'contingency', 'unbidden', 'crisis_faction']
-        for keyword in crisis_keywords:
-            if keyword in self.gamestate.lower():
-                # Further check if crisis is actually active
-                if re.search(rf'{keyword}.*country_type="(swarm|crisis|extradimensional)"',
-                           self.gamestate.lower()):
-                    result['crisis_active'] = True
-                    break
+        # Check for crisis using dedicated extractor
+        crisis_status = self.get_crisis_status()
+        result['crisis_active'] = crisis_status.get('crisis_active', False)
+        if result['crisis_active']:
+            result['crisis_type'] = crisis_status.get('crisis_type')
+            result['player_is_crisis_fighter'] = crisis_status.get('player_is_crisis_fighter', False)
 
         # Check for Fallen Empires (both dormant and awakened)
         fallen = self.get_fallen_empires()

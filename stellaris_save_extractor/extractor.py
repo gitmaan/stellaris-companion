@@ -12,6 +12,7 @@ from .base import SaveExtractorBase
 from .briefing import BriefingMixin
 from .diplomacy import DiplomacyMixin
 from .economy import EconomyMixin
+from .endgame import EndgameMixin
 from .leaders import LeadersMixin
 from .metadata import MetadataMixin
 from .military import MilitaryMixin
@@ -28,6 +29,7 @@ class SaveExtractor(
     PlayerMixin,
     MilitaryMixin,
     ArmiesMixin,
+    EndgameMixin,
     LeadersMixin,
     TechnologyMixin,
     EconomyMixin,
