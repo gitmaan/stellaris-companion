@@ -110,6 +110,26 @@ class PlanetsMixin:
             if amenities_match:
                 planet_info['amenities'] = float(amenities_match.group(1))
 
+            # Extract free amenities (surplus/deficit)
+            free_amenities_match = re.search(r'\n\s*free_amenities=([-\d.]+)', planet_block)
+            if free_amenities_match:
+                planet_info['free_amenities'] = float(free_amenities_match.group(1))
+
+            # Extract crime
+            crime_match = re.search(r'\n\s*crime=([\d.]+)', planet_block)
+            if crime_match:
+                planet_info['crime'] = round(float(crime_match.group(1)), 1)
+
+            # Extract permanent planet modifier
+            pm_match = re.search(r'planet_modifier="([^"]+)"', planet_block)
+            if pm_match:
+                planet_info['planet_modifier'] = pm_match.group(1).replace('pm_', '')
+
+            # Extract timed modifiers (crime, events, buffs)
+            timed_mods = self._extract_timed_modifiers(planet_block)
+            if timed_mods:
+                planet_info['modifiers'] = timed_mods
+
             # Extract buildings - resolve IDs to building type names
             # Planet format: buildings={ { buildings={ ID1 ID2 ... } } }
             # These IDs reference the global buildings section
@@ -143,7 +163,8 @@ class PlanetsMixin:
 
             planets_found.append(planet_info)
 
-        result['planets'] = planets_found[:50]  # Limit to 50 planets
+        # Full list (no truncation); callers that need caps should slice.
+        result['planets'] = planets_found
         result['count'] = len(planets_found)
 
         # Summary by type
@@ -289,4 +310,112 @@ class PlanetsMixin:
 
         result['sites'] = sites_found
         result['count'] = len(sites_found)
+        return result
+
+    def _extract_timed_modifiers(self, planet_block: str) -> list[dict]:
+        """Extract timed modifiers from a planet block.
+
+        Timed modifiers include crime events, prosperity buffs, etc.
+
+        Returns:
+            List of modifiers with name and days remaining
+        """
+        modifiers = []
+
+        # Find timed_modifier block
+        tm_match = re.search(r'timed_modifier\s*=\s*\{', planet_block)
+        if not tm_match:
+            return modifiers
+
+        # Extract the timed_modifier block
+        start = tm_match.start()
+        brace_count = 0
+        end = None
+        for i, char in enumerate(planet_block[start:], start):
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    end = i + 1
+                    break
+
+        if end is None:
+            return modifiers
+
+        tm_block = planet_block[start:end]
+
+        # Find items block
+        items_match = re.search(r'items\s*=\s*\{', tm_block)
+        if not items_match:
+            return modifiers
+
+        # Extract individual modifier entries
+        # Format: { modifier="name" days=N }
+        for match in re.finditer(r'\{\s*modifier="([^"]+)"\s*days=([-\d]+)\s*\}', tm_block):
+            mod_name = match.group(1)
+            days = int(match.group(2))
+
+            # Clean up modifier name for display
+            display_name = mod_name.replace('_', ' ').title()
+
+            modifiers.append({
+                'name': mod_name,
+                'display_name': display_name,
+                'days': days,  # -1 means permanent
+                'permanent': days < 0,
+            })
+
+        return modifiers
+
+    def get_problem_planets(self) -> dict:
+        """Get planets with issues (high crime, low stability, amenity deficit).
+
+        Returns:
+            Dict with lists of planets grouped by problem type
+        """
+        planets_data = self.get_planets()
+        planets = planets_data.get('planets', [])
+
+        result = {
+            'high_crime': [],      # Crime > 25%
+            'low_stability': [],   # Stability < 50
+            'amenity_deficit': [], # Free amenities < 0
+            'problem_count': 0,
+        }
+
+        for planet in planets:
+            problems = []
+
+            crime = planet.get('crime', 0)
+            if crime > 25:
+                problems.append(f"crime {crime:.0f}%")
+                result['high_crime'].append({
+                    'name': planet.get('name', 'Unknown'),
+                    'crime': crime,
+                    'modifiers': planet.get('modifiers', []),
+                })
+
+            stability = planet.get('stability', 100)
+            if stability < 50:
+                problems.append(f"stability {stability:.0f}")
+                result['low_stability'].append({
+                    'name': planet.get('name', 'Unknown'),
+                    'stability': stability,
+                })
+
+            free_amenities = planet.get('free_amenities', 0)
+            if free_amenities < 0:
+                problems.append(f"amenities {free_amenities:.0f}")
+                result['amenity_deficit'].append({
+                    'name': planet.get('name', 'Unknown'),
+                    'deficit': free_amenities,
+                })
+
+        result['problem_count'] = (
+            len(result['high_crime']) +
+            len(result['low_stability']) +
+            len(result['amenity_deficit'])
+        )
+
         return result

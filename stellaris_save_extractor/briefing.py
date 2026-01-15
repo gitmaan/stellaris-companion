@@ -243,6 +243,7 @@ class BriefingMixin:
         menace = self.get_menace()
         great_khan = self.get_great_khan()
         projects = self.get_special_projects()
+        leviathans = self.get_leviathans()
 
         player_clean = self._strip_previews(player)
 
@@ -303,6 +304,7 @@ class BriefingMixin:
                 "menace": menace,
                 "great_khan": great_khan,
             },
+            "leviathans": leviathans,
             "projects": projects,
         }
 

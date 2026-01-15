@@ -14,6 +14,7 @@ from .diplomacy import DiplomacyMixin
 from .economy import EconomyMixin
 from .endgame import EndgameMixin
 from .leaders import LeadersMixin
+from .leviathans import LeviathansMixin
 from .metadata import MetadataMixin
 from .military import MilitaryMixin
 from .planets import PlanetsMixin
@@ -32,6 +33,7 @@ class SaveExtractor(
     ArmiesMixin,
     EndgameMixin,
     ProjectsMixin,
+    LeviathansMixin,
     LeadersMixin,
     TechnologyMixin,
     EconomyMixin,
