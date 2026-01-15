@@ -241,6 +241,7 @@ class BriefingMixin:
         crisis = self.get_crisis_status()
         lgate = self.get_lgate_status()
         menace = self.get_menace()
+        projects = self.get_special_projects()
 
         player_clean = self._strip_previews(player)
 
@@ -300,6 +301,7 @@ class BriefingMixin:
                 "lgate": lgate,
                 "menace": menace,
             },
+            "projects": projects,
         }
 
     def get_slim_briefing(self) -> dict:

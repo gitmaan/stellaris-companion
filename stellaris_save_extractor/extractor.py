@@ -19,6 +19,7 @@ from .military import MilitaryMixin
 from .planets import PlanetsMixin
 from .player import PlayerMixin
 from .politics import PoliticsMixin
+from .projects import ProjectsMixin
 from .species import SpeciesMixin
 from .technology import TechnologyMixin
 
@@ -30,6 +31,7 @@ class SaveExtractor(
     MilitaryMixin,
     ArmiesMixin,
     EndgameMixin,
+    ProjectsMixin,
     LeadersMixin,
     TechnologyMixin,
     EconomyMixin,
