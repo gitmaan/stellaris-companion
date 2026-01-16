@@ -98,17 +98,26 @@ def setup(bot) -> None:
         await interaction.response.defer(thinking=True)
 
         try:
-            history_context = None
-            if should_include_history(question):
-                try:
-                    db = get_default_db()
-                    history_context = build_history_context_for_companion(db=db, companion=bot.companion)
-                except Exception:
-                    history_context = None
+            session_key = f"{interaction.user.id}:{interaction.channel_id}"
 
-            # Get response from companion using ask_simple (pre-injects data, 3 AFC max)
-            # This is faster than chat() which allows 8 AFC calls
-            response_text, elapsed = await asyncio.to_thread(bot.companion.ask_simple, question, history_context)
+            # Phase 4: /ask uses full precompute (no tools) with sliding-window history.
+            # ALL blocking operations (history context + LLM call) must be in to_thread
+            # to avoid blocking Discord's event loop and causing heartbeat timeouts.
+            def _run_ask():
+                history_context = None
+                if should_include_history(question):
+                    try:
+                        db = get_default_db()
+                        history_context = build_history_context_for_companion(db=db, companion=bot.companion)
+                    except Exception:
+                        history_context = None
+                return bot.companion.ask_precomputed(
+                    question,
+                    session_key,
+                    history_context,
+                )
+
+            response_text, elapsed = await asyncio.to_thread(_run_ask)
 
             # Split into multiple messages if needed
             chunks = split_response(response_text)

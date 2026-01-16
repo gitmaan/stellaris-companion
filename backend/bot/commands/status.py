@@ -6,6 +6,7 @@ Slash command to get a formatted status embed of the player's empire.
 This is a quick reference that doesn't require an LLM call.
 """
 
+import asyncio
 import logging
 import discord
 from discord import app_commands
@@ -74,9 +75,12 @@ def setup(bot) -> None:
             )
             return
 
+        # Defer since status extraction can block the event loop
+        await interaction.response.defer(thinking=True)
+
         try:
-            # Get raw status data (no LLM call)
-            data = bot.companion.get_status_data()
+            # Get raw status data (no LLM call, but extraction can still block)
+            data = await asyncio.to_thread(bot.companion.get_status_data)
 
             # Create embed
             embed = discord.Embed(
@@ -146,11 +150,11 @@ def setup(bot) -> None:
             # Add footer with companion info
             embed.set_footer(text="Use /ask for detailed analysis or /briefing for full strategic report")
 
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Error in /status command: {e}")
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"An error occurred while getting status: {str(e)}",
                 ephemeral=True
             )

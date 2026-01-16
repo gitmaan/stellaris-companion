@@ -5,6 +5,7 @@
 Show recent derived events for the current campaign/session.
 """
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -41,29 +42,37 @@ def setup(bot) -> None:
         await interaction.response.defer(thinking=True, ephemeral=True)
 
         try:
-            db = get_default_db()
+            # Run all blocking DB operations in a thread to avoid blocking the event loop
+            def _fetch_history_data():
+                db = get_default_db()
 
-            briefing = getattr(bot.companion, "_current_snapshot", None) or {}
-            metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
+                briefing = getattr(bot.companion, "_current_snapshot", None) or {}
+                metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
 
-            campaign_id = None
-            if bot.companion.extractor and getattr(bot.companion.extractor, "gamestate", None):
-                campaign_id = extract_campaign_id_from_gamestate(bot.companion.extractor.gamestate)
+                campaign_id = None
+                if bot.companion.extractor and getattr(bot.companion.extractor, "gamestate", None):
+                    campaign_id = extract_campaign_id_from_gamestate(bot.companion.extractor.gamestate)
 
-            save_id = compute_save_id(
-                campaign_id=campaign_id,
-                player_id=bot.companion.extractor.get_player_empire_id() if bot.companion.extractor else None,
-                empire_name=metrics.get("empire_name") if isinstance(metrics, dict) else None,
-                save_path=bot.companion.save_path if isinstance(bot.companion.save_path, Path) else None,
-            )
+                save_id = compute_save_id(
+                    campaign_id=campaign_id,
+                    player_id=bot.companion.extractor.get_player_empire_id() if bot.companion.extractor else None,
+                    empire_name=metrics.get("empire_name") if isinstance(metrics, dict) else None,
+                    save_path=bot.companion.save_path if isinstance(bot.companion.save_path, Path) else None,
+                )
 
-            session_id = db.get_active_or_latest_session_id(save_id=save_id)
+                session_id = db.get_active_or_latest_session_id(save_id=save_id)
+                if not session_id:
+                    return None, None, None
+
+                events = db.get_recent_events(session_id=session_id, limit=min(max(limit, 1), 25))
+                stats = db.get_session_snapshot_stats(session_id)
+                return session_id, events, stats
+
+            session_id, events, stats = await asyncio.to_thread(_fetch_history_data)
+
             if not session_id:
                 await interaction.followup.send("No sessions found yet for this campaign.")
                 return
-
-            events = db.get_recent_events(session_id=session_id, limit=min(max(limit, 1), 25))
-            stats = db.get_session_snapshot_stats(session_id)
 
             header = (
                 f"Session `{session_id}`\n"
