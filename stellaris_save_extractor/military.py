@@ -72,11 +72,21 @@ class MilitaryMixin:
 
             war_block = war_chunk[entry_start:entry_end]
 
-            # Extract war name
-            name_match = re.search(r'name\s*=\s*"([^"]+)"', war_block)
-            if not name_match:
-                continue
-            war_name = name_match.group(1)
+            # Extract war name - can be either name="string" or name={key="string"...}
+            war_name = None
+            simple_name_match = re.search(r'\bname\s*=\s*"([^"]+)"', war_block[:2000])
+            if simple_name_match:
+                war_name = simple_name_match.group(1)
+            else:
+                # Try nested block format: name={...key="..."...}
+                name_block = self._extract_braced_block(war_block[:5000], 'name')
+                if name_block:
+                    key_match = re.search(r'\bkey="([^"]+)"', name_block)
+                    if key_match:
+                        war_name = key_match.group(1)
+
+            if not war_name:
+                war_name = f"War #{entry_match.group(1)}"  # Fallback name
 
             # Extract start date
             start_date_match = re.search(r'start_date\s*=\s*"?([0-9.]+)"?', war_block)
@@ -92,17 +102,17 @@ class MilitaryMixin:
             war_goal_match = re.search(r'war_goal\s*=\s*\{[^}]*type\s*=\s*"?([^"\s}]+)"?', war_block, re.DOTALL)
             war_goal = war_goal_match.group(1) if war_goal_match else "unknown"
 
-            # Extract attacker country IDs
+            # Extract attacker country IDs using proper brace matching
             attacker_ids = []
-            attackers_match = re.search(r'attackers\s*=\s*\{(.*?)\n\t\}', war_block, re.DOTALL)
-            if attackers_match:
-                attacker_ids = re.findall(r'country\s*=\s*(\d+)', attackers_match.group(1))
+            attackers_block = self._extract_braced_block(war_block, 'attackers')
+            if attackers_block:
+                attacker_ids = re.findall(r'\bcountry\s*=\s*(\d+)', attackers_block)
 
-            # Extract defender country IDs
+            # Extract defender country IDs using proper brace matching
             defender_ids = []
-            defenders_match = re.search(r'defenders\s*=\s*\{(.*?)\n\t\}', war_block, re.DOTALL)
-            if defenders_match:
-                defender_ids = re.findall(r'country\s*=\s*(\d+)', defenders_match.group(1))
+            defenders_block = self._extract_braced_block(war_block, 'defenders')
+            if defenders_block:
+                defender_ids = re.findall(r'\bcountry\s*=\s*(\d+)', defenders_block)
 
             # Check if player is involved and determine side
             player_id_str = str(player_id)

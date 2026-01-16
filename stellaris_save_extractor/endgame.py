@@ -44,25 +44,9 @@ class EndgameMixin:
         crisis_countries = []
         crisis_types_found = set()
 
-        # Search for crisis country types
-        for crisis_type_key, crisis_name in CRISIS_TYPES.items():
-            pattern = rf'country_type="{re.escape(crisis_type_key)}"'
-            if re.search(pattern, self.gamestate):
-                crisis_types_found.add(crisis_name)
-
-        # Also check for swarm via type="swarm" (alternate format)
-        if re.search(r'\btype="swarm"', self.gamestate):
-            crisis_types_found.add('prethoryn')
-
-        # Check for contingency via contingency_bot species or contingency data
-        if re.search(r'contingency_bot|data="contingency_', self.gamestate):
-            crisis_types_found.add('contingency')
-
-        # Check for extradimensional via related tech/species
-        if re.search(r'extradimensional_weapon|type="extradimensional"', self.gamestate):
-            crisis_types_found.add('unbidden')
-
-        # Find crisis country IDs
+        # Find crisis country IDs by scanning the country section
+        # This is more reliable than regex-matching country_type patterns globally,
+        # which can match tech names or other false positives.
         country_section_start = self._find_country_section_start()
         if country_section_start != -1:
             country_chunk = self.gamestate[country_section_start:country_section_start + 50000000]
@@ -76,15 +60,23 @@ class EndgameMixin:
                 end = start + 50000
                 block = country_chunk[start:end]
 
-                # Check if this is a crisis country
-                type_match = re.search(r'\btype="([^"]+)"', block[:5000])
-                if type_match:
-                    ctype = type_match.group(1)
-                    if ctype in CRISIS_TYPES or ctype in ['swarm', 'extradimensional']:
-                        crisis_countries.append({
-                            'country_id': country_id,
-                            'type': CRISIS_TYPES.get(ctype, ctype),
-                        })
+                # Check if this is a crisis country by looking for country_type or type
+                ctype = None
+                ctype_match = re.search(r'\bcountry_type="([^"]+)"', block[:5000])
+                if ctype_match:
+                    ctype = ctype_match.group(1)
+                else:
+                    type_match = re.search(r'\btype="([^"]+)"', block[:5000])
+                    if type_match:
+                        ctype = type_match.group(1)
+
+                if ctype and (ctype in CRISIS_TYPES or ctype in ['swarm', 'extradimensional']):
+                    crisis_name = CRISIS_TYPES.get(ctype, ctype)
+                    crisis_countries.append({
+                        'country_id': country_id,
+                        'type': crisis_name,
+                    })
+                    crisis_types_found.add(crisis_name)
 
         result['crisis_countries'] = crisis_countries
         result['crisis_types_detected'] = list(crisis_types_found)
