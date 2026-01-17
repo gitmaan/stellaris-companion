@@ -71,8 +71,8 @@
         "Uses GameDatabase methods"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in server.py. Added get_sessions() and get_session_by_id() methods to GameDatabase. Returns sessions with id, empire_name, started_at, ended_at, first_game_date, last_game_date, snapshot_count, is_active. Events endpoint returns id, game_date, event_type, summary, data. Verified all criteria with TestClient."
     },
     {
       "id": "API-006",

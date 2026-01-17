@@ -290,6 +290,41 @@ class GameDatabase:
             ).fetchone()
             return dict(row) if row else None
 
+    def get_latest_snapshot_full_briefing_json(self, *, session_id: str) -> str | None:
+        """Return the most recent snapshot JSON for a session (newest-first)."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT full_briefing_json
+                FROM snapshots
+                WHERE session_id = ?
+                ORDER BY captured_at DESC, id DESC
+                LIMIT 1;
+                """,
+                (session_id,),
+            ).fetchone()
+            if not row:
+                return None
+            value = row["full_briefing_json"]
+            return str(value) if value else None
+
+    def get_latest_snapshot_full_briefing_json_any(self) -> str | None:
+        """Return the most recent snapshot JSON across all sessions."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT full_briefing_json
+                FROM snapshots
+                WHERE full_briefing_json IS NOT NULL AND full_briefing_json != ''
+                ORDER BY captured_at DESC, id DESC
+                LIMIT 1;
+                """
+            ).fetchone()
+            if not row:
+                return None
+            value = row["full_briefing_json"]
+            return str(value) if value else None
+
     def insert_snapshot(
         self,
         *,
@@ -608,6 +643,60 @@ class GameDatabase:
                 (session_id, lim),
             ).fetchall()
             return [dict(r) for r in rows]
+
+    def get_sessions(self, *, limit: int = 50) -> list[dict[str, Any]]:
+        """Return all sessions with snapshot stats, ordered by started_at DESC."""
+        lim = max(1, min(int(limit), 100))
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT
+                    s.id,
+                    s.save_id,
+                    s.save_path,
+                    s.empire_name,
+                    s.started_at,
+                    s.ended_at,
+                    s.last_game_date,
+                    s.last_updated_at,
+                    COUNT(snap.id) AS snapshot_count,
+                    MIN(snap.game_date) AS first_game_date,
+                    MAX(snap.game_date) AS last_game_date_computed
+                FROM sessions s
+                LEFT JOIN snapshots snap ON snap.session_id = s.id
+                GROUP BY s.id
+                ORDER BY s.started_at DESC
+                LIMIT ?;
+                """,
+                (lim,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_session_by_id(self, session_id: str) -> dict[str, Any] | None:
+        """Get a single session by ID with snapshot stats."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT
+                    s.id,
+                    s.save_id,
+                    s.save_path,
+                    s.empire_name,
+                    s.started_at,
+                    s.ended_at,
+                    s.last_game_date,
+                    s.last_updated_at,
+                    COUNT(snap.id) AS snapshot_count,
+                    MIN(snap.game_date) AS first_game_date,
+                    MAX(snap.game_date) AS last_game_date_computed
+                FROM sessions s
+                LEFT JOIN snapshots snap ON snap.session_id = s.id
+                WHERE s.id = ?
+                GROUP BY s.id;
+                """,
+                (session_id,),
+            ).fetchone()
+            return dict(row) if row else None
 
 
 _default_db: GameDatabase | None = None

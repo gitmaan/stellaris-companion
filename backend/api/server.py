@@ -227,4 +227,87 @@ def create_app() -> FastAPI:
             ],
         }
 
+    @app.get("/api/sessions", dependencies=[Depends(verify_token)])
+    async def get_sessions(request: Request) -> dict[str, Any]:
+        """Get list of all sessions with snapshot stats.
+
+        Returns sessions ordered by started_at DESC with empire name, dates, and snapshot counts.
+        """
+        db = getattr(request.app.state, "db", None)
+
+        if db is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Database not initialized"},
+            )
+
+        sessions_data = db.get_sessions(limit=50)
+
+        # Format response according to API spec
+        sessions = []
+        for session in sessions_data:
+            sessions.append({
+                "id": session["id"],
+                "empire_name": session["empire_name"],
+                "started_at": session["started_at"],
+                "ended_at": session["ended_at"],
+                "first_game_date": session["first_game_date"],
+                "last_game_date": session["last_game_date_computed"] or session["last_game_date"],
+                "snapshot_count": session["snapshot_count"],
+                "is_active": session["ended_at"] is None,
+            })
+
+        return {"sessions": sessions}
+
+    @app.get("/api/sessions/{session_id}/events", dependencies=[Depends(verify_token)])
+    async def get_session_events(
+        request: Request,
+        session_id: str,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Get events for a specific session.
+
+        Returns events ordered by captured_at DESC with game_date, event_type, summary, and data.
+        """
+        db = getattr(request.app.state, "db", None)
+
+        if db is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Database not initialized"},
+            )
+
+        # Check if session exists
+        session = db.get_session_by_id(session_id)
+        if session is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "Session not found"},
+            )
+
+        # Get events for the session
+        import json as json_module
+        events_data = db.get_recent_events(session_id=session_id, limit=limit)
+
+        # Format response according to API spec
+        events = []
+        for event in events_data:
+            data_json = event.get("data_json")
+            data = {}
+            if data_json:
+                try:
+                    data = json_module.loads(data_json)
+                except Exception:
+                    pass
+
+            events.append({
+                "id": event["id"],
+                "game_date": event["game_date"],
+                "event_type": event["event_type"],
+                "summary": event["summary"],
+                "data": data,
+            })
+
+        return {"events": events}
+
     return app
