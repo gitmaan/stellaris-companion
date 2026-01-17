@@ -1,10 +1,27 @@
 // Main process entry point
 // Implements ELEC-002: Python subprocess management
+// Implements ELEC-004: Settings IPC handlers (keytar + electron-store)
 
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
 const crypto = require('crypto')
+const Store = require('electron-store')
+const keytar = require('keytar')
+
+// Constants for keytar service names
+const KEYTAR_SERVICE = 'StellarisCompanion'
+const KEYTAR_ACCOUNT_GOOGLE_API = 'google-api-key'
+const KEYTAR_ACCOUNT_DISCORD = 'discord-token'
+
+// Initialize electron-store for non-secret settings
+const store = new Store({
+  name: 'settings',
+  defaults: {
+    savePath: '',
+    discordEnabled: false,
+  },
+})
 
 // Configuration
 const BACKEND_HOST = '127.0.0.1'
@@ -277,18 +294,93 @@ function startHealthCheck() {
 }
 
 /**
- * Get settings from storage (placeholder - full implementation in ELEC-004).
- * @returns {Object} Settings
+ * Mask a secret key for display (show first 4 chars and last 4 chars).
+ * @param {string} key - The secret key
+ * @returns {string} Masked key like "abcd...wxyz" or empty if not set
+ */
+function maskSecret(key) {
+  if (!key || key.length < 12) {
+    return key ? '****' : ''
+  }
+  return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`
+}
+
+/**
+ * Get settings from storage.
+ * Uses keytar for secrets (returns masked), electron-store for non-secrets.
+ * @returns {Promise<Object>} Settings with masked secrets
  */
 async function getSettings() {
-  // Import electron-store and keytar for full implementation
-  // For now, return env-based settings for testing
+  // Get secrets from keytar (masked for display)
+  const googleApiKey = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_GOOGLE_API)
+  const discordToken = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_DISCORD)
+
+  // Get non-secrets from electron-store
+  const savePath = store.get('savePath', '')
+  const discordEnabled = store.get('discordEnabled', false)
+
   return {
-    googleApiKey: process.env.GOOGLE_API_KEY || '',
-    savePath: process.env.STELLARIS_SAVE_PATH || '',
-    discordEnabled: false,
-    discordToken: '',
+    googleApiKey: maskSecret(googleApiKey),
+    googleApiKeySet: !!googleApiKey,
+    discordToken: maskSecret(discordToken),
+    discordTokenSet: !!discordToken,
+    savePath,
+    discordEnabled,
   }
+}
+
+/**
+ * Get the actual (unmasked) secrets for internal use.
+ * @returns {Promise<Object>} Settings with actual secret values
+ */
+async function getSettingsWithSecrets() {
+  const googleApiKey = (await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_GOOGLE_API)) || ''
+  const discordToken = (await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_DISCORD)) || ''
+  const savePath = store.get('savePath', '')
+  const discordEnabled = store.get('discordEnabled', false)
+
+  return {
+    googleApiKey,
+    discordToken,
+    savePath,
+    discordEnabled,
+  }
+}
+
+/**
+ * Save settings to storage.
+ * Secrets go to keytar, non-secrets go to electron-store.
+ * @param {Object} settings - Settings to save
+ * @returns {Promise<Object>} Result with success status
+ */
+async function saveSettings(settings) {
+  // Save secrets to keytar (only if provided and not masked)
+  if (settings.googleApiKey !== undefined && !settings.googleApiKey.includes('...')) {
+    if (settings.googleApiKey) {
+      await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_GOOGLE_API, settings.googleApiKey)
+    } else {
+      await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_GOOGLE_API)
+    }
+  }
+
+  if (settings.discordToken !== undefined && !settings.discordToken.includes('...')) {
+    if (settings.discordToken) {
+      await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_DISCORD, settings.discordToken)
+    } else {
+      await keytar.deletePassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_DISCORD)
+    }
+  }
+
+  // Save non-secrets to electron-store
+  if (settings.savePath !== undefined) {
+    store.set('savePath', settings.savePath)
+  }
+
+  if (settings.discordEnabled !== undefined) {
+    store.set('discordEnabled', settings.discordEnabled)
+  }
+
+  return { success: true }
 }
 
 // Window Management
@@ -392,23 +484,20 @@ ipcMain.handle('backend:end-session', async () => {
   }
 })
 
-// Settings handlers (placeholder - full implementation in ELEC-004)
+// Settings handlers (ELEC-004: keytar + electron-store)
 ipcMain.handle('get-settings', async () => {
   return getSettings()
 })
 
 ipcMain.handle('save-settings', async (event, settings) => {
-  // Full implementation in ELEC-004 with keytar + electron-store
-  // For now, just restart backend with new settings
-  if (settings.googleApiKey) {
-    process.env.GOOGLE_API_KEY = settings.googleApiKey
-  }
-  if (settings.savePath) {
-    process.env.STELLARIS_SAVE_PATH = settings.savePath
-  }
+  // Save settings to keytar (secrets) and electron-store (non-secrets)
+  await saveSettings(settings)
 
-  const currentSettings = await getSettings()
-  restartPythonBackend({ ...currentSettings, ...settings })
+  // Get the full settings with actual secrets for backend restart
+  const fullSettings = await getSettingsWithSecrets()
+
+  // Restart the Python backend with new settings
+  restartPythonBackend(fullSettings)
 
   return { success: true }
 })
@@ -447,8 +536,8 @@ app.whenReady().then(async () => {
   // Create the main window
   createWindow()
 
-  // Get settings and start backend
-  const settings = await getSettings()
+  // Get settings with actual secrets and start backend
+  const settings = await getSettingsWithSecrets()
   if (settings.googleApiKey) {
     startPythonBackend(settings)
 

@@ -12,7 +12,9 @@
     "Use 'from __future__ import annotations' for Python 3.9+ type hint compatibility",
     "Use process.kill(-pid, 'SIGTERM') on Unix to kill process group; use taskkill on Windows for proper cleanup",
     "Electron main.js can't be tested directly with Node - ipcMain requires Electron context; verify via syntax checking and pattern matching",
-    "Preload event listeners should return cleanup functions for React useEffect cleanup - e.g., return () => ipcRenderer.removeListener(channel, handler)"
+    "Preload event listeners should return cleanup functions for React useEffect cleanup - e.g., return () => ipcRenderer.removeListener(channel, handler)",
+    "Settings IPC should return googleApiKeySet/discordTokenSet booleans alongside masked values so UI can distinguish 'not set' from 'empty string'",
+    "When saving settings, check for mask pattern (contains '...') to avoid overwriting secrets with their masked representation"
   ],
   "stories": [
     {
@@ -164,8 +166,8 @@
         "Settings changes restart Python backend"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in main.js. getSettings() returns masked secrets via maskSecret() function (shows first/last 4 chars) plus googleApiKeySet/discordTokenSet booleans, and non-secrets (savePath, discordEnabled) from electron-store. saveSettings() stores secrets in keytar via setPassword() and non-secrets in electron-store. show-folder-dialog uses dialog.showOpenDialog() with openDirectory property. save-settings handler calls restartPythonBackend() after saving. Verified syntax with node --check."
     },
     {
       "id": "ELEC-005",
