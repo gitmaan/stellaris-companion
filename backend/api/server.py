@@ -28,6 +28,12 @@ class ChatRequest(BaseModel):
     session_key: str = "default"
 
 
+class RecapRequest(BaseModel):
+    """Request body for /api/recap endpoint."""
+
+    session_id: str
+
+
 def get_auth_token() -> str | None:
     """Get the expected auth token from environment."""
     return os.environ.get(ENV_API_TOKEN)
@@ -309,5 +315,61 @@ def create_app() -> FastAPI:
             })
 
         return {"events": events}
+
+    @app.post("/api/recap", dependencies=[Depends(verify_token)])
+    async def generate_recap(request: Request, body: RecapRequest) -> dict[str, Any]:
+        """Generate a recap summary for a session.
+
+        Returns a narrative recap of events and key changes during the session.
+        """
+        db = getattr(request.app.state, "db", None)
+
+        if db is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Database not initialized"},
+            )
+
+        # Check if session exists
+        session = db.get_session_by_id(body.session_id)
+        if session is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "Session not found"},
+            )
+
+        # Get session stats for date range and event count
+        stats = db.get_session_snapshot_stats(body.session_id)
+        first_date = stats.get("first_game_date")
+        last_date = stats.get("last_game_date")
+
+        # Build date range string
+        if first_date and last_date:
+            date_range = f"{first_date} - {last_date}"
+        elif first_date:
+            date_range = f"{first_date} - ongoing"
+        elif last_date:
+            date_range = f"unknown - {last_date}"
+        else:
+            date_range = "No snapshots"
+
+        # Get events count
+        events = db.get_recent_events(session_id=body.session_id, limit=100)
+        events_summarized = len(events)
+
+        # Generate recap using existing reporting function
+        from backend.core.reporting import build_session_report_text
+
+        recap = build_session_report_text(
+            db=db,
+            session_id=body.session_id,
+            max_events=50,
+        )
+
+        return {
+            "recap": recap,
+            "events_summarized": events_summarized,
+            "date_range": date_range,
+        }
 
     return app

@@ -83,8 +83,8 @@
         "Returns 404 if session not found"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in server.py. Uses build_session_report_text() from reporting.py to generate a deterministic recap with key deltas and event timeline. Returns recap text, events_summarized count, and date_range string. Verified all criteria with TestClient."
     },
     {
       "id": "API-007",
