@@ -9,7 +9,9 @@
     "DB path must use app.getPath('userData'), not install directory",
     "Python backend spawned by Electron, not run standalone",
     "FastAPI uses Depends(verify_token) for per-route auth; access companion/db via request.app.state",
-    "Use 'from __future__ import annotations' for Python 3.9+ type hint compatibility"
+    "Use 'from __future__ import annotations' for Python 3.9+ type hint compatibility",
+    "Use process.kill(-pid, 'SIGTERM') on Unix to kill process group; use taskkill on Windows for proper cleanup",
+    "Electron main.js can't be tested directly with Node - ipcMain requires Electron context; verify via syntax checking and pattern matching"
   ],
   "stories": [
     {
@@ -135,8 +137,8 @@
         "Health checks backend on startup"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in main.js. Uses spawn() to start Python backend with STELLARIS_API_TOKEN, GOOGLE_API_KEY, STELLARIS_DB_PATH, STELLARIS_SAVE_PATH environment variables. Generates 64-char hex auth token using crypto.randomBytes(32). Kills Python on app quit via 'will-quit' event with platform-aware process termination. Health checks via waitForBackendReady() on startup with 30s timeout, then periodic checks every 5s. IPC handlers proxy all backend:* calls through main process with auth header."
     },
     {
       "id": "ELEC-003",
