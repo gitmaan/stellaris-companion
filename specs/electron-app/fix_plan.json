@@ -34,8 +34,8 @@
         "Returns precompute_ready=true when briefing cached"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Already implemented in server.py lines 88-113. Verified all criteria with TestClient."
     },
     {
       "id": "API-003",
