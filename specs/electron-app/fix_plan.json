@@ -11,7 +11,8 @@
     "FastAPI uses Depends(verify_token) for per-route auth; access companion/db via request.app.state",
     "Use 'from __future__ import annotations' for Python 3.9+ type hint compatibility",
     "Use process.kill(-pid, 'SIGTERM') on Unix to kill process group; use taskkill on Windows for proper cleanup",
-    "Electron main.js can't be tested directly with Node - ipcMain requires Electron context; verify via syntax checking and pattern matching"
+    "Electron main.js can't be tested directly with Node - ipcMain requires Electron context; verify via syntax checking and pattern matching",
+    "Preload event listeners should return cleanup functions for React useEffect cleanup - e.g., return () => ipcRenderer.removeListener(channel, handler)"
   ],
   "stories": [
     {
@@ -150,8 +151,8 @@
         "contextIsolation enabled"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in preload.js. Uses contextBridge.exposeInMainWorld to expose electronAPI with: settings methods (getSettings, saveSettings, showFolderDialog), backend proxy (health, chat, status, sessions, sessionEvents, recap, endSession), event listeners with cleanup functions (onBackendStatus, onUpdateAvailable, onUpdateDownloaded). contextIsolation: true set in main.js BrowserWindow config. Verified syntax with node --check."
     },
     {
       "id": "ELEC-004",

@@ -1,5 +1,6 @@
 // Preload script - IPC bridge (contextBridge)
-// Full implementation in ELEC-003
+// Implements ELEC-003: Expose window.electronAPI with IPC methods
+// Security: contextIsolation enabled in main.js, renderer never sees auth token
 
 const { contextBridge, ipcRenderer } = require('electron')
 
@@ -9,7 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   showFolderDialog: () => ipcRenderer.invoke('show-folder-dialog'),
 
-  // Backend (proxied through main)
+  // Backend (proxied through main process which adds auth header)
   backend: {
     health: () => ipcRenderer.invoke('backend:health'),
     chat: (message, sessionKey) =>
@@ -26,10 +27,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     endSession: () => ipcRenderer.invoke('backend:end-session'),
   },
 
+  // Backend status events (sent from main process health checks)
+  onBackendStatus: (callback) => {
+    const handler = (event, status) => callback(status)
+    ipcRenderer.on('backend-status', handler)
+    // Return cleanup function
+    return () => ipcRenderer.removeListener('backend-status', handler)
+  },
+
   // Updates
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
-  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', callback),
-  onUpdateDownloaded: (callback) =>
-    ipcRenderer.on('update-downloaded', callback),
+  onUpdateAvailable: (callback) => {
+    const handler = (event, info) => callback(info)
+    ipcRenderer.on('update-available', handler)
+    return () => ipcRenderer.removeListener('update-available', handler)
+  },
+  onUpdateDownloaded: (callback) => {
+    const handler = (event, info) => callback(info)
+    ipcRenderer.on('update-downloaded', handler)
+    return () => ipcRenderer.removeListener('update-downloaded', handler)
+  },
 })
