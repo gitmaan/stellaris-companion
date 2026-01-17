@@ -14,7 +14,8 @@
     "Electron main.js can't be tested directly with Node - ipcMain requires Electron context; verify via syntax checking and pattern matching",
     "Preload event listeners should return cleanup functions for React useEffect cleanup - e.g., return () => ipcRenderer.removeListener(channel, handler)",
     "Settings IPC should return googleApiKeySet/discordTokenSet booleans alongside masked values so UI can distinguish 'not set' from 'empty string'",
-    "When saving settings, check for mask pattern (contains '...') to avoid overwriting secrets with their masked representation"
+    "When saving settings, check for mask pattern (contains '...') to avoid overwriting secrets with their masked representation",
+    "Vite projects must exclude vite.config.ts from main tsconfig.json - it uses tsconfig.node.json with composite: true"
   ],
   "stories": [
     {
@@ -204,8 +205,8 @@
         "App.tsx has basic routing (Chat, Recap, Settings)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "React 18.2 + TypeScript 5.3 + Vite 5.0 scaffold already existed. Fixed tsconfig.json to exclude vite.config.ts (was causing build error). npm run dev starts dev server on port 5173. npm run build creates dist/ with index.html and assets. App.tsx has tab-based navigation (useState) rendering ChatPage, RecapPage, SettingsPage components."
     },
     {
       "id": "UI-002",
