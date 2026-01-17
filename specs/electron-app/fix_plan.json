@@ -95,8 +95,8 @@
         "Returns 400 if no active session"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in server.py. Uses compute_save_id and get_active_session_id to find active session for current save. Calls end_active_sessions_for_save to end it. Returns session_id, ended_at (unix timestamp), and snapshot_count. Returns 400 with error detail if no save loaded or no active session. Verified all criteria with TestClient."
     },
     {
       "id": "API-008",

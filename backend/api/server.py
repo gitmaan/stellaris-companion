@@ -316,6 +316,70 @@ def create_app() -> FastAPI:
 
         return {"events": events}
 
+    @app.post("/api/end-session", dependencies=[Depends(verify_token)])
+    async def end_session(request: Request) -> dict[str, Any]:
+        """End the current active session.
+
+        Returns the session ID, ended_at timestamp, and snapshot count.
+        Returns 400 if no active session exists.
+        """
+        import time as time_module
+
+        from backend.core.history import compute_save_id, extract_campaign_id_from_gamestate
+
+        companion = getattr(request.app.state, "companion", None)
+        db = getattr(request.app.state, "db", None)
+
+        if db is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Database not initialized"},
+            )
+
+        if companion is None or not companion.is_loaded:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "No active session - no save file loaded"},
+            )
+
+        # Compute save_id from companion's current state
+        extractor = getattr(companion, "extractor", None)
+        gamestate = getattr(extractor, "gamestate", None) if extractor else None
+        campaign_id = extract_campaign_id_from_gamestate(gamestate) if gamestate else None
+        player_id = extractor.get_player_empire_id() if extractor else None
+        empire_name = (companion.metadata or {}).get("name")
+        save_path = getattr(companion, "save_path", None)
+
+        save_id = compute_save_id(
+            campaign_id=campaign_id,
+            player_id=player_id,
+            empire_name=empire_name,
+            save_path=save_path,
+        )
+
+        # Check for active session
+        active_session_id = db.get_active_session_id(save_id)
+        if not active_session_id:
+            raise HTTPException(
+                status_code=400,
+                detail={"error": "No active session found for current save"},
+            )
+
+        # End the session
+        db.end_active_sessions_for_save(save_id=save_id)
+
+        # Get stats for the ended session
+        stats = db.get_session_snapshot_stats(active_session_id)
+
+        # Get ended_at timestamp (current time since we just ended it)
+        ended_at = int(time_module.time())
+
+        return {
+            "session_id": active_session_id,
+            "ended_at": ended_at,
+            "snapshot_count": stats.get("snapshot_count", 0),
+        }
+
     @app.post("/api/recap", dependencies=[Depends(verify_token)])
     async def generate_recap(request: Request, body: RecapRequest) -> dict[str, Any]:
         """Generate a recap summary for a session.
