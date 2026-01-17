@@ -47,8 +47,8 @@
         "Returns 503 with retry_after_ms if precompute not ready"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in server.py. Verified all criteria with TestClient mock tests."
     },
     {
       "id": "API-004",

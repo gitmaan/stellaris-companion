@@ -8,15 +8,24 @@ the Python backend. All endpoints require Bearer token authentication.
 from __future__ import annotations
 
 import os
+import time
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
 
 
 # Auth configuration
 ENV_API_TOKEN = "STELLARIS_API_TOKEN"
 security = HTTPBearer(auto_error=False)
+
+
+class ChatRequest(BaseModel):
+    """Request body for /api/chat endpoint."""
+
+    message: str
+    session_key: str = "default"
 
 
 def get_auth_token() -> str | None:
@@ -110,6 +119,55 @@ def create_app() -> FastAPI:
             "empire_name": companion.metadata.get("name"),
             "game_date": companion.metadata.get("date"),
             "precompute_ready": precompute_status.get("ready", False),
+        }
+
+    @app.post("/api/chat", dependencies=[Depends(verify_token)])
+    async def chat(request: Request, body: ChatRequest) -> dict[str, Any]:
+        """Chat endpoint for asking questions about the game state.
+
+        Uses the precomputed briefing for fast responses without tool calls.
+
+        Returns 503 if the precompute is not ready yet.
+        """
+        companion = getattr(request.app.state, "companion", None)
+
+        if companion is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Companion not initialized", "retry_after_ms": 2000},
+            )
+
+        if not companion.is_loaded:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "No save file loaded", "retry_after_ms": 2000},
+            )
+
+        # Check if precompute is ready
+        precompute_status = companion.get_precompute_status()
+        if not precompute_status.get("ready", False):
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Briefing not ready yet", "retry_after_ms": 2000},
+            )
+
+        # Call ask_precomputed to get the response
+        start_time = time.time()
+        response_text, elapsed = companion.ask_precomputed(
+            question=body.message,
+            session_key=body.session_key,
+        )
+        response_time_ms = int((time.time() - start_time) * 1000)
+
+        # Get tools_used from the companion's last call stats
+        call_stats = companion.get_call_stats()
+        tools_used = call_stats.get("tools_used", [])
+
+        return {
+            "text": response_text,
+            "game_date": precompute_status.get("game_date"),
+            "tools_used": tools_used,
+            "response_time_ms": response_time_ms,
         }
 
     return app
