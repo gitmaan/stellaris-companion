@@ -1,0 +1,338 @@
+{
+  "feature": "Electron Desktop App",
+  "branch": "ralph/electron-app",
+  "patterns": [
+    "Reuse existing Companion, GameDatabase, SaveWatcher classes - do not reimplement",
+    "All API endpoints require Bearer token auth middleware",
+    "Renderer calls window.electronAPI.* only, never fetch() directly",
+    "Use keytar for secrets, electron-store for non-secrets",
+    "DB path must use app.getPath('userData'), not install directory",
+    "Python backend spawned by Electron, not run standalone",
+    "FastAPI uses Depends(verify_token) for per-route auth; access companion/db via request.app.state",
+    "Use 'from __future__ import annotations' for Python 3.9+ type hint compatibility"
+  ],
+  "stories": [
+    {
+      "id": "API-001",
+      "title": "Create FastAPI server with auth middleware",
+      "criteria": [
+        "backend/api/server.py exists with create_app() function",
+        "Auth middleware rejects requests without valid Bearer token",
+        "Auth middleware accepts requests with correct token",
+        "python -c 'from backend.api.server import create_app' succeeds"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "API-002",
+      "title": "Implement /api/health endpoint",
+      "criteria": [
+        "GET /api/health returns status, save_loaded, empire_name, game_date, precompute_ready",
+        "Returns save_loaded=false when no save loaded",
+        "Returns precompute_ready=true when briefing cached"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "API-003",
+      "title": "Implement /api/chat endpoint",
+      "criteria": [
+        "POST /api/chat accepts {message, session_key}",
+        "Returns {text, game_date, tools_used, response_time_ms}",
+        "Uses companion.ask_precomputed() internally",
+        "Returns 503 with retry_after_ms if precompute not ready"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "API-004",
+      "title": "Implement /api/status endpoint",
+      "criteria": [
+        "GET /api/status returns empire summary",
+        "Includes military_power, economy, colonies, pops, active_wars",
+        "Uses companion.get_status_data() or equivalent"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "API-005",
+      "title": "Implement /api/sessions endpoints",
+      "criteria": [
+        "GET /api/sessions returns list of sessions",
+        "GET /api/sessions/{id}/events returns events for session",
+        "Uses GameDatabase methods"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "API-006",
+      "title": "Implement /api/recap endpoint",
+      "criteria": [
+        "POST /api/recap accepts {session_id}",
+        "Returns {recap, events_summarized, date_range}",
+        "Returns 404 if session not found"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "API-007",
+      "title": "Implement /api/end-session endpoint",
+      "criteria": [
+        "POST /api/end-session ends current session",
+        "Returns {session_id, ended_at, snapshot_count}",
+        "Returns 400 if no active session"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "API-008",
+      "title": "Create electron_main.py entry point",
+      "criteria": [
+        "backend/electron_main.py exists",
+        "Reads config from environment variables",
+        "Initializes Companion with save_path and api_key",
+        "Starts SaveWatcher with callback to companion.reload_save",
+        "Runs FastAPI server with uvicorn",
+        "python backend/electron_main.py --help or similar works"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "ELEC-001",
+      "title": "Create Electron directory structure and package.json",
+      "criteria": [
+        "electron/ directory exists with correct structure",
+        "package.json has all required dependencies",
+        "npm install succeeds in electron/"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "ELEC-002",
+      "title": "Implement main.js with Python subprocess management",
+      "criteria": [
+        "main.js spawns Python backend with environment variables",
+        "Generates random auth token per launch",
+        "Kills Python on app quit",
+        "Health checks backend on startup"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "ELEC-003",
+      "title": "Implement preload.js with IPC bridge",
+      "criteria": [
+        "preload.js exposes window.electronAPI",
+        "Includes settings methods (get, save, folder dialog)",
+        "Includes backend proxy methods (health, chat, status, etc.)",
+        "contextIsolation enabled"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "ELEC-004",
+      "title": "Implement IPC handlers for settings (keytar + electron-store)",
+      "criteria": [
+        "get-settings returns masked keys + non-secret settings",
+        "save-settings stores secrets in keytar, others in electron-store",
+        "show-folder-dialog opens native folder picker",
+        "Settings changes restart Python backend"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "ELEC-005",
+      "title": "Implement IPC handlers for backend API proxy",
+      "criteria": [
+        "backend:* handlers call Python API with auth header",
+        "Handles connection errors gracefully",
+        "Returns parsed JSON responses"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "ELEC-006",
+      "title": "Implement system tray",
+      "criteria": [
+        "Tray icon appears on launch",
+        "Context menu has Open, Status, Quit options",
+        "Click toggles window visibility",
+        "macOS: app stays running when window closed"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "UI-001",
+      "title": "Create React app scaffold with Vite",
+      "criteria": [
+        "electron/renderer/ has React + TypeScript setup",
+        "npm run dev starts Vite dev server",
+        "npm run build creates production bundle",
+        "App.tsx has basic routing (Chat, Recap, Settings)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "UI-002",
+      "title": "Implement StatusBar component",
+      "criteria": [
+        "Shows empire name and game date",
+        "Shows connection status (Connected, Connecting, Disconnected)",
+        "Polls backend health every 5 seconds"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "UI-003",
+      "title": "Implement ChatPage with ChatMessage and ChatInput",
+      "criteria": [
+        "ChatInput sends message on Enter",
+        "ChatMessage renders user and assistant messages differently",
+        "Shows loading state during API call",
+        "Shows error messages on failure",
+        "Messages list scrolls to bottom on new message"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "UI-004",
+      "title": "Implement SettingsPage",
+      "criteria": [
+        "Shows Google API Key input (masked if set)",
+        "Shows save path with Browse button",
+        "Shows Discord toggle with conditional token input",
+        "Save button saves settings and restarts backend",
+        "First-run shows welcome message"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "UI-005",
+      "title": "Implement RecapPage with SessionList and RecapViewer",
+      "criteria": [
+        "SessionList shows all sessions with selection",
+        "Selected session shows details (dates, snapshot count)",
+        "Generate Recap button calls API and shows result",
+        "RecapViewer renders markdown",
+        "End Current Session button works"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "UI-006",
+      "title": "Implement useBackend hook",
+      "criteria": [
+        "useBackend() returns methods for all API calls",
+        "Uses window.electronAPI.backend.* internally",
+        "Handles loading states",
+        "Handles errors consistently"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "UI-007",
+      "title": "Apply dark theme styling",
+      "criteria": [
+        "global.css has CSS variables for colors",
+        "Dark theme applied to all components",
+        "Matches spec color palette"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "PKG-001",
+      "title": "Create PyInstaller spec file",
+      "criteria": [
+        "stellaris-backend.spec exists",
+        "Includes all required data files",
+        "Includes hidden imports for uvicorn",
+        "pyinstaller --clean stellaris-backend.spec succeeds"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "PKG-002",
+      "title": "Create electron-builder.yml",
+      "criteria": [
+        "electron-builder.yml configures mac/win/linux targets",
+        "extraResources includes Python backend",
+        "App builds without signing (for now)"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "PKG-003",
+      "title": "Create build scripts",
+      "criteria": [
+        "scripts/build-python.sh builds Python backend",
+        "scripts/build-electron.sh builds Electron app",
+        "scripts/build-all.sh runs both",
+        "Scripts are executable"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "INT-001",
+      "title": "End-to-end test: launch app, load save, ask question",
+      "criteria": [
+        "App launches without crash",
+        "Settings page allows entering API key",
+        "Backend starts after saving settings",
+        "Chat page shows backend connected",
+        "Asking a question returns response"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    }
+  ],
+  "discovered": []
+}
