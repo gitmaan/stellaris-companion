@@ -59,8 +59,8 @@
         "Uses companion.get_status_data() or equivalent"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in server.py. Returns empire_name, game_date, military_power, economy (with all resources), colonies, pops, active_wars. Verified with TestClient mock tests."
     },
     {
       "id": "API-005",

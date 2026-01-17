@@ -170,4 +170,61 @@ def create_app() -> FastAPI:
             "response_time_ms": response_time_ms,
         }
 
+    @app.get("/api/status", dependencies=[Depends(verify_token)])
+    async def get_status(request: Request) -> dict[str, Any]:
+        """Get empire status summary.
+
+        Returns key metrics: military power, economy, colonies, population, active wars.
+        This is a fast endpoint that doesn't require LLM processing.
+        """
+        companion = getattr(request.app.state, "companion", None)
+
+        if companion is None or not companion.is_loaded:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "No save file loaded"},
+            )
+
+        # Get status data from companion (uses get_status_data internally)
+        status_data = companion.get_status_data()
+
+        if "error" in status_data:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": status_data["error"]},
+            )
+
+        # Get active wars from the extractor
+        wars_data = companion.extractor.get_wars()
+        active_wars = wars_data.get("wars", [])
+
+        # Extract key metrics per API-004 criteria
+        colonies_data = status_data.get("colonies", {})
+        net_resources = status_data.get("net_resources", {})
+
+        return {
+            "empire_name": status_data.get("empire_name"),
+            "game_date": status_data.get("date"),
+            "military_power": status_data.get("military_power", 0),
+            "economy": {
+                "energy": net_resources.get("energy", 0),
+                "minerals": net_resources.get("minerals", 0),
+                "alloys": net_resources.get("alloys", 0),
+                "food": net_resources.get("food", 0),
+                "consumer_goods": net_resources.get("consumer_goods", 0),
+                "tech_power": status_data.get("tech_power", 0),
+                "economy_power": status_data.get("economy_power", 0),
+            },
+            "colonies": colonies_data.get("total_count", 0) if isinstance(colonies_data, dict) else 0,
+            "pops": colonies_data.get("total_population", 0) if isinstance(colonies_data, dict) else 0,
+            "active_wars": [
+                {
+                    "name": war.get("name"),
+                    "attackers": war.get("attackers", []),
+                    "defenders": war.get("defenders", []),
+                }
+                for war in active_wars
+            ],
+        }
+
     return app
