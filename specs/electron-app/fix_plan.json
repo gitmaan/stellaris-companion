@@ -110,8 +110,8 @@
         "python backend/electron_main.py --help or similar works"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in backend/electron_main.py. Reads GOOGLE_API_KEY, STELLARIS_API_TOKEN, STELLARIS_DB_PATH, STELLARIS_SAVE_PATH from environment. Initializes Companion with save_path (from args, env, or auto-discovered). Starts SaveWatcher with on_save_detected callback that calls companion.reload_save(new_path=path). Runs FastAPI via uvicorn.run(). Verified --help works and import backend.electron_main succeeds."
     },
     {
       "id": "ELEC-001",
