@@ -178,8 +178,8 @@
         "Returns parsed JSON responses"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Already implemented in main.js (lines 419-485). All 7 backend handlers (health, chat, status, sessions, session-events, recap, end-session) use callBackendApi() which adds 'Authorization: Bearer <token>' header. All handlers wrap calls in try/catch and return {error: e.message} on failure. callBackendApi() parses JSON via response.json(). Preload.js exposes these via window.electronAPI.backend.*. Verified syntax with node --check."
     },
     {
       "id": "ELEC-006",
