@@ -329,8 +329,8 @@
         "Scripts are executable"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created scripts/build-python.sh (activates venv, runs PyInstaller with spec file, moves output to dist-python/), scripts/build-electron.sh (verifies Python backend exists, builds React renderer, runs electron-builder), and scripts/build-all.sh (runs both in sequence). All scripts are executable (chmod +x). Verified: build-python.sh produces dist-python/stellaris-backend (33MB), build-electron.sh produces DMG files in electron/dist/, build-all.sh runs both successfully."
     },
     {
       "id": "INT-001",
