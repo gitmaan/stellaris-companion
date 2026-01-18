@@ -234,8 +234,8 @@
         "Messages list scrolls to bottom on new message"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in ChatPage.tsx, ChatMessage.tsx, ChatInput.tsx. ChatInput handles Enter key via handleKeyDown callback. ChatMessage uses role-based CSS classes for different styling (user=right-aligned purple, assistant=left-aligned dark). Loading state shows animated dots indicator and disables input. Errors shown with red border styling via isError prop. Auto-scroll via useRef + scrollIntoView in useEffect on messages change. TypeScript compiles and npm run build succeeds."
     },
     {
       "id": "UI-004",

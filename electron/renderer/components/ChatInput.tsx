@@ -1,20 +1,41 @@
-import { useState } from 'react'
+import { useState, useCallback, KeyboardEvent } from 'react'
 
 interface ChatInputProps {
   onSend: (message: string) => void
   disabled?: boolean
+  loading?: boolean
 }
 
-function ChatInput({ onSend, disabled }: ChatInputProps) {
+/**
+ * ChatInput - Text input for sending chat messages
+ *
+ * Implements UI-003 criteria:
+ * - Sends message on Enter key press
+ * - Disabled during loading state
+ */
+function ChatInput({ onSend, disabled, loading }: ChatInputProps) {
   const [message, setMessage] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const isDisabled = disabled || loading
+
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    if (message.trim() && !disabled) {
+    if (message.trim() && !isDisabled) {
       onSend(message.trim())
       setMessage('')
     }
-  }
+  }, [message, isDisabled, onSend])
+
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+    // Send on Enter, but not Shift+Enter (allows for potential multiline later)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      if (message.trim() && !isDisabled) {
+        onSend(message.trim())
+        setMessage('')
+      }
+    }
+  }, [message, isDisabled, onSend])
 
   return (
     <form className="chat-input" onSubmit={handleSubmit}>
@@ -22,11 +43,13 @@ function ChatInput({ onSend, disabled }: ChatInputProps) {
         type="text"
         value={message}
         onChange={(e) => setMessage(e.target.value)}
-        placeholder="Ask your advisor..."
-        disabled={disabled}
+        onKeyDown={handleKeyDown}
+        placeholder={loading ? 'Waiting for response...' : 'Ask your advisor...'}
+        disabled={isDisabled}
+        autoFocus
       />
-      <button type="submit" disabled={disabled || !message.trim()}>
-        Send
+      <button type="submit" disabled={isDisabled || !message.trim()}>
+        {loading ? 'Sending...' : 'Send'}
       </button>
     </form>
   )
