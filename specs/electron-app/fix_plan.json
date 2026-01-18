@@ -220,8 +220,8 @@
         "Polls backend health every 5 seconds"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in electron/renderer/components/StatusBar.tsx. Uses useBackend().health() with 5-second polling via setTimeout pattern. Displays empire name and game date from HealthResponse. Shows connection status with color-coded indicators: Connected (green), Connecting (yellow with pulse animation), No Save (yellow), Disconnected (red). Also listens to backend-status events from main process via onBackendStatus. CSS styling added to global.css. TypeScript compiles and npm run build succeeds."
     },
     {
       "id": "UI-003",

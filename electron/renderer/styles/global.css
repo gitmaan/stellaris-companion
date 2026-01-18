@@ -64,3 +64,92 @@ body {
   flex: 1;
   overflow: auto;
 }
+
+/* ============================================
+   StatusBar Component (UI-002)
+   ============================================ */
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  min-height: 40px;
+}
+
+.status-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-bar-right {
+  display: flex;
+  align-items: center;
+}
+
+.status-bar .empire-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.status-bar .game-date {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.status-bar .connection-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status-bar .status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Connection status colors */
+.status-bar .connection-status.connected {
+  color: var(--success);
+}
+.status-bar .connection-status.connected .status-indicator {
+  background-color: var(--success);
+}
+
+.status-bar .connection-status.connecting {
+  color: var(--warning);
+}
+.status-bar .connection-status.connecting .status-indicator {
+  background-color: var(--warning);
+  animation: pulse 2s infinite;
+}
+
+.status-bar .connection-status.no-save {
+  color: var(--warning);
+}
+.status-bar .connection-status.no-save .status-indicator {
+  background-color: var(--warning);
+}
+
+.status-bar .connection-status.disconnected {
+  color: var(--error);
+}
+.status-bar .connection-status.disconnected .status-indicator {
+  background-color: var(--error);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
