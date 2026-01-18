@@ -248,8 +248,8 @@
         "First-run shows welcome message"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in electron/renderer/pages/SettingsPage.tsx. Uses useSettings hook for state management. Google API key uses password input type with '(configured)' status indicator when set. Save path has readonly input with Browse button that opens native folder dialog. Discord toggle is a checkbox that conditionally shows token input when enabled. Save button calls saveSettings which triggers backend restart in main.js. First-run welcome message shows when googleApiKeySet is false. CSS styles added to global.css. TypeScript compiles and npm run build succeeds."
     },
     {
       "id": "UI-005",
