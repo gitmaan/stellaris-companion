@@ -1,15 +1,43 @@
 :root {
-  --bg-primary: #1a1a2e;
-  --bg-secondary: #16213e;
-  --bg-tertiary: #0f3460;
-  --text-primary: #eaeaea;
-  --text-secondary: #a0a0a0;
-  --accent-primary: #e94560;
-  --accent-secondary: #533483;
-  --border-color: #2a2a4a;
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --error: #ef4444;
+  /* Background layers - Stellaris-inspired dark theme */
+  --bg-primary: #0a0e14;      /* Deepest background */
+  --bg-secondary: #131a24;    /* Card/panel background */
+  --bg-tertiary: #1a2332;     /* Hover states, borders */
+
+  /* Text */
+  --text-primary: #e6edf3;    /* Main text */
+  --text-secondary: #8b949e;  /* Secondary/muted text */
+  --text-accent: #58a6ff;     /* Links, highlights */
+
+  /* Accents */
+  --accent-blue: #1f6feb;     /* Primary buttons, active states */
+  --accent-green: #238636;    /* Success, positive */
+  --accent-yellow: #d29922;   /* Warning, pending */
+  --accent-red: #da3633;      /* Error, danger */
+  --accent-purple: #8957e5;   /* Special/empire color */
+
+  /* Borders */
+  --border-default: #30363d;
+  --border-subtle: #21262d;
+
+  /* Legacy aliases for backward compatibility */
+  --accent-primary: var(--accent-blue);
+  --accent-secondary: var(--accent-purple);
+  --border-color: var(--border-default);
+  --success: var(--accent-green);
+  --warning: var(--accent-yellow);
+  --error: var(--accent-red);
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.25rem;    /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
 }
 
 * {
@@ -19,10 +47,11 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.5;
+  font-size: var(--text-base);
 }
 
 .app {
@@ -246,7 +275,7 @@ body {
 /* User messages - align right */
 .chat-message.user {
   align-self: flex-end;
-  background-color: var(--accent-secondary);
+  background-color: var(--accent-blue);
   border-bottom-right-radius: 4px;
 }
 
@@ -338,7 +367,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: var(--accent-primary);
+  background-color: var(--accent-blue);
   animation: bounce 1.4s infinite ease-in-out both;
 }
 
@@ -419,7 +448,7 @@ body {
 }
 
 .chat-input button:hover:not(:disabled) {
-  background-color: #d13a52;
+  background-color: #1a5fd1;
 }
 
 .chat-input button:disabled {
@@ -463,11 +492,11 @@ body {
 
 /* Welcome message for first-run */
 .settings-welcome {
-  background: linear-gradient(135deg, var(--accent-secondary) 0%, var(--bg-tertiary) 100%);
+  background: linear-gradient(135deg, var(--accent-purple) 0%, var(--bg-tertiary) 100%);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 24px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-default);
 }
 
 .settings-welcome h2 {
@@ -569,8 +598,8 @@ body {
 }
 
 .form-input:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.15);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(31, 111, 235, 0.15);
 }
 
 .form-input::placeholder {
@@ -664,7 +693,7 @@ body {
 }
 
 .save-button:hover:not(:disabled) {
-  background-color: #d13a52;
+  background-color: #1a5fd1;
 }
 
 .save-button:disabled {
@@ -985,7 +1014,7 @@ body {
 }
 
 .generate-recap-button:hover:not(:disabled) {
-  background-color: #d13a52;
+  background-color: #1a5fd1;
 }
 
 .generate-recap-button:disabled {

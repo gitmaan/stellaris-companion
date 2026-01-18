@@ -18,7 +18,8 @@
     "Vite projects must exclude vite.config.ts from main tsconfig.json - it uses tsconfig.node.json with composite: true",
     "For macOS tray, use setTemplateImage(true) on the nativeImage so it renders correctly in the menu bar; use trayTemplate.png naming convention",
     "Window minimize-to-tray requires intercepting 'close' event (not 'closed') and calling event.preventDefault() + mainWindow.hide(); use isQuitting flag to allow actual quit",
-    "React hooks that call IPC should return {data, loading, error} pattern via UseBackendResult<T> for consistent error handling across components"
+    "React hooks that call IPC should return {data, loading, error} pattern via UseBackendResult<T> for consistent error handling across components",
+    "CSS color variables should be defined at :root level; use legacy aliases (--accent-primary, --border-color, etc.) when refactoring colors to maintain backward compatibility with existing component styles"
   ],
   "stories": [
     {
@@ -287,8 +288,8 @@
         "Matches spec color palette"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Updated global.css with Stellaris-inspired dark theme color palette from ui.md spec. CSS variables now include: --bg-primary (#0a0e14), --bg-secondary (#131a24), --bg-tertiary (#1a2332), --text-primary (#e6edf3), --text-secondary (#8b949e), --text-accent (#58a6ff), --accent-blue (#1f6feb), --accent-green (#238636), --accent-yellow (#d29922), --accent-red (#da3633), --accent-purple (#8957e5), --border-default (#30363d), --border-subtle (#21262d). Added typography variables (font-sans, font-mono, text-xs through text-2xl). Legacy aliases maintained for backward compatibility. User messages now use --accent-blue. npm run build succeeds."
     },
     {
       "id": "PKG-001",
