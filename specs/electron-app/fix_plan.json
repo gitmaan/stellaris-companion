@@ -15,7 +15,9 @@
     "Preload event listeners should return cleanup functions for React useEffect cleanup - e.g., return () => ipcRenderer.removeListener(channel, handler)",
     "Settings IPC should return googleApiKeySet/discordTokenSet booleans alongside masked values so UI can distinguish 'not set' from 'empty string'",
     "When saving settings, check for mask pattern (contains '...') to avoid overwriting secrets with their masked representation",
-    "Vite projects must exclude vite.config.ts from main tsconfig.json - it uses tsconfig.node.json with composite: true"
+    "Vite projects must exclude vite.config.ts from main tsconfig.json - it uses tsconfig.node.json with composite: true",
+    "For macOS tray, use setTemplateImage(true) on the nativeImage so it renders correctly in the menu bar; use trayTemplate.png naming convention",
+    "Window minimize-to-tray requires intercepting 'close' event (not 'closed') and calling event.preventDefault() + mainWindow.hide(); use isQuitting flag to allow actual quit"
   ],
   "stories": [
     {
@@ -192,8 +194,8 @@
         "macOS: app stays running when window closed"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in main.js. Added Tray and Menu imports from Electron. createTray() creates system tray with icon from assets/trayTemplate.png (macOS) or assets/icon.png (other platforms). updateTrayMenu() builds context menu with 'Open Stellaris Companion', 'Status: Connected/Disconnected', and 'Quit' options. Tray click handler toggles window visibility via mainWindow.hide()/show(). Window close event is intercepted to hide window instead of quitting (unless isQuitting flag is set). macOS keeps running via existing window-all-closed handler that only quits on non-darwin. Health check updates tray menu periodically. Placeholder PNG icons created in assets/."
     },
     {
       "id": "UI-001",

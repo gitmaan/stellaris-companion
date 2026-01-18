@@ -2,7 +2,7 @@
 // Implements ELEC-002: Python subprocess management
 // Implements ELEC-004: Settings IPC handlers (keytar + electron-store)
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
 const crypto = require('crypto')
@@ -35,6 +35,7 @@ let pythonProcess = null
 let authToken = null
 let healthCheckTimer = null
 let isQuitting = false
+let tray = null
 
 /**
  * Generate a random auth token for this session.
@@ -285,10 +286,14 @@ function startHealthCheck() {
       if (mainWindow) {
         mainWindow.webContents.send('backend-status', { connected: true, ...health })
       }
+      // Update tray menu with current status
+      updateTrayMenu()
     } catch (e) {
       if (mainWindow) {
         mainWindow.webContents.send('backend-status', { connected: false })
       }
+      // Update tray menu with disconnected status
+      updateTrayMenu()
     }
   }, HEALTH_CHECK_INTERVAL)
 }
@@ -383,6 +388,118 @@ async function saveSettings(settings) {
   return { success: true }
 }
 
+// System Tray (ELEC-006)
+
+/**
+ * Get the path to the tray icon.
+ * Uses template image for macOS (trayTemplate.png) and regular icon for other platforms.
+ * @returns {string} Path to tray icon
+ */
+function getTrayIconPath() {
+  if (app.isPackaged) {
+    if (process.platform === 'darwin') {
+      return path.join(process.resourcesPath, 'assets', 'trayTemplate.png')
+    }
+    return path.join(process.resourcesPath, 'assets', 'icon.png')
+  } else {
+    // Development - use assets folder
+    if (process.platform === 'darwin') {
+      return path.join(__dirname, 'assets', 'trayTemplate.png')
+    }
+    return path.join(__dirname, 'assets', 'icon.png')
+  }
+}
+
+/**
+ * Create and configure the system tray.
+ * Implements:
+ * - Tray icon appears on launch
+ * - Context menu with Open, Status, Quit options
+ * - Click toggles window visibility
+ * - macOS: app stays running when window closed
+ */
+function createTray() {
+  // Create tray icon - use a placeholder if file doesn't exist
+  let trayIcon
+  try {
+    const iconPath = getTrayIconPath()
+    trayIcon = nativeImage.createFromPath(iconPath)
+
+    // If icon is empty (file doesn't exist), create a simple placeholder
+    if (trayIcon.isEmpty()) {
+      // Create a simple 16x16 placeholder icon
+      trayIcon = nativeImage.createEmpty()
+    }
+  } catch (e) {
+    console.error('Failed to load tray icon:', e)
+    trayIcon = nativeImage.createEmpty()
+  }
+
+  // For macOS, mark as template image for proper menu bar appearance
+  if (process.platform === 'darwin') {
+    trayIcon.setTemplateImage(true)
+  }
+
+  tray = new Tray(trayIcon)
+  tray.setToolTip('Stellaris Companion')
+
+  // Update tray context menu
+  updateTrayMenu()
+
+  // Click handler - toggle window visibility
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide()
+      } else {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+    } else {
+      // Window was destroyed, recreate it
+      createWindow()
+    }
+  })
+}
+
+/**
+ * Update the tray context menu with current status.
+ * Called periodically to update status display.
+ */
+function updateTrayMenu() {
+  if (!tray) return
+
+  const statusText = pythonProcess ? 'Connected' : 'Disconnected'
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Open Stellaris Companion',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show()
+          mainWindow.focus()
+        } else {
+          createWindow()
+        }
+      },
+    },
+    {
+      label: `Status: ${statusText}`,
+      enabled: false,
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        isQuitting = true
+        app.quit()
+      },
+    },
+  ])
+
+  tray.setContextMenu(contextMenu)
+}
+
 // Window Management
 
 function createWindow() {
@@ -407,6 +524,15 @@ function createWindow() {
     // In production, load the built renderer
     mainWindow.loadFile(path.join(__dirname, 'renderer', 'dist', 'index.html'))
   }
+
+  // Minimize to tray on close (instead of quitting)
+  // On macOS, apps typically stay running in the background
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      mainWindow.hide()
+    }
+  })
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -535,6 +661,9 @@ app.whenReady().then(async () => {
 
   // Create the main window
   createWindow()
+
+  // Create the system tray (ELEC-006)
+  createTray()
 
   // Get settings with actual secrets and start backend
   const settings = await getSettingsWithSecrets()
