@@ -19,7 +19,9 @@
     "For macOS tray, use setTemplateImage(true) on the nativeImage so it renders correctly in the menu bar; use trayTemplate.png naming convention",
     "Window minimize-to-tray requires intercepting 'close' event (not 'closed') and calling event.preventDefault() + mainWindow.hide(); use isQuitting flag to allow actual quit",
     "React hooks that call IPC should return {data, loading, error} pattern via UseBackendResult<T> for consistent error handling across components",
-    "CSS color variables should be defined at :root level; use legacy aliases (--accent-primary, --border-color, etc.) when refactoring colors to maintain backward compatibility with existing component styles"
+    "CSS color variables should be defined at :root level; use legacy aliases (--accent-primary, --border-color, etc.) when refactoring colors to maintain backward compatibility with existing component styles",
+    "PyInstaller spec must include entire backend/ package in datas, not just the entry point - internal imports need the source files",
+    "For google-genai SDK, use google.genai not google.ai.generativelanguage (deprecated) in hiddenimports"
   ],
   "stories": [
     {
@@ -301,8 +303,8 @@
         "pyinstaller --clean stellaris-backend.spec succeeds"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created stellaris-backend.spec with entry point backend/electron_main.py. Includes datas: stellaris_save_extractor package, personality.py, save_extractor.py, save_loader.py, backend package. Hidden imports for uvicorn (logging, loops.auto, loops.asyncio, protocols.http.auto, protocols.http.h11_impl, protocols.http.httptools_impl, protocols.websockets.*, lifespan.on/off) and Google GenAI SDK. Build succeeds with pyinstaller --clean, producing dist/stellaris-backend (33MB executable)."
     },
     {
       "id": "PKG-002",
