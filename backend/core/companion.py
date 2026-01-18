@@ -11,7 +11,9 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +30,7 @@ except ImportError:
 
 from save_extractor import SaveExtractor
 from personality import build_optimized_prompt, get_personality_summary
+from backend.core.conversation import ConversationManager
 
 
 # Configure dedicated logger for companion performance metrics
@@ -122,9 +125,57 @@ class Companion:
         self._previous_snapshot: dict | None = None
         self._current_snapshot: dict | None = None
 
+        # Phase 4: full precompute cache (Option B /ask)
+        self._briefing_lock = threading.RLock()
+        self._briefing_ready = threading.Event()
+        self._complete_briefing_json: str | None = None
+        self._briefing_game_date: str | None = None
+        self._briefing_updated_at: float | None = None
+        self._briefing_last_error: str | None = None
+        self._precompute_generation = 0
+
+        # Phase 4: sliding-window conversation memory (per session key)
+        self._conversations = ConversationManager(max_turns=5, timeout_minutes=15, max_answer_chars=500)
+
         # Load save if provided
         if save_path:
             self.load_save(save_path)
+
+    def _build_minimal_situation(self) -> dict:
+        """Build a low-cost situation stub for initial personality.
+
+        Full situation is computed during background precompute.
+        """
+        date_str = (self.metadata or {}).get("date") or "2200.01.01"
+        try:
+            year = int(str(date_str).split(".")[0])
+        except Exception:
+            year = 2200
+
+        if year < 2230:
+            phase = "early"
+        elif year < 2300:
+            phase = "mid_early"
+        elif year < 2350:
+            phase = "mid_late"
+        elif year < 2400:
+            phase = "late"
+        else:
+            phase = "endgame"
+
+        return {
+            "game_phase": phase,
+            "year": year,
+            "at_war": False,
+            "war_count": 0,
+            "contacts_made": False,
+            "contact_count": 0,
+            "rivals": [],
+            "allies": [],
+            "crisis_active": False,
+            "economy": {"resources_in_deficit": 0},
+            "_note": "Minimal stub; full situation computed asynchronously.",
+        }
 
     def load_save(self, save_path: str | Path) -> None:
         """Load a save file and initialize the companion.
@@ -142,23 +193,26 @@ class Companion:
         # Get basic metadata for context
         self.metadata = self.extractor.get_metadata()
 
-        # Extract empire identity and situation for personality
+        # Extract identity cheaply; full situation is computed during precompute.
         self.identity = self.extractor.get_empire_identity()
-        self.situation = self.extractor.get_situation()
+        self.situation = self._build_minimal_situation()
 
         # Build dynamic personality prompt
         self._build_personality()
 
-        # Initialize save state tracking
-        self._save_hash = self._compute_save_hash()
-        self._last_known_date = self.metadata.get('date')
+        # Initialize save state tracking (finalized after precompute)
+        self._save_hash = None
+        self._last_known_date = self.metadata.get("date")
 
-        # Initialize snapshot tracking
+        # Initialize snapshot tracking (set on precompute completion)
         self._previous_snapshot = None
-        self._current_snapshot = self.extractor.get_full_briefing()
+        self._current_snapshot = None
 
         # Reset chat session for new save
         self._chat_session = None
+
+        # Kick off Phase 4 background precompute immediately.
+        self.start_background_precompute(self.save_path)
 
     def _build_personality(self) -> None:
         """Build the dynamic personality prompt from empire data.
@@ -228,7 +282,6 @@ class Companion:
             return False
 
         old_identity = self.identity.copy() if self.identity else {}
-        old_hash = self._save_hash
         old_date = self._last_known_date
 
         # Reload extractor
@@ -238,7 +291,7 @@ class Companion:
 
         # Re-extract identity and situation
         self.identity = self.extractor.get_empire_identity()
-        self.situation = self.extractor.get_situation()
+        self.situation = self._build_minimal_situation()
 
         # Check if identity changed
         identity_changed = (
@@ -250,31 +303,23 @@ class Companion:
         # Rebuild personality
         self._build_personality()
 
-        # Update save state tracking
-        new_hash = self._compute_save_hash()
-        hash_changed = old_hash != new_hash
-
-        # Save current snapshot as previous, load new snapshot as current
+        # Keep previous snapshot for diffing until a fresh precompute swaps in.
         self._previous_snapshot = self._current_snapshot
-        self._current_snapshot = self.extractor.get_full_briefing()
+        self._last_known_date = self.metadata.get("date")
 
-        # Update tracking state
-        self._save_hash = new_hash
-        self._last_known_date = self.metadata.get('date')
+        # Reset tool-mode chat session on reload.
+        self._chat_session = None
+        logger.info(
+            "save_update_detected",
+            extra={
+                "old_date": old_date,
+                "new_date": self._last_known_date,
+                "identity_changed": identity_changed,
+            }
+        )
 
-        # Reset chat session if hash changed (game state is different)
-        if hash_changed:
-            self._chat_session = None
-            logger.info(
-                "save_update_detected",
-                extra={
-                    "old_hash": old_hash,
-                    "new_hash": new_hash,
-                    "old_date": old_date,
-                    "new_date": self._last_known_date,
-                    "identity_changed": identity_changed,
-                }
-            )
+        # Kick off Phase 4 background precompute for the new save.
+        self.start_background_precompute(self.save_path)
 
         return identity_changed
 
@@ -897,6 +942,305 @@ class Companion:
     def clear_conversation(self) -> None:
         """Clear the conversation history by resetting the chat session."""
         self._chat_session = None
+        # Also clear precomputed /ask conversation windows.
+        self._conversations = ConversationManager(max_turns=5, timeout_minutes=15, max_answer_chars=500)
+
+    def get_precompute_status(self) -> dict[str, Any]:
+        """Get current Phase 4 precompute cache status (safe for UI display)."""
+        with self._briefing_lock:
+            return {
+                "ready": bool(self._briefing_ready.is_set()),
+                "game_date": self._briefing_game_date,
+                "updated_at": self._briefing_updated_at,
+                "has_cache": self._complete_briefing_json is not None,
+                "last_error": self._briefing_last_error,
+            }
+
+    def start_background_precompute(self, save_path: Path | None = None) -> None:
+        """Start background extraction of the complete briefing for /ask."""
+        if save_path is not None:
+            self.save_path = Path(save_path)
+
+        if not self.save_path:
+            return
+
+        with self._briefing_lock:
+            self._precompute_generation += 1
+            generation = self._precompute_generation
+            self._briefing_last_error = None
+            # Mark as "not ready" while extraction runs; /ask can still use last cache.
+            self._briefing_ready.clear()
+
+        thread = threading.Thread(
+            target=self._precompute_worker,
+            args=(Path(self.save_path), generation),
+            daemon=True,
+            name=f"precompute-{generation}",
+        )
+        thread.start()
+
+    def _compute_save_hash_from_briefing(self, briefing: dict[str, Any]) -> str | None:
+        """Compute a stable-ish hash for deduping snapshots."""
+        if not isinstance(briefing, dict):
+            return None
+        meta = briefing.get("meta", {}) if isinstance(briefing.get("meta", {}), dict) else {}
+        military = briefing.get("military", {}) if isinstance(briefing.get("military", {}), dict) else {}
+        date = meta.get("date")
+        empire_name = meta.get("empire_name") or meta.get("name")
+        mil = military.get("military_power")
+        if date is None and empire_name is None and mil is None:
+            return None
+        key_data = f"{date}|{mil}|{empire_name}"
+        return hashlib.md5(key_data.encode("utf-8", errors="replace")).hexdigest()[:8]
+
+    def _precompute_worker(self, save_path: Path, generation: int) -> None:
+        started = time.time()
+        extractor: SaveExtractor | None = None
+        briefing: dict[str, Any] | None = None
+
+        for attempt in range(1, 4):
+            try:
+                extractor = SaveExtractor(str(save_path))
+                briefing = extractor.get_complete_briefing()
+                break
+            except (zipfile.BadZipFile, KeyError) as e:
+                # Save may still be writing; retry a couple times.
+                logger.warning(f"precompute_retry attempt={attempt} error={e}")
+                time.sleep(0.75)
+            except Exception:
+                break
+
+        if not isinstance(briefing, dict):
+            err = "Failed to compute complete briefing"
+            with self._briefing_lock:
+                if generation == self._precompute_generation:
+                    self._briefing_last_error = err
+            logger.error("precompute_failed")
+            return
+
+        briefing_json = json.dumps(briefing, ensure_ascii=False, separators=(",", ":"), default=str)
+        meta = briefing.get("meta", {}) if isinstance(briefing.get("meta", {}), dict) else {}
+        game_date = meta.get("date")
+        save_hash = self._compute_save_hash_from_briefing(briefing)
+
+        # Persist snapshot to SQLite (Phase 4)
+        try:
+            from backend.core.database import get_default_db
+            from backend.core.history import record_snapshot_from_companion
+
+            db = get_default_db()
+            record_snapshot_from_companion(
+                db=db,
+                save_path=save_path,
+                save_hash=save_hash,
+                gamestate=getattr(extractor, "gamestate", None) if extractor else None,
+                player_id=extractor.get_player_empire_id() if extractor else None,
+                briefing=briefing,
+            )
+        except Exception as e:
+            logger.warning(f"precompute_snapshot_persist_failed error={e}")
+
+        # Atomic swap into in-memory cache
+        with self._briefing_lock:
+            if generation != self._precompute_generation:
+                return
+
+            self._complete_briefing_json = briefing_json
+            self._briefing_game_date = str(game_date) if game_date is not None else None
+            self._briefing_updated_at = time.time()
+            self._briefing_last_error = None
+            self._save_hash = save_hash
+
+            # Keep dict form for internal consumers (/history, etc.)
+            self._previous_snapshot = self._current_snapshot
+            self._current_snapshot = briefing
+
+            identity = briefing.get("identity")
+            situation = briefing.get("situation")
+            if isinstance(identity, dict):
+                self.identity = identity
+            if isinstance(situation, dict):
+                self.situation = situation
+            self._last_known_date = self._briefing_game_date
+
+            # Update personality from full situation/identity.
+            self._build_personality()
+
+            self._briefing_ready.set()
+
+        elapsed_ms = (time.time() - started) * 1000
+        logger.info(
+            "precompute_complete",
+            extra={
+                "generation": generation,
+                "wall_time_ms": elapsed_ms,
+                "briefing_bytes": len(briefing_json),
+                "game_date": self._briefing_game_date,
+            },
+        )
+
+    def _load_latest_briefing_json_from_db(self) -> tuple[str | None, str | None]:
+        """Attempt to load the latest full briefing JSON from SQLite."""
+        try:
+            from backend.core.database import get_default_db
+            from backend.core.history import compute_save_id, extract_campaign_id_from_gamestate
+
+            db = get_default_db()
+
+            # Best-effort: target the current save/campaign if possible.
+            if self.extractor and getattr(self.extractor, "gamestate", None) and self.save_path:
+                campaign_id = extract_campaign_id_from_gamestate(self.extractor.gamestate)
+                player_id = self.extractor.get_player_empire_id()
+                save_id = compute_save_id(
+                    campaign_id=campaign_id,
+                    player_id=player_id,
+                    empire_name=(self.metadata or {}).get("name"),
+                    save_path=self.save_path,
+                )
+                session_id = db.get_active_or_latest_session_id(save_id=save_id)
+                if session_id:
+                    json_text = db.get_latest_snapshot_full_briefing_json(session_id=session_id)
+                    if json_text:
+                        try:
+                            parsed = json.loads(json_text)
+                            gd = None
+                            if isinstance(parsed, dict):
+                                meta = parsed.get("meta", {}) if isinstance(parsed.get("meta", {}), dict) else {}
+                                gd = meta.get("date")
+                            return json_text, (str(gd) if gd is not None else None)
+                        except Exception:
+                            return json_text, None
+
+            json_text = db.get_latest_snapshot_full_briefing_json_any()
+            if not json_text:
+                return None, None
+            try:
+                parsed = json.loads(json_text)
+                gd = None
+                if isinstance(parsed, dict):
+                    meta = parsed.get("meta", {}) if isinstance(parsed.get("meta", {}), dict) else {}
+                    gd = meta.get("date")
+                return json_text, (str(gd) if gd is not None else None)
+            except Exception:
+                return json_text, None
+
+        except Exception:
+            return None, None
+
+    def _get_best_briefing_json(self) -> tuple[str | None, str | None, str | None]:
+        """Return (briefing_json, game_date, data_note)."""
+        # Prefer in-memory cache.
+        with self._briefing_lock:
+            cached_json = self._complete_briefing_json
+            cached_date = self._briefing_game_date
+            ready = self._briefing_ready.is_set()
+
+        if cached_json:
+            if ready:
+                return cached_json, cached_date, None
+            if cached_date:
+                return cached_json, cached_date, f"Using cached data from {cached_date}; new save processing…"
+            return cached_json, cached_date, "Using cached data; new save processing…"
+
+        # If we have a precompute running, wait briefly for it to finish (cold start).
+        if not ready:
+            self._briefing_ready.wait(timeout=20)
+            with self._briefing_lock:
+                if self._complete_briefing_json:
+                    return self._complete_briefing_json, self._briefing_game_date, None
+
+        # Try SQLite fallback (persistence across restarts).
+        db_json, db_date = self._load_latest_briefing_json_from_db()
+        if db_json:
+            return db_json, db_date, "Loaded from history cache; live save processing may still be running…"
+
+        return None, None, None
+
+    def ask_precomputed(
+        self,
+        question: str,
+        session_key: str,
+        history_context: str | None = None,
+    ) -> tuple[str, float]:
+        """Ask a question using the fully precomputed briefing (no tools)."""
+        start_time = time.time()
+
+        briefing_json, game_date, data_note = self._get_best_briefing_json()
+        if not briefing_json:
+            return "No precomputed game state is available yet. Please wait for a save to be processed.", 0.0
+
+        # Build prompt with sliding-window history (Phase 4)
+        user_prompt = self._conversations.build_prompt(
+            session_key=session_key,
+            briefing_json=briefing_json,
+            game_date=game_date,
+            question=question,
+            data_note=data_note,
+            history_context=history_context,
+        )
+
+        ask_system_prompt = (
+            f"{self.system_prompt}\n\n"
+            "ASK MODE (NO TOOLS):\n"
+            "- You are given the complete current game state as JSON in the user message.\n"
+            "- Do NOT call tools or ask to call tools.\n"
+            "- ALL numbers and factual claims must come from the JSON.\n"
+            "- If a value is missing, say 'unknown' and suggest what to check in-game.\n"
+            "- Be a strategic ADVISOR: interpret, prioritize, and recommend next actions.\n"
+        )
+
+        try:
+            cfg = types.GenerateContentConfig(
+                system_instruction=ask_system_prompt,
+                temperature=1.0,
+                max_output_tokens=4096,
+            )
+            if self._thinking_level != "dynamic":
+                cfg.thinking_config = types.ThinkingConfig(thinking_level=self._thinking_level)
+
+            response = self.client.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=user_prompt,
+                config=cfg,
+            )
+            response_text = response.text or "Could not generate a response."
+
+            # Deterministic disclaimer on stale/cache fallback.
+            if data_note:
+                response_text = f"*{data_note}*\n\n{response_text}"
+
+            elapsed = time.time() - start_time
+            wall_time_ms = elapsed * 1000
+
+            self._last_call_stats = {
+                "total_calls": 1,
+                "tools_used": ["ask_precomputed_no_tools"],
+                "wall_time_ms": wall_time_ms,
+                "response_length": len(response_text),
+                "payload_sizes": {"briefing_json": len(briefing_json)},
+            }
+
+            self._conversations.record_turn(
+                session_key=session_key,
+                question=question,
+                answer=response_text,
+                game_date=game_date,
+            )
+
+            return response_text, elapsed
+
+        except Exception as e:
+            elapsed = time.time() - start_time
+            wall_time_ms = elapsed * 1000
+            self._last_call_stats = {
+                "total_calls": 0,
+                "tools_used": [],
+                "wall_time_ms": wall_time_ms,
+                "response_length": 0,
+                "payload_sizes": {"briefing_json": len(briefing_json)},
+                "error": str(e),
+            }
+            return f"Error: {str(e)}", elapsed
 
     def get_status_data(self) -> dict:
         """Get raw status data for embedding without LLM processing.

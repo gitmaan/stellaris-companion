@@ -59,8 +59,14 @@ function getPythonPath() {
       return path.join(resourcePath, 'python-backend', 'stellaris-backend')
     }
   } else {
-    // In development, use system Python
-    return 'python'
+    // In development, try venv first, then system Python
+    const fs = require('fs')
+    const venvPython = path.join(__dirname, '..', 'venv', 'bin', 'python')
+    if (fs.existsSync(venvPython)) {
+      return venvPython
+    }
+    // Use python3 on Unix (python may not exist on macOS)
+    return process.platform === 'win32' ? 'python' : 'python3'
   }
 }
 
