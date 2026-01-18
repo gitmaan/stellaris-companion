@@ -262,8 +262,8 @@
         "End Current Session button works"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented RecapPage.tsx with full session list, selection, details view, and recap generation. SessionList.tsx shows sessions with empire name, date range, snapshot count, and active badge. RecapViewer.tsx implements markdown rendering for headers, lists, inline code (backticks), and bold text. Generate Recap button calls backend.recap() and displays result with date_range and events_summarized metadata. End Current Session button calls backend.endSession() with success/error messaging. TypeScript compiles and npm run build succeeds."
     },
     {
       "id": "UI-006",
