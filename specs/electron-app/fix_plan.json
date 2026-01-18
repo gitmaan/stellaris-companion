@@ -17,7 +17,8 @@
     "When saving settings, check for mask pattern (contains '...') to avoid overwriting secrets with their masked representation",
     "Vite projects must exclude vite.config.ts from main tsconfig.json - it uses tsconfig.node.json with composite: true",
     "For macOS tray, use setTemplateImage(true) on the nativeImage so it renders correctly in the menu bar; use trayTemplate.png naming convention",
-    "Window minimize-to-tray requires intercepting 'close' event (not 'closed') and calling event.preventDefault() + mainWindow.hide(); use isQuitting flag to allow actual quit"
+    "Window minimize-to-tray requires intercepting 'close' event (not 'closed') and calling event.preventDefault() + mainWindow.hide(); use isQuitting flag to allow actual quit",
+    "React hooks that call IPC should return {data, loading, error} pattern via UseBackendResult<T> for consistent error handling across components"
   ],
   "stories": [
     {
@@ -274,8 +275,8 @@
         "Handles errors consistently"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in electron/renderer/hooks/useBackend.ts. Exports typed interfaces for all API responses (HealthResponse, ChatResponse, StatusResponse, etc.). Returns methods for all 7 API calls (health, chat, status, sessions, sessionEvents, recap, endSession). Uses window.electronAPI.backend.* internally via callApi() wrapper. Tracks loading state per-method via loadingStates record and isLoading(key) helper. Handles errors consistently - all methods return UseBackendResult<T> with {data, loading, error} pattern. Includes type guards isErrorResponse() and isChatRetryResponse(). TypeScript compiles and npm run build succeeds."
     },
     {
       "id": "UI-007",
