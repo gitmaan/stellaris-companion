@@ -7,10 +7,10 @@
   "license": "MIT",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
-    "dev:renderer": "cd renderer && vite",
+    "dev:renderer": "cd renderer && npm run dev",
     "dev:electron": "electron .",
     "build": "npm run build:renderer && npm run build:electron",
-    "build:renderer": "cd renderer && vite build",
+    "build:renderer": "cd renderer && npm run build",
     "build:electron": "electron-builder",
     "start": "electron ."
   },

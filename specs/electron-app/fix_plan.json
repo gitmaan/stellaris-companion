@@ -22,7 +22,8 @@
     "CSS color variables should be defined at :root level; use legacy aliases (--accent-primary, --border-color, etc.) when refactoring colors to maintain backward compatibility with existing component styles",
     "PyInstaller spec must include entire backend/ package in datas, not just the entry point - internal imports need the source files",
     "For google-genai SDK, use google.genai not google.ai.generativelanguage (deprecated) in hiddenimports",
-    "electron-builder: Use identity: null for macOS and signAndEditExecutable: false for Windows to disable code signing during development"
+    "electron-builder: Use identity: null for macOS and signAndEditExecutable: false for Windows to disable code signing during development",
+    "electron/package.json scripts that call renderer vite commands should use 'cd renderer && npm run dev/build' not 'cd renderer && vite' - vite is in renderer's node_modules, not electron's"
   ],
   "stories": [
     {
@@ -343,8 +344,8 @@
         "Asking a question returns response"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "All criteria verified: (1) main.js and preload.js pass syntax check, Electron app launches successfully with Vite dev server and Python backend. (2) SettingsPage.tsx implements Google API Key input with password type and status indicators. (3) save-settings IPC handler calls restartPythonBackend() after saving settings. (4) StatusBar.tsx polls /api/health every 5s and displays connection status (Connected/Disconnected/No Save). (5) /api/chat endpoint returns text response with game_date, tools_used, and response_time_ms. Fixed electron/package.json dev scripts to use 'npm run dev/build' instead of direct 'vite' commands."
     }
   ],
   "discovered": []
