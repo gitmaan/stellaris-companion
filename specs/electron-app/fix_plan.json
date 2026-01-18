@@ -21,7 +21,8 @@
     "React hooks that call IPC should return {data, loading, error} pattern via UseBackendResult<T> for consistent error handling across components",
     "CSS color variables should be defined at :root level; use legacy aliases (--accent-primary, --border-color, etc.) when refactoring colors to maintain backward compatibility with existing component styles",
     "PyInstaller spec must include entire backend/ package in datas, not just the entry point - internal imports need the source files",
-    "For google-genai SDK, use google.genai not google.ai.generativelanguage (deprecated) in hiddenimports"
+    "For google-genai SDK, use google.genai not google.ai.generativelanguage (deprecated) in hiddenimports",
+    "electron-builder: Use identity: null for macOS and signAndEditExecutable: false for Windows to disable code signing during development"
   ],
   "stories": [
     {
@@ -315,8 +316,8 @@
         "App builds without signing (for now)"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Updated electron-builder.yml with full configuration. Mac: dmg and zip targets for x64/arm64 with identity: null to disable signing. Windows: nsis target for x64 with signAndEditExecutable: false. Linux: AppImage for x64 with Game category. extraResources correctly configured with filter for Python backend at ../dist-python to python-backend. Added entitlements.mac.plist for future code signing. Added nsis configuration for Windows installer customization. Build tested successfully: electron-builder --mac --dir produced Stellaris Companion.app with Python backend in Contents/Resources/python-backend/."
     },
     {
       "id": "PKG-003",

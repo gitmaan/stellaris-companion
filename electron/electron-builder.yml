@@ -1,23 +1,60 @@
 appId: com.stellaris.companion
 productName: Stellaris Companion
+
 directories:
   output: dist
+
 files:
   - main.js
   - preload.js
   - renderer/dist/**/*
+  - assets/**/*
+
 extraResources:
   - from: ../dist-python
     to: python-backend
+    filter:
+      - "**/*"
+
 mac:
   category: public.app-category.games
-  target:
-    - dmg
-    - zip
   icon: assets/icon.icns
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  # Entitlements for when code signing is enabled
+  entitlements: entitlements.mac.plist
+  entitlementsInherit: entitlements.mac.plist
+  # Disable signing for now
+  identity: null
+
 win:
-  target: nsis
   icon: assets/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  # Disable signing for now
+  signAndEditExecutable: false
+
 linux:
-  target: AppImage
   icon: assets/icon.png
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Game
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+publish:
+  provider: github
+  owner: stellaris-companion
+  repo: stellaris-companion
+  releaseType: release
