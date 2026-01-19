@@ -1,3 +1,5 @@
+import { forwardRef } from 'react'
+
 interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
@@ -15,7 +17,10 @@ interface ChatMessageProps {
  * - Shows error messages with distinct styling (isError prop)
  * - Displays optional metadata (response time, tools used)
  */
-function ChatMessage({ role, content, timestamp, responseTimeMs, toolsUsed, isError }: ChatMessageProps) {
+const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMessage(
+  { role, content, timestamp, responseTimeMs, toolsUsed, isError }: ChatMessageProps,
+  ref,
+) {
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
@@ -23,7 +28,7 @@ function ChatMessage({ role, content, timestamp, responseTimeMs, toolsUsed, isEr
   const roleLabel = role === 'user' ? 'You' : 'Advisor'
 
   return (
-    <div className={`chat-message ${role}${isError ? ' error' : ''}`}>
+    <div ref={ref} className={`chat-message ${role}${isError ? ' error' : ''}`}>
       <div className="message-header">
         <span className="message-role">{roleLabel}</span>
         {timestamp && (
@@ -43,6 +48,6 @@ function ChatMessage({ role, content, timestamp, responseTimeMs, toolsUsed, isEr
       )}
     </div>
   )
-}
+})
 
 export default ChatMessage

@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import ChatMessage from '../components/ChatMessage'
 import ChatInput from '../components/ChatInput'
+import VirtualChatList from '../components/VirtualChatList'
 import { useBackend, ChatResponse, isChatRetryResponse } from '../hooks/useBackend'
 
 interface Message {
@@ -28,7 +29,6 @@ function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [sessionKey] = useState(() => `chat-${Date.now()}`)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Track mounted state to prevent state updates after unmount
   const isMountedRef = useRef(true)
@@ -40,15 +40,6 @@ function ChatPage() {
       isMountedRef.current = false
     }
   }, [])
-
-  // Scroll to bottom when messages change
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages, scrollToBottom])
 
   const handleSend = useCallback(async (text: string) => {
     // Add user message
@@ -122,10 +113,46 @@ function ChatPage() {
     }
   }, [backend, sessionKey])
 
+  const items = useMemo(() => {
+    const base = messages.map(message => ({
+      key: message.id,
+      render: (ref: (el: HTMLDivElement | null) => void) => (
+        <ChatMessage
+          key={message.id}
+          ref={ref}
+          role={message.role}
+          content={message.content}
+          timestamp={message.timestamp}
+          responseTimeMs={message.responseTimeMs}
+          toolsUsed={message.toolsUsed}
+          isError={message.isError}
+        />
+      ),
+    }))
+
+    if (isLoading) {
+      base.push({
+        key: '__loading__',
+        render: (ref: (el: HTMLDivElement | null) => void) => (
+          <div key="__loading__" ref={ref} className="chat-loading">
+            <div className="loading-indicator">
+              <span className="loading-dot"></span>
+              <span className="loading-dot"></span>
+              <span className="loading-dot"></span>
+            </div>
+            <span className="loading-text">Advisor is thinking...</span>
+          </div>
+        ),
+      })
+    }
+
+    return base
+  }, [messages, isLoading])
+
   return (
     <div className="chat-page">
-      <div className="chat-messages">
-        {messages.length === 0 ? (
+      {messages.length === 0 ? (
+        <div className="chat-messages">
           <div className="chat-welcome">
             <h2>Stellaris Advisor</h2>
             <p>Ask questions about your empire, strategy, or game state.</p>
@@ -139,31 +166,10 @@ function ChatPage() {
               </ul>
             </div>
           </div>
-        ) : (
-          messages.map(message => (
-            <ChatMessage
-              key={message.id}
-              role={message.role}
-              content={message.content}
-              timestamp={message.timestamp}
-              responseTimeMs={message.responseTimeMs}
-              toolsUsed={message.toolsUsed}
-              isError={message.isError}
-            />
-          ))
-        )}
-        {isLoading && (
-          <div className="chat-loading">
-            <div className="loading-indicator">
-              <span className="loading-dot"></span>
-              <span className="loading-dot"></span>
-              <span className="loading-dot"></span>
-            </div>
-            <span className="loading-text">Advisor is thinking...</span>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
+        </div>
+      ) : (
+        <VirtualChatList items={items} isLoading={isLoading} />
+      )}
       <ChatInput
         onSend={handleSend}
         loading={isLoading}
