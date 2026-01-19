@@ -22,6 +22,10 @@ from backend.core.events import compute_events
 DEFAULT_DB_FILENAME = "stellaris_history.db"
 ENV_DB_PATH = "STELLARIS_DB_PATH"
 
+# Default DB retention (no user-facing knobs).
+# Keep the earliest full briefing (baseline) plus the most recent N per session.
+DEFAULT_KEEP_FULL_BRIEFINGS_RECENT = 20
+
 
 @dataclass(frozen=True)
 class DatabaseConfig:
@@ -403,6 +407,103 @@ class GameDatabase:
         )
         self.update_session(session_id=session_id, last_game_date=game_date)
         return True, snapshot_id
+
+    def enforce_full_briefing_retention(
+        self,
+        *,
+        session_id: str,
+        keep_recent: int = DEFAULT_KEEP_FULL_BRIEFINGS_RECENT,
+        keep_first: bool = True,
+    ) -> int:
+        """Keep disk bounded by clearing full briefing JSON on older snapshots.
+
+        This preserves lightweight metric rows and derived events, but removes large
+        per-snapshot JSON blobs except for:
+          - the earliest snapshot (baseline), if keep_first=True
+          - the most recent `keep_recent` snapshots
+        """
+        keep_n = max(0, min(int(keep_recent), 500))
+
+        ids_to_keep: set[int] = set()
+        with self._lock:
+            if keep_first:
+                first = self._conn.execute(
+                    """
+                    SELECT id
+                    FROM snapshots
+                    WHERE session_id = ?
+                      AND full_briefing_json IS NOT NULL
+                      AND full_briefing_json != ''
+                    ORDER BY captured_at ASC, id ASC
+                    LIMIT 1;
+                    """,
+                    (session_id,),
+                ).fetchone()
+                if first:
+                    ids_to_keep.add(int(first["id"]))
+
+            if keep_n > 0:
+                rows = self._conn.execute(
+                    """
+                    SELECT id
+                    FROM snapshots
+                    WHERE session_id = ?
+                      AND full_briefing_json IS NOT NULL
+                      AND full_briefing_json != ''
+                    ORDER BY captured_at DESC, id DESC
+                    LIMIT ?;
+                    """,
+                    (session_id, keep_n),
+                ).fetchall()
+                ids_to_keep.update(int(r["id"]) for r in rows)
+
+            if not ids_to_keep:
+                cur = self._conn.execute(
+                    """
+                    UPDATE snapshots
+                    SET full_briefing_json = NULL
+                    WHERE session_id = ?
+                      AND full_briefing_json IS NOT NULL
+                      AND full_briefing_json != '';
+                    """,
+                    (session_id,),
+                )
+                return int(cur.rowcount or 0)
+
+            placeholders = ",".join(["?"] * len(ids_to_keep))
+            params: list[Any] = [session_id, *sorted(ids_to_keep)]
+            cur = self._conn.execute(
+                f"""
+                UPDATE snapshots
+                SET full_briefing_json = NULL
+                WHERE session_id = ?
+                  AND full_briefing_json IS NOT NULL
+                  AND full_briefing_json != ''
+                  AND id NOT IN ({placeholders});
+                """,
+                tuple(params),
+            )
+            return int(cur.rowcount or 0)
+
+    def get_db_stats(self) -> dict[str, Any]:
+        """Return small DB stats for status reporting."""
+        if self.path == Path(":memory:"):
+            return {"path": ":memory:", "bytes": 0}
+        try:
+            db_path = self.path
+            sizes: dict[str, int] = {}
+            total = 0
+            for suffix in ("", "-wal", "-shm"):
+                p = Path(str(db_path) + suffix)
+                try:
+                    st = os.stat(p)
+                except FileNotFoundError:
+                    continue
+                sizes[suffix or "db"] = int(st.st_size)
+                total += int(st.st_size)
+            return {"path": str(db_path), "bytes": total, "files": sizes}
+        except Exception:
+            return {"path": str(self.path), "bytes": None}
 
     def end_session(self, *, session_id: str, ended_at: int | None = None) -> None:
         """Mark a session as ended."""

@@ -12,6 +12,7 @@ import json
 
 from backend.core.history import record_snapshot_from_briefing
 from backend.core.ingestion_worker import WorkerJob, run_worker_job
+from backend.core.database import DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
 
 logger = logging.getLogger(__name__)
 
@@ -108,14 +109,23 @@ class IngestionManager:
 
     def get_status(self) -> dict[str, Any]:
         with self._lock:
-            return self._status.to_dict()
+            payload = self._status.to_dict()
+        db = self._db
+        if db is not None:
+            try:
+                payload["db"] = db.get_db_stats()
+                payload["db"]["keep_full_briefings_recent"] = DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
+                payload["db"]["keep_full_briefings_first"] = True
+            except Exception:
+                payload["db"] = {"keep_full_briefings_recent": DEFAULT_KEEP_FULL_BRIEFINGS_RECENT, "keep_full_briefings_first": True}
+        return payload
 
     def get_health_payload(self) -> dict[str, Any]:
         with self._lock:
             meta = dict(self._status.t2_meta or {}) if self._status.t2_ready else dict(self._status.t0_meta or {})
             empire_name = meta.get("empire_name") or meta.get("name")
             game_date = meta.get("date") or self._status.t2_game_date
-            return {
+            payload = {
                 "save_loaded": bool(self._status.save_loaded),
                 "empire_name": empire_name,
                 "game_date": game_date,
@@ -135,6 +145,13 @@ class IngestionManager:
                     "cancel_count": self._status.cancel_count,
                 },
             }
+        db = self._db
+        if db is not None:
+            try:
+                payload["ingestion"]["db"] = db.get_db_stats()
+            except Exception:
+                pass
+        return payload
 
     def get_latest_t1_status(self) -> dict[str, Any] | None:
         with self._lock:

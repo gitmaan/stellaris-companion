@@ -797,6 +797,10 @@ def record_snapshot_from_briefing(
             db.record_events_for_new_snapshot(session_id=session_id, snapshot_id=snapshot_id, current_briefing=briefing)
         except Exception:
             pass
+        try:
+            db.enforce_full_briefing_retention(session_id=session_id)
+        except Exception:
+            pass
 
     return inserted, snapshot_id, session_id
 
@@ -895,6 +899,10 @@ def record_snapshot_from_companion(
             db.record_events_for_new_snapshot(session_id=session_id, snapshot_id=snapshot_id, current_briefing=briefing_for_storage)
         except Exception:
             # Event generation should never break snapshot recording.
+            pass
+        try:
+            db.enforce_full_briefing_retention(session_id=session_id)
+        except Exception:
             pass
 
     return inserted, snapshot_id, session_id
