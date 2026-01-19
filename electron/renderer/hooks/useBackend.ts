@@ -1,7 +1,7 @@
 // IPC wrapper for API calls - uses window.electronAPI.backend.* internally
 // Implements UI-006: useBackend hook with loading states and error handling
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 
 // ============================================
 // API Response Types (match backend/api/server.py)
@@ -159,8 +159,18 @@ export function useBackend() {
   // Track loading states per-method
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({})
 
+  // Set loading state, removing key when done to prevent object growth
   const setLoading = useCallback((key: string, loading: boolean) => {
-    setLoadingStates(prev => ({ ...prev, [key]: loading }))
+    setLoadingStates(prev => {
+      if (loading) {
+        return { ...prev, [key]: true }
+      } else {
+        // Remove key when not loading to prevent unbounded object growth
+        const next = { ...prev }
+        delete next[key]
+        return next
+      }
+    })
   }, [])
 
   /**
@@ -286,10 +296,10 @@ export function useBackend() {
   }, [callApi])
 
   // ============================================
-  // Return API
+  // Return API (memoized to prevent infinite re-renders)
   // ============================================
 
-  return {
+  return useMemo(() => ({
     // Methods
     health,
     chat,
@@ -306,7 +316,7 @@ export function useBackend() {
     // Type guards for consumers
     isErrorResponse,
     isChatRetryResponse,
-  }
+  }), [health, chat, status, sessions, sessionEvents, recap, endSession, loadingStates])
 }
 
 export default useBackend

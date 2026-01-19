@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useBackend, HealthResponse } from '../hooks/useBackend'
+import { useState, useEffect } from 'react'
+import { HealthResponse } from '../hooks/useBackend'
 
 type ConnectionStatus = 'connected' | 'connecting' | 'no-save' | 'disconnected'
 
@@ -38,62 +38,40 @@ function getStatusLabel(status: ConnectionStatus): string {
  * Implements UI-002:
  * - Shows empire name and game date when available
  * - Shows connection status (Connected, Connecting, No Save, Disconnected)
- * - Polls backend health every 5 seconds
- * - Listens to backend-status events from main process
+ * - Listens to backend-status events from main process (event-driven, no polling)
  */
 function StatusBar() {
-  const backend = useBackend()
   const [state, setState] = useState<StatusState>({
     connectionStatus: 'connecting',
     empireName: null,
     gameDate: null,
   })
 
-  const updateFromHealth = useCallback((health: HealthResponse | null, error: string | null) => {
-    setState({
-      connectionStatus: getConnectionStatus(health, error),
-      empireName: health?.empire_name ?? null,
-      gameDate: health?.game_date ?? null,
-    })
-  }, [])
-
-  // Poll backend health every 5 seconds
-  useEffect(() => {
-    let mounted = true
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-    const checkHealth = async () => {
-      const result = await backend.health()
-      if (mounted) {
-        updateFromHealth(result.data, result.error)
-        // Schedule next check
-        timeoutId = setTimeout(checkHealth, 5000)
-      }
-    }
-
-    // Initial check
-    checkHealth()
-
-    return () => {
-      mounted = false
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-      }
-    }
-  }, [backend, updateFromHealth])
-
-  // Also listen to backend-status events from main process
+  // Listen to backend-status events from main process
+  // Main process pushes updates when health changes - no polling needed
+  // Empty dependency array to prevent listener re-subscription on re-renders
   useEffect(() => {
     if (!window.electronAPI?.onBackendStatus) {
+      // Not running in Electron
+      setState(prev => ({ ...prev, connectionStatus: 'disconnected' }))
       return
     }
 
     const cleanup = window.electronAPI.onBackendStatus((health) => {
-      updateFromHealth(health, null)
+      setState({
+        connectionStatus: getConnectionStatus(health, null),
+        empireName: health?.empire_name ?? null,
+        gameDate: health?.game_date ?? null,
+      })
     })
 
-    return cleanup
-  }, [updateFromHealth])
+    // Ensure cleanup is always called
+    return () => {
+      if (typeof cleanup === 'function') {
+        cleanup()
+      }
+    }
+  }, []) // Empty deps - subscribe once on mount, cleanup on unmount
 
   const statusClass = `connection-status ${state.connectionStatus}`
   const statusLabel = getStatusLabel(state.connectionStatus)

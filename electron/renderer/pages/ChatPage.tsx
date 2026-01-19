@@ -30,6 +30,17 @@ function ChatPage() {
   const [sessionKey] = useState(() => `chat-${Date.now()}`)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Track mounted state to prevent state updates after unmount
+  const isMountedRef = useRef(true)
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
   // Scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -52,6 +63,9 @@ function ChatPage() {
 
     try {
       const result = await backend.chat(text, sessionKey)
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return
 
       if (result.error) {
         // API error (connection failure, etc.)
@@ -89,6 +103,9 @@ function ChatPage() {
         }
       }
     } catch (err) {
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return
+
       // Unexpected error
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
@@ -99,7 +116,9 @@ function ChatPage() {
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
-      setIsLoading(false)
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
   }, [backend, sessionKey])
 

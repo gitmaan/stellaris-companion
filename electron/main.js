@@ -36,6 +36,7 @@ let authToken = null
 let healthCheckTimer = null
 let isQuitting = false
 let tray = null
+let lastTrayStatus = null // Track last status to avoid rebuilding menu unnecessarily
 
 /**
  * Generate a random auth token for this session.
@@ -471,11 +472,18 @@ function createTray() {
 /**
  * Update the tray context menu with current status.
  * Called periodically to update status display.
+ * Only rebuilds menu when status actually changes to prevent memory leaks.
  */
 function updateTrayMenu() {
   if (!tray) return
 
-  const statusText = pythonProcess ? 'Connected' : 'Disconnected'
+  const currentStatus = pythonProcess ? 'Connected' : 'Disconnected'
+
+  // Only rebuild menu if status changed to avoid Menu object accumulation
+  if (lastTrayStatus === currentStatus) {
+    return
+  }
+  lastTrayStatus = currentStatus
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -490,7 +498,7 @@ function updateTrayMenu() {
       },
     },
     {
-      label: `Status: ${statusText}`,
+      label: `Status: ${currentStatus}`,
       enabled: false,
     },
     { type: 'separator' },
@@ -661,9 +669,9 @@ ipcMain.handle('install-update', async () => {
 // App Lifecycle
 
 app.whenReady().then(async () => {
-  // Generate auth token for this session
-  authToken = generateAuthToken()
-  console.log('Generated auth token for session')
+  // Use existing token from env (dev mode) or generate new one (production)
+  authToken = process.env.STELLARIS_API_TOKEN || generateAuthToken()
+  console.log('Using auth token:', authToken.substring(0, 12) + '...')
 
   // Create the main window
   createWindow()
@@ -671,9 +679,23 @@ app.whenReady().then(async () => {
   // Create the system tray (ELEC-006)
   createTray()
 
-  // Get settings with actual secrets and start backend
+  // Check if backend is already running (dev mode with dev.sh)
+  let backendAlreadyRunning = false
+  try {
+    await checkBackendHealth()
+    backendAlreadyRunning = true
+    console.log('Backend already running (dev mode)')
+  } catch (e) {
+    // Backend not running, we'll start it
+  }
+
+  // Get settings with actual secrets and start backend if needed
   const settings = await getSettingsWithSecrets()
-  if (settings.googleApiKey) {
+  if (backendAlreadyRunning) {
+    // Backend already running, just start health checks
+    console.log('Using existing backend process')
+    startHealthCheck()
+  } else if (settings.googleApiKey) {
     startPythonBackend(settings)
 
     // Wait for backend to be ready
@@ -702,6 +724,12 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   // Kill Python backend on quit
   stopPythonBackend()
+
+  // Destroy tray to prevent memory leak
+  if (tray) {
+    tray.destroy()
+    tray = null
+  }
 })
 
 app.on('window-all-closed', () => {

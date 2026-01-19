@@ -1,7 +1,7 @@
 // SettingsPage - UI-004
 // Implements settings management for API keys, save path, and Discord integration
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSettings } from '../hooks/useSettings'
 
 function SettingsPage() {
@@ -18,6 +18,18 @@ function SettingsPage() {
 
   // Track successful save for feedback
   const [saveSuccess, setSaveSuccess] = useState(false)
+
+  // Ref for success message timeout to allow cleanup
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Initialize form when settings load
   useEffect(() => {
@@ -77,8 +89,12 @@ function SettingsPage() {
     if (success) {
       setSaveSuccess(true)
       setHasChanges(false)
+      // Clear any existing timeout before setting a new one
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current)
+      }
       // Clear success message after 3 seconds
-      setTimeout(() => setSaveSuccess(false), 3000)
+      successTimeoutRef.current = setTimeout(() => setSaveSuccess(false), 3000)
     }
   }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import SessionList from '../components/SessionList'
 import RecapViewer from '../components/RecapViewer'
 import { useBackend, Session, RecapResponse } from '../hooks/useBackend'
@@ -15,6 +15,9 @@ import { useBackend, Session, RecapResponse } from '../hooks/useBackend'
  */
 function RecapPage() {
   const backend = useBackend()
+
+  // Track mounted state to prevent state updates after unmount
+  const isMountedRef = useRef(true)
 
   // Session list state
   const [sessions, setSessions] = useState<Session[]>([])
@@ -33,12 +36,15 @@ function RecapPage() {
   const [endingSession, setEndingSession] = useState(false)
   const [endSessionMessage, setEndSessionMessage] = useState<string | null>(null)
 
-  // Load sessions on mount
+  // Load sessions with unmount guard
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true)
     setSessionsError(null)
 
     const result = await backend.sessions()
+
+    // Only update state if component is still mounted
+    if (!isMountedRef.current) return
 
     if (result.error) {
       setSessionsError(result.error)
@@ -50,8 +56,14 @@ function RecapPage() {
     setSessionsLoading(false)
   }, [backend])
 
+  // Load sessions on mount, cleanup on unmount
   useEffect(() => {
+    isMountedRef.current = true
     loadSessions()
+
+    return () => {
+      isMountedRef.current = false
+    }
   }, [loadSessions])
 
   // Handle session selection
@@ -62,7 +74,7 @@ function RecapPage() {
     setRecapError(null)
   }, [])
 
-  // Generate recap for selected session
+  // Generate recap for selected session with unmount guard
   const handleGenerateRecap = useCallback(async () => {
     if (!selectedSession) return
 
@@ -70,6 +82,9 @@ function RecapPage() {
     setRecapError(null)
 
     const result = await backend.recap(selectedSession.id)
+
+    // Only update state if component is still mounted
+    if (!isMountedRef.current) return
 
     if (result.error) {
       setRecapError(result.error)
@@ -81,12 +96,15 @@ function RecapPage() {
     setRecapLoading(false)
   }, [backend, selectedSession])
 
-  // End current session
+  // End current session with unmount guard
   const handleEndSession = useCallback(async () => {
     setEndingSession(true)
     setEndSessionMessage(null)
 
     const result = await backend.endSession()
+
+    // Only update state if component is still mounted
+    if (!isMountedRef.current) return
 
     if (result.error) {
       setEndSessionMessage(`Error: ${result.error}`)

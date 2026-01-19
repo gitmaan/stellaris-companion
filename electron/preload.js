@@ -4,6 +4,43 @@
 
 const { contextBridge, ipcRenderer } = require('electron')
 
+// Track active listeners to prevent accumulation
+// Each channel can have multiple callbacks, but only one IPC listener
+const listenerRegistry = new Map()
+
+/**
+ * Create a managed event listener that prevents accumulation.
+ * Uses a single IPC listener per channel that dispatches to registered callbacks.
+ * @param {string} channel - The IPC channel name
+ * @param {Function} callback - The callback to register
+ * @returns {Function} Cleanup function to unregister the callback
+ */
+function createManagedListener(channel, callback) {
+  if (!listenerRegistry.has(channel)) {
+    // First listener for this channel - create the IPC listener
+    const callbacks = new Set()
+    const ipcHandler = (event, ...args) => {
+      callbacks.forEach(cb => cb(...args))
+    }
+    ipcRenderer.on(channel, ipcHandler)
+    listenerRegistry.set(channel, { callbacks, ipcHandler })
+  }
+
+  const { callbacks } = listenerRegistry.get(channel)
+  callbacks.add(callback)
+
+  // Return cleanup function
+  return () => {
+    callbacks.delete(callback)
+    // If no more callbacks, remove the IPC listener entirely
+    if (callbacks.size === 0) {
+      const { ipcHandler } = listenerRegistry.get(channel)
+      ipcRenderer.removeListener(channel, ipcHandler)
+      listenerRegistry.delete(channel)
+    }
+  }
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
   // Settings
   getSettings: () => ipcRenderer.invoke('get-settings'),
@@ -28,24 +65,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Backend status events (sent from main process health checks)
+  // Uses managed listener to prevent accumulation
   onBackendStatus: (callback) => {
-    const handler = (event, status) => callback(status)
-    ipcRenderer.on('backend-status', handler)
-    // Return cleanup function
-    return () => ipcRenderer.removeListener('backend-status', handler)
+    return createManagedListener('backend-status', callback)
   },
 
   // Updates
   checkForUpdate: () => ipcRenderer.invoke('check-for-update'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
+  // Uses managed listener to prevent accumulation
   onUpdateAvailable: (callback) => {
-    const handler = (event, info) => callback(info)
-    ipcRenderer.on('update-available', handler)
-    return () => ipcRenderer.removeListener('update-available', handler)
+    return createManagedListener('update-available', callback)
   },
+  // Uses managed listener to prevent accumulation
   onUpdateDownloaded: (callback) => {
-    const handler = (event, info) => callback(info)
-    ipcRenderer.on('update-downloaded', handler)
-    return () => ipcRenderer.removeListener('update-downloaded', handler)
+    return createManagedListener('update-downloaded', callback)
   },
 })
