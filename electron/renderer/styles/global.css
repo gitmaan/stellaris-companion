@@ -152,6 +152,21 @@ body {
   background-color: var(--success);
 }
 
+.status-bar .connection-status.ready {
+  color: var(--success);
+}
+.status-bar .connection-status.ready .status-indicator {
+  background-color: var(--success);
+}
+
+.status-bar .connection-status.analyzing {
+  color: var(--warning);
+}
+.status-bar .connection-status.analyzing .status-indicator {
+  background-color: var(--warning);
+  animation: pulse 2s infinite;
+}
+
 .status-bar .connection-status.connecting {
   color: var(--warning);
 }
@@ -164,6 +179,13 @@ body {
   color: var(--warning);
 }
 .status-bar .connection-status.no-save .status-indicator {
+  background-color: var(--warning);
+}
+
+.status-bar .connection-status.not-configured {
+  color: var(--warning);
+}
+.status-bar .connection-status.not-configured .status-indicator {
   background-color: var(--warning);
 }
 

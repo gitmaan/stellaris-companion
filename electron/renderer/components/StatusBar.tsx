@@ -1,32 +1,42 @@
 import { useState, useEffect } from 'react'
-import { HealthResponse } from '../hooks/useBackend'
+import { BackendStatusEvent } from '../hooks/useBackend'
 
-type ConnectionStatus = 'connected' | 'connecting' | 'no-save' | 'disconnected'
+type ConnectionStatus = 'ready' | 'analyzing' | 'connecting' | 'no-save' | 'not-configured' | 'disconnected'
 
 interface StatusState {
   connectionStatus: ConnectionStatus
   empireName: string | null
   gameDate: string | null
+  stage: string | null
 }
 
-function getConnectionStatus(health: HealthResponse | null, error: string | null): ConnectionStatus {
-  if (error || !health) {
-    return 'disconnected'
+function getConnectionStatus(payload: BackendStatusEvent | null): ConnectionStatus {
+  if (!payload) return 'disconnected'
+
+  if (payload.connected === false) {
+    return payload.backend_configured ? 'disconnected' : 'not-configured'
   }
-  if (health.status === 'healthy' || health.status === 'ok') {
-    return health.save_loaded ? 'connected' : 'no-save'
-  }
-  return 'disconnected'
+
+  // If connected is not explicitly set, fall back to /api/health status fields.
+  const healthy = payload.status === 'healthy' || payload.status === 'ok'
+  if (!healthy) return 'disconnected'
+
+  if (!payload.save_loaded) return 'no-save'
+  return payload.precompute_ready ? 'ready' : 'analyzing'
 }
 
-function getStatusLabel(status: ConnectionStatus): string {
+function getStatusLabel(status: ConnectionStatus, stage: string | null): string {
   switch (status) {
-    case 'connected':
-      return 'Connected'
+    case 'ready':
+      return 'Ready'
+    case 'analyzing':
+      return stage ? `Analyzing (${stage})…` : 'Analyzing save…'
     case 'connecting':
       return 'Connecting...'
     case 'no-save':
       return 'No Save'
+    case 'not-configured':
+      return 'Not configured'
     case 'disconnected':
       return 'Disconnected'
   }
@@ -45,6 +55,7 @@ function StatusBar() {
     connectionStatus: 'connecting',
     empireName: null,
     gameDate: null,
+    stage: null,
   })
 
   // Listen to backend-status events from main process
@@ -58,10 +69,12 @@ function StatusBar() {
     }
 
     const cleanup = window.electronAPI.onBackendStatus((health) => {
+      const stage = health?.ingestion?.stage ?? null
       setState({
-        connectionStatus: getConnectionStatus(health, null),
+        connectionStatus: getConnectionStatus(health),
         empireName: health?.empire_name ?? null,
         gameDate: health?.game_date ?? null,
+        stage,
       })
     })
 
@@ -74,7 +87,7 @@ function StatusBar() {
   }, []) // Empty deps - subscribe once on mount, cleanup on unmount
 
   const statusClass = `connection-status ${state.connectionStatus}`
-  const statusLabel = getStatusLabel(state.connectionStatus)
+  const statusLabel = getStatusLabel(state.connectionStatus, state.stage)
 
   return (
     <div className="status-bar">

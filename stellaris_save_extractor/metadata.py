@@ -17,9 +17,11 @@ class MetadataMixin:
         result = {
             'file_path': str(self.save_path),
             'file_size_mb': self.save_path.stat().st_size / (1024 * 1024),
-            'gamestate_chars': len(self.gamestate),
             'modified': datetime.fromtimestamp(self.save_path.stat().st_mtime).isoformat(),
+            'gamestate_loaded': getattr(self, "_gamestate", None) is not None,
         }
+        if getattr(self, "_gamestate", None) is not None:
+            result["gamestate_chars"] = len(self.gamestate)
 
         # Parse meta file
         for line in self.meta.split('\n'):
@@ -31,4 +33,3 @@ class MetadataMixin:
                     result[key] = value
 
         return result
-

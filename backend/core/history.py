@@ -699,6 +699,108 @@ def extract_snapshot_metrics(briefing: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_history_enrichment(*, gamestate: str | None, player_id: int | None) -> dict[str, Any]:
+    """Build the optional `history` payload stored with a snapshot.
+
+    This is intentionally best-effort and returns an empty dict when inputs are missing.
+    """
+    if not gamestate:
+        return {}
+
+    resolved_player_id = int(player_id) if isinstance(player_id, int) else None
+
+    wars = extract_player_wars_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    leaders = extract_player_leaders_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    diplomacy = extract_player_diplomacy_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    galaxy = extract_galaxy_settings_from_gamestate(gamestate)
+
+    techs = extract_player_techs_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    policies = extract_player_policies_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    edicts = extract_player_edicts_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    megastructures = extract_megastructures_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    crisis = extract_crisis_from_gamestate(gamestate)
+    systems = extract_system_count_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    fallen_empires = extract_fallen_empires_from_gamestate(gamestate)
+
+    history: dict[str, Any] = {}
+    if wars:
+        history["wars"] = wars
+    if leaders:
+        history["leaders"] = leaders
+    if diplomacy:
+        history["diplomacy"] = diplomacy
+    if galaxy:
+        history["galaxy"] = galaxy
+    if techs:
+        history["techs"] = techs
+    if policies:
+        history["policies"] = policies
+    if edicts:
+        history["edicts"] = edicts
+    if megastructures:
+        history["megastructures"] = megastructures
+    if crisis:
+        history["crisis"] = crisis
+    if systems:
+        history["systems"] = systems
+    if fallen_empires:
+        history["fallen_empires"] = fallen_empires
+
+    return history
+
+
+def record_snapshot_from_briefing(
+    *,
+    db: GameDatabase,
+    save_path: Path | None,
+    save_hash: str | None,
+    briefing: dict[str, Any],
+) -> tuple[bool, int | None, str]:
+    """Record a snapshot when you already have a full briefing dict.
+
+    This avoids re-parsing gamestate in the main process (useful when ingestion happens
+    in a separate worker process). If the briefing already contains a `history` key,
+    it will be persisted as-is.
+    """
+    metrics = extract_snapshot_metrics(briefing)
+    resolved_campaign_id = metrics.get("campaign_id")
+    resolved_player_id = metrics.get("player_id")
+
+    history = briefing.get("history") if isinstance(briefing.get("history"), dict) else None
+    wars = history.get("wars") if isinstance(history, dict) else None
+
+    session_id = db.get_or_create_active_session(
+        save_id=compute_save_id(
+            campaign_id=resolved_campaign_id,
+            player_id=resolved_player_id,
+            empire_name=metrics.get("empire_name"),
+            save_path=save_path,
+        ),
+        save_path=str(save_path) if save_path else None,
+        empire_name=metrics.get("empire_name"),
+        last_game_date=metrics.get("game_date"),
+    )
+
+    inserted, snapshot_id = db.insert_snapshot_if_new(
+        session_id=session_id,
+        game_date=metrics.get("game_date"),
+        save_hash=save_hash,
+        military_power=metrics.get("military_power"),
+        colony_count=metrics.get("colony_count"),
+        wars_count=(wars.get("count") if isinstance(wars, dict) else metrics.get("wars_count")),
+        energy_net=metrics.get("energy_net"),
+        alloys_net=metrics.get("alloys_net"),
+        full_briefing_json=json.dumps(briefing, ensure_ascii=False, separators=(",", ":")),
+    )
+    if inserted and snapshot_id is not None:
+        try:
+            db.record_events_for_new_snapshot(session_id=session_id, snapshot_id=snapshot_id, current_briefing=briefing)
+        except Exception:
+            pass
+
+    return inserted, snapshot_id, session_id
+
+
 def record_snapshot_from_companion(
     *,
     db: GameDatabase,

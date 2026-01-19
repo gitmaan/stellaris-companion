@@ -13,6 +13,26 @@ export interface HealthResponse {
   empire_name: string | null
   game_date: string | null
   precompute_ready: boolean
+  ingestion?: {
+    stage?: string
+    stage_detail?: string | null
+    updated_at?: number
+    last_error?: string | null
+    current_save_path?: string | null
+    pending_save_path?: string | null
+    worker_pid?: number | null
+    worker_tier?: string | null
+    t2_game_date?: string | null
+    t2_updated_at?: number | null
+    t2_last_duration_ms?: number | null
+    cancel_count?: number
+  }
+}
+
+export type BackendStatusEvent = HealthResponse & {
+  connected?: boolean
+  backend_configured?: boolean
+  error?: string
 }
 
 export interface ChatResponse {
@@ -112,7 +132,7 @@ declare global {
       getSettings: () => Promise<unknown>
       saveSettings: (settings: unknown) => Promise<unknown>
       showFolderDialog: () => Promise<string | null>
-      onBackendStatus: (callback: (status: HealthResponse) => void) => () => void
+      onBackendStatus: (callback: (status: BackendStatusEvent) => void) => () => void
     }
   }
 }

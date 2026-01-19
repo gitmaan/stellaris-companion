@@ -28,15 +28,20 @@ const BACKEND_HOST = '127.0.0.1'
 const BACKEND_PORT = 8742
 const HEALTH_CHECK_INTERVAL = 5000 // 5 seconds
 const HEALTH_CHECK_TIMEOUT = 30000 // 30 seconds for initial startup
+const HEALTH_CHECK_REQUEST_TIMEOUT = 2000 // 2 seconds per health request
 
 // State
 let mainWindow = null
 let pythonProcess = null
 let authToken = null
 let healthCheckTimer = null
+let healthCheckInFlight = false
 let isQuitting = false
 let tray = null
 let lastTrayStatus = null // Track last status to avoid rebuilding menu unnecessarily
+let backendConfigured = false
+let lastBackendConnected = false
+let lastBackendStatusPayload = null
 
 /**
  * Generate a random auth token for this session.
@@ -224,20 +229,39 @@ function restartPythonBackend(settings) {
 async function callBackendApi(endpoint, options = {}) {
   const url = `http://${BACKEND_HOST}:${BACKEND_PORT}${endpoint}`
 
+  const { timeoutMs, ...restOptions } = options
+  const controller = timeoutMs ? new AbortController() : null
+  const timer = timeoutMs
+    ? setTimeout(() => {
+      try {
+        controller.abort()
+      } catch (e) {
+        // ignore
+      }
+    }, timeoutMs)
+    : null
+
   const fetchOptions = {
-    ...options,
+    ...restOptions,
+    signal: controller ? controller.signal : undefined,
     headers: {
-      ...options.headers,
+      ...restOptions.headers,
       Authorization: `Bearer ${authToken}`,
       'Content-Type': 'application/json',
     },
   }
 
-  const response = await fetch(url, fetchOptions)
+  let response
+  try {
+    response = await fetch(url, fetchOptions)
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
-    throw new Error(error.detail || `HTTP ${response.status}`)
+    const detail = error?.detail?.error || error?.detail || error?.error
+    throw new Error(detail || `HTTP ${response.status}`)
   }
 
   return response.json()
@@ -248,7 +272,7 @@ async function callBackendApi(endpoint, options = {}) {
  * @returns {Promise<Object>} Health response
  */
 async function checkBackendHealth() {
-  return callBackendApi('/api/health')
+  return callBackendApi('/api/health', { timeoutMs: HEALTH_CHECK_REQUEST_TIMEOUT })
 }
 
 /**
@@ -283,26 +307,39 @@ function startHealthCheck() {
     clearInterval(healthCheckTimer)
   }
 
-  healthCheckTimer = setInterval(async () => {
-    if (!pythonProcess || isQuitting) {
-      return
-    }
-
+  const perform = async () => {
+    if (isQuitting || healthCheckInFlight) return
+    healthCheckInFlight = true
     try {
       const health = await checkBackendHealth()
-      if (mainWindow) {
-        mainWindow.webContents.send('backend-status', { connected: true, ...health })
+      lastBackendConnected = true
+      lastBackendStatusPayload = {
+        connected: true,
+        backend_configured: backendConfigured,
+        ...health,
       }
-      // Update tray menu with current status
-      updateTrayMenu()
+      if (mainWindow) {
+        mainWindow.webContents.send('backend-status', lastBackendStatusPayload)
+      }
     } catch (e) {
-      if (mainWindow) {
-        mainWindow.webContents.send('backend-status', { connected: false })
+      lastBackendConnected = false
+      lastBackendStatusPayload = {
+        connected: false,
+        backend_configured: backendConfigured,
+        error: e.message,
       }
-      // Update tray menu with disconnected status
+      if (mainWindow) {
+        mainWindow.webContents.send('backend-status', lastBackendStatusPayload)
+      }
+    } finally {
+      healthCheckInFlight = false
       updateTrayMenu()
     }
-  }, HEALTH_CHECK_INTERVAL)
+  }
+
+  // Emit an immediate status so renderer never sticks on "Connecting..."
+  perform()
+  healthCheckTimer = setInterval(perform, HEALTH_CHECK_INTERVAL)
 }
 
 /**
@@ -477,7 +514,7 @@ function createTray() {
 function updateTrayMenu() {
   if (!tray) return
 
-  const currentStatus = pythonProcess ? 'Connected' : 'Disconnected'
+  const currentStatus = lastBackendConnected ? 'Connected' : (backendConfigured ? 'Disconnected' : 'Not configured')
 
   // Only rebuild menu if status changed to avoid Menu object accumulation
   if (lastTrayStatus === currentStatus) {
@@ -550,6 +587,19 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+  })
+
+  // Ensure the renderer always receives at least one status event.
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (!mainWindow) return
+    if (lastBackendStatusPayload) {
+      mainWindow.webContents.send('backend-status', lastBackendStatusPayload)
+    } else {
+      mainWindow.webContents.send('backend-status', {
+        connected: false,
+        backend_configured: backendConfigured,
+      })
+    }
   })
 }
 
@@ -635,6 +685,7 @@ ipcMain.handle('save-settings', async (event, settings) => {
 
   // Get the full settings with actual secrets for backend restart
   const fullSettings = await getSettingsWithSecrets()
+  backendConfigured = !!fullSettings.googleApiKey
 
   // Restart the Python backend with new settings
   restartPythonBackend(fullSettings)
@@ -679,35 +730,37 @@ app.whenReady().then(async () => {
   // Create the system tray (ELEC-006)
   createTray()
 
-  // Check if backend is already running (dev mode with dev.sh)
+  // Get settings with actual secrets and start backend if needed
+  const settings = await getSettingsWithSecrets()
+  backendConfigured = !!settings.googleApiKey
+
+  // Always start health checks (even if we don't spawn Python) so the UI gets accurate status.
+  startHealthCheck()
+
+  // If backend is reachable already, don't spawn another process.
   let backendAlreadyRunning = false
   try {
     await checkBackendHealth()
     backendAlreadyRunning = true
-    console.log('Backend already running (dev mode)')
+    console.log('Backend already running')
   } catch (e) {
-    // Backend not running, we'll start it
+    // Not running or not authorized (still shows status via health checks).
   }
 
-  // Get settings with actual secrets and start backend if needed
-  const settings = await getSettingsWithSecrets()
-  if (backendAlreadyRunning) {
-    // Backend already running, just start health checks
-    console.log('Using existing backend process')
-    startHealthCheck()
-  } else if (settings.googleApiKey) {
+  if (!backendAlreadyRunning && settings.googleApiKey) {
     startPythonBackend(settings)
 
     // Wait for backend to be ready
     const ready = await waitForBackendReady()
     if (ready) {
       console.log('Backend health check passed')
-      startHealthCheck()
     } else {
       console.error('Backend failed to start')
     }
   } else {
-    console.log('No Google API key configured, skipping backend start')
+    if (!settings.googleApiKey) {
+      console.log('No Google API key configured, skipping backend start')
+    }
   }
 
   app.on('activate', () => {

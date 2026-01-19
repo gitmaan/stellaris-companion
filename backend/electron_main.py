@@ -159,6 +159,7 @@ def main() -> None:
     from backend.api.server import create_app
     from backend.core.companion import Companion
     from backend.core.database import get_default_db
+    from backend.core.ingestion import IngestionManager
     from backend.core.save_watcher import SaveWatcher
 
     # Initialize history database
@@ -169,27 +170,29 @@ def main() -> None:
         logger.error(f"Failed to initialize history DB: {e}")
         sys.exit(1)
 
-    # Initialize companion
+    # Initialize companion (Electron ingestion manager owns save loading + precompute).
     try:
-        companion = Companion(save_path=save_path)
-        if companion.is_loaded:
-            logger.info(f"Companion loaded: {companion.metadata.get('name', 'Unknown')}")
-            logger.info(f"Personality: {companion.personality_summary}")
-        else:
-            logger.info("Companion initialized without save")
+        companion = Companion(save_path=None, auto_precompute=False)
+        logger.info("Companion initialized (precompute managed by ingestion coordinator)")
     except Exception as e:
         logger.error(f"Failed to initialize companion: {e}")
         sys.exit(1)
 
-    # Initialize save watcher with callback to companion.reload_save
+    # Initialize ingestion coordinator (latest-only + cancelable parsing).
+    ingestion = IngestionManager(companion=companion, db=db)
+    ingestion.start()
+
+    if save_path:
+        logger.info(f"Initial save scheduled: {save_path.name}")
+        ingestion.notify_save(save_path)
+
+    # Initialize save watcher with callback to ingestion.notify_save
     def on_save_detected(path: Path) -> None:
-        """Callback for when a new save file is detected."""
         logger.info(f"New save detected: {path.name}")
         try:
-            companion.reload_save(new_path=path)
-            logger.info(f"Companion reloaded: {companion.metadata.get('name', 'Unknown')}")
+            ingestion.notify_save(path)
         except Exception as e:
-            logger.error(f"Failed to reload save: {e}")
+            logger.error(f"Failed to schedule ingestion: {e}")
 
     save_watcher = SaveWatcher(on_save_detected=on_save_detected)
     valid_paths = save_watcher.get_valid_watch_paths()
@@ -203,6 +206,7 @@ def main() -> None:
     app = create_app()
     app.state.companion = companion
     app.state.db = db
+    app.state.ingestion = ingestion
 
     # Start uvicorn server
     import uvicorn

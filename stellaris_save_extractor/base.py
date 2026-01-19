@@ -15,14 +15,34 @@ class SaveExtractorBase:
             save_path: Path to the .sav file
         """
         self.save_path = Path(save_path)
-        self.meta = None
-        self.gamestate = None
-        self._load_save()
+        self._meta: str | None = None
+        self._gamestate: str | None = None
+        self._load_meta()
 
         # Cache for parsed sections
         self._section_cache = {}
         self._building_types = None  # Lazy-loaded building ID→type map
         self._country_names = None  # Lazy-loaded country ID→name map
+
+    @property
+    def meta(self) -> str:
+        if self._meta is None:
+            self._load_meta()
+        return self._meta or ""
+
+    @meta.setter
+    def meta(self, value: str | None) -> None:
+        self._meta = value
+
+    @property
+    def gamestate(self) -> str:
+        if self._gamestate is None:
+            self._load_gamestate()
+        return self._gamestate or ""
+
+    @gamestate.setter
+    def gamestate(self, value: str | None) -> None:
+        self._gamestate = value
 
     def _get_building_types(self) -> dict:
         """Parse the global buildings section to get ID→type mapping.
@@ -51,11 +71,15 @@ class SaveExtractorBase:
 
         return self._building_types
 
-    def _load_save(self):
-        """Extract gamestate and meta from the save file."""
+    def _load_meta(self) -> None:
+        """Extract meta from the save file (cheap, used for Tier 0 status)."""
         with zipfile.ZipFile(self.save_path, 'r') as z:
-            self.gamestate = z.read('gamestate').decode('utf-8', errors='replace')
-            self.meta = z.read('meta').decode('utf-8', errors='replace')
+            self._meta = z.read('meta').decode('utf-8', errors='replace')
+
+    def _load_gamestate(self) -> None:
+        """Extract the full gamestate from the save file (expensive)."""
+        with zipfile.ZipFile(self.save_path, 'r') as z:
+            self._gamestate = z.read('gamestate').decode('utf-8', errors='replace')
 
     def _find_section_bounds(self, section_name: str) -> tuple[int, int] | None:
         """Find the start and end positions of a top-level section.
@@ -868,4 +892,3 @@ class SaveExtractorBase:
         if not isinstance(data, dict):
             return data
         return {k: v for k, v in data.items() if 'preview' not in k.lower()}
-

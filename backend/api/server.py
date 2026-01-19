@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -106,9 +107,13 @@ def create_app() -> FastAPI:
 
         Returns server status and current game state info.
         """
-        companion = getattr(request.app.state, "companion", None)
+        ingestion = getattr(request.app.state, "ingestion", None)
+        if ingestion is not None:
+            payload = ingestion.get_health_payload()
+            return {"status": "ok", **payload}
 
-        if companion is None or not companion.is_loaded:
+        companion = getattr(request.app.state, "companion", None)
+        if companion is None or not getattr(companion, "is_loaded", False):
             return {
                 "status": "ok",
                 "save_loaded": False,
@@ -127,6 +132,14 @@ def create_app() -> FastAPI:
             "precompute_ready": precompute_status.get("ready", False),
         }
 
+    @app.get("/api/ingestion-status", dependencies=[Depends(verify_token)])
+    async def ingestion_status(request: Request) -> dict[str, Any]:
+        """Detailed ingestion status (staged progress, cancellation, timestamps)."""
+        ingestion = getattr(request.app.state, "ingestion", None)
+        if ingestion is None:
+            return {"enabled": False}
+        return {"enabled": True, "status": ingestion.get_status()}
+
     @app.post("/api/chat", dependencies=[Depends(verify_token)])
     async def chat(request: Request, body: ChatRequest) -> dict[str, Any]:
         """Chat endpoint for asking questions about the game state.
@@ -136,6 +149,7 @@ def create_app() -> FastAPI:
         Returns 503 if the precompute is not ready yet.
         """
         companion = getattr(request.app.state, "companion", None)
+        ingestion = getattr(request.app.state, "ingestion", None)
 
         if companion is None:
             raise HTTPException(
@@ -143,14 +157,38 @@ def create_app() -> FastAPI:
                 detail={"error": "Companion not initialized", "retry_after_ms": 2000},
             )
 
-        if not companion.is_loaded:
-            raise HTTPException(
-                status_code=503,
-                detail={"error": "No save file loaded", "retry_after_ms": 2000},
-            )
+        if ingestion is not None:
+            health = ingestion.get_health_payload()
+            if not health.get("save_loaded", False):
+                raise HTTPException(
+                    status_code=503,
+                    detail={"error": "No save file loaded", "retry_after_ms": 2000},
+                )
+            if not health.get("precompute_ready", False):
+                try:
+                    ingestion.request_t2_on_demand()
+                except Exception:
+                    pass
+                raise HTTPException(
+                    status_code=503,
+                    detail={"error": "Briefing not ready yet", "retry_after_ms": 2000},
+                )
+        else:
+            if not companion.is_loaded:
+                raise HTTPException(
+                    status_code=503,
+                    detail={"error": "No save file loaded", "retry_after_ms": 2000},
+                )
 
-        # Check if precompute is ready
+            precompute_status = companion.get_precompute_status()
+            if not precompute_status.get("ready", False):
+                raise HTTPException(
+                    status_code=503,
+                    detail={"error": "Briefing not ready yet", "retry_after_ms": 2000},
+                )
+
         precompute_status = companion.get_precompute_status()
+
         if not precompute_status.get("ready", False):
             raise HTTPException(
                 status_code=503,
@@ -183,6 +221,16 @@ def create_app() -> FastAPI:
         Returns key metrics: military power, economy, colonies, population, active wars.
         This is a fast endpoint that doesn't require LLM processing.
         """
+        ingestion = getattr(request.app.state, "ingestion", None)
+        if ingestion is not None:
+            latest = ingestion.get_latest_t1_status()
+            if latest is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail={"error": "Status snapshot not ready yet"},
+                )
+            return latest
+
         companion = getattr(request.app.state, "companion", None)
 
         if companion is None or not companion.is_loaded:
@@ -325,9 +373,10 @@ def create_app() -> FastAPI:
         """
         import time as time_module
 
-        from backend.core.history import compute_save_id, extract_campaign_id_from_gamestate
+        from backend.core.history import compute_save_id
 
         companion = getattr(request.app.state, "companion", None)
+        ingestion = getattr(request.app.state, "ingestion", None)
         db = getattr(request.app.state, "db", None)
 
         if db is None:
@@ -336,19 +385,30 @@ def create_app() -> FastAPI:
                 detail={"error": "Database not initialized"},
             )
 
-        if companion is None or not companion.is_loaded:
-            raise HTTPException(
-                status_code=400,
-                detail={"error": "No active session - no save file loaded"},
-            )
+        save_path: Path | None = None
+        campaign_id: str | None = None
+        player_id: int | None = None
+        empire_name: str | None = None
 
-        # Compute save_id from companion's current state
-        extractor = getattr(companion, "extractor", None)
-        gamestate = getattr(extractor, "gamestate", None) if extractor else None
-        campaign_id = extract_campaign_id_from_gamestate(gamestate) if gamestate else None
-        player_id = extractor.get_player_empire_id() if extractor else None
-        empire_name = (companion.metadata or {}).get("name")
-        save_path = getattr(companion, "save_path", None)
+        if ingestion is not None:
+            status = ingestion.get_status()
+            if not status.get("t2_ready"):
+                raise HTTPException(
+                    status_code=400,
+                    detail={"error": "No active session - briefing not ready yet"},
+                )
+            t2_meta = status.get("t2_meta") if isinstance(status.get("t2_meta"), dict) else {}
+            campaign_id = t2_meta.get("campaign_id")
+            player_id = t2_meta.get("player_id")
+            empire_name = t2_meta.get("empire_name")
+            sp = status.get("current_save_path")
+            if isinstance(sp, str) and sp:
+                save_path = Path(sp)
+        elif companion is not None and companion.is_loaded:
+            extractor = getattr(companion, "extractor", None)
+            player_id = extractor.get_player_empire_id() if extractor else None
+            empire_name = (companion.metadata or {}).get("name")
+            save_path = getattr(companion, "save_path", None)
 
         save_id = compute_save_id(
             campaign_id=campaign_id,

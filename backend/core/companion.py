@@ -82,7 +82,13 @@ class Companion:
     This is a reusable class that can be used by the CLI, Discord bot, or other interfaces.
     """
 
-    def __init__(self, save_path: str | Path | None = None, api_key: str | None = None):
+    def __init__(
+        self,
+        save_path: str | Path | None = None,
+        api_key: str | None = None,
+        *,
+        auto_precompute: bool = True,
+    ):
         """Initialize the companion.
 
         Args:
@@ -97,6 +103,7 @@ class Companion:
         self.client = genai.Client(api_key=self.api_key)
         self._chat_session = None
         self._thinking_level = 'dynamic'
+        self._auto_precompute = bool(auto_precompute)
 
         # Initialize save-related attributes
         self.save_path: Path | None = None
@@ -211,8 +218,9 @@ class Companion:
         # Reset chat session for new save
         self._chat_session = None
 
-        # Kick off Phase 4 background precompute immediately.
-        self.start_background_precompute(self.save_path)
+        # Kick off Phase 4 background precompute immediately (unless disabled for Electron ingestion manager).
+        if self._auto_precompute:
+            self.start_background_precompute(self.save_path)
 
     def _build_personality(self) -> None:
         """Build the dynamic personality prompt from empire data.
@@ -318,8 +326,9 @@ class Companion:
             }
         )
 
-        # Kick off Phase 4 background precompute for the new save.
-        self.start_background_precompute(self.save_path)
+        # Kick off Phase 4 background precompute for the new save (unless disabled for Electron ingestion manager).
+        if self._auto_precompute:
+            self.start_background_precompute(self.save_path)
 
         return identity_changed
 
@@ -955,6 +964,42 @@ class Companion:
                 "has_cache": self._complete_briefing_json is not None,
                 "last_error": self._briefing_last_error,
             }
+
+    def mark_precompute_stale(self) -> None:
+        """Mark precompute as stale (keeps cached JSON but clears ready flag)."""
+        with self._briefing_lock:
+            self._briefing_ready.clear()
+            self._briefing_last_error = None
+
+    def apply_precomputed_briefing(
+        self,
+        *,
+        save_path: Path | None,
+        briefing_json: str,
+        game_date: str | None,
+        identity: dict[str, Any] | None,
+        situation: dict[str, Any] | None,
+        save_hash: str | None = None,
+    ) -> None:
+        """Activate a precomputed briefing produced externally (e.g., worker process)."""
+        with self._briefing_lock:
+            if save_path is not None:
+                self.save_path = Path(save_path)
+            self._complete_briefing_json = briefing_json
+            self._briefing_game_date = game_date
+            self._briefing_updated_at = time.time()
+            self._briefing_last_error = None
+            self._save_hash = save_hash
+            self._briefing_ready.set()
+
+        # Update identity/situation/personality out of lock (prompt building can do I/O/logging).
+        if isinstance(identity, dict):
+            self.identity = identity
+        if isinstance(situation, dict):
+            self.situation = situation
+        self._last_known_date = game_date
+        self._build_personality()
+        self._chat_session = None
 
     def start_background_precompute(self, save_path: Path | None = None) -> None:
         """Start background extraction of the complete briefing for /ask."""
