@@ -715,13 +715,13 @@ class SaveExtractorBase:
                 if fleet_name.startswith('shipclass_'):
                     fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
 
-                if len(result['military_fleets']) < 20:  # Keep top 20
-                    result['military_fleets'].append({
-                        'id': fid,
-                        'name': fleet_name,
-                        'ships': ship_count,
-                        'military_power': round(mp, 0),
-                    })
+                # Store all military fleets (no truncation - callers can slice if needed)
+                result['military_fleets'].append({
+                    'id': fid,
+                    'name': fleet_name,
+                    'ships': ship_count,
+                    'military_power': round(mp, 0),
+                })
             else:
                 result['civilian_fleet_count'] += 1
 
