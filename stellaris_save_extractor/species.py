@@ -45,7 +45,8 @@ class SpeciesMixin:
 
         species_list = []
 
-        for i, match in enumerate(entries[:200]):  # Cap at 200 species
+        # Process all species - modded games can have 500+ species types
+        for i, match in enumerate(entries):
             species_id = match.group(1)
             start_pos = match.end()
 
@@ -155,7 +156,8 @@ class SpeciesMixin:
 
         rights_list = []
 
-        for match in entries[:50]:  # Cap at 50 species rights
+        # Process all species rights - empires with many subspecies/templates can exceed 50
+        for match in entries:
             species_index = match.group(1)
             start_pos = match.start()
 

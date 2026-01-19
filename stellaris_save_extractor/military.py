@@ -638,6 +638,7 @@ class MilitaryMixin:
         result['megastructures'] = player_megas
         result['count'] = len(player_megas)
         result['by_type'] = by_type
-        result['ruined_available'] = ruined_megas[:20]  # Cap ruined list
+        # Return all ruined megastructures - late-game galaxies can have many
+        result['ruined_available'] = ruined_megas
 
         return result

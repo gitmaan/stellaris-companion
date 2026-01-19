@@ -125,9 +125,9 @@ class LeadersMixin:
                 class_counts[leader_class] = 0
             class_counts[leader_class] += 1
 
-        result['leaders'] = leaders_found[:30]  # Limit to 30 leaders
+        # Full list (no truncation); callers that need caps should slice.
+        result['leaders'] = leaders_found
         result['count'] = len(leaders_found)
         result['by_class'] = class_counts
 
         return result
-

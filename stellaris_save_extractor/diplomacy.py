@@ -947,9 +947,9 @@ class DiplomacyMixin:
         player_claims.sort(key=lambda x: x.get('system_name', ''))
         claims_against.sort(key=lambda x: x.get('system_name', ''))
 
-        # Cap results for performance
-        result['player_claims'] = player_claims[:100]
-        result['claims_against_player'] = claims_against[:100]
+        # Return all claims - large empires in late-game can have 200+ claims
+        result['player_claims'] = player_claims
+        result['claims_against_player'] = claims_against
         result['player_claims_count'] = len(player_claims)
         result['claims_against_count'] = len(claims_against)
 

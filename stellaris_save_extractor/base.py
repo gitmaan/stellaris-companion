@@ -22,6 +22,7 @@ class SaveExtractorBase:
         # Cache for parsed sections
         self._section_cache = {}
         self._building_types = None  # Lazy-loaded building ID→type map
+        self._country_names = None  # Lazy-loaded country ID→name map
 
     def _get_building_types(self) -> dict:
         """Parse the global buildings section to get ID→type mapping.
@@ -239,8 +240,9 @@ class SaveExtractorBase:
 
         # Extract all fleet=N values until we hit a section at lower indent
         # The structure is: owned_fleets=\n\t\t\t{\n\t\t\t\t{\n\t\t\t\t\tfleet=0\n\t\t\t\t}\n...
+        # Use 100KB window - late-game empires can have 200+ fleets, each entry ~50 bytes
         fleet_ids = []
-        for match in re.finditer(r'fleet=(\d+)', content[:15000]):
+        for match in re.finditer(r'fleet=(\d+)', content[:100000]):
             fleet_ids.append(match.group(1))
 
         return fleet_ids
@@ -412,38 +414,61 @@ class SaveExtractorBase:
     def _get_country_names_map(self) -> dict:
         """Build a mapping of country ID -> country name for all empires.
 
+        This method is cached - the expensive parsing is only done once per
+        extraction session. Late-game saves can have 300+ countries including
+        primitives, pirates, marauders, caravaneers, fallen/awakened empires, etc.
+
         Returns:
             Dict mapping integer country IDs to their empire names
         """
+        # Return cached result if available
+        if self._country_names is not None:
+            return self._country_names
+
         country_names = {}
 
         country_start = self._find_country_section_start()
         if country_start == -1:
+            self._country_names = country_names
             return country_names
 
-        # Get a chunk of the country section
-        country_chunk = self.gamestate[country_start:country_start + 10000000]
+        # Get a chunk large enough for the country section
+        # Then find where the section actually ends to avoid bleeding into other sections
+        raw_chunk = self.gamestate[country_start:country_start + 50000000]
+
+        # Find the end of country section (next top-level section starts with \n<name>=\n{)
+        # Skip first 1000 chars to avoid matching "country=" itself
+        section_end_match = re.search(r'\n[a-z_]+=\n\{', raw_chunk[1000:])
+        if section_end_match:
+            country_chunk = raw_chunk[:section_end_match.start() + 1000]
+        else:
+            country_chunk = raw_chunk
 
         # Find entries like \n\t0=\n\t{ ... name="United Nations of Earth" ... }
         # Parse each country block to extract ID and name
         country_entry_pattern = r'\n\t(\d+)=\n\t\{'
         entries = list(re.finditer(country_entry_pattern, country_chunk))
 
-        for i, entry_match in enumerate(entries[:200]):  # Limit to first 200 countries for performance
+        # Process all country entries - no artificial limit
+        # Late-game saves can have 300+ countries (fallen empires, primitives,
+        # marauders, caravaneers, etc.) and we need to resolve all of them
+        for i, entry_match in enumerate(entries):
             country_id = int(entry_match.group(1))
             entry_start = entry_match.start()
 
-            # Determine block end
+            # Determine block end - only need first part of block for name
+            # Using min of 5000 chars or next entry to optimize performance
             if i + 1 < len(entries):
-                entry_end = entries[i + 1].start()
+                entry_end = min(entry_start + 5000, entries[i + 1].start())
             else:
-                entry_end = min(entry_start + 50000, len(country_chunk))
+                entry_end = entry_start + 5000
 
             block = country_chunk[entry_start:entry_end]
 
             # Extract name - can be either:
             # 1. name="Direct Name" (simple string)
             # 2. name={ key="LOCALIZATION_KEY" } (localization reference)
+            # 3. name={ key="%ADJECTIVE%" variables={...} } (template with variables)
             # First try direct string format
             name_match = re.search(r'\n\t\tname\s*=\s*"([^"]+)"', block)
             if name_match:
@@ -452,13 +477,162 @@ class SaveExtractorBase:
                 # Try localization key format: name={ key="..." }
                 key_match = re.search(r'\n\t\tname\s*=\s*\{\s*key\s*=\s*"([^"]+)"', block)
                 if key_match:
-                    # Use the key as a fallback, cleaned up for readability
                     key = key_match.group(1)
-                    # Convert EMPIRE_DESIGN_humans1 to "Humans 1" for readability
-                    readable = key.replace('EMPIRE_DESIGN_', '').replace('_', ' ').title()
+                    # Check if name block has variables (look specifically in name={...} block)
+                    # Extract name block first to check for variables
+                    name_block_match = re.search(r'\n\t\tname\s*=\s*\{', block)
+                    has_name_vars = False
+                    if name_block_match:
+                        # Find extent of name block
+                        ns = name_block_match.end()
+                        bc = 1
+                        ne = ns
+                        while bc > 0 and ne < len(block):
+                            if block[ne] == '{': bc += 1
+                            elif block[ne] == '}': bc -= 1
+                            ne += 1
+                        name_section = block[name_block_match.start():ne]
+                        has_name_vars = 'variables=' in name_section
+
+                    if has_name_vars:
+                        # Extract variable values to build readable name
+                        readable = self._resolve_template_name(block, key)
+                    else:
+                        readable = self._localization_key_to_readable_name(key)
                     country_names[country_id] = readable
 
+        # Cache the result for subsequent calls
+        self._country_names = country_names
         return country_names
+
+    def _localization_key_to_readable_name(self, key: str) -> str:
+        """Convert a localization key to a human-readable name.
+
+        Handles various patterns including:
+        - EMPIRE_DESIGN_* (standard empires)
+        - FALLEN_EMPIRE_* (fallen empires with optional type suffix)
+        - AWAKENED_EMPIRE_* (awakened empires)
+        - NAME_* (named entities like Enigmatic Observers)
+
+        Args:
+            key: The localization key (e.g., "FALLEN_EMPIRE_SPIRITUALIST")
+
+        Returns:
+            Human-readable name (e.g., "Fallen Empire (Spiritualist)")
+        """
+        # Handle AWAKENED_EMPIRE_* patterns (check before FALLEN to handle awakened first)
+        # Examples: AWAKENED_EMPIRE_SPIRITUALIST, AWAKENED_EMPIRE_1
+        if key.startswith('AWAKENED_EMPIRE_'):
+            suffix = key[len('AWAKENED_EMPIRE_'):]
+            if suffix.isdigit():
+                return f"Awakened Empire {suffix}"
+            else:
+                # Convert suffix like SPIRITUALIST to (Spiritualist)
+                type_name = suffix.replace('_', ' ').title()
+                return f"Awakened Empire ({type_name})"
+
+        # Handle FALLEN_EMPIRE_* patterns
+        # Examples: FALLEN_EMPIRE_1, FALLEN_EMPIRE_SPIRITUALIST, FALLEN_EMPIRE_MATERIALIST
+        if key.startswith('FALLEN_EMPIRE_'):
+            suffix = key[len('FALLEN_EMPIRE_'):]
+            if suffix.isdigit():
+                return f"Fallen Empire {suffix}"
+            else:
+                # Convert suffix like SPIRITUALIST to (Spiritualist)
+                type_name = suffix.replace('_', ' ').title()
+                return f"Fallen Empire ({type_name})"
+
+        # Handle NAME_* patterns (specific named entities)
+        # Examples: NAME_Enigmatic_Observers, NAME_Keepers_of_Knowledge
+        if key.startswith('NAME_'):
+            name_part = key[len('NAME_'):]
+            # Replace underscores with spaces, preserve existing capitalization
+            return name_part.replace('_', ' ')
+
+        # Handle standard EMPIRE_DESIGN_* patterns
+        # Examples: EMPIRE_DESIGN_humans1, EMPIRE_DESIGN_commonwealth
+        if key.startswith('EMPIRE_DESIGN_'):
+            name_part = key[len('EMPIRE_DESIGN_'):]
+            # Insert space before trailing numbers (humans1 -> humans 1)
+            name_part = re.sub(r'(\D)(\d+)$', r'\1 \2', name_part)
+            return name_part.replace('_', ' ').title()
+
+        # Fallback: general cleanup for any other patterns
+        # Remove common prefixes and clean up
+        result = key
+        for prefix in ['EMPIRE_', 'COUNTRY_', 'CIV_']:
+            if result.startswith(prefix):
+                result = result[len(prefix):]
+                break
+
+        return result.replace('_', ' ').title()
+
+    def _resolve_template_name(self, block: str, template_key: str) -> str:
+        """Resolve a template name like %ADJECTIVE% using its variables block.
+
+        Stellaris uses templates like:
+            name={
+                key="%ADJECTIVE%"
+                variables={
+                    { key="adjective" value={ key="SPEC_Khessam" } }
+                    { key="1" value={ key="State" } }
+                }
+            }
+        This should resolve to "Khessam State".
+
+        Args:
+            block: The country block containing the name and variables
+            template_key: The template key (e.g., "%ADJECTIVE%")
+
+        Returns:
+            Resolved name or a cleaned-up fallback
+        """
+        # First, extract just the name={...} block to avoid matching adjective={...}
+        name_block_match = re.search(r'\n\t\tname\s*=\s*\{', block)
+        if name_block_match:
+            # Find matching closing brace for name block
+            start = name_block_match.end()
+            brace_count = 1
+            end = start
+            while brace_count > 0 and end < len(block):
+                if block[end] == '{':
+                    brace_count += 1
+                elif block[end] == '}':
+                    brace_count -= 1
+                end += 1
+            name_block = block[name_block_match.start():end]
+        else:
+            name_block = block[:1000]  # Fallback to first part
+
+        # Recursively extract all literal value keys from nested variables
+        # This handles nested templates like %ADJ% containing more templates
+        # Pattern: value={ key="SOMETHING" } where SOMETHING doesn't start with %
+        all_values = re.findall(r'value\s*=\s*\{\s*key\s*=\s*"([^"%][^"]*)"', name_block)
+
+        if not all_values:
+            # Try simpler value="string" format
+            all_values = re.findall(r'value\s*=\s*"([^"%][^"]*)"', name_block)
+
+        if all_values:
+            # Clean up each value and combine
+            parts = []
+            for vk in all_values:
+                # Remove common prefixes like SPEC_, ADJ_, etc.
+                clean = vk
+                for prefix in ['SPEC_', 'ADJ_', 'NAME_', 'SUFFIX_']:
+                    if clean.startswith(prefix):
+                        clean = clean[len(prefix):]
+                        break
+                # Convert underscores to spaces
+                clean = clean.replace('_', ' ').strip()
+                if clean:
+                    parts.append(clean)
+
+            if parts:
+                return ' '.join(parts)
+
+        # Fallback: return a generic label
+        return "Unknown Empire"
 
     def _analyze_player_fleets(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
         """Analyze player's fleet IDs to categorize them properly.
