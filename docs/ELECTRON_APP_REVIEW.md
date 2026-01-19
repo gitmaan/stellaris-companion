@@ -30,6 +30,7 @@ Scope: the Electron app (`electron/`) + Electron-focused backend (`backend/api`,
 | **Tiered compute** | B.3 | T0 (meta ~5ms), T1 (status ~3s), T2 (full briefing ~20s) |
 | Idle-only T2 scheduling | B.4 | 12s quiet period before T2; on-demand via `request_t2_on_demand()` |
 | Lazy gamestate loading | C.1 | `stellaris_save_extractor/base.py` - property getter defers 70MB decode |
+| **DB retention policy** | C.3 | `database.py` - keeps first + 20 recent briefings, clears old JSON, preserves metrics |
 | Status labels in UI | E.2 | StatusBar shows "Analyzing (parsing_t1)…", "Ready", "No Save", etc. |
 | Window dragging | — | CSS `-webkit-app-region: drag` on StatusBar |
 
@@ -38,15 +39,14 @@ Scope: the Electron app (`electron/`) + Electron-focused backend (`backend/api`,
 | Item | Phase | Priority | Effort | Notes |
 |------|-------|----------|--------|-------|
 | mmap/streaming parser | C.1 | P1 | High | Replace full string load with mmap slices |
-| DB compression/retention | C.3 | P1 | Medium | Limit snapshots per session, compress JSON |
 | Save path edit/clear | E.1 | P2 | Low | Add "Clear" / "Auto-detect" buttons |
 | Virtualize chat list | E.3 | P2 | Medium | Use `react-window` for long sessions |
 | Tray onboarding hint | E.5 | P2 | Low | One-time toast on first minimize-to-tray |
 
 ### Recommended Next Steps (High ROI)
 
-1. **DB retention policy** — ~2 hours, prevents unbounded growth over long campaigns
-2. **Chat virtualization** — ~3 hours, keeps UI snappy in marathon sessions
+1. **Chat virtualization** — ~3 hours, keeps UI snappy in marathon sessions
+2. **Save path edit/clear** — ~1 hour, quality of life improvement
 
 ---
 
@@ -68,7 +68,7 @@ Scope: the Electron app (`electron/`) + Electron-focused backend (`backend/api`,
 ### P1 — Big performance wins
 - ✅ ~~Avoid loading/decoding the entire `gamestate` into a giant Python string for every parse~~ — Lazy loading implemented; full mmap optimization deferred.
 - ✅ Cancel or coalesce background precompute work so frequent autosaves don't spawn multiple heavyweight parses.
-- ❌ Reduce history DB growth (retain/compact/compress stored briefings).
+- ✅ Reduce history DB growth (retain/compact/compress stored briefings) — keeps first + 20 recent, clears old JSON.
 - ✅ Prefer process-based cancellation for parsing (kill stale jobs) and add internal-only automatic backpressure (no user knobs).
 
 ### P2 — UX polish
@@ -388,20 +388,22 @@ Scheduling rule: Tier 2 runs only when save stream is idle (12s) or on-demand vi
 - Process-based cancellation ensures stale work doesn't burn resources
 - Idle delay (12s) prevents T2 thrash during active gameplay
 
-### Phase C (P1): Core performance work in Python extractor — PARTIAL
+### Phase C (P1): Core performance work in Python extractor — ✅ COMPLETE (practical scope)
 
-1) ✅ Reduce full-gamestate materialization — PARTIAL
+1) ✅ Reduce full-gamestate materialization — PARTIAL (sufficient)
 - Implemented lazy loading: gamestate not decoded until first access
-- ❌ Full mmap optimization deferred (would require parser rewrite)
+- Full mmap optimization deferred (would require parser rewrite, diminishing returns)
 
 2) ✅ Precompute coalescing / cancellation — COMPLETE
 - Single worker via IngestionManager
 - Debounce via file stability wait (0.6s)
 - Process-based cancellation
 
-3) ❌ DB size control — NOT STARTED
-- Compress/retain stored briefings
-- Consider storing only key metrics + derived events by default
+3) ✅ DB size control — COMPLETE
+- `enforce_full_briefing_retention()` keeps first + 20 most recent briefings
+- Clears `full_briefing_json` on older rows, preserving metrics and events
+- `get_db_stats()` exposes DB size (including WAL/SHM) in health endpoints
+- Automatically enforced after each snapshot insert
 
 ### Phase D (P1+): Rust where it pays (optional, “no drama”)
 
