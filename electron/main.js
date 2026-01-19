@@ -2,7 +2,7 @@
 // Implements ELEC-002: Python subprocess management
 // Implements ELEC-004: Settings IPC handlers (keytar + electron-store)
 
-const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, shell } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
 const crypto = require('crypto')
@@ -28,7 +28,8 @@ const BACKEND_HOST = '127.0.0.1'
 const BACKEND_PORT = 8742
 const HEALTH_CHECK_INTERVAL = 5000 // 5 seconds
 const HEALTH_CHECK_TIMEOUT = 30000 // 30 seconds for initial startup
-const HEALTH_CHECK_REQUEST_TIMEOUT = 2000 // 2 seconds per health request
+const HEALTH_CHECK_REQUEST_TIMEOUT = 4000 // 4 seconds per health request (increased from 2s)
+const HEALTH_CHECK_FAIL_THRESHOLD = 2 // Require 2 consecutive failures before showing disconnected
 
 // State
 let mainWindow = null
@@ -36,6 +37,7 @@ let pythonProcess = null
 let authToken = null
 let healthCheckTimer = null
 let healthCheckInFlight = false
+let healthCheckFailCount = 0 // Track consecutive failures to prevent flickering
 let isQuitting = false
 let tray = null
 let lastTrayStatus = null // Track last status to avoid rebuilding menu unnecessarily
@@ -306,12 +308,14 @@ function startHealthCheck() {
   if (healthCheckTimer) {
     clearInterval(healthCheckTimer)
   }
+  healthCheckFailCount = 0 // Reset fail count on fresh start
 
   const perform = async () => {
     if (isQuitting || healthCheckInFlight) return
     healthCheckInFlight = true
     try {
       const health = await checkBackendHealth()
+      healthCheckFailCount = 0 // Reset on success
       lastBackendConnected = true
       lastBackendStatusPayload = {
         connected: true,
@@ -322,15 +326,20 @@ function startHealthCheck() {
         mainWindow.webContents.send('backend-status', lastBackendStatusPayload)
       }
     } catch (e) {
-      lastBackendConnected = false
-      lastBackendStatusPayload = {
-        connected: false,
-        backend_configured: backendConfigured,
-        error: e.message,
+      healthCheckFailCount++
+      // Only mark as disconnected after consecutive failures to prevent flickering
+      if (healthCheckFailCount >= HEALTH_CHECK_FAIL_THRESHOLD) {
+        lastBackendConnected = false
+        lastBackendStatusPayload = {
+          connected: false,
+          backend_configured: backendConfigured,
+          error: e.message,
+        }
+        if (mainWindow) {
+          mainWindow.webContents.send('backend-status', lastBackendStatusPayload)
+        }
       }
-      if (mainWindow) {
-        mainWindow.webContents.send('backend-status', lastBackendStatusPayload)
-      }
+      // If below threshold, keep previous successful status (don't update UI)
     } finally {
       healthCheckInFlight = false
       updateTrayMenu()
@@ -352,6 +361,28 @@ function maskSecret(key) {
     return key ? '****' : ''
   }
   return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`
+}
+
+/**
+ * Validate that an IPC event comes from a trusted origin.
+ * @param {Electron.IpcMainInvokeEvent} event - The IPC event
+ * @throws {Error} If the sender origin is not trusted
+ */
+function validateSender(event) {
+  const senderUrl = event.senderFrame?.url
+  if (!senderUrl) {
+    throw new Error('IPC sender validation failed: no sender URL')
+  }
+
+  const allowedOrigins = [
+    'http://localhost:5173', // Dev
+    'file://', // Prod
+  ]
+
+  const isAllowed = allowedOrigins.some((origin) => senderUrl.startsWith(origin))
+  if (!isAllowed) {
+    throw new Error(`IPC sender validation failed: untrusted origin ${senderUrl}`)
+  }
 }
 
 /**
@@ -564,7 +595,35 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
+      webviewTag: false,
     },
+  })
+
+  // Navigation lockdown - prevent opening new windows, open external URLs in system browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Open external URLs in system browser
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url)
+    }
+    // Deny all new window creation
+    return { action: 'deny' }
+  })
+
+  // Block navigation away from app origin
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowedOrigins = [
+      'http://localhost:5173', // Dev
+      'file://', // Prod
+    ]
+    const isAllowed = allowedOrigins.some((origin) => url.startsWith(origin))
+    if (!isAllowed) {
+      event.preventDefault()
+      // Open external URLs in system browser instead
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        shell.openExternal(url)
+      }
+    }
   })
 
   // In development, load from Vite dev server
@@ -606,8 +665,9 @@ function createWindow() {
 // IPC Handlers - Backend Proxy (requires ELEC-005 for full implementation)
 // Basic handlers for backend proxy
 
-ipcMain.handle('backend:health', async () => {
+ipcMain.handle('backend:health', async (event) => {
   try {
+    validateSender(event)
     return await callBackendApi('/api/health')
   } catch (e) {
     return { error: e.message, connected: false }
@@ -616,6 +676,7 @@ ipcMain.handle('backend:health', async () => {
 
 ipcMain.handle('backend:chat', async (event, { message, session_key }) => {
   try {
+    validateSender(event)
     return await callBackendApi('/api/chat', {
       method: 'POST',
       body: JSON.stringify({ message, session_key }),
@@ -675,11 +736,13 @@ ipcMain.handle('backend:end-session', async () => {
 })
 
 // Settings handlers (ELEC-004: keytar + electron-store)
-ipcMain.handle('get-settings', async () => {
+ipcMain.handle('load-settings', async (event) => {
+  validateSender(event)
   return getSettings()
 })
 
 ipcMain.handle('save-settings', async (event, settings) => {
+  validateSender(event)
   // Save settings to keytar (secrets) and electron-store (non-secrets)
   await saveSettings(settings)
 
@@ -693,7 +756,8 @@ ipcMain.handle('save-settings', async (event, settings) => {
   return { success: true }
 })
 
-ipcMain.handle('show-folder-dialog', async () => {
+ipcMain.handle('select-folder', async (event) => {
+  validateSender(event)
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
     title: 'Select Stellaris Save Folder',
@@ -722,7 +786,7 @@ ipcMain.handle('install-update', async () => {
 app.whenReady().then(async () => {
   // Use existing token from env (dev mode) or generate new one (production)
   authToken = process.env.STELLARIS_API_TOKEN || generateAuthToken()
-  console.log('Using auth token:', authToken.substring(0, 12) + '...')
+  console.log('Auth token configured')
 
   // Create the main window
   createWindow()

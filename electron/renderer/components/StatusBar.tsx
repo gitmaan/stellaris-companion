@@ -90,7 +90,7 @@ function StatusBar() {
   const statusLabel = getStatusLabel(state.connectionStatus, state.stage)
 
   return (
-    <div className="status-bar">
+    <div className="status-bar title-bar-drag-region">
       <div className="status-bar-left">
         <span className="empire-name">
           {state.empireName ?? 'No save loaded'}

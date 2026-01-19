@@ -60,6 +60,19 @@ body {
   height: 100vh;
 }
 
+/* Draggable title bar region for frameless window (macOS hiddenInset) */
+.title-bar-drag-region {
+  -webkit-app-region: drag;
+}
+
+/* Prevent buttons/interactive elements from being draggable */
+.title-bar-drag-region button,
+.title-bar-drag-region a,
+.title-bar-drag-region input,
+.title-bar-drag-region select {
+  -webkit-app-region: no-drag;
+}
+
 .tab-nav {
   display: flex;
   gap: 0;

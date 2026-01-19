@@ -43,9 +43,9 @@ function createManagedListener(channel, callback) {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Settings
-  getSettings: () => ipcRenderer.invoke('get-settings'),
+  getSettings: () => ipcRenderer.invoke('load-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
-  showFolderDialog: () => ipcRenderer.invoke('show-folder-dialog'),
+  showFolderDialog: () => ipcRenderer.invoke('select-folder'),
 
   // Backend (proxied through main process which adds auth header)
   backend: {
