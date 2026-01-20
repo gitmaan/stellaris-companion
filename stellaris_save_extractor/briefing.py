@@ -123,6 +123,11 @@ class BriefingMixin:
         player = self.get_player_status()
         resources = self.get_resources()
         diplomacy = self.get_diplomacy()
+        subjects = self.get_subjects()
+        if isinstance(diplomacy, dict):
+            # Add vassals/subjects/overlord agreements (Overlord DLC style).
+            diplomacy = dict(diplomacy)
+            diplomacy["subjects"] = subjects
         planets = self.get_planets()
         starbases = self.get_starbases()
         leaders = self.get_leaders()
