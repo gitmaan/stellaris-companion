@@ -8,6 +8,7 @@ const { spawn } = require('child_process')
 const crypto = require('crypto')
 const Store = require('electron-store')
 const keytar = require('keytar')
+const net = require('net')
 
 // Global process error handlers (ELEC-xxx: diagnostics)
 // Prevent silent failures in production builds.
@@ -38,6 +39,12 @@ process.on('unhandledRejection', (reason) => {
   console.error('Unhandled promise rejection in main process:', reason)
 })
 
+// Single-instance lock to prevent multiple Electron shells fighting over ports / subprocesses.
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+}
+
 // Constants for keytar service names
 const KEYTAR_SERVICE = 'StellarisCompanion'
 const KEYTAR_ACCOUNT_GOOGLE_API = 'google-api-key'
@@ -54,7 +61,11 @@ const store = new Store({
 
 // Configuration
 const BACKEND_HOST = '127.0.0.1'
-const BACKEND_PORT = 8742
+const DEFAULT_BACKEND_PORT = (() => {
+  const raw = process.env.STELLARIS_API_PORT
+  const parsed = raw ? Number.parseInt(raw, 10) : 8742
+  return Number.isFinite(parsed) && parsed > 0 && parsed <= 65535 ? parsed : 8742
+})()
 const HEALTH_CHECK_INTERVAL = 5000 // 5 seconds
 const HEALTH_CHECK_TIMEOUT = 30000 // 30 seconds for initial startup
 const HEALTH_CHECK_REQUEST_TIMEOUT = 4000 // 4 seconds per health request (increased from 2s)
@@ -64,6 +75,7 @@ const HEALTH_CHECK_FAIL_THRESHOLD = 2 // Require 2 consecutive failures before s
 let mainWindow = null
 let pythonProcess = null
 let authToken = null
+let backendPort = DEFAULT_BACKEND_PORT
 let healthCheckTimer = null
 let healthCheckInFlight = false
 let healthCheckFailCount = 0 // Track consecutive failures to prevent flickering
@@ -136,6 +148,8 @@ function buildBackendEnv(settings) {
     STELLARIS_API_TOKEN: authToken,
     // DB path uses app data directory for persistence
     STELLARIS_DB_PATH: path.join(app.getPath('userData'), 'stellaris_history.db'),
+    // Log path uses app data directory for persistence + rotation
+    STELLARIS_LOG_DIR: path.join(app.getPath('userData'), 'logs'),
   }
 
   // Add Google API key if provided
@@ -172,10 +186,10 @@ function startPythonBackend(settings) {
   let args = []
   if (app.isPackaged) {
     // Packaged app runs the bundled executable directly
-    args = ['--host', BACKEND_HOST, '--port', String(BACKEND_PORT)]
+    args = ['--host', BACKEND_HOST, '--port', String(backendPort)]
   } else {
     // Development runs the Python script
-    args = [getBackendScriptPath(), '--host', BACKEND_HOST, '--port', String(BACKEND_PORT)]
+    args = [getBackendScriptPath(), '--host', BACKEND_HOST, '--port', String(backendPort)]
   }
 
   console.log(`Starting Python backend: ${pythonPath} ${args.join(' ')}`)
@@ -297,7 +311,7 @@ function restartPythonBackend(settings) {
  * @returns {Promise<Object>} API response
  */
 async function callBackendApi(endpoint, options = {}) {
-  const url = `http://${BACKEND_HOST}:${BACKEND_PORT}${endpoint}`
+  const url = `http://${BACKEND_HOST}:${backendPort}${endpoint}`
 
   const { timeoutMs, ...restOptions } = options
   const controller = timeoutMs ? new AbortController() : null
@@ -357,6 +371,36 @@ async function callBackendApi(endpoint, options = {}) {
  */
 async function checkBackendHealth() {
   return callBackendApi('/api/health', { timeoutMs: HEALTH_CHECK_REQUEST_TIMEOUT })
+}
+
+function listenOnce(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer()
+    server.unref()
+    server.once('error', () => resolve(null))
+    server.listen({ host: BACKEND_HOST, port }, () => {
+      const address = server.address()
+      const assignedPort = typeof address === 'object' && address ? address.port : null
+      server.close(() => resolve(assignedPort))
+    })
+  })
+}
+
+async function findAvailablePort(preferredPort) {
+  const start = Number.isFinite(preferredPort) ? preferredPort : 8742
+  const attempts = 20
+  for (let offset = 0; offset < attempts; offset++) {
+    const candidate = start + offset
+    if (candidate > 65535) break
+    const bound = await listenOnce(candidate)
+    if (bound === candidate) return candidate
+  }
+
+  const ephemeral = await listenOnce(0)
+  if (!ephemeral) {
+    throw new Error('Failed to find an available port for backend')
+  }
+  return ephemeral
 }
 
 /**
@@ -866,9 +910,27 @@ ipcMain.handle('install-update', async () => {
 // App Lifecycle
 
 app.whenReady().then(async () => {
+  // If a second instance is started, focus the existing window instead.
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  })
+
   // Use existing token from env (dev mode) or generate new one (production)
   authToken = process.env.STELLARIS_API_TOKEN || generateAuthToken()
   console.log('Auth token configured')
+
+  try {
+    const chosenPort = await findAvailablePort(DEFAULT_BACKEND_PORT)
+    backendPort = chosenPort
+    if (chosenPort !== DEFAULT_BACKEND_PORT) {
+      console.warn(`Default port ${DEFAULT_BACKEND_PORT} in use; using port ${chosenPort} instead`)
+    }
+  } catch (e) {
+    console.error('Failed to pick backend port:', e)
+  }
 
   // Create the main window
   createWindow()

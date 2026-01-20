@@ -26,6 +26,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from logging.handlers import RotatingFileHandler
 
 # Add project root to path for imports
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -40,12 +41,36 @@ except ImportError:
     pass  # dotenv not installed, rely on environment variables
 
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)-8s | %(name)s | %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+def configure_logging() -> None:
+    """Configure console + rotating file logging (when STELLARIS_LOG_DIR is set)."""
+    level_name = os.environ.get("STELLARIS_LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+
+    handlers = [logging.StreamHandler()]
+
+    log_dir_raw = os.environ.get("STELLARIS_LOG_DIR")
+    if log_dir_raw:
+        log_dir = Path(log_dir_raw)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        logfile = log_dir / "stellaris-companion-backend.log"
+        handlers.append(
+            RotatingFileHandler(
+                logfile,
+                maxBytes=5_000_000,
+                backupCount=3,
+                encoding="utf-8",
+            )
+        )
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=handlers,
+    )
+
+
+configure_logging()
 logger = logging.getLogger(__name__)
 
 

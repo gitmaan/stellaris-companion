@@ -14,6 +14,13 @@ interface Message {
   isError?: boolean
 }
 
+const MAX_CHAT_MESSAGES = 300
+
+function capMessages(next: Message[]): Message[] {
+  if (next.length <= MAX_CHAT_MESSAGES) return next
+  return next.slice(next.length - MAX_CHAT_MESSAGES)
+}
+
 /**
  * ChatPage - Main chat interface for interacting with the Stellaris advisor
  *
@@ -49,7 +56,7 @@ function ChatPage() {
       content: text,
       timestamp: new Date(),
     }
-    setMessages(prev => [...prev, userMessage])
+    setMessages(prev => capMessages([...prev, userMessage]))
     setIsLoading(true)
 
     try {
@@ -67,7 +74,7 @@ function ChatPage() {
           timestamp: new Date(),
           isError: true,
         }
-        setMessages(prev => [...prev, errorMessage])
+        setMessages(prev => capMessages([...prev, errorMessage]))
       } else if (result.data) {
         if (isChatRetryResponse(result.data)) {
           // Precompute not ready - show retry message
@@ -78,7 +85,7 @@ function ChatPage() {
             timestamp: new Date(),
             isError: true,
           }
-          setMessages(prev => [...prev, retryMessage])
+          setMessages(prev => capMessages([...prev, retryMessage]))
         } else {
           // Success - add assistant response
           const chatResponse = result.data as ChatResponse
@@ -90,7 +97,7 @@ function ChatPage() {
             responseTimeMs: chatResponse.response_time_ms,
             toolsUsed: chatResponse.tools_used,
           }
-          setMessages(prev => [...prev, assistantMessage])
+          setMessages(prev => capMessages([...prev, assistantMessage]))
         }
       }
     } catch (err) {
@@ -105,7 +112,7 @@ function ChatPage() {
         timestamp: new Date(),
         isError: true,
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => capMessages([...prev, errorMessage]))
     } finally {
       if (isMountedRef.current) {
         setIsLoading(false)
