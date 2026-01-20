@@ -9,6 +9,35 @@ const crypto = require('crypto')
 const Store = require('electron-store')
 const keytar = require('keytar')
 
+// Global process error handlers (ELEC-xxx: diagnostics)
+// Prevent silent failures in production builds.
+let hasShownFatalErrorDialog = false
+process.on('uncaughtException', async (err) => {
+  console.error('Uncaught exception in main process:', err)
+  if (!hasShownFatalErrorDialog && app?.isReady?.()) {
+    hasShownFatalErrorDialog = true
+    try {
+      await dialog.showMessageBox({
+        type: 'error',
+        title: 'Stellaris Companion crashed',
+        message: 'An unexpected error occurred in the app.',
+        detail: err?.stack || String(err),
+      })
+    } catch (e) {
+      // Ignore dialog errors
+    }
+  }
+  try {
+    app.quit()
+  } catch (e) {
+    // ignore
+  }
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection in main process:', reason)
+})
+
 // Constants for keytar service names
 const KEYTAR_SERVICE = 'StellarisCompanion'
 const KEYTAR_ACCOUNT_GOOGLE_API = 'google-api-key'
@@ -69,10 +98,21 @@ function getPythonPath() {
   } else {
     // In development, try venv first, then system Python
     const fs = require('fs')
-    const venvPython = path.join(__dirname, '..', 'venv', 'bin', 'python')
-    if (fs.existsSync(venvPython)) {
-      return venvPython
+    const venvRoot = path.join(__dirname, '..', 'venv')
+    const venvPythonCandidates = process.platform === 'win32'
+      ? [
+        path.join(venvRoot, 'Scripts', 'python.exe'),
+        path.join(venvRoot, 'Scripts', 'python'),
+      ]
+      : [
+        path.join(venvRoot, 'bin', 'python3'),
+        path.join(venvRoot, 'bin', 'python'),
+      ]
+
+    for (const candidate of venvPythonCandidates) {
+      if (fs.existsSync(candidate)) return candidate
     }
+
     // Use python3 on Unix (python may not exist on macOS)
     return process.platform === 'win32' ? 'python' : 'python3'
   }
@@ -143,7 +183,7 @@ function startPythonBackend(settings) {
   pythonProcess = spawn(pythonPath, args, {
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
-    // Detach on Windows to allow proper cleanup
+    // Detach on Unix so we can kill the whole process group with -pid
     detached: process.platform !== 'win32',
   })
 
@@ -176,7 +216,7 @@ function startPythonBackend(settings) {
  */
 function stopPythonBackend() {
   if (!pythonProcess) {
-    return
+    return Promise.resolve()
   }
 
   console.log('Stopping Python backend...')
@@ -187,25 +227,50 @@ function stopPythonBackend() {
     healthCheckTimer = null
   }
 
-  // Kill the process
-  if (process.platform === 'win32') {
-    // Windows needs taskkill
-    spawn('taskkill', ['/pid', pythonProcess.pid, '/f', '/t'])
-  } else {
-    // Unix - kill the process group
+  const child = pythonProcess
+  pythonProcess = null
+
+  const waitForExit = (timeoutMs) => new Promise((resolve) => {
+    let settled = false
+    const settle = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      child.removeListener('exit', settle)
+      child.removeListener('close', settle)
+      resolve()
+    }
+    const timer = setTimeout(settle, timeoutMs)
+    child.once('exit', settle)
+    child.once('close', settle)
+  })
+
+  const kill = async () => {
+    if (process.platform === 'win32') {
+      // Windows: taskkill the full tree and wait briefly.
+      await new Promise((resolve) => {
+        const killer = spawn('taskkill', ['/pid', String(child.pid), '/f', '/t'], { stdio: 'ignore' })
+        killer.on('error', resolve)
+        killer.on('close', resolve)
+      })
+      await waitForExit(1500)
+      return
+    }
+
+    // Unix: try killing the process group (requires detached: true), fallback to direct kill.
     try {
-      process.kill(-pythonProcess.pid, 'SIGTERM')
+      process.kill(-child.pid, 'SIGTERM')
     } catch (e) {
-      // Process may have already exited
       try {
-        pythonProcess.kill('SIGTERM')
+        child.kill('SIGTERM')
       } catch (e2) {
-        // Ignore
+        // ignore
       }
     }
+    await waitForExit(1500)
   }
 
-  pythonProcess = null
+  return kill()
 }
 
 /**
@@ -214,12 +279,15 @@ function stopPythonBackend() {
  */
 function restartPythonBackend(settings) {
   stopPythonBackend()
-  // Small delay to ensure port is released
-  setTimeout(() => {
-    startPythonBackend(settings)
-    // Start health check after restart
-    startHealthCheck()
-  }, 500)
+    .catch(() => {})
+    .finally(() => {
+      // Small delay to ensure port is released
+      setTimeout(() => {
+        startPythonBackend(settings)
+        // Start health check after restart
+        startHealthCheck()
+      }, 500)
+    })
 }
 
 /**
@@ -260,13 +328,27 @@ async function callBackendApi(endpoint, options = {}) {
     if (timer) clearTimeout(timer)
   }
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
-    const detail = error?.detail?.error || error?.detail || error?.error
-    throw new Error(detail || `HTTP ${response.status}`)
+  const rawBody = await response.text().catch(() => '')
+  let parsedBody = null
+  if (rawBody) {
+    try {
+      parsedBody = JSON.parse(rawBody)
+    } catch (e) {
+      parsedBody = null
+    }
   }
 
-  return response.json()
+  if (!response.ok) {
+    const detail = parsedBody?.detail?.error || parsedBody?.detail || parsedBody?.error
+    const fallback = rawBody ? rawBody.slice(0, 500) : null
+    throw new Error(detail || fallback || `HTTP ${response.status}`)
+  }
+
+  if (parsedBody === null) {
+    throw new Error('Invalid JSON response from backend')
+  }
+
+  return parsedBody
 }
 
 /**
@@ -834,19 +916,24 @@ app.whenReady().then(async () => {
   })
 })
 
-app.on('before-quit', () => {
+let quitCleanupStarted = false
+app.on('before-quit', (event) => {
+  if (quitCleanupStarted) return
+  quitCleanupStarted = true
   isQuitting = true
-})
 
-app.on('will-quit', () => {
-  // Kill Python backend on quit
-  stopPythonBackend()
-
-  // Destroy tray to prevent memory leak
-  if (tray) {
-    tray.destroy()
-    tray = null
-  }
+  // Ensure backend shutdown completes (esp. on Windows) before the app exits.
+  event.preventDefault()
+  Promise.race([
+    stopPythonBackend(),
+    new Promise((resolve) => setTimeout(resolve, 2000)),
+  ]).finally(() => {
+    if (tray) {
+      tray.destroy()
+      tray = null
+    }
+    app.exit(0)
+  })
 })
 
 app.on('window-all-closed', () => {
