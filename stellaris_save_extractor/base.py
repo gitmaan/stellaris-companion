@@ -709,11 +709,25 @@ class SaveExtractorBase:
             if not match:
                 continue
 
-            fleet_data = fleet_section[match.start():match.start() + 2500]
+            # Get fleet data - find boundary at next fleet entry to handle
+            # arbitrarily large fleets (hundreds of ships, combat history, etc.)
+            fleet_start = match.start()
+
+            # Find next fleet entry: \n\t{digits}=\n\t{ pattern
+            # Search within reasonable window (100KB handles extreme cases)
+            search_window = fleet_section[fleet_start + 10:fleet_start + 100000]
+            next_fleet = re.search(r'\n\t\d+=\n\t\{', search_window)
+            if next_fleet:
+                block_end = next_fleet.start() + 10  # +10 accounts for offset
+            else:
+                block_end = 100000  # Last fleet in section
+
+            fleet_data = fleet_section[fleet_start:fleet_start + block_end]
             analyzed += 1
 
-            is_station = 'station=yes' in fleet_data
-            is_civilian = 'civilian=yes' in fleet_data
+            # Check for station/civilian at fleet's top level (two tabs indentation)
+            is_station = re.search(r'\n\t\tstation=yes', fleet_data) is not None
+            is_civilian = re.search(r'\n\t\tcivilian=yes', fleet_data) is not None
 
             # Count ships
             ships_match = re.search(r'ships=\s*\{([^}]+)\}', fleet_data)
