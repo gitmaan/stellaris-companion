@@ -84,6 +84,9 @@ class DiplomacyMixin:
             result['error'] = "Could not find player country"
             return result
 
+        # Get country name mappings for resolving IDs to empire names
+        country_names = self._get_country_names_map()
+
         # Find relations_manager section
         rel_match = re.search(r'relations_manager=\s*\{', player_chunk)
         if not rel_match:
@@ -96,15 +99,15 @@ class DiplomacyMixin:
             return result
 
         relations_found: list[dict] = []
-        allies: list[int] = []
-        rivals: list[int] = []
-        defensive_pacts: list[int] = []
-        non_aggression_pacts: list[int] = []
-        closed_borders: list[int] = []
-        migration_treaties: list[int] = []
-        commercial_pacts: list[int] = []
-        sensor_links: list[int] = []
-        treaties: list[dict] = []
+        allies: list[dict] = []  # List of {id, name}
+        rivals: list[dict] = []
+        defensive_pacts: list[dict] = []
+        non_aggression_pacts: list[dict] = []
+        closed_borders: list[dict] = []
+        migration_treaties: list[dict] = []
+        commercial_pacts: list[dict] = []
+        sensor_links: list[dict] = []
+        treaties: list[dict] = []  # List of {country_id, empire_name, type}
 
         for match in re.finditer(r'\brelation\s*=\s*\{', rel_block):
             rel_start = match.start()
@@ -129,13 +132,16 @@ class DiplomacyMixin:
 
             relation_info = {}
 
-            # Extract country ID
+            # Extract country ID and resolve to name
             country_match = re.search(r'\bcountry=(\d+)', rel_text)
             if country_match:
                 relation_info['country_id'] = int(country_match.group(1))
             country_id = relation_info.get('country_id')
             if country_id is None:
                 continue
+
+            # Resolve empire name
+            relation_info['empire_name'] = country_names.get(country_id, f"Empire {country_id}")
 
             # Extract trust
             trust_match = re.search(r'\btrust=(\d+)', rel_text)
@@ -147,40 +153,43 @@ class DiplomacyMixin:
             if rel_current:
                 relation_info['opinion'] = int(rel_current.group(1))
 
+            # Get the resolved empire name for this country
+            empire_name = relation_info['empire_name']
+
             # Check for treaties/agreements (some vary by game version)
             if 'alliance=yes' in rel_text or 'defensive_pact=yes' in rel_text:
                 relation_info['defensive_pact'] = True
-                defensive_pacts.append(country_id)
-                allies.append(country_id)  # Backwards-compatible "allies"
-                treaties.append({'country_id': country_id, 'type': 'defensive_pact'})
+                defensive_pacts.append({'id': country_id, 'name': empire_name})
+                allies.append({'id': country_id, 'name': empire_name})
+                treaties.append({'country_id': country_id, 'empire_name': empire_name, 'type': 'defensive_pact'})
             if 'non_aggression_pact=yes' in rel_text:
                 relation_info['non_aggression_pact'] = True
-                non_aggression_pacts.append(country_id)
-                treaties.append({'country_id': country_id, 'type': 'non_aggression_pact'})
+                non_aggression_pacts.append({'id': country_id, 'name': empire_name})
+                treaties.append({'country_id': country_id, 'empire_name': empire_name, 'type': 'non_aggression_pact'})
             if 'commercial_pact=yes' in rel_text:
                 relation_info['commercial_pact'] = True
-                commercial_pacts.append(country_id)
-                treaties.append({'country_id': country_id, 'type': 'commercial_pact'})
+                commercial_pacts.append({'id': country_id, 'name': empire_name})
+                treaties.append({'country_id': country_id, 'empire_name': empire_name, 'type': 'commercial_pact'})
             if 'migration_treaty=yes' in rel_text or 'migration_pact=yes' in rel_text:
                 relation_info['migration_treaty'] = True
-                migration_treaties.append(country_id)
-                treaties.append({'country_id': country_id, 'type': 'migration_treaty'})
+                migration_treaties.append({'id': country_id, 'name': empire_name})
+                treaties.append({'country_id': country_id, 'empire_name': empire_name, 'type': 'migration_treaty'})
             if 'sensor_link=yes' in rel_text:
                 relation_info['sensor_link'] = True
-                sensor_links.append(country_id)
-                treaties.append({'country_id': country_id, 'type': 'sensor_link'})
+                sensor_links.append({'id': country_id, 'name': empire_name})
+                treaties.append({'country_id': country_id, 'empire_name': empire_name, 'type': 'sensor_link'})
             if 'closed_borders=yes' in rel_text:
                 relation_info['closed_borders'] = True
-                closed_borders.append(country_id)
-                treaties.append({'country_id': country_id, 'type': 'closed_borders'})
+                closed_borders.append({'id': country_id, 'name': empire_name})
+                treaties.append({'country_id': country_id, 'empire_name': empire_name, 'type': 'closed_borders'})
             if 'rival=yes' in rel_text or 'rivalry=yes' in rel_text:
                 relation_info['rival'] = True
-                rivals.append(country_id)
-                treaties.append({'country_id': country_id, 'type': 'rival'})
+                rivals.append({'id': country_id, 'name': empire_name})
+                treaties.append({'country_id': country_id, 'empire_name': empire_name, 'type': 'rival'})
 
             if 'research_agreement=yes' in rel_text:
                 relation_info['research_agreement'] = True
-                treaties.append({'country_id': country_id, 'type': 'research_agreement'})
+                treaties.append({'country_id': country_id, 'empire_name': empire_name, 'type': 'research_agreement'})
             if 'embassy=yes' in rel_text:
                 relation_info['embassy'] = True
             if 'truce=' in rel_text and 'truce' not in rel_text.split('=')[0]:
