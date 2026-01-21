@@ -32,12 +32,25 @@ class EndgameMixin:
         }
 
         # Crisis country type mappings
+        # NOTE: 'swarm' alone is space fauna (Tiyanki, Amoebas, etc.)
+        # Prethoryn uses 'swarm_species' and has names containing 'Prethoryn'
         CRISIS_TYPES = {
-            'swarm': 'prethoryn',
+            'swarm_species': 'prethoryn',           # Actual Prethoryn Scourge
             'extradimensional': 'unbidden',
             'extradimensional_2': 'aberrant',
             'extradimensional_3': 'vehement',
-            'ai_empire_01': 'contingency',  # Contingency uses special country type
+            'ai_empire_01': 'contingency',          # Contingency machine worlds
+            'contingency_machine_empire': 'contingency',
+        }
+
+        # Space fauna types to EXCLUDE (these are NOT crisis)
+        SPACE_FAUNA_TYPES = {
+            'swarm',           # Generic space creatures (Tiyanki, Amoebas)
+            'amoeba',
+            'tiyanki',
+            'crystal',
+            'drone',
+            'cloud',
         }
 
         # Detect crisis countries by country_type
@@ -45,8 +58,6 @@ class EndgameMixin:
         crisis_types_found = set()
 
         # Find crisis country IDs by scanning the country section
-        # This is more reliable than regex-matching country_type patterns globally,
-        # which can match tech names or other false positives.
         country_section_start = self._find_country_section_start()
         if country_section_start != -1:
             country_chunk = self.gamestate[country_section_start:country_section_start + 50000000]
@@ -60,23 +71,34 @@ class EndgameMixin:
                 end = start + 50000
                 block = country_chunk[start:end]
 
-                # Check if this is a crisis country by looking for country_type or type
+                # Check if this is a crisis country by looking for country_type
                 ctype = None
                 ctype_match = re.search(r'\bcountry_type="([^"]+)"', block[:5000])
                 if ctype_match:
                     ctype = ctype_match.group(1)
-                else:
-                    type_match = re.search(r'\btype="([^"]+)"', block[:5000])
-                    if type_match:
-                        ctype = type_match.group(1)
 
-                if ctype and (ctype in CRISIS_TYPES or ctype in ['swarm', 'extradimensional']):
-                    crisis_name = CRISIS_TYPES.get(ctype, ctype)
+                # Skip space fauna
+                if ctype and ctype in SPACE_FAUNA_TYPES:
+                    continue
+
+                # Check for known crisis types
+                if ctype and ctype in CRISIS_TYPES:
+                    crisis_name = CRISIS_TYPES[ctype]
                     crisis_countries.append({
                         'country_id': country_id,
                         'type': crisis_name,
                     })
                     crisis_types_found.add(crisis_name)
+                    continue
+
+                # Also check for Prethoryn by name (backup detection)
+                name_match = re.search(r'key="([^"]*[Pp]rethoryn[^"]*)"', block[:5000])
+                if name_match:
+                    crisis_countries.append({
+                        'country_id': country_id,
+                        'type': 'prethoryn',
+                    })
+                    crisis_types_found.add('prethoryn')
 
         result['crisis_countries'] = crisis_countries
         result['crisis_types_detected'] = list(crisis_types_found)
@@ -104,10 +126,15 @@ class EndgameMixin:
                 result['player_crisis_kills'] = int(kills_match.group(1))
 
         # Count crisis-controlled systems via flags
+        # NOTE: 'hostile_system' is for space creatures (amoebas, drones, etc.), NOT crisis
+        # NOTE: 'lost_swarm_system' is for the Lost Swarm space creature event, NOT Prethoryn
         crisis_system_flags = [
-            'lost_swarm_system',
-            'hostile_system',
-            'contingency_system',
+            'prethoryn_system',           # Prethoryn infested systems
+            'prethoryn_invasion_system',  # Prethoryn invasion target
+            'contingency_system',         # Contingency sterilization hubs
+            'contingency_world',          # Contingency machine world
+            'unbidden_portal_system',     # Unbidden dimensional anchor
+            'extradimensional_system',    # Generic extradimensional flag
         ]
         total_crisis_systems = 0
         for flag in crisis_system_flags:
