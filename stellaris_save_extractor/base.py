@@ -749,9 +749,26 @@ class SaveExtractorBase:
                 # Extract fleet name for military fleets
                 name_match = re.search(r'key="([^"]+)"', fleet_data)
                 fleet_name = name_match.group(1) if name_match else f"Fleet {fid}"
+
+                # Handle %SEQ% format strings - extract num variable for fleet number
+                if fleet_name == '%SEQ%':
+                    num_match = re.search(r'key="num"[^}]*key="(\d+)"', fleet_data)
+                    if num_match:
+                        fleet_num = int(num_match.group(1))
+                        fleet_name = f"Fleet #{fleet_num}"
+                    else:
+                        fleet_name = f"Fleet {fid}"
+
                 # Clean up localization keys
                 if fleet_name.startswith('shipclass_'):
                     fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
+                elif fleet_name.startswith('NAME_'):
+                    fleet_name = fleet_name.replace('NAME_', '').replace('_', ' ')
+                elif fleet_name.startswith('TRANS_'):
+                    fleet_name = 'Transport Fleet'
+                elif fleet_name.endswith('_FLEET'):
+                    # e.g., HUMAN1_FLEET -> extract just the type
+                    fleet_name = fleet_name.replace('_FLEET', '').replace('_', ' ').title() + ' Fleet'
 
                 # Store all military fleets (no truncation - callers can slice if needed)
                 result['military_fleets'].append({

@@ -364,8 +364,8 @@ class BriefingMixin:
                 'net_monthly': resources.get('net_monthly', {}),
             },
             'territory': {
-                'total_colonies': player.get('colonies', {}).get('total', 0),
-                'habitats': player.get('colonies', {}).get('habitats', 0),
+                'total_colonies': player.get('colonies', {}).get('total_count', 0),
+                'habitats': player.get('colonies', {}).get('habitats', {}),
                 'by_type': planets.get('by_type', {}),
                 # HEADLINE: Capital only (not all planets)
                 'capital': {
