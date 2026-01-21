@@ -22,6 +22,10 @@ class PlanetsMixin:
 
         player_id = self.get_player_empire_id()
 
+        # Build population map from pop_groups section
+        # pop_groups aggregates pops by type with size=N showing actual count
+        pop_by_planet = self._get_population_by_planet()
+
         # Find the planets section
         planets_match = re.search(r'^planets=\s*\{\s*planet=\s*\{', self.gamestate, re.MULTILINE)
         if not planets_match:
@@ -91,14 +95,10 @@ class PlanetsMixin:
             if size_match:
                 planet_info['size'] = int(size_match.group(1))
 
-            # Count pops from pop_jobs list
-            pop_jobs_match = re.search(r'pop_jobs=\s*\{([^}]+)\}', planet_block)
-            if pop_jobs_match:
-                pop_ids = re.findall(r'\d+', pop_jobs_match.group(1))
-                planet_info['population'] = len(pop_ids)
-                result['total_pops'] += len(pop_ids)
-            else:
-                planet_info['population'] = 0
+            # Get population from pop_groups (accurate count via size field)
+            planet_id_int = int(planet_id)
+            planet_info['population'] = pop_by_planet.get(planet_id_int, 0)
+            result['total_pops'] += planet_info['population']
 
             # Extract stability
             stability_match = re.search(r'\n\s*stability=([\d.]+)', planet_block)
@@ -419,3 +419,80 @@ class PlanetsMixin:
         )
 
         return result
+
+    def _get_population_by_planet(self) -> dict[int, int]:
+        """Build a mapping of planet_id -> total population from pop_groups.
+
+        The pop_groups section aggregates pops by type (species, job category, ethics)
+        with a 'size' field showing the actual number of pops in each group.
+        This is the accurate way to count population, NOT pop_jobs which only
+        lists job assignment IDs.
+
+        Returns:
+            Dict mapping planet_id (int) to total population (int)
+        """
+        pop_by_planet: dict[int, int] = {}
+
+        # Find pop_groups section
+        pop_groups_match = re.search(r'\npop_groups=\n\{', self.gamestate)
+        if not pop_groups_match:
+            # Try alternate format
+            pop_groups_match = re.search(r'^pop_groups=\s*\{', self.gamestate, re.MULTILINE)
+            if not pop_groups_match:
+                return pop_by_planet
+
+        pg_start = pop_groups_match.start()
+        # Pop groups section can be very large in late game
+        pg_chunk = self.gamestate[pg_start:pg_start + 100000000]  # Up to 100MB
+
+        # Parse each pop_group entry: \n\tID=\n\t{ ... planet=X size=N ... }
+        pop_pattern = r'\n\t(\d+)=\n\t\{'
+        groups_processed = 0
+        max_groups = 100000  # Safety limit
+
+        for match in re.finditer(pop_pattern, pg_chunk):
+            if groups_processed >= max_groups:
+                break
+
+            groups_processed += 1
+            block_start = match.start() + 1
+
+            # Get pop group block content (they're relatively small)
+            chunk = pg_chunk[block_start:block_start + 2500]
+
+            # Find end of this pop group's block
+            brace_count = 0
+            block_end = 0
+            started = False
+            for i, char in enumerate(chunk):
+                if char == '{':
+                    brace_count += 1
+                    started = True
+                elif char == '}':
+                    brace_count -= 1
+                    if started and brace_count == 0:
+                        block_end = i + 1
+                        break
+
+            if block_end == 0:
+                continue
+
+            pop_block = chunk[:block_end]
+
+            # Extract planet ID
+            planet_match = re.search(r'\n\s*planet=(\d+)', pop_block)
+            if not planet_match:
+                continue
+
+            planet_id = int(planet_match.group(1))
+
+            # Extract size (actual number of pops in this group)
+            size_match = re.search(r'\n\s*size=(\d+)', pop_block)
+            if not size_match:
+                continue
+
+            pop_size = int(size_match.group(1))
+            if pop_size > 0:
+                pop_by_planet[planet_id] = pop_by_planet.get(planet_id, 0) + pop_size
+
+        return pop_by_planet
