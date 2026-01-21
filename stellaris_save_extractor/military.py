@@ -92,11 +92,14 @@ class MilitaryMixin:
             start_date_match = re.search(r'start_date\s*=\s*"?([0-9.]+)"?', war_block)
             start_date = start_date_match.group(1) if start_date_match else None
 
-            # Extract exhaustion values
-            attacker_exhaustion_match = re.search(r'attacker_war_exhaustion\s*=\s*([\d.]+)', war_block)
-            defender_exhaustion_match = re.search(r'defender_war_exhaustion\s*=\s*([\d.]+)', war_block)
-            attacker_exhaustion = float(attacker_exhaustion_match.group(1)) if attacker_exhaustion_match else 0.0
-            defender_exhaustion = float(defender_exhaustion_match.group(1)) if defender_exhaustion_match else 0.0
+            # Extract exhaustion values - use findall and take LAST match
+            # The battles={} block contains per-battle exhaustion (usually 0 or small)
+            # The war-level totals appear AFTER battles as top-level fields
+            # Values are stored as 0-1 decimals, multiply by 100 for percentage
+            attacker_exhaustion_matches = re.findall(r'attacker_war_exhaustion\s*=\s*([\d.]+)', war_block)
+            defender_exhaustion_matches = re.findall(r'defender_war_exhaustion\s*=\s*([\d.]+)', war_block)
+            attacker_exhaustion = float(attacker_exhaustion_matches[-1]) * 100 if attacker_exhaustion_matches else 0.0
+            defender_exhaustion = float(defender_exhaustion_matches[-1]) * 100 if defender_exhaustion_matches else 0.0
 
             # Extract war goal
             war_goal_match = re.search(r'war_goal\s*=\s*\{[^}]*type\s*=\s*"?([^"\s}]+)"?', war_block, re.DOTALL)

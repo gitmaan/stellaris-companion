@@ -190,13 +190,15 @@ class ExtractionValidator:
         attacker_ex = None
         defender_ex = None
 
-        att_match = re.search(r'attacker_war_exhaustion=([\d.]+)', block)
-        if att_match:
-            attacker_ex = float(att_match.group(1))
+        # Use findall and take LAST match - battles block has per-battle values,
+        # war-level totals appear after battles. Multiply by 100 for percentage.
+        att_matches = re.findall(r'attacker_war_exhaustion=([\d.]+)', block)
+        if att_matches:
+            attacker_ex = float(att_matches[-1]) * 100
 
-        def_match = re.search(r'defender_war_exhaustion=([\d.]+)', block)
-        if def_match:
-            defender_ex = float(def_match.group(1))
+        def_matches = re.findall(r'defender_war_exhaustion=([\d.]+)', block)
+        if def_matches:
+            defender_ex = float(def_matches[-1]) * 100
 
         return attacker_ex, defender_ex
 
