@@ -1,1516 +1,6 @@
 {
   "species": [
     {
-      "id": "3036676097",
-      "name": "PRESCRIPTED_species_name_humans1",
-      "class": "HUM",
-      "portrait": "human",
-      "traits": [
-        "trait_organic",
-        "trait_adaptive",
-        "trait_nomadic",
-        "trait_wasteful",
-        "trait_pc_continental_preference"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "3"
-    },
-    {
-      "id": "2",
-      "name": "PRESCRIPTED_species_name_orbis",
-      "class": "REP",
-      "portrait": "rep1",
-      "traits": [
-        "trait_organic",
-        "trait_charismatic",
-        "trait_adaptive",
-        "trait_enduring",
-        "trait_decadent",
-        "trait_slow_breeders",
-        "trait_pc_ocean_preference"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "31"
-    },
-    {
-      "id": "3",
-      "name": "SPEC_Khessam",
-      "class": "AVI",
-      "portrait": "avi5",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_quarrelsome",
-        "trait_thrifty",
-        "trait_sedentary",
-        "trait_deviants",
-        "trait_very_strong"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "43"
-    },
-    {
-      "id": "16777220",
-      "name": "SPEC_Zithorian",
-      "class": "ART",
-      "portrait": "art5",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arid_preference",
-        "trait_rapid_breeders",
-        "trait_sedentary",
-        "trait_enduring",
-        "trait_repugnant",
-        "trait_thrifty"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "53"
-    },
-    {
-      "id": "16777221",
-      "name": "SPEC_Jusstkan",
-      "class": "MAM",
-      "portrait": "mammalian_ar_06",
-      "traits": [
-        "trait_syncretic_proles",
-        "trait_organic",
-        "trait_pc_arid_preference",
-        "trait_resilient",
-        "trait_repugnant",
-        "trait_conservational",
-        "trait_communal"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "53"
-    },
-    {
-      "id": "6",
-      "name": "SPEC_Cevanti",
-      "class": "HUM",
-      "portrait": "humanoid_05",
-      "traits": [
-        "trait_organic",
-        "trait_pc_savannah_preference",
-        "trait_fleeting",
-        "trait_intelligent",
-        "trait_strong",
-        "trait_decadent",
-        "trait_talented"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "74"
-    },
-    {
-      "id": "16777223",
-      "name": "SPEC_Baviir",
-      "class": "AVI",
-      "portrait": "avi6",
-      "traits": [
-        "trait_perfected_genes",
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_natural_sociologists",
-        "trait_nonadaptive",
-        "trait_nomadic",
-        "trait_talented",
-        "trait_strong"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "83"
-    },
-    {
-      "id": "16777224",
-      "name": "SPEC_Hiran",
-      "class": "AVI",
-      "portrait": "avi10",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_slow_learners",
-        "trait_natural_engineers",
-        "trait_deviants",
-        "trait_nomadic",
-        "trait_industrious"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "94"
-    },
-    {
-      "id": "16777225",
-      "name": "SPEC_Ozkox",
-      "class": "AVI",
-      "portrait": "avi4",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tropical_preference",
-        "trait_charismatic",
-        "trait_quarrelsome",
-        "trait_nomadic",
-        "trait_slow_breeders",
-        "trait_industrious"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "115"
-    },
-    {
-      "id": "16777226",
-      "name": "SPEC_Yapathi",
-      "class": "MAM",
-      "portrait": "mammalian_ar_07",
-      "traits": [
-        "trait_organic",
-        "trait_pc_continental_preference",
-        "trait_natural_sociologists",
-        "trait_traditional",
-        "trait_decadent",
-        "trait_strong"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "127"
-    },
-    {
-      "id": "16777227",
-      "name": "SPEC_Baanthurian",
-      "class": "REP",
-      "portrait": "rep2",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_quick_learners",
-        "trait_quarrelsome",
-        "trait_thrifty",
-        "trait_deviants",
-        "trait_conservational"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "140"
-    },
-    {
-      "id": "16777228",
-      "name": "SPEC_Sojagg",
-      "class": "FUN",
-      "portrait": "fun1",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_nonadaptive",
-        "trait_natural_sociologists",
-        "trait_conservational",
-        "trait_traditional",
-        "trait_quick_learners"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "150"
-    },
-    {
-      "id": "16777229",
-      "name": "SPEC_Udkavongo",
-      "class": "FUN",
-      "portrait": "fun13",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_charismatic",
-        "trait_wasteful",
-        "trait_unruly",
-        "trait_ingenious",
-        "trait_quick_learners"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "159"
-    },
-    {
-      "id": "16777230",
-      "name": "SPEC_Gox",
-      "class": "REP",
-      "portrait": "rep11",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_docile",
-        "trait_fleeting",
-        "trait_slow_breeders",
-        "trait_resilient",
-        "trait_conformists"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "175"
-    },
-    {
-      "id": "16777231",
-      "name": "SPEC_Izki",
-      "class": "ART",
-      "portrait": "art8",
-      "traits": [
-        "trait_organic",
-        "trait_pc_savannah_preference",
-        "trait_docile",
-        "trait_repugnant",
-        "trait_strong",
-        "trait_conservational"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "198"
-    },
-    {
-      "id": "16777232",
-      "name": "NAME_Robot",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_mechanical",
-        "trait_wet_planet_preference"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "17",
-      "name": "NAME_Robot",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_dry_planet_preference",
-        "trait_mechanical",
-        "trait_auto_mod_robotic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "198"
-    },
-    {
-      "id": "18",
-      "name": "SPEC_Sinrath",
-      "class": "MAM",
-      "portrait": "mam2",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tropical_preference",
-        "trait_natural_physicists",
-        "trait_fleeting",
-        "trait_conservational",
-        "trait_unruly",
-        "trait_very_strong"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "211"
-    },
-    {
-      "id": "16777235",
-      "name": "NAME_Robot",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_wet_planet_preference",
-        "trait_mechanical",
-        "trait_auto_mod_robotic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "211"
-    },
-    {
-      "id": "20",
-      "name": "SPEC_Gulk-Furki",
-      "class": "AVI",
-      "portrait": "avi16",
-      "traits": [
-        "trait_organic",
-        "trait_pc_shattered_ring_habitable_preference",
-        "trait_ingenious",
-        "trait_slow_breeders",
-        "trait_enduring",
-        "trait_nomadic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "222"
-    },
-    {
-      "id": "16777237",
-      "name": "SPEC_Ziiran",
-      "class": "REP",
-      "portrait": "rep10",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_agrarian",
-        "trait_extremely_adaptive",
-        "trait_strong"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "22",
-      "name": "NAME_Robot",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_mechanical",
-        "trait_cold_planet_preference"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "23",
-      "name": "NAME_Synthetic",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_mechanical",
-        "trait_robot_luxurious",
-        "trait_robot_domestic_protocols",
-        "trait_wet_planet_preference"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "24",
-      "name": "SPEC_Xeltek",
-      "class": "ART",
-      "portrait": "art20",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_conformists",
-        "trait_sedentary",
-        "trait_conservational",
-        "trait_decadent",
-        "trait_enduring"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "25",
-      "name": "SPEC_Aztani",
-      "class": "MOL",
-      "portrait": "mol15",
-      "traits": [
-        "trait_organic",
-        "trait_pc_continental_preference",
-        "trait_thrifty",
-        "trait_unruly",
-        "trait_enduring",
-        "trait_natural_physicists"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "26",
-      "name": "SPEC_Pelx-Cradonian",
-      "class": "AVI",
-      "portrait": "avi8",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_traditional",
-        "trait_solitary",
-        "trait_conformists",
-        "trait_unruly",
-        "trait_ingenious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "27",
-      "name": "SPEC_RekThalar",
-      "class": "MAM",
-      "portrait": "mammalian_ar_08",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_repugnant",
-        "trait_venerable",
-        "trait_decadent",
-        "trait_strong"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "28",
-      "name": "SPEC_Ztrakpor",
-      "class": "ART",
-      "portrait": "art11",
-      "traits": [
-        "trait_organic",
-        "trait_pc_desert_preference",
-        "trait_communal",
-        "trait_natural_physicists",
-        "trait_nonadaptive",
-        "trait_decadent",
-        "trait_very_strong"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "29",
-      "name": "SPEC_Zeppadroggan",
-      "class": "FUN",
-      "portrait": "fun16",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_industrious",
-        "trait_charismatic",
-        "trait_very_strong"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "30",
-      "name": "NAME_Robot",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_mechanical",
-        "trait_wet_planet_preference"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "31",
-      "name": "SPEC_Kroll",
-      "class": "MAM",
-      "portrait": "mammalian_ar_04",
-      "traits": [
-        "trait_pc_arctic_preference",
-        "trait_nerve_stapled",
-        "trait_strong",
-        "trait_charismatic",
-        "trait_organic"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "32",
-      "name": "SPEC_Zaanami",
-      "class": "MAM",
-      "portrait": "mam16",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tropical_preference",
-        "trait_ingenious",
-        "trait_rapid_breeders",
-        "trait_natural_engineers"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "33",
-      "name": "SPEC_Zaanami",
-      "class": "MAM",
-      "portrait": "mam16",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tropical_preference",
-        "trait_ingenious",
-        "trait_rapid_breeders",
-        "trait_natural_engineers",
-        "trait_psionic"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "34",
-      "name": "SPEC_Ubaric",
-      "class": "REP",
-      "portrait": "rep13",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_enduring",
-        "trait_resilient",
-        "trait_conformists",
-        "trait_natural_physicists"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "35",
-      "name": "SPEC_Ubaric",
-      "class": "REP",
-      "portrait": "rep13",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_enduring",
-        "trait_resilient",
-        "trait_conformists",
-        "trait_natural_physicists",
-        "trait_cybernetic"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "36",
-      "name": "NAME_Robot",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_mechanical",
-        "trait_wet_planet_preference"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "37",
-      "name": "NAME_Synthetic",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_mechanical",
-        "trait_robot_luxurious",
-        "trait_robot_domestic_protocols",
-        "trait_cold_planet_preference"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "38",
-      "name": "SPEC_Yohtoh",
-      "class": "SHROUDWALKER",
-      "portrait": "shroudwalker01",
-      "traits": [
-        "trait_pc_habitat_preference",
-        "trait_enduring",
-        "trait_sedentary",
-        "trait_charismatic",
-        "trait_wasteful",
-        "trait_communal",
-        "trait_psionic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "1255"
-    },
-    {
-      "id": "39",
-      "name": "SPEC_Helvan",
-      "class": "AVI",
-      "portrait": "avi13",
-      "traits": [
-        "trait_organic",
-        "trait_pc_desert_preference",
-        "trait_resilient",
-        "trait_deviants",
-        "trait_natural_sociologists",
-        "trait_fleeting",
-        "trait_thrifty"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "40",
-      "name": "SPEC_Hantak",
-      "class": "ART",
-      "portrait": "art7",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_repugnant",
-        "trait_traditional",
-        "trait_deviants",
-        "trait_docile",
-        "trait_intelligent"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "41",
-      "name": "SPEC_Larongo",
-      "class": "MOL",
-      "portrait": "mol7",
-      "traits": [
-        "trait_organic",
-        "trait_pc_continental_preference",
-        "trait_quarrelsome",
-        "trait_sedentary",
-        "trait_enduring",
-        "trait_solitary",
-        "trait_extremely_adaptive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "42",
-      "name": "SPEC_Urzo",
-      "class": "MOL",
-      "portrait": "mol3",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_rapid_breeders",
-        "trait_quarrelsome",
-        "trait_natural_sociologists",
-        "trait_slow_learners",
-        "trait_conservational"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "43",
-      "name": "SPEC_Urzo",
-      "class": "MOL",
-      "portrait": "mol3",
-      "traits": [
-        "trait_organic",
-        "trait_conservational",
-        "trait_rapid_breeders",
-        "trait_quarrelsome",
-        "trait_natural_sociologists",
-        "trait_slow_learners",
-        "trait_pc_habitat_preference"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "44",
-      "name": "NAME_Robot",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_mechanical",
-        "trait_wet_planet_preference"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "45",
-      "name": "NAME_Caravaneer_Fleet1_species",
-      "class": "FUN",
-      "portrait": "fun10",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tropical_preference",
-        "trait_unruly",
-        "trait_quarrelsome",
-        "trait_conservational",
-        "trait_talented",
-        "trait_very_strong"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "46",
-      "name": "NAME_Ketling",
-      "class": "MAM",
-      "portrait": "mam_rat",
-      "traits": [
-        "trait_pc_savannah_preference",
-        "trait_organic",
-        "trait_repugnant",
-        "trait_slow_breeders",
-        "trait_thrifty",
-        "trait_deviants",
-        "trait_fleeting"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "47",
-      "name": "$affix$$base$",
-      "class": "MAM",
-      "portrait": "mam_rat",
-      "traits": [
-        "trait_pc_nuked_preference",
-        "trait_organic",
-        "trait_cybernetic",
-        "trait_repugnant",
-        "trait_slow_breeders",
-        "trait_thrifty",
-        "trait_cyborg_trading_algorithms",
-        "trait_deviants",
-        "trait_fleeting"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "48",
-      "name": "NAME_Caravaneer_Fleet3_robot",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_machine_pc_nuked_preference",
-        "trait_mechanical",
-        "trait_auto_mod_robotic",
-        "trait_robot_bulky",
-        "trait_robot_repurposed_hardware"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "49",
-      "name": "SPEC_Uindar",
-      "class": "ART",
-      "portrait": "art19",
-      "traits": [
-        "trait_organic",
-        "trait_pc_continental_preference",
-        "trait_conservational",
-        "trait_communal",
-        "trait_unruly",
-        "trait_natural_sociologists",
-        "trait_enduring"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "50",
-      "name": "SPEC_Connisthian",
-      "class": "MOL",
-      "portrait": "mol14",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tropical_preference",
-        "trait_sedentary",
-        "trait_natural_sociologists",
-        "trait_nonadaptive",
-        "trait_very_strong",
-        "trait_enduring"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "51",
-      "name": "SPEC_Sotwotrumatta",
-      "class": "SALVAGER",
-      "portrait": "salvager01",
-      "traits": [
-        "trait_pc_habitat_preference",
-        "trait_talented",
-        "trait_strong",
-        "trait_slow_learners",
-        "trait_resilient"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "1495"
-    },
-    {
-      "id": "52",
-      "name": "SPEC_Reshethi",
-      "class": "REP",
-      "portrait": "rep15",
-      "traits": [
-        "trait_organic",
-        "trait_pc_ocean_preference",
-        "trait_enduring",
-        "trait_repugnant",
-        "trait_very_strong",
-        "trait_solitary",
-        "trait_resilient"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "53",
-      "name": "SPEC_Havarigga",
-      "class": "MOL",
-      "portrait": "mol6",
-      "traits": [
-        "trait_organic",
-        "trait_pc_savannah_preference",
-        "trait_sedentary",
-        "trait_charismatic",
-        "trait_strong",
-        "trait_slow_breeders",
-        "trait_industrious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "54",
-      "name": "SPEC_Buhavilaa",
-      "class": "FUN",
-      "portrait": "fun3",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_talented",
-        "trait_natural_sociologists",
-        "trait_solitary",
-        "trait_unruly",
-        "trait_very_strong"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "55",
-      "name": "SPEC_Tuxkan",
-      "class": "REP",
-      "portrait": "rep12",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_talented",
-        "trait_traditional",
-        "trait_nonadaptive",
-        "trait_unruly",
-        "trait_venerable"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "56",
-      "name": "SPEC_Pouz-Jok",
-      "class": "MAM",
-      "portrait": "mam8",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_deviants",
-        "trait_resilient",
-        "trait_wasteful",
-        "trait_intelligent",
-        "trait_enduring"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "57",
-      "name": "SPEC_Jubaran",
-      "class": "MOL",
-      "portrait": "mol1",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_industrious",
-        "trait_wasteful",
-        "trait_resilient",
-        "trait_weak",
-        "trait_natural_sociologists"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "2020"
-    },
-    {
-      "id": "58",
-      "name": "SPEC_Sirgogg",
-      "class": "MOL",
-      "portrait": "mol2",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_communal",
-        "trait_quarrelsome",
-        "trait_rapid_breeders",
-        "trait_fleeting",
-        "trait_resilient"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "59",
-      "name": "NAME_Robot",
-      "class": "ROBOT",
-      "portrait": "default_robot",
-      "traits": [
-        "trait_mechanical",
-        "trait_cold_planet_preference"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "60",
-      "name": "SPEC_Ruphaari",
-      "class": "MAM",
-      "portrait": "mam12",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_agrarian",
-        "trait_slow_learners",
-        "trait_natural_engineers",
-        "trait_solitary",
-        "trait_enduring"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "61",
-      "name": "SPEC_Avarrian",
-      "class": "AVI",
-      "portrait": "avi8",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_resilient",
-        "trait_wasteful",
-        "trait_traditional",
-        "trait_talented"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "2487"
-    },
-    {
-      "id": "62",
-      "name": "SPEC_Haspalv",
-      "class": "AVI",
-      "portrait": "avi12",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_fleeting",
-        "trait_wasteful",
-        "trait_quick_learners",
-        "trait_conformists",
-        "trait_traditional"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "3558"
-    },
-    {
-      "id": "63",
-      "name": "SPEC_Yssravannar",
-      "class": "AVI",
-      "portrait": "avi10",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_thrifty",
-        "trait_repugnant",
-        "trait_agrarian",
-        "trait_solitary",
-        "trait_nomadic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "3993"
-    },
-    {
-      "id": "64",
-      "name": "SPEC_YaxKalock",
-      "class": "ART",
-      "portrait": "art10",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_wasteful",
-        "trait_traditional",
-        "trait_natural_physicists",
-        "trait_fleeting",
-        "trait_charismatic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "4371"
-    },
-    {
-      "id": "65",
-      "name": "SPEC_Zracon",
-      "class": "FUN",
-      "portrait": "fun4",
-      "traits": [
-        "trait_organic",
-        "trait_pc_continental_preference",
-        "trait_natural_sociologists",
-        "trait_strong",
-        "trait_slow_learners",
-        "trait_traditional"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "4440"
-    },
-    {
-      "id": "66",
-      "name": "SPEC_Djomar",
-      "class": "MOL",
-      "portrait": "mol11",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arid_preference",
-        "trait_deviants",
-        "trait_unruly",
-        "trait_nomadic",
-        "trait_industrious",
-        "trait_rapid_breeders"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "5085"
-    },
-    {
-      "id": "67",
-      "name": "SPEC_Uthabulan",
-      "class": "MOL",
-      "portrait": "mol4",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_repugnant",
-        "trait_nomadic",
-        "trait_very_strong",
-        "trait_quarrelsome",
-        "trait_enduring"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "5535"
-    },
-    {
-      "id": "68",
-      "name": "SPEC_Zukakkan",
-      "class": "REP",
-      "portrait": "rep17",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_conformists",
-        "trait_slow_breeders",
-        "trait_adaptive",
-        "trait_repugnant",
-        "trait_thrifty"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "5806"
-    },
-    {
-      "id": "69",
-      "name": "SPEC_Hissma",
-      "class": "FUN",
-      "portrait": "fun8",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_quarrelsome",
-        "trait_nonadaptive",
-        "trait_venerable",
-        "trait_strong"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "6101"
-    },
-    {
-      "id": "70",
-      "name": "SPEC_Birnathi",
-      "class": "MAM",
-      "portrait": "mam17",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tropical_preference",
-        "trait_docile",
-        "trait_repugnant",
-        "trait_agrarian",
-        "trait_slow_learners",
-        "trait_natural_engineers"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "6166"
-    },
-    {
-      "id": "71",
-      "name": "SPEC_QuVab",
-      "class": "MAM",
-      "portrait": "mam11",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_docile",
-        "trait_solitary",
-        "trait_talented",
-        "trait_nonadaptive",
-        "trait_charismatic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "6812"
-    },
-    {
-      "id": "72",
-      "name": "SPEC_Evandari",
-      "class": "MAM",
-      "portrait": "mammalian_ar_05",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_industrious",
-        "trait_decadent",
-        "trait_repugnant",
-        "trait_quick_learners",
-        "trait_docile"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "6939"
-    },
-    {
-      "id": "73",
-      "name": "SPEC_Estwani",
-      "class": "MAM",
-      "portrait": "mam15",
-      "traits": [
-        "trait_organic",
-        "trait_pc_continental_preference",
-        "trait_natural_sociologists",
-        "trait_decadent",
-        "trait_communal",
-        "trait_wasteful",
-        "trait_adaptive"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "7100"
-    },
-    {
-      "id": "74",
-      "name": "SPEC_LaginChuuz",
-      "class": "MOL",
-      "portrait": "mol8",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arctic_preference",
-        "trait_decadent",
-        "trait_fleeting",
-        "trait_extremely_adaptive",
-        "trait_slow_breeders",
-        "trait_ingenious"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "7173"
-    },
-    {
-      "id": "75",
-      "name": "SPEC_Hiffnar",
-      "class": "MAM",
-      "portrait": "mammalian_ar_03",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tundra_preference",
-        "trait_industrious",
-        "trait_slow_breeders",
-        "trait_natural_sociologists",
-        "trait_traditional"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "7361"
-    },
-    {
-      "id": "76",
-      "name": "SPEC_DrullPerfen",
-      "class": "MAM",
-      "portrait": "mam7",
-      "traits": [
-        "trait_organic",
-        "trait_pc_tropical_preference",
-        "trait_thrifty",
-        "trait_wasteful",
-        "trait_weak",
-        "trait_nomadic",
-        "trait_natural_sociologists"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "8341"
-    },
-    {
-      "id": "77",
-      "name": "SPEC_Ragerian",
-      "class": "MAM",
-      "portrait": "mam14",
-      "traits": [
-        "trait_organic",
-        "trait_pc_savannah_preference",
-        "trait_conformists",
-        "trait_decadent",
-        "trait_enduring",
-        "trait_unruly",
-        "trait_rapid_breeders"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "9448"
-    },
-    {
-      "id": "78",
-      "name": "SPEC_Zaxxoid",
-      "class": "ART",
-      "portrait": "art12",
-      "traits": [
-        "trait_organic",
-        "trait_pc_continental_preference",
-        "trait_intelligent",
-        "trait_nonadaptive",
-        "trait_thrifty",
-        "trait_repugnant",
-        "trait_industrious"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "10299"
-    },
-    {
-      "id": "79",
-      "name": "SPEC_Figyar",
-      "class": "AVI",
-      "portrait": "avi7",
-      "traits": [
-        "trait_organic",
-        "trait_pc_savannah_preference",
-        "trait_strong",
-        "trait_deviants",
-        "trait_traditional",
-        "trait_wasteful",
-        "trait_adaptive"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "10306"
-    },
-    {
-      "id": "80",
-      "name": "SPEC_Groknaploran",
-      "class": "MAM",
-      "portrait": "mam13",
-      "traits": [
-        "trait_organic",
-        "trait_pc_desert_preference",
-        "trait_industrious",
-        "trait_solitary",
-        "trait_fleeting",
-        "trait_natural_physicists",
-        "trait_nomadic"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "81",
-      "name": "SPEC_Krithakkan",
-      "class": "ART",
-      "portrait": "art14",
-      "traits": [
-        "trait_organic",
-        "trait_pc_arid_preference",
-        "trait_sedentary",
-        "trait_talented",
-        "trait_deviants",
-        "trait_intelligent",
-        "trait_strong"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "82",
-      "name": "SPEC_TwaxIhdar",
-      "class": "AVI",
-      "portrait": "avi11",
-      "traits": [
-        "trait_organic",
-        "trait_pc_ocean_preference",
-        "trait_natural_engineers",
-        "trait_resilient",
-        "trait_nonadaptive",
-        "trait_docile"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "83",
-      "name": "SPEC_OnedQarak",
-      "class": "PRE_MAM",
-      "portrait": "pre_mam13",
-      "traits": [
-        "trait_presapient_proles",
-        "trait_pc_gaia_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "1272"
-    },
-    {
-      "id": "84",
-      "name": "SPEC_DimaXanian",
-      "class": "PRE_REP",
-      "portrait": "pre_rep09",
-      "traits": [
-        "trait_presapient_irradiated",
-        "trait_pc_tropical_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "1739"
-    },
-    {
-      "id": "85",
-      "name": "SPEC_Raltek",
-      "class": "PRE_MAM",
-      "portrait": "pre_mam6",
-      "traits": [
-        "trait_presapient_starborn",
-        "trait_pc_gaia_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "1012"
-    },
-    {
-      "id": "86",
-      "name": "SPEC_Myrran",
-      "class": "PRE_ART",
-      "portrait": "pre_art13",
-      "traits": [
-        "trait_presapient_earthbound",
-        "trait_pc_arid_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "2265"
-    },
-    {
-      "id": "87",
-      "name": "SPEC_Andigonj",
-      "class": "PRE_MOL",
-      "portrait": "pre_mol3",
-      "traits": [
-        "trait_presapient_earthbound",
-        "trait_pc_ocean_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "3093"
-    },
-    {
-      "id": "88",
-      "name": "SPEC_Fjasivlin",
-      "class": "PRE_FUN",
-      "portrait": "pre_fun9",
-      "traits": [
-        "trait_presapient_earthbound",
-        "trait_pc_arid_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "4459"
-    },
-    {
-      "id": "89",
-      "name": "SPEC_Opalglec",
-      "class": "PRE_ART",
-      "portrait": "pre_art1",
-      "traits": [
-        "trait_presapient_forcefully_devolved",
-        "trait_pc_desert_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "4597"
-    },
-    {
-      "id": "90",
-      "name": "SPEC_Cynur",
-      "class": "PRE_AVI",
-      "portrait": "pre_avi1",
-      "traits": [
-        "trait_presapient_irradiated",
-        "trait_pc_arctic_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "4685"
-    },
-    {
-      "id": "91",
-      "name": "SPEC_Hjannarthi",
-      "class": "PRE_MOL",
-      "portrait": "pre_mol1",
-      "traits": [
-        "trait_presapient_conservative",
-        "trait_pc_savannah_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "4960"
-    },
-    {
-      "id": "92",
-      "name": "SPEC_Onotach",
-      "class": "PRE_MAM",
-      "portrait": "pre_mam6",
-      "traits": [
-        "trait_presapient_earthbound",
-        "trait_pc_continental_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "10127"
-    },
-    {
-      "id": "93",
-      "name": "SPEC_Pirak",
-      "class": "PRE_ART",
-      "portrait": "pre_art14",
-      "traits": [
-        "trait_presapient_irradiated",
-        "trait_pc_tundra_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "5453"
-    },
-    {
-      "id": "94",
-      "name": "SPEC_Zaydran",
-      "class": "PRE_REP",
-      "portrait": "pre_rep12",
-      "traits": [
-        "trait_presapient_proles",
-        "trait_pc_continental_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "1233"
-    },
-    {
-      "id": "95",
-      "name": "SPEC_Suramo",
-      "class": "PRE_REP",
-      "portrait": "pre_rep09",
-      "traits": [
-        "trait_presapient_irradiated",
-        "trait_pc_desert_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "7460"
-    },
-    {
-      "id": "96",
-      "name": "SPEC_Heejam",
-      "class": "PRE_MOL",
-      "portrait": "pre_mol1",
-      "traits": [
-        "trait_presapient_starborn",
-        "trait_pc_desert_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "7656"
-    },
-    {
-      "id": "97",
-      "name": "SPEC_Jhoolian",
-      "class": "PRE_FUN",
-      "portrait": "pre_fun13",
-      "traits": [
-        "trait_presapient_conservative",
-        "trait_pc_arid_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "9127"
-    },
-    {
-      "id": "98",
-      "name": "SPEC_SavixQast",
-      "class": "PRE_ART",
-      "portrait": "pre_art12",
-      "traits": [
-        "trait_presapient_natural_intellectuals",
-        "trait_pc_tropical_preference",
-        "trait_organic"
-      ],
-      "is_player_species": false,
-      "home_planet_id": "9472"
-    },
-    {
-      "id": "99",
-      "name": "SPEC_Shantari",
-      "class": "AVI",
-      "portrait": "avi9",
-      "traits": [
-        "trait_organic",
-        "trait_pc_alpine_preference",
-        "trait_weak",
-        "trait_industrious",
-        "trait_communal",
-        "trait_decadent",
-        "trait_nomadic"
-      ],
-      "is_player_species": false
-    },
-    {
       "id": "100",
       "name": "SPEC_Mect-Pux",
       "class": "REP",
@@ -2555,6 +1045,230 @@
       "is_player_species": false
     },
     {
+      "id": "16777220",
+      "name": "SPEC_Zithorian",
+      "class": "ART",
+      "portrait": "art5",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arid_preference",
+        "trait_rapid_breeders",
+        "trait_sedentary",
+        "trait_enduring",
+        "trait_repugnant",
+        "trait_thrifty"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "53"
+    },
+    {
+      "id": "16777221",
+      "name": "SPEC_Jusstkan",
+      "class": "MAM",
+      "portrait": "mammalian_ar_06",
+      "traits": [
+        "trait_syncretic_proles",
+        "trait_organic",
+        "trait_pc_arid_preference",
+        "trait_resilient",
+        "trait_repugnant",
+        "trait_conservational",
+        "trait_communal"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "53"
+    },
+    {
+      "id": "16777223",
+      "name": "SPEC_Baviir",
+      "class": "AVI",
+      "portrait": "avi6",
+      "traits": [
+        "trait_perfected_genes",
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_natural_sociologists",
+        "trait_nonadaptive",
+        "trait_nomadic",
+        "trait_talented",
+        "trait_strong"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "83"
+    },
+    {
+      "id": "16777224",
+      "name": "SPEC_Hiran",
+      "class": "AVI",
+      "portrait": "avi10",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_slow_learners",
+        "trait_natural_engineers",
+        "trait_deviants",
+        "trait_nomadic",
+        "trait_industrious"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "94"
+    },
+    {
+      "id": "16777225",
+      "name": "SPEC_Ozkox",
+      "class": "AVI",
+      "portrait": "avi4",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tropical_preference",
+        "trait_charismatic",
+        "trait_quarrelsome",
+        "trait_nomadic",
+        "trait_slow_breeders",
+        "trait_industrious"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "115"
+    },
+    {
+      "id": "16777226",
+      "name": "SPEC_Yapathi",
+      "class": "MAM",
+      "portrait": "mammalian_ar_07",
+      "traits": [
+        "trait_organic",
+        "trait_pc_continental_preference",
+        "trait_natural_sociologists",
+        "trait_traditional",
+        "trait_decadent",
+        "trait_strong"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "127"
+    },
+    {
+      "id": "16777227",
+      "name": "SPEC_Baanthurian",
+      "class": "REP",
+      "portrait": "rep2",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_quick_learners",
+        "trait_quarrelsome",
+        "trait_thrifty",
+        "trait_deviants",
+        "trait_conservational"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "140"
+    },
+    {
+      "id": "16777228",
+      "name": "SPEC_Sojagg",
+      "class": "FUN",
+      "portrait": "fun1",
+      "traits": [
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_nonadaptive",
+        "trait_natural_sociologists",
+        "trait_conservational",
+        "trait_traditional",
+        "trait_quick_learners"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "150"
+    },
+    {
+      "id": "16777229",
+      "name": "SPEC_Udkavongo",
+      "class": "FUN",
+      "portrait": "fun13",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_charismatic",
+        "trait_wasteful",
+        "trait_unruly",
+        "trait_ingenious",
+        "trait_quick_learners"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "159"
+    },
+    {
+      "id": "16777230",
+      "name": "SPEC_Gox",
+      "class": "REP",
+      "portrait": "rep11",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_docile",
+        "trait_fleeting",
+        "trait_slow_breeders",
+        "trait_resilient",
+        "trait_conformists"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "175"
+    },
+    {
+      "id": "16777231",
+      "name": "SPEC_Izki",
+      "class": "ART",
+      "portrait": "art8",
+      "traits": [
+        "trait_organic",
+        "trait_pc_savannah_preference",
+        "trait_docile",
+        "trait_repugnant",
+        "trait_strong",
+        "trait_conservational"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "198"
+    },
+    {
+      "id": "16777232",
+      "name": "NAME_Robot",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_mechanical",
+        "trait_wet_planet_preference"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "16777235",
+      "name": "NAME_Robot",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_wet_planet_preference",
+        "trait_mechanical",
+        "trait_auto_mod_robotic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "211"
+    },
+    {
+      "id": "16777237",
+      "name": "SPEC_Ziiran",
+      "class": "REP",
+      "portrait": "rep10",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_agrarian",
+        "trait_extremely_adaptive",
+        "trait_strong"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "168",
       "name": "SPEC_Glost-Werheni",
       "class": "MAM",
@@ -2584,6 +1298,19 @@
         "trait_industrious"
       ],
       "is_player_species": false
+    },
+    {
+      "id": "17",
+      "name": "NAME_Robot",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_dry_planet_preference",
+        "trait_mechanical",
+        "trait_auto_mod_robotic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "198"
     },
     {
       "id": "170",
@@ -2744,6 +1471,23 @@
         "trait_conformists"
       ],
       "is_player_species": false
+    },
+    {
+      "id": "18",
+      "name": "SPEC_Sinrath",
+      "class": "MAM",
+      "portrait": "mam2",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tropical_preference",
+        "trait_natural_physicists",
+        "trait_fleeting",
+        "trait_conservational",
+        "trait_unruly",
+        "trait_very_strong"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "211"
     },
     {
       "id": "180",
@@ -3051,6 +1795,39 @@
       "is_player_species": false
     },
     {
+      "id": "2",
+      "name": "PRESCRIPTED_species_name_orbis",
+      "class": "REP",
+      "portrait": "rep1",
+      "traits": [
+        "trait_organic",
+        "trait_charismatic",
+        "trait_adaptive",
+        "trait_enduring",
+        "trait_decadent",
+        "trait_slow_breeders",
+        "trait_pc_ocean_preference"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "31"
+    },
+    {
+      "id": "20",
+      "name": "SPEC_Gulk-Furki",
+      "class": "AVI",
+      "portrait": "avi16",
+      "traits": [
+        "trait_organic",
+        "trait_pc_shattered_ring_habitable_preference",
+        "trait_ingenious",
+        "trait_slow_breeders",
+        "trait_enduring",
+        "trait_nomadic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "222"
+    },
+    {
       "id": "200",
       "name": "SPEC_Entheri",
       "class": "ART",
@@ -3351,6 +2128,17 @@
       "is_player_species": false
     },
     {
+      "id": "22",
+      "name": "NAME_Robot",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_mechanical",
+        "trait_cold_planet_preference"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "220",
       "name": "SPEC_Kundan",
       "class": "MOL",
@@ -3502,6 +2290,19 @@
         "trait_strong",
         "trait_sedentary",
         "trait_natural_engineers"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "23",
+      "name": "NAME_Synthetic",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_mechanical",
+        "trait_robot_luxurious",
+        "trait_robot_domestic_protocols",
+        "trait_wet_planet_preference"
       ],
       "is_player_species": false
     },
@@ -3666,6 +2467,22 @@
       "is_player_species": false
     },
     {
+      "id": "24",
+      "name": "SPEC_Xeltek",
+      "class": "ART",
+      "portrait": "art20",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_conformists",
+        "trait_sedentary",
+        "trait_conservational",
+        "trait_decadent",
+        "trait_enduring"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "240",
       "name": "NAME_Robot",
       "class": "ROBOT",
@@ -3824,6 +2641,21 @@
       "home_planet_id": "94"
     },
     {
+      "id": "25",
+      "name": "SPEC_Aztani",
+      "class": "MOL",
+      "portrait": "mol15",
+      "traits": [
+        "trait_organic",
+        "trait_pc_continental_preference",
+        "trait_thrifty",
+        "trait_unruly",
+        "trait_enduring",
+        "trait_natural_physicists"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "250",
       "name": "SPEC_RekThalar",
       "class": "MAM",
@@ -3973,6 +2805,22 @@
       "is_player_species": false
     },
     {
+      "id": "26",
+      "name": "SPEC_Pelx-Cradonian",
+      "class": "AVI",
+      "portrait": "avi8",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_traditional",
+        "trait_solitary",
+        "trait_conformists",
+        "trait_unruly",
+        "trait_ingenious"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "260",
       "name": "SPEC_Othari",
       "class": "MAM",
@@ -4116,6 +2964,21 @@
       ],
       "is_player_species": false,
       "home_planet_id": "83"
+    },
+    {
+      "id": "27",
+      "name": "SPEC_RekThalar",
+      "class": "MAM",
+      "portrait": "mammalian_ar_08",
+      "traits": [
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_repugnant",
+        "trait_venerable",
+        "trait_decadent",
+        "trait_strong"
+      ],
+      "is_player_species": false
     },
     {
       "id": "270",
@@ -4275,6 +3138,22 @@
       ],
       "is_player_species": false,
       "home_planet_id": "94"
+    },
+    {
+      "id": "28",
+      "name": "SPEC_Ztrakpor",
+      "class": "ART",
+      "portrait": "art11",
+      "traits": [
+        "trait_organic",
+        "trait_pc_desert_preference",
+        "trait_communal",
+        "trait_natural_physicists",
+        "trait_nonadaptive",
+        "trait_decadent",
+        "trait_very_strong"
+      ],
+      "is_player_species": false
     },
     {
       "id": "280",
@@ -4450,6 +3329,20 @@
       "home_planet_id": "6232"
     },
     {
+      "id": "29",
+      "name": "SPEC_Zeppadroggan",
+      "class": "FUN",
+      "portrait": "fun16",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_industrious",
+        "trait_charismatic",
+        "trait_very_strong"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "290",
       "name": "SPEC_Provalguvor",
       "class": "FUN",
@@ -4605,6 +3498,34 @@
       "is_player_species": false
     },
     {
+      "id": "3",
+      "name": "SPEC_Khessam",
+      "class": "AVI",
+      "portrait": "avi5",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_quarrelsome",
+        "trait_thrifty",
+        "trait_sedentary",
+        "trait_deviants",
+        "trait_very_strong"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "43"
+    },
+    {
+      "id": "30",
+      "name": "NAME_Robot",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_mechanical",
+        "trait_wet_planet_preference"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "300",
       "name": "$base$ $affix$",
       "class": "FUN",
@@ -4669,6 +3590,21 @@
         "trait_venerable"
       ],
       "is_player_species": false
+    },
+    {
+      "id": "3036676097",
+      "name": "PRESCRIPTED_species_name_humans1",
+      "class": "HUM",
+      "portrait": "human",
+      "traits": [
+        "trait_organic",
+        "trait_adaptive",
+        "trait_nomadic",
+        "trait_wasteful",
+        "trait_pc_continental_preference"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "3"
     },
     {
       "id": "304",
@@ -4763,6 +3699,20 @@
         "trait_unruly",
         "trait_conservational",
         "trait_agrarian"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "31",
+      "name": "SPEC_Kroll",
+      "class": "MAM",
+      "portrait": "mammalian_ar_04",
+      "traits": [
+        "trait_pc_arctic_preference",
+        "trait_nerve_stapled",
+        "trait_strong",
+        "trait_charismatic",
+        "trait_organic"
       ],
       "is_player_species": false
     },
@@ -4934,6 +3884,20 @@
       "is_player_species": false
     },
     {
+      "id": "32",
+      "name": "SPEC_Zaanami",
+      "class": "MAM",
+      "portrait": "mam16",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tropical_preference",
+        "trait_ingenious",
+        "trait_rapid_breeders",
+        "trait_natural_engineers"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "320",
       "name": "SPEC_KTaknor",
       "class": "MAM",
@@ -5091,6 +4055,21 @@
       "is_player_species": false
     },
     {
+      "id": "33",
+      "name": "SPEC_Zaanami",
+      "class": "MAM",
+      "portrait": "mam16",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tropical_preference",
+        "trait_ingenious",
+        "trait_rapid_breeders",
+        "trait_natural_engineers",
+        "trait_psionic"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "330",
       "name": "SPEC_Ragerian",
       "class": "MAM",
@@ -5242,6 +4221,21 @@
       ],
       "is_player_species": false,
       "home_planet_id": "1739"
+    },
+    {
+      "id": "34",
+      "name": "SPEC_Ubaric",
+      "class": "REP",
+      "portrait": "rep13",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_enduring",
+        "trait_resilient",
+        "trait_conformists",
+        "trait_natural_physicists"
+      ],
+      "is_player_species": false
     },
     {
       "id": "340",
@@ -5405,6 +4399,22 @@
         "trait_ingenious",
         "trait_weak",
         "trait_conservational"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "35",
+      "name": "SPEC_Ubaric",
+      "class": "REP",
+      "portrait": "rep13",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_enduring",
+        "trait_resilient",
+        "trait_conformists",
+        "trait_natural_physicists",
+        "trait_cybernetic"
       ],
       "is_player_species": false
     },
@@ -5578,6 +4588,17 @@
       "is_player_species": false
     },
     {
+      "id": "36",
+      "name": "NAME_Robot",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_mechanical",
+        "trait_wet_planet_preference"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "360",
       "name": "SPEC_TJell",
       "class": "MAM",
@@ -5732,6 +4753,19 @@
       ],
       "is_player_species": false,
       "home_planet_id": "198"
+    },
+    {
+      "id": "37",
+      "name": "NAME_Synthetic",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_mechanical",
+        "trait_robot_luxurious",
+        "trait_robot_domestic_protocols",
+        "trait_cold_planet_preference"
+      ],
+      "is_player_species": false
     },
     {
       "id": "370",
@@ -5891,6 +4925,23 @@
       "is_player_species": false
     },
     {
+      "id": "38",
+      "name": "SPEC_Yohtoh",
+      "class": "SHROUDWALKER",
+      "portrait": "shroudwalker01",
+      "traits": [
+        "trait_pc_habitat_preference",
+        "trait_enduring",
+        "trait_sedentary",
+        "trait_charismatic",
+        "trait_wasteful",
+        "trait_communal",
+        "trait_psionic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "1255"
+    },
+    {
       "id": "380",
       "name": "SPEC_Fevarian",
       "class": "MAM",
@@ -6043,6 +5094,22 @@
         "trait_quick_learners",
         "trait_sedentary",
         "trait_natural_engineers"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "39",
+      "name": "SPEC_Helvan",
+      "class": "AVI",
+      "portrait": "avi13",
+      "traits": [
+        "trait_organic",
+        "trait_pc_desert_preference",
+        "trait_resilient",
+        "trait_deviants",
+        "trait_natural_sociologists",
+        "trait_fleeting",
+        "trait_thrifty"
       ],
       "is_player_species": false
     },
@@ -6208,6 +5275,22 @@
       "home_planet_id": "198"
     },
     {
+      "id": "40",
+      "name": "SPEC_Hantak",
+      "class": "ART",
+      "portrait": "art7",
+      "traits": [
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_repugnant",
+        "trait_traditional",
+        "trait_deviants",
+        "trait_docile",
+        "trait_intelligent"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "400",
       "name": "SPEC_Fellnoll",
       "class": "MOL",
@@ -6357,6 +5440,22 @@
         "trait_traditional",
         "trait_decadent",
         "trait_communal"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "41",
+      "name": "SPEC_Larongo",
+      "class": "MOL",
+      "portrait": "mol7",
+      "traits": [
+        "trait_organic",
+        "trait_pc_continental_preference",
+        "trait_quarrelsome",
+        "trait_sedentary",
+        "trait_enduring",
+        "trait_solitary",
+        "trait_extremely_adaptive"
       ],
       "is_player_species": false
     },
@@ -6519,6 +5618,22 @@
       "is_player_species": false
     },
     {
+      "id": "42",
+      "name": "SPEC_Urzo",
+      "class": "MOL",
+      "portrait": "mol3",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_rapid_breeders",
+        "trait_quarrelsome",
+        "trait_natural_sociologists",
+        "trait_slow_learners",
+        "trait_conservational"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "420",
       "name": "SPEC_Sek-Lokkar",
       "class": "REP",
@@ -6676,6 +5791,22 @@
       "home_planet_id": "7361"
     },
     {
+      "id": "43",
+      "name": "SPEC_Urzo",
+      "class": "MOL",
+      "portrait": "mol3",
+      "traits": [
+        "trait_organic",
+        "trait_conservational",
+        "trait_rapid_breeders",
+        "trait_quarrelsome",
+        "trait_natural_sociologists",
+        "trait_slow_learners",
+        "trait_pc_habitat_preference"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "430",
       "name": "SPEC_Kroll",
       "class": "MAM",
@@ -6827,6 +5958,17 @@
         "trait_thrifty",
         "trait_unruly",
         "trait_conformists"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "44",
+      "name": "NAME_Robot",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_mechanical",
+        "trait_wet_planet_preference"
       ],
       "is_player_species": false
     },
@@ -7000,6 +6142,22 @@
       "home_planet_id": "642"
     },
     {
+      "id": "45",
+      "name": "NAME_Caravaneer_Fleet1_species",
+      "class": "FUN",
+      "portrait": "fun10",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tropical_preference",
+        "trait_unruly",
+        "trait_quarrelsome",
+        "trait_conservational",
+        "trait_talented",
+        "trait_very_strong"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "450",
       "name": "$base$ $affix$",
       "class": "MAM",
@@ -7152,6 +6310,22 @@
         "trait_natural_physicists",
         "trait_nonadaptive",
         "trait_conformists"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "46",
+      "name": "NAME_Ketling",
+      "class": "MAM",
+      "portrait": "mam_rat",
+      "traits": [
+        "trait_pc_savannah_preference",
+        "trait_organic",
+        "trait_repugnant",
+        "trait_slow_breeders",
+        "trait_thrifty",
+        "trait_deviants",
+        "trait_fleeting"
       ],
       "is_player_species": false
     },
@@ -7312,6 +6486,24 @@
         "trait_traditional",
         "trait_slow_learners",
         "trait_natural_physicists"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "47",
+      "name": "$affix$$base$",
+      "class": "MAM",
+      "portrait": "mam_rat",
+      "traits": [
+        "trait_pc_nuked_preference",
+        "trait_organic",
+        "trait_cybernetic",
+        "trait_repugnant",
+        "trait_slow_breeders",
+        "trait_thrifty",
+        "trait_cyborg_trading_algorithms",
+        "trait_deviants",
+        "trait_fleeting"
       ],
       "is_player_species": false
     },
@@ -7479,6 +6671,20 @@
       "is_player_species": false
     },
     {
+      "id": "48",
+      "name": "NAME_Caravaneer_Fleet3_robot",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_machine_pc_nuked_preference",
+        "trait_mechanical",
+        "trait_auto_mod_robotic",
+        "trait_robot_bulky",
+        "trait_robot_repurposed_hardware"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "480",
       "name": "SPEC_Ytrellan",
       "class": "ART",
@@ -7642,6 +6848,22 @@
       "is_player_species": false
     },
     {
+      "id": "49",
+      "name": "SPEC_Uindar",
+      "class": "ART",
+      "portrait": "art19",
+      "traits": [
+        "trait_organic",
+        "trait_pc_continental_preference",
+        "trait_conservational",
+        "trait_communal",
+        "trait_unruly",
+        "trait_natural_sociologists",
+        "trait_enduring"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "490",
       "name": "SPEC_Hjannarthi",
       "class": "MOL",
@@ -7790,6 +7012,22 @@
         "trait_quarrelsome",
         "trait_slow_breeders",
         "trait_very_strong"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "50",
+      "name": "SPEC_Connisthian",
+      "class": "MOL",
+      "portrait": "mol14",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tropical_preference",
+        "trait_sedentary",
+        "trait_natural_sociologists",
+        "trait_nonadaptive",
+        "trait_very_strong",
+        "trait_enduring"
       ],
       "is_player_species": false
     },
@@ -7965,6 +7203,21 @@
       ],
       "is_player_species": false,
       "home_planet_id": "573"
+    },
+    {
+      "id": "51",
+      "name": "SPEC_Sotwotrumatta",
+      "class": "SALVAGER",
+      "portrait": "salvager01",
+      "traits": [
+        "trait_pc_habitat_preference",
+        "trait_talented",
+        "trait_strong",
+        "trait_slow_learners",
+        "trait_resilient"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "1495"
     },
     {
       "id": "510",
@@ -8143,6 +7396,22 @@
       "is_player_species": false
     },
     {
+      "id": "52",
+      "name": "SPEC_Reshethi",
+      "class": "REP",
+      "portrait": "rep15",
+      "traits": [
+        "trait_organic",
+        "trait_pc_ocean_preference",
+        "trait_enduring",
+        "trait_repugnant",
+        "trait_very_strong",
+        "trait_solitary",
+        "trait_resilient"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "520",
       "name": "SPEC_Havarigga",
       "class": "MOL",
@@ -8297,6 +7566,22 @@
         "trait_conservational",
         "trait_weak",
         "trait_natural_engineers"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "53",
+      "name": "SPEC_Havarigga",
+      "class": "MOL",
+      "portrait": "mol6",
+      "traits": [
+        "trait_organic",
+        "trait_pc_savannah_preference",
+        "trait_sedentary",
+        "trait_charismatic",
+        "trait_strong",
+        "trait_slow_breeders",
+        "trait_industrious"
       ],
       "is_player_species": false
     },
@@ -8480,6 +7765,22 @@
       "home_planet_id": "10299"
     },
     {
+      "id": "54",
+      "name": "SPEC_Buhavilaa",
+      "class": "FUN",
+      "portrait": "fun3",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_talented",
+        "trait_natural_sociologists",
+        "trait_solitary",
+        "trait_unruly",
+        "trait_very_strong"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "540",
       "name": "$base$ $affix$",
       "class": "REP",
@@ -8654,6 +7955,22 @@
       ],
       "is_player_species": false,
       "home_planet_id": "9219"
+    },
+    {
+      "id": "55",
+      "name": "SPEC_Tuxkan",
+      "class": "REP",
+      "portrait": "rep12",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_talented",
+        "trait_traditional",
+        "trait_nonadaptive",
+        "trait_unruly",
+        "trait_venerable"
+      ],
+      "is_player_species": false
     },
     {
       "id": "550",
@@ -8832,6 +8149,22 @@
       "home_planet_id": "6101"
     },
     {
+      "id": "56",
+      "name": "SPEC_Pouz-Jok",
+      "class": "MAM",
+      "portrait": "mam8",
+      "traits": [
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_deviants",
+        "trait_resilient",
+        "trait_wasteful",
+        "trait_intelligent",
+        "trait_enduring"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "560",
       "name": "$affix$$base$",
       "class": "FUN",
@@ -9003,6 +8336,23 @@
       ],
       "is_player_species": false,
       "home_planet_id": "198"
+    },
+    {
+      "id": "57",
+      "name": "SPEC_Jubaran",
+      "class": "MOL",
+      "portrait": "mol1",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_industrious",
+        "trait_wasteful",
+        "trait_resilient",
+        "trait_weak",
+        "trait_natural_sociologists"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "2020"
     },
     {
       "id": "570",
@@ -9183,6 +8533,22 @@
       "home_planet_id": "430"
     },
     {
+      "id": "58",
+      "name": "SPEC_Sirgogg",
+      "class": "MOL",
+      "portrait": "mol2",
+      "traits": [
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_communal",
+        "trait_quarrelsome",
+        "trait_rapid_breeders",
+        "trait_fleeting",
+        "trait_resilient"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "580",
       "name": "$base$ $affix$",
       "class": "FUN",
@@ -9355,6 +8721,17 @@
       "home_planet_id": "198"
     },
     {
+      "id": "59",
+      "name": "NAME_Robot",
+      "class": "ROBOT",
+      "portrait": "default_robot",
+      "traits": [
+        "trait_mechanical",
+        "trait_cold_planet_preference"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "590",
       "name": "SPEC_Izki",
       "class": "ART",
@@ -9520,6 +8897,39 @@
       ],
       "is_player_species": false,
       "home_planet_id": "159"
+    },
+    {
+      "id": "6",
+      "name": "SPEC_Cevanti",
+      "class": "HUM",
+      "portrait": "humanoid_05",
+      "traits": [
+        "trait_organic",
+        "trait_pc_savannah_preference",
+        "trait_fleeting",
+        "trait_intelligent",
+        "trait_strong",
+        "trait_decadent",
+        "trait_talented"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "74"
+    },
+    {
+      "id": "60",
+      "name": "SPEC_Ruphaari",
+      "class": "MAM",
+      "portrait": "mam12",
+      "traits": [
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_agrarian",
+        "trait_slow_learners",
+        "trait_natural_engineers",
+        "trait_solitary",
+        "trait_enduring"
+      ],
+      "is_player_species": false
     },
     {
       "id": "600",
@@ -9688,6 +9098,22 @@
       ],
       "is_player_species": false,
       "home_planet_id": "564"
+    },
+    {
+      "id": "61",
+      "name": "SPEC_Avarrian",
+      "class": "AVI",
+      "portrait": "avi8",
+      "traits": [
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_resilient",
+        "trait_wasteful",
+        "trait_traditional",
+        "trait_talented"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "2487"
     },
     {
       "id": "610",
@@ -9866,6 +9292,23 @@
       "home_planet_id": "564"
     },
     {
+      "id": "62",
+      "name": "SPEC_Haspalv",
+      "class": "AVI",
+      "portrait": "avi12",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_fleeting",
+        "trait_wasteful",
+        "trait_quick_learners",
+        "trait_conformists",
+        "trait_traditional"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "3558"
+    },
+    {
       "id": "620",
       "name": "SPEC_Ekwynian",
       "class": "MAM",
@@ -10031,6 +9474,23 @@
       "is_player_species": false
     },
     {
+      "id": "63",
+      "name": "SPEC_Yssravannar",
+      "class": "AVI",
+      "portrait": "avi10",
+      "traits": [
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_thrifty",
+        "trait_repugnant",
+        "trait_agrarian",
+        "trait_solitary",
+        "trait_nomadic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "3993"
+    },
+    {
       "id": "630",
       "name": "SPEC_DimaXanian",
       "class": "REP",
@@ -10175,6 +9635,23 @@
         "trait_nomadic"
       ],
       "is_player_species": false
+    },
+    {
+      "id": "64",
+      "name": "SPEC_YaxKalock",
+      "class": "ART",
+      "portrait": "art10",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_wasteful",
+        "trait_traditional",
+        "trait_natural_physicists",
+        "trait_fleeting",
+        "trait_charismatic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "4371"
     },
     {
       "id": "640",
@@ -10338,6 +9815,22 @@
       "is_player_species": false
     },
     {
+      "id": "65",
+      "name": "SPEC_Zracon",
+      "class": "FUN",
+      "portrait": "fun4",
+      "traits": [
+        "trait_organic",
+        "trait_pc_continental_preference",
+        "trait_natural_sociologists",
+        "trait_strong",
+        "trait_slow_learners",
+        "trait_traditional"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "4440"
+    },
+    {
       "id": "650",
       "name": "SPEC_Gulk-Furki",
       "class": "AVI",
@@ -10499,6 +9992,23 @@
       "home_planet_id": "430"
     },
     {
+      "id": "66",
+      "name": "SPEC_Djomar",
+      "class": "MOL",
+      "portrait": "mol11",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arid_preference",
+        "trait_deviants",
+        "trait_unruly",
+        "trait_nomadic",
+        "trait_industrious",
+        "trait_rapid_breeders"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "5085"
+    },
+    {
       "id": "660",
       "name": "SPEC_Kazam",
       "class": "MAM",
@@ -10652,6 +10162,23 @@
         "trait_charismatic"
       ],
       "is_player_species": false
+    },
+    {
+      "id": "67",
+      "name": "SPEC_Uthabulan",
+      "class": "MOL",
+      "portrait": "mol4",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_repugnant",
+        "trait_nomadic",
+        "trait_very_strong",
+        "trait_quarrelsome",
+        "trait_enduring"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "5535"
     },
     {
       "id": "670",
@@ -10833,6 +10360,23 @@
       ],
       "is_player_species": false,
       "home_planet_id": "159"
+    },
+    {
+      "id": "68",
+      "name": "SPEC_Zukakkan",
+      "class": "REP",
+      "portrait": "rep17",
+      "traits": [
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_conformists",
+        "trait_slow_breeders",
+        "trait_adaptive",
+        "trait_repugnant",
+        "trait_thrifty"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "5806"
     },
     {
       "id": "680",
@@ -11017,6 +10561,22 @@
       ],
       "is_player_species": false,
       "home_planet_id": "5085"
+    },
+    {
+      "id": "69",
+      "name": "SPEC_Hissma",
+      "class": "FUN",
+      "portrait": "fun8",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_quarrelsome",
+        "trait_nonadaptive",
+        "trait_venerable",
+        "trait_strong"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "6101"
     },
     {
       "id": "690",
@@ -11210,6 +10770,23 @@
       "home_planet_id": "159"
     },
     {
+      "id": "70",
+      "name": "SPEC_Birnathi",
+      "class": "MAM",
+      "portrait": "mam17",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tropical_preference",
+        "trait_docile",
+        "trait_repugnant",
+        "trait_agrarian",
+        "trait_slow_learners",
+        "trait_natural_engineers"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "6166"
+    },
+    {
       "id": "700",
       "name": "$affix$$base$",
       "class": "MAM",
@@ -11378,6 +10955,23 @@
       "is_player_species": false
     },
     {
+      "id": "71",
+      "name": "SPEC_QuVab",
+      "class": "MAM",
+      "portrait": "mam11",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_docile",
+        "trait_solitary",
+        "trait_talented",
+        "trait_nonadaptive",
+        "trait_charismatic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "6812"
+    },
+    {
       "id": "710",
       "name": "SPEC_Tarassi",
       "class": "MAM",
@@ -11539,6 +11133,23 @@
         "trait_resilient"
       ],
       "is_player_species": false
+    },
+    {
+      "id": "72",
+      "name": "SPEC_Evandari",
+      "class": "MAM",
+      "portrait": "mammalian_ar_05",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_industrious",
+        "trait_decadent",
+        "trait_repugnant",
+        "trait_quick_learners",
+        "trait_docile"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "6939"
     },
     {
       "id": "720",
@@ -11707,6 +11318,23 @@
       "home_planet_id": "10482"
     },
     {
+      "id": "73",
+      "name": "SPEC_Estwani",
+      "class": "MAM",
+      "portrait": "mam15",
+      "traits": [
+        "trait_organic",
+        "trait_pc_continental_preference",
+        "trait_natural_sociologists",
+        "trait_decadent",
+        "trait_communal",
+        "trait_wasteful",
+        "trait_adaptive"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "7100"
+    },
+    {
       "id": "730",
       "name": "$base$ $affix$",
       "class": "REP",
@@ -11864,6 +11492,23 @@
       ],
       "is_player_species": false,
       "home_planet_id": "31"
+    },
+    {
+      "id": "74",
+      "name": "SPEC_LaginChuuz",
+      "class": "MOL",
+      "portrait": "mol8",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arctic_preference",
+        "trait_decadent",
+        "trait_fleeting",
+        "trait_extremely_adaptive",
+        "trait_slow_breeders",
+        "trait_ingenious"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "7173"
     },
     {
       "id": "740",
@@ -12032,6 +11677,22 @@
       "is_player_species": false
     },
     {
+      "id": "75",
+      "name": "SPEC_Hiffnar",
+      "class": "MAM",
+      "portrait": "mammalian_ar_03",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tundra_preference",
+        "trait_industrious",
+        "trait_slow_breeders",
+        "trait_natural_sociologists",
+        "trait_traditional"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "7361"
+    },
+    {
       "id": "750",
       "name": "$base$ $affix$",
       "class": "AVI",
@@ -12197,6 +11858,23 @@
       ],
       "is_player_species": false,
       "home_planet_id": "222"
+    },
+    {
+      "id": "76",
+      "name": "SPEC_DrullPerfen",
+      "class": "MAM",
+      "portrait": "mam7",
+      "traits": [
+        "trait_organic",
+        "trait_pc_tropical_preference",
+        "trait_thrifty",
+        "trait_wasteful",
+        "trait_weak",
+        "trait_nomadic",
+        "trait_natural_sociologists"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "8341"
     },
     {
       "id": "760",
@@ -12381,6 +12059,23 @@
       "home_planet_id": "10407"
     },
     {
+      "id": "77",
+      "name": "SPEC_Ragerian",
+      "class": "MAM",
+      "portrait": "mam14",
+      "traits": [
+        "trait_organic",
+        "trait_pc_savannah_preference",
+        "trait_conformists",
+        "trait_decadent",
+        "trait_enduring",
+        "trait_unruly",
+        "trait_rapid_breeders"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "9448"
+    },
+    {
       "id": "770",
       "name": "$affix$$base$",
       "class": "AVI",
@@ -12560,6 +12255,23 @@
       "is_player_species": false
     },
     {
+      "id": "78",
+      "name": "SPEC_Zaxxoid",
+      "class": "ART",
+      "portrait": "art12",
+      "traits": [
+        "trait_organic",
+        "trait_pc_continental_preference",
+        "trait_intelligent",
+        "trait_nonadaptive",
+        "trait_thrifty",
+        "trait_repugnant",
+        "trait_industrious"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "10299"
+    },
+    {
       "id": "780",
       "name": "$base$ $affix$",
       "class": "MAM",
@@ -12736,6 +12448,23 @@
       ],
       "is_player_species": false,
       "home_planet_id": "198"
+    },
+    {
+      "id": "79",
+      "name": "SPEC_Figyar",
+      "class": "AVI",
+      "portrait": "avi7",
+      "traits": [
+        "trait_organic",
+        "trait_pc_savannah_preference",
+        "trait_strong",
+        "trait_deviants",
+        "trait_traditional",
+        "trait_wasteful",
+        "trait_adaptive"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "10306"
     },
     {
       "id": "790",
@@ -12918,6 +12647,22 @@
       "home_planet_id": "7346"
     },
     {
+      "id": "80",
+      "name": "SPEC_Groknaploran",
+      "class": "MAM",
+      "portrait": "mam13",
+      "traits": [
+        "trait_organic",
+        "trait_pc_desert_preference",
+        "trait_industrious",
+        "trait_solitary",
+        "trait_fleeting",
+        "trait_natural_physicists",
+        "trait_nomadic"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "800",
       "name": "$base$ $affix$",
       "class": "REP",
@@ -13080,6 +12825,22 @@
         "trait_fleeting",
         "trait_agrarian",
         "trait_industrious"
+      ],
+      "is_player_species": false
+    },
+    {
+      "id": "81",
+      "name": "SPEC_Krithakkan",
+      "class": "ART",
+      "portrait": "art14",
+      "traits": [
+        "trait_organic",
+        "trait_pc_arid_preference",
+        "trait_sedentary",
+        "trait_talented",
+        "trait_deviants",
+        "trait_intelligent",
+        "trait_strong"
       ],
       "is_player_species": false
     },
@@ -13256,6 +13017,21 @@
       "home_planet_id": "74"
     },
     {
+      "id": "82",
+      "name": "SPEC_TwaxIhdar",
+      "class": "AVI",
+      "portrait": "avi11",
+      "traits": [
+        "trait_organic",
+        "trait_pc_ocean_preference",
+        "trait_natural_engineers",
+        "trait_resilient",
+        "trait_nonadaptive",
+        "trait_docile"
+      ],
+      "is_player_species": false
+    },
+    {
       "id": "820",
       "name": "$base$ $affix$",
       "class": "ART",
@@ -13426,6 +13202,19 @@
       "is_player_species": false
     },
     {
+      "id": "83",
+      "name": "SPEC_OnedQarak",
+      "class": "PRE_MAM",
+      "portrait": "pre_mam13",
+      "traits": [
+        "trait_presapient_proles",
+        "trait_pc_gaia_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "1272"
+    },
+    {
       "id": "830",
       "name": "SPEC_Cithin",
       "class": "ART",
@@ -13590,6 +13379,19 @@
       "home_planet_id": "10404"
     },
     {
+      "id": "84",
+      "name": "SPEC_DimaXanian",
+      "class": "PRE_REP",
+      "portrait": "pre_rep09",
+      "traits": [
+        "trait_presapient_irradiated",
+        "trait_pc_tropical_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "1739"
+    },
+    {
       "id": "840",
       "name": "SPEC_Zaydran",
       "class": "REP",
@@ -13746,6 +13548,19 @@
         "trait_natural_physicists"
       ],
       "is_player_species": false
+    },
+    {
+      "id": "85",
+      "name": "SPEC_Raltek",
+      "class": "PRE_MAM",
+      "portrait": "pre_mam6",
+      "traits": [
+        "trait_presapient_starborn",
+        "trait_pc_gaia_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "1012"
     },
     {
       "id": "850",
@@ -13908,6 +13723,19 @@
         "trait_resilient"
       ],
       "is_player_species": false
+    },
+    {
+      "id": "86",
+      "name": "SPEC_Myrran",
+      "class": "PRE_ART",
+      "portrait": "pre_art13",
+      "traits": [
+        "trait_presapient_earthbound",
+        "trait_pc_arid_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "2265"
     },
     {
       "id": "860",
@@ -14081,6 +13909,19 @@
       ],
       "is_player_species": false,
       "home_planet_id": "430"
+    },
+    {
+      "id": "87",
+      "name": "SPEC_Andigonj",
+      "class": "PRE_MOL",
+      "portrait": "pre_mol3",
+      "traits": [
+        "trait_presapient_earthbound",
+        "trait_pc_ocean_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "3093"
     },
     {
       "id": "870",
@@ -14275,6 +14116,19 @@
       "is_player_species": false
     },
     {
+      "id": "88",
+      "name": "SPEC_Fjasivlin",
+      "class": "PRE_FUN",
+      "portrait": "pre_fun9",
+      "traits": [
+        "trait_presapient_earthbound",
+        "trait_pc_arid_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "4459"
+    },
+    {
       "id": "880",
       "name": "$affix$$base$",
       "class": "MAM",
@@ -14467,6 +14321,19 @@
       "home_planet_id": "159"
     },
     {
+      "id": "89",
+      "name": "SPEC_Opalglec",
+      "class": "PRE_ART",
+      "portrait": "pre_art1",
+      "traits": [
+        "trait_presapient_forcefully_devolved",
+        "trait_pc_desert_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "4597"
+    },
+    {
       "id": "890",
       "name": "SPEC_Dethakkan",
       "class": "REP",
@@ -14643,6 +14510,19 @@
       "home_planet_id": "7173"
     },
     {
+      "id": "90",
+      "name": "SPEC_Cynur",
+      "class": "PRE_AVI",
+      "portrait": "pre_avi1",
+      "traits": [
+        "trait_presapient_irradiated",
+        "trait_pc_arctic_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "4685"
+    },
+    {
       "id": "900",
       "name": "$base$ $affix$",
       "class": "AVI",
@@ -14798,6 +14678,19 @@
         "trait_talented"
       ],
       "is_player_species": false
+    },
+    {
+      "id": "91",
+      "name": "SPEC_Hjannarthi",
+      "class": "PRE_MOL",
+      "portrait": "pre_mol1",
+      "traits": [
+        "trait_presapient_conservative",
+        "trait_pc_savannah_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "4960"
     },
     {
       "id": "910",
@@ -14961,6 +14854,19 @@
       "is_player_species": false
     },
     {
+      "id": "92",
+      "name": "SPEC_Onotach",
+      "class": "PRE_MAM",
+      "portrait": "pre_mam6",
+      "traits": [
+        "trait_presapient_earthbound",
+        "trait_pc_continental_preference",
+        "trait_organic"
+      ],
+      "is_player_species": false,
+      "home_planet_id": "10127"
+    },
+    {
       "id": "920",
       "name": "SPEC_Ziiran",
       "class": "REP",
@@ -15046,1186 +14952,100 @@
       "is_player_species": false
     },
     {
-      "id": "3321888792",
-      "name": null,
-      "class": null,
-      "portrait": null,
+      "id": "93",
+      "name": "SPEC_Pirak",
+      "class": "PRE_ART",
+      "portrait": "pre_art14",
       "traits": [
-        "trait_robot_trading_algorithms"
+        "trait_presapient_irradiated",
+        "trait_pc_tundra_preference",
+        "trait_organic"
       ],
-      "is_player_species": false
+      "is_player_species": false,
+      "home_planet_id": "5453"
     },
     {
-      "id": "788529186",
-      "name": null,
-      "class": null,
-      "portrait": null,
+      "id": "94",
+      "name": "SPEC_Zaydran",
+      "class": "PRE_REP",
+      "portrait": "pre_rep12",
       "traits": [
-        "trait_robot_logic_engines"
+        "trait_presapient_proles",
+        "trait_pc_continental_preference",
+        "trait_organic"
       ],
-      "is_player_species": false
+      "is_player_species": false,
+      "home_planet_id": "1233"
     },
     {
-      "id": "1610612784",
-      "name": null,
-      "class": null,
-      "portrait": null,
+      "id": "95",
+      "name": "SPEC_Suramo",
+      "class": "PRE_REP",
+      "portrait": "pre_rep09",
       "traits": [
-        "trait_robot_trading_algorithms"
+        "trait_presapient_irradiated",
+        "trait_pc_desert_preference",
+        "trait_organic"
       ],
-      "is_player_species": false
+      "is_player_species": false,
+      "home_planet_id": "7460"
     },
     {
-      "id": "4043309132",
-      "name": null,
-      "class": null,
-      "portrait": null,
+      "id": "96",
+      "name": "SPEC_Heejam",
+      "class": "PRE_MOL",
+      "portrait": "pre_mol1",
       "traits": [
-        "trait_robot_power_drills"
+        "trait_presapient_starborn",
+        "trait_pc_desert_preference",
+        "trait_organic"
       ],
-      "is_player_species": false
+      "is_player_species": false,
+      "home_planet_id": "7656"
     },
     {
-      "id": "1526726739",
-      "name": null,
-      "class": null,
-      "portrait": null,
+      "id": "97",
+      "name": "SPEC_Jhoolian",
+      "class": "PRE_FUN",
+      "portrait": "pre_fun13",
       "traits": [
-        "trait_robot_harvesters"
+        "trait_presapient_conservative",
+        "trait_pc_arid_preference",
+        "trait_organic"
       ],
-      "is_player_species": false
+      "is_player_species": false,
+      "home_planet_id": "9127"
     },
     {
-      "id": "1291845728",
-      "name": null,
-      "class": null,
-      "portrait": null,
+      "id": "98",
+      "name": "SPEC_SavixQast",
+      "class": "PRE_ART",
+      "portrait": "pre_art12",
       "traits": [
-        "trait_robot_trading_algorithms"
+        "trait_presapient_natural_intellectuals",
+        "trait_pc_tropical_preference",
+        "trait_organic"
       ],
-      "is_player_species": false
+      "is_player_species": false,
+      "home_planet_id": "9472"
     },
     {
-      "id": "1224736869",
-      "name": null,
-      "class": null,
-      "portrait": null,
+      "id": "99",
+      "name": "SPEC_Shantari",
+      "class": "AVI",
+      "portrait": "avi9",
       "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "654311528",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1509949564",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_ingenious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2113929342",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2499805344",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2936012985",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1644167379",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_emotion_emulators"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "4009754851",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3489661199",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_ingenious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1895825697",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3238003028",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3439329680",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_propaganda_machines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "4261413304",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3439329730",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_propaganda_machines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1442841058",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1426063862",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1107296770",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_propaganda_machines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "369099269",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2147484181",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "4093641239",
-      "name": "GROWTH_CAT_ASSEMBLY",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3573547553",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2835350072",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_propaganda_machines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1526727268",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2600469099",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_ingenious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1509950087",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3137340082",
-      "name": "GROWTH_CAT_FACTION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2667578062",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "268436175",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2348810995",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2432697094",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "738198309",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_emotion_emulators"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2717909799",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_emotion_emulators"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1593836385",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1560282185",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "4110419077",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2801796257",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1627391183",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_ingenious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1040188646",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3707766001",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2080376061",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "301991175",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3372221757",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1761609107",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_emotion_emulators"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1509950873",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1437",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3070231980",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1006634427",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2348811733",
-      "name": "GROWTH_CAT_ASSEMBLY",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2130707928",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_ingenious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1778386424",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "587204147",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2332034614",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3003123272",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1258292834",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "117442149",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "4143974006",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "603981435",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3405776549",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1711277746",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "553649859",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1224738535",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "620758769",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2751465227",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3204450089",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "100665146",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "771753839",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "905971568",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2667579285",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1023412148",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "117442487",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "553650155",
-      "name": "GROWTH_CAT_ASSEMBLY",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2281703405",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1828718582",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_emotion_emulators"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3942647823",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "4110419986",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_emotion_emulators"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2046822454",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3506440259",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3774875725",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "234883222",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3506440344",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_emotion_emulators"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1040189601",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2147485979",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3422554437",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_propaganda_machines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2667579728",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "754977113",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3238005088",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2751465843",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "251660661",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2147486077",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3120564611",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_ingenious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1946159496",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2533362062",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_ingenious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1375734159",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2097154454",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "905972134",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "100665767",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2600470963",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1728055732",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3238005187",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_ingenious"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "4244638150",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_trading_algorithms"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2332035528",
-      "name": "GROWTH_CAT_MIGRATION",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2147486162",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2550139350",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "922749413",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "2214595064",
-      "name": "GROWTH_CAT_ASSEMBLY",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_harvesters"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3909093881",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1744833029",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "3825207883",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "1191184993",
-      "name": "GROWTH_CAT_ASSEMBLY",
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "721422959",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_power_drills"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "4194306680",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_logic_engines"
-      ],
-      "is_player_species": false
-    },
-    {
-      "id": "285215368",
-      "name": null,
-      "class": null,
-      "portrait": null,
-      "traits": [
-        "trait_robot_superconductive"
+        "trait_organic",
+        "trait_pc_alpine_preference",
+        "trait_weak",
+        "trait_industrious",
+        "trait_communal",
+        "trait_decadent",
+        "trait_nomadic"
       ],
       "is_player_species": false
     }
   ],
-  "count": 1042,
+  "count": 924,
   "player_species_id": "806"
 }

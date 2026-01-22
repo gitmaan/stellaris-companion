@@ -1,6 +1,17 @@
 from __future__ import annotations
 
+import logging
 import re
+
+# Rust bridge for fast Clausewitz parsing
+try:
+    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    RUST_BRIDGE_AVAILABLE = True
+except ImportError:
+    RUST_BRIDGE_AVAILABLE = False
+    ParserError = Exception  # Fallback type for type hints
+
+logger = logging.getLogger(__name__)
 
 
 class SpeciesMixin:
@@ -9,11 +20,190 @@ class SpeciesMixin:
     def get_species_full(self) -> dict:
         """Get all species in the game with their traits.
 
+        Uses Rust parser for iteration and structured data, with regex
+        for traits extraction (due to duplicate key issue in Clausewitz format).
+
         Returns:
             Dict with:
               - species: List of species with id, name, class, traits, home_planet
               - count: Total number of species
               - player_species_id: The player's founder species ID
+        """
+        # Try Rust parser first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                return self._get_species_full_rust()
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for species: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_species_full_regex()
+
+    def _get_species_full_rust(self) -> dict:
+        """Get species using Rust parser.
+
+        Uses hybrid approach: Rust parser for iteration and structured data
+        (name, class, portrait, home_planet), but regex for traits extraction
+        because the Clausewitz format has duplicate keys (trait="x" repeated)
+        which the Rust parser doesn't handle correctly (only keeps last value).
+
+        Returns:
+            Dict with species data
+        """
+        result = {
+            'species': [],
+            'count': 0,
+            'player_species_id': None,
+        }
+
+        # Find player's founder species using Rust parser
+        player_id = self.get_player_empire_id()
+        for country_id, country_data in iter_section_entries(self.save_path, "country"):
+            if str(country_id) == str(player_id):
+                founder_ref = country_data.get('founder_species_ref')
+                if founder_ref is not None:
+                    result['player_species_id'] = str(founder_ref)
+                break
+
+        # Build a map of species_id -> traits using regex
+        # (Rust parser only keeps last trait due to duplicate keys)
+        species_traits = self._extract_species_traits_regex()
+
+        species_list = []
+
+        # Iterate species using Rust parser
+        for species_id, species_data in iter_section_entries(self.save_path, "species_db"):
+            # Skip empty species entries
+            if not species_data or len(species_data) < 2:
+                continue
+
+            # Skip species without class (usually empty entries)
+            species_class = species_data.get('class')
+            if not species_class:
+                continue
+
+            # Extract name from name block
+            name = None
+            name_block = species_data.get('name')
+            if isinstance(name_block, dict):
+                name = name_block.get('key')
+            elif isinstance(name_block, str):
+                name = name_block
+
+            # Get portrait
+            portrait = species_data.get('portrait')
+
+            # Get home planet
+            home_planet = species_data.get('home_planet')
+
+            # Get traits from regex extraction (more complete than Rust)
+            traits = species_traits.get(str(species_id), [])
+
+            species_info = {
+                'id': str(species_id),
+                'name': name,
+                'class': species_class,
+                'portrait': portrait,
+                'traits': traits,
+                'is_player_species': str(species_id) == result['player_species_id'],
+            }
+
+            if home_planet is not None:
+                species_info['home_planet_id'] = str(home_planet)
+
+            species_list.append(species_info)
+
+        result['species'] = species_list
+        result['count'] = len(species_list)
+
+        return result
+
+    def _find_species_db_section(self) -> str:
+        """Find and extract the species_db section with proper boundaries.
+
+        Returns:
+            The species_db section content, or empty string if not found
+        """
+        # Find species_db section
+        species_start = self.gamestate.find('\nspecies_db=')
+        if species_start == -1:
+            species_start = self.gamestate.find('species_db=')
+        if species_start == -1:
+            return ""
+
+        # Find the end of species_db section using brace matching
+        chunk = self.gamestate[species_start:]
+        brace_count = 0
+        started = False
+        end_pos = 0
+        for i, char in enumerate(chunk):
+            if char == '{':
+                brace_count += 1
+                started = True
+            elif char == '}':
+                brace_count -= 1
+                if started and brace_count == 0:
+                    end_pos = i + 1
+                    break
+
+        return self.gamestate[species_start:species_start + end_pos]
+
+    def _extract_species_traits_regex(self) -> dict:
+        """Extract traits for all species using regex.
+
+        The Rust parser can't handle duplicate keys (trait="x" repeated),
+        so we extract traits with regex from the species_db section.
+
+        Returns:
+            Dict mapping species ID to list of trait names
+        """
+        species_traits = {}
+
+        # Get properly bounded species_db section
+        species_section = self._find_species_db_section()
+        if not species_section:
+            return species_traits
+
+        # Parse individual species entries
+        entry_pattern = r'\n\t(\d+)=\s*\{'
+        entries = list(re.finditer(entry_pattern, species_section))
+
+        for i, match in enumerate(entries):
+            species_id = match.group(1)
+            start_pos = match.end()
+
+            # Find end of block using brace matching
+            brace_count = 1
+            pos = start_pos
+            max_pos = min(start_pos + 5000, len(species_section))
+            while brace_count > 0 and pos < max_pos:
+                if species_section[pos] == '{':
+                    brace_count += 1
+                elif species_section[pos] == '}':
+                    brace_count -= 1
+                pos += 1
+
+            block = species_section[start_pos:pos]
+
+            # Extract traits
+            traits = []
+            traits_block = re.search(r'traits=\s*\{([^}]+)\}', block)
+            if traits_block:
+                trait_matches = re.findall(r'trait="([^"]+)"', traits_block.group(1))
+                traits = trait_matches
+
+            if traits:
+                species_traits[species_id] = traits
+
+        return species_traits
+
+    def _get_species_full_regex(self) -> dict:
+        """Get species using regex parsing (fallback method).
+
+        Returns:
+            Dict with species data
         """
         result = {
             'species': [],
@@ -29,15 +219,10 @@ class SpeciesMixin:
             if founder_match:
                 result['player_species_id'] = founder_match.group(1)
 
-        # Find species_db section
-        species_start = self.gamestate.find('\nspecies_db=')
-        if species_start == -1:
-            species_start = self.gamestate.find('species_db=')
-        if species_start == -1:
+        # Get properly bounded species_db section
+        species_section = self._find_species_db_section()
+        if not species_section:
             return result
-
-        # Get the species section
-        species_section = self.gamestate[species_start:species_start + 2000000]
 
         # Parse individual species entries
         entry_pattern = r'\n\t(\d+)=\s*\{'

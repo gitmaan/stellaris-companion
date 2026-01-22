@@ -70,3 +70,5 @@ grep -c 're\.' stellaris_save_extractor/*.py | sort -t: -k2 -nr
 - When comparing by ID (ignoring order), migration is correct even if validation fails on order
 - Can manually update baseline by running extraction and saving result
 - relations_manager.relation has multiple entries with same key - must use regex for parsing relations
+- When extracting sections with regex, ALWAYS properly bound the section using brace matching - don't use fixed offsets like species_start + 2000000, or you'll match entries from other sections
+- Species traits have duplicate keys (trait="x" repeated) - use regex for traits extraction

@@ -111,8 +111,8 @@
         "RUN: python3 scripts/validate_migration.py get_species_full --update (matches or improves, baseline updated if improved)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "11 regex calls. Species names should IMPROVE"
+      "passes": true,
+      "notes": "Migrated get_species_full to Rust parser using iter_section_entries for species iteration. Uses hybrid approach: Rust for structured data (name, class, portrait, home_planet), regex for traits (duplicate key issue). Fixed critical bug in original code that was matching entries from other sections (pop_groups). Baseline updated - 924 species (correct) vs 1042 (incorrect due to section boundary bug)."
     },
     {
       "id": "MIG-LEADERS",
