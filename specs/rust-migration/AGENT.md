@@ -69,3 +69,4 @@ grep -c 're\.' stellaris_save_extractor/*.py | sort -t: -k2 -nr
 - iter_section_entries returns in numeric ID order, not file order
 - When comparing by ID (ignoring order), migration is correct even if validation fails on order
 - Can manually update baseline by running extraction and saving result
+- relations_manager.relation has multiple entries with same key - must use regex for parsing relations
