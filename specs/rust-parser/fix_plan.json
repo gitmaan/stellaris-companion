@@ -4,7 +4,9 @@
   "patterns": [
     "Rust must be sourced from ~/.cargo/env before cargo commands will work",
     "jomini text::de::from_utf8_slice requires target type annotation (HashMap<String, Value>)",
-    "Use a shared error.rs module for JSON error output to stderr with exit codes (1=file not found, 2=parse error, 3=invalid argument)"
+    "Use a shared error.rs module for JSON error output to stderr with exit codes (1=file not found, 2=parse error, 3=invalid argument)",
+    "jomini HashMap<String, Value> deserialization overwrites duplicate keys (last value wins); use TextTape or custom deserializers for duplicate preservation",
+    "Condensed syntax parsing works when quoted strings provide delimiters (a={b=\"1\"c=\"2\"}); bare values adjacent to bare values may concatenate"
   ],
   "stories": [
     {
@@ -71,8 +73,8 @@
         "RUN: cd stellaris-parser && cargo test (all tests pass)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Create unit tests for edge cases using test fixtures"
+      "passes": true,
+      "notes": "Added 15 tests in edge_cases.rs covering duplicate keys, condensed syntax, escape sequences, empty blocks, and mixed values. Tests document jomini's actual behavior: HashMap deserialization overwrites duplicates (last value wins), quoted strings serve as delimiters for condensed syntax."
     },
     {
       "id": "RUST-006",

@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 
 mod commands;
+mod edge_cases;
 mod error;
 
 #[derive(Parser)]
