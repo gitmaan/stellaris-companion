@@ -1,0 +1,231 @@
+{
+  "feature": "Rust Parser Migration",
+  "branch": "ralph/rust-migration",
+  "patterns": [
+    "Use venv/bin/python or python3 - bare python doesn't exist",
+    "Extractors are in stellaris_save_extractor/ not backend/extractors/",
+    "Always capture baseline BEFORE changing code",
+    "Planet names use key/variables structure - extract from variables for real name",
+    "Species names similarly need variable extraction",
+    "extract_sections() returns dict, iter_section_entries() yields (key, value) tuples"
+  ],
+  "stories": [
+    {
+      "id": "SETUP-001",
+      "title": "Create validation infrastructure and capture all baselines",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py --list (shows available methods)",
+        "RUN: python3 scripts/capture_baseline.py get_player_status (baseline saved)",
+        "RUN: python3 scripts/capture_baseline.py get_planets (baseline saved)",
+        "RUN: python3 scripts/capture_baseline.py get_fleets (baseline saved)",
+        "RUN: python3 scripts/capture_baseline.py get_diplomacy (baseline saved)",
+        "RUN: python3 scripts/capture_baseline.py get_resources (baseline saved)",
+        "RUN: python3 scripts/capture_baseline.py get_species_full (baseline saved)",
+        "RUN: python3 scripts/capture_baseline.py get_leaders (baseline saved)",
+        "RUN: python3 scripts/capture_baseline.py get_technology (baseline saved)",
+        "RUN: python3 scripts/capture_baseline.py get_armies (baseline saved)",
+        "RUN: python3 scripts/capture_baseline.py get_metadata (baseline saved)",
+        "RUN: ls tests/migration_baselines/*.json | wc -l (at least 10 baseline files)"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Completed: All 10 baselines captured successfully (get_player_status, get_planets, get_fleets, get_diplomacy, get_resources, get_species_full, get_leaders, get_technology, get_armies, get_metadata)"
+    },
+    {
+      "id": "MIG-PLAYER",
+      "title": "Migrate player.py to Rust parser",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py get_player_status (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/player.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/player.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_player_status --update (matches or improves, baseline updated if improved)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; print(SaveExtractor(\"test_save.sav\").get_player_status())' (no errors)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "32 regex calls to migrate"
+    },
+    {
+      "id": "MIG-PLANETS",
+      "title": "Migrate planets.py to Rust parser",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py get_planets (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/planets.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/planets.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_planets --update (matches or improves, baseline updated if improved)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(len(e.get_planets()))' (returns count)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "36 regex calls. Planet names should IMPROVE (show real names not NEW_COLONY_1)"
+    },
+    {
+      "id": "MIG-MILITARY",
+      "title": "Migrate military.py to Rust parser",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py get_fleets (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/military.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/military.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_fleets --update (matches or improves, baseline updated if improved)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; print(SaveExtractor(\"test_save.sav\").get_fleets().keys())' (no errors)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "36 regex calls to migrate"
+    },
+    {
+      "id": "MIG-DIPLOMACY",
+      "title": "Migrate diplomacy.py to Rust parser",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py get_diplomacy (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/diplomacy.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/diplomacy.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_diplomacy --update (matches or improves, baseline updated if improved)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; print(len(SaveExtractor(\"test_save.sav\").get_diplomacy()))' (returns count)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "69 regex calls - largest file to migrate"
+    },
+    {
+      "id": "MIG-ECONOMY",
+      "title": "Migrate economy.py to Rust parser",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py get_resources (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/economy.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/economy.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_resources --update (matches or improves, baseline updated if improved)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; print(SaveExtractor(\"test_save.sav\").get_resources().keys())' (no errors)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "29 regex calls to migrate"
+    },
+    {
+      "id": "MIG-SPECIES",
+      "title": "Migrate species.py to Rust parser",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py get_species_full (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/species.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/species.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_species_full --update (matches or improves, baseline updated if improved)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "11 regex calls. Species names should IMPROVE"
+    },
+    {
+      "id": "MIG-LEADERS",
+      "title": "Migrate leaders.py to Rust parser",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py get_leaders (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/leaders.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/leaders.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_leaders --update (matches or improves, baseline updated if improved)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "11 regex calls to migrate"
+    },
+    {
+      "id": "MIG-TECHNOLOGY",
+      "title": "Migrate technology.py to Rust parser",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py get_technology (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/technology.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/technology.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_technology --update (matches or improves, baseline updated if improved)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "14 regex calls to migrate"
+    },
+    {
+      "id": "MIG-ARMIES",
+      "title": "Migrate armies.py to Rust parser",
+      "criteria": [
+        "RUN: python3 scripts/capture_baseline.py get_armies (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/armies.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/armies.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_armies --update (matches or improves, baseline updated if improved)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "11 regex calls to migrate"
+    },
+    {
+      "id": "MIG-ENDGAME",
+      "title": "Migrate endgame.py to Rust parser",
+      "criteria": [
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/endgame.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/endgame.py (fallback present)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(e.get_crisis_status())' (no errors)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "14 regex calls to migrate"
+    },
+    {
+      "id": "MIG-POLITICS",
+      "title": "Migrate politics.py to Rust parser",
+      "criteria": [
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/politics.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/politics.py (fallback present)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(e.get_factions())' (no errors)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "9 regex calls to migrate"
+    },
+    {
+      "id": "MIG-PROJECTS",
+      "title": "Migrate projects.py to Rust parser",
+      "criteria": [
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/projects.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/projects.py (fallback present)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(e.get_special_projects())' (no errors)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "10 regex calls to migrate"
+    },
+    {
+      "id": "MIG-LEVIATHANS",
+      "title": "Migrate leviathans.py to Rust parser",
+      "criteria": [
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/leviathans.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/leviathans.py (fallback present)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(e.get_leviathans())' (no errors)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "6 regex calls to migrate"
+    },
+    {
+      "id": "MIG-BASE",
+      "title": "Complete base.py migration (remaining regex)",
+      "criteria": [
+        "RUN: grep -c 're\\.' stellaris_save_extractor/base.py (less than 10 remaining)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/base.py | wc -l (at least 5 usages)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(e.get_metadata())' (no errors)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "42 regex calls remaining, 2 already migrated"
+    },
+    {
+      "id": "VALIDATE-ALL",
+      "title": "Final validation - all extractions work correctly",
+      "criteria": [
+        "RUN: python3 v2_native_tools.py test_save.sav --briefing 2>&1 | head -30 (briefing works)",
+        "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); p=e.get_planets(); f=e.get_fleets(); print(\"Planets:\", len(p.get(\"planets\",[])), \"Fleets:\", len(f.get(\"fleets\",[])))' (counts look reasonable)",
+        "RUN: grep -r 'extract_sections\\|iter_section_entries' stellaris_save_extractor/*.py | wc -l (at least 15 usages)",
+        "RUN: grep -c 're\\.' stellaris_save_extractor/*.py | awk -F: '{sum+=$2} END {print sum}' (less than 50 regex remaining)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Final check that everything works together"
+    }
+  ],
+  "discovered": []
+}

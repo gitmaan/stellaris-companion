@@ -1,0 +1,8216 @@
+{
+  "armies": [
+    {
+      "id": "16777218",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "16777231",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "342"
+    },
+    {
+      "id": "67108880",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "50331698",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "16777228"
+    },
+    {
+      "id": "50331714",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "273"
+    },
+    {
+      "id": "16777290",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "78"
+    },
+    {
+      "id": "67108941",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "81",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "82",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "83",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "84",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "85",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "83886167",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "806"
+    },
+    {
+      "id": "16777305",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "73"
+    },
+    {
+      "id": "184549466",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "33554550",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "67109002",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "73"
+    },
+    {
+      "id": "251658382",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "64"
+    },
+    {
+      "id": "117440711",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "806"
+    },
+    {
+      "id": "33554638",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "234881231",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "16777427",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "50331862",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "67109094",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "67109097",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "780"
+    },
+    {
+      "id": "201326826",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "251658484",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "806"
+    },
+    {
+      "id": "134217986",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "273"
+    },
+    {
+      "id": "83886348",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "117440791",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "33554715",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "16777223"
+    },
+    {
+      "id": "167772445",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "50331939",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "134218052",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "184549706",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "806"
+    },
+    {
+      "id": "50331982",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "33554793",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "67109248",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "33554819",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "67109259",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "234881424",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "83886489",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "16777628",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "184549791",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "806"
+    },
+    {
+      "id": "100663730",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "83886529",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "761"
+    },
+    {
+      "id": "50332256",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "806"
+    },
+    {
+      "id": "50332319",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "16777892",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "73"
+    },
+    {
+      "id": "33555114",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "134218483",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "273"
+    },
+    {
+      "id": "117441272",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "16777980",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "285213441",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "100664070",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "83886856",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "33555215",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "806"
+    },
+    {
+      "id": "83886865",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "184550162",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "74"
+    },
+    {
+      "id": "100664095",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "150995755",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "50332462",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "117441334",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "806"
+    },
+    {
+      "id": "33555262",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "759"
+    },
+    {
+      "id": "67109705",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "273"
+    },
+    {
+      "id": "67109756",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "83886986",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "83887014",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "134218667",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "64"
+    },
+    {
+      "id": "83887046",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "83887049",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "64"
+    },
+    {
+      "id": "67109835",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "50332620",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "117441491",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "806"
+    },
+    {
+      "id": "218104788",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "73"
+    },
+    {
+      "id": "50332629",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "150995933",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "64"
+    },
+    {
+      "id": "50332638",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "83887075",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "806"
+    },
+    {
+      "id": "16778215",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "16778218",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "64"
+    },
+    {
+      "id": "50332659",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "201327606",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "218104833",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "67109893",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "761"
+    },
+    {
+      "id": "67109913",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "64"
+    },
+    {
+      "id": "117441570",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "78"
+    },
+    {
+      "id": "100664395",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "16777221"
+    },
+    {
+      "id": "83887182",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "78"
+    },
+    {
+      "id": "50332757",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "16778336",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "201327741",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "77"
+    },
+    {
+      "id": "83887236",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "167773320",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "50332817",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "73"
+    },
+    {
+      "id": "218104980",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "83887253",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "64"
+    },
+    {
+      "id": "50332824",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "218105018",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "234882242",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "273"
+    },
+    {
+      "id": "50332867",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "117441740",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "301991126",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "150996185",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "150996186",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "64"
+    },
+    {
+      "id": "50332892",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "117441790",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "73"
+    },
+    {
+      "id": "33555712",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "33555738",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "100664604",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "67110186",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "50332978",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "16778547",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "100664628",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "78"
+    },
+    {
+      "id": "83887420",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "234882368",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "273"
+    },
+    {
+      "id": "167773505",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "184550742",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "273"
+    },
+    {
+      "id": "33555806",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "117441889",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "18"
+    },
+    {
+      "id": "83887459",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "47"
+    },
+    {
+      "id": "218105192",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "83887470",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "16777223"
+    },
+    {
+      "id": "16778615",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "150996362",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "134219151",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "150996388",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "83887530",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "67110331",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "117441983",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "73"
+    },
+    {
+      "id": "117441985",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "83887560",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "16777228"
+    },
+    {
+      "id": "201328085",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "64"
+    },
+    {
+      "id": "50333150",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "806"
+    },
+    {
+      "id": "117442040",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "610"
+    },
+    {
+      "id": "184550915",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "273"
+    },
+    {
+      "id": "67110405",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "33555976",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "16777221"
+    },
+    {
+      "id": "50333193",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "50333196",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "73"
+    },
+    {
+      "id": "50333198",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "201328147",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "100664852",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "806"
+    },
+    {
+      "id": "150996501",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "184550937",
+      "type": "robotic_defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 200.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "634"
+    },
+    {
+      "id": "100664862",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "74"
+    },
+    {
+      "id": "33556004",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "218105386",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "150996532",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "117442101",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "184550971",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "273"
+    },
+    {
+      "id": "50333244",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "100664902",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "78"
+    },
+    {
+      "id": "50333271",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "117442140",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "50333277",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "78"
+    },
+    {
+      "id": "50333282",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "33556072",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "16778863",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "18"
+    },
+    {
+      "id": "100664944",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "134219385",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "64"
+    },
+    {
+      "id": "167773829",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "117442187",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "83887759",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "16778909",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "134219426",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "273"
+    },
+    {
+      "id": "33556133",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "67110576",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "150996664",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "806"
+    },
+    {
+      "id": "33556153",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "64"
+    },
+    {
+      "id": "134219451",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "806"
+    },
+    {
+      "id": "33556159",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "100665024",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "64"
+    },
+    {
+      "id": "33556165",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "73"
+    },
+    {
+      "id": "335546065",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "73"
+    },
+    {
+      "id": "1762",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "1763",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "201328358",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "806"
+    },
+    {
+      "id": "1768",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "16778985",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "73"
+    },
+    {
+      "id": "1770",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "1771",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "83887852",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "74"
+    },
+    {
+      "id": "16778989",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "73"
+    },
+    {
+      "id": "1775",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "1776",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "16778994",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "1780",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "64"
+    },
+    {
+      "id": "134219509",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "1784",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "1785",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "67110653",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "67110657",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "117442307",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "806"
+    },
+    {
+      "id": "268437253",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "33556233",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "67110676",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "100665115",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "67110686",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "167773986",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "73"
+    },
+    {
+      "id": "16779045",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "33556263",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "16779054",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "50333496",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "318768953",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "16779066",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "134219580",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "16777237"
+    },
+    {
+      "id": "16779076",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "16779083",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "1868",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "33556302",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "117442383",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "16779088",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "64"
+    },
+    {
+      "id": "16779092",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "16779107",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "16779110",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "16779125",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "150996855",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "16779134",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "134219652",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "1928",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "1932",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "67110805",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "150996899",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "318769068",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "33556400",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "167774176",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "806"
+    },
+    {
+      "id": "50333672",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "50333690",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "16777223"
+    },
+    {
+      "id": "33556477",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "184551422",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "117442567",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "150997019",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "16779306",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "342"
+    },
+    {
+      "id": "201328683",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "16777228"
+    },
+    {
+      "id": "184551468",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "150997037",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "16779310",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "273"
+    },
+    {
+      "id": "218105906",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "73"
+    },
+    {
+      "id": "16779318",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "134219847",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "273"
+    },
+    {
+      "id": "150997065",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "117442645",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "50333788",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "33556574",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "806"
+    },
+    {
+      "id": "50333794",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "16779363",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "50333796",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "16779366",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "50333811",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "273"
+    },
+    {
+      "id": "67111031",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "73"
+    },
+    {
+      "id": "117442680",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "806"
+    },
+    {
+      "id": "16779387",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "184551548",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "16779391",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "16779395",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "16779400",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "67111056",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "100665495",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "16779417",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "201328800",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "806"
+    },
+    {
+      "id": "218106025",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "273"
+    },
+    {
+      "id": "33556657",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "16779442",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "78"
+    },
+    {
+      "id": "117442741",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "806"
+    },
+    {
+      "id": "318769356",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "610"
+    },
+    {
+      "id": "117442765",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "64"
+    },
+    {
+      "id": "117442770",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "64"
+    },
+    {
+      "id": "33556708",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "33556719",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "218106097",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "184551676",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "134220038",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "313"
+    },
+    {
+      "id": "33556744",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "100665620",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "16779551",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "species_id": "806"
+    },
+    {
+      "id": "50334002",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "16779572",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "100665658",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "273"
+    },
+    {
+      "id": "33556799",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "83888448",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "50334023",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "134220104",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "273"
+    },
+    {
+      "id": "67111252",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "73"
+    },
+    {
+      "id": "16779635",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "184551808",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "78"
+    },
+    {
+      "id": "100665729",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "2440",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "64"
+    },
+    {
+      "id": "2447",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "73"
+    },
+    {
+      "id": "50334100",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "16777221"
+    },
+    {
+      "id": "134220182",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "806"
+    },
+    {
+      "id": "50334108",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "806"
+    },
+    {
+      "id": "67111342",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "83888560",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "117443013",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "273"
+    },
+    {
+      "id": "83888589",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "33556956",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "50334175",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "806"
+    },
+    {
+      "id": "16779745",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "100665827",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "33556980",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "83888629",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "73"
+    },
+    {
+      "id": "167774725",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "78"
+    },
+    {
+      "id": "50334229",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "100665885",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "150997534",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "117443104",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "64"
+    },
+    {
+      "id": "83888691",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "100665911",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "806"
+    },
+    {
+      "id": "234883647",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "117443149",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "78"
+    },
+    {
+      "id": "50334298",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "16777228"
+    },
+    {
+      "id": "33557103",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "83888753",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "273"
+    },
+    {
+      "id": "117443193",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "117443194",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "67111552",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "67111562",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "83888789",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "78"
+    },
+    {
+      "id": "33557147",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "78"
+    },
+    {
+      "id": "67111593",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "33557162",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "806"
+    },
+    {
+      "id": "150997690",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "273"
+    },
+    {
+      "id": "67111634",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "610"
+    },
+    {
+      "id": "83888868",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "16780028",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "67111697",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "273"
+    },
+    {
+      "id": "251661074",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "806"
+    },
+    {
+      "id": "50334483",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "67111710",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "117443373",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "766"
+    },
+    {
+      "id": "16780085",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "78"
+    },
+    {
+      "id": "50334521",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "806"
+    },
+    {
+      "id": "33557311",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "167775051",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "16777225"
+    },
+    {
+      "id": "100666190",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "273"
+    },
+    {
+      "id": "251661135",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "50334557",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "273"
+    },
+    {
+      "id": "50334577",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "33557377",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "33557386",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "50334648",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "3001",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "273"
+    },
+    {
+      "id": "134220742",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "16780236",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "33557460",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "150997978",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "16780263",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "16780267",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "273"
+    },
+    {
+      "id": "268438532",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "33557517",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "33557521",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "273"
+    },
+    {
+      "id": "268438562",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "134220842",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "74"
+    },
+    {
+      "id": "3125",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "73"
+    },
+    {
+      "id": "67111997",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "806"
+    },
+    {
+      "id": "50334788",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "16780358",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "234884191",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "184552558",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "806"
+    },
+    {
+      "id": "33557642",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "73"
+    },
+    {
+      "id": "16780454",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "16780459",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "3256",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "806"
+    },
+    {
+      "id": "33557696",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "83889368",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "100666592",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10527",
+      "species_id": "610"
+    },
+    {
+      "id": "50334975",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "100666626",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "610"
+    },
+    {
+      "id": "100666655",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "77"
+    },
+    {
+      "id": "50335011",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "50335026",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "74"
+    },
+    {
+      "id": "100666687",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "73"
+    },
+    {
+      "id": "67112262",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "16777228"
+    },
+    {
+      "id": "150998344",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "50335056",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "273"
+    },
+    {
+      "id": "50335060",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "342"
+    },
+    {
+      "id": "33557845",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "78"
+    },
+    {
+      "id": "67112313",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "3452",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "806"
+    },
+    {
+      "id": "50335101",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "273"
+    },
+    {
+      "id": "3458",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "73"
+    },
+    {
+      "id": "3460",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "73"
+    },
+    {
+      "id": "16780687",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "100666779",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "64"
+    },
+    {
+      "id": "67112353",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "16777228"
+    },
+    {
+      "id": "16780714",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "50335169",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "610"
+    },
+    {
+      "id": "16780741",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "100666826",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "273"
+    },
+    {
+      "id": "33557964",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "50335181",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "64"
+    },
+    {
+      "id": "150998484",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "67112417",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "67112426",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "78"
+    },
+    {
+      "id": "134221291",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "100666879",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "74"
+    },
+    {
+      "id": "167775748",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "50335243",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "184552975",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "78"
+    },
+    {
+      "id": "83889682",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "64"
+    },
+    {
+      "id": "50335253",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "73"
+    },
+    {
+      "id": "33558051",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "78"
+    },
+    {
+      "id": "67112509",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "16780884",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "33558105",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "117444191",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "446"
+    },
+    {
+      "id": "67112549",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "334",
+      "species_id": "450"
+    },
+    {
+      "id": "50335347",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "83889781",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "67112585",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "67112645",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "100667079",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "18"
+    },
+    {
+      "id": "234884809",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "33558221",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "806"
+    },
+    {
+      "id": "67112654",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "806"
+    },
+    {
+      "id": "50335443",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "67112665",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "273"
+    },
+    {
+      "id": "83889882",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "273"
+    },
+    {
+      "id": "83889889",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "64"
+    },
+    {
+      "id": "33558246",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "73"
+    },
+    {
+      "id": "33558258",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "806"
+    },
+    {
+      "id": "33558287",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1571",
+      "species_id": "73"
+    },
+    {
+      "id": "16781089",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "273"
+    },
+    {
+      "id": "285216557",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10528",
+      "species_id": "273"
+    },
+    {
+      "id": "184553269",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "117444416",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "64"
+    },
+    {
+      "id": "16781136",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "50335583",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "273"
+    },
+    {
+      "id": "218107756",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "806"
+    },
+    {
+      "id": "33558386",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "50335607",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "73"
+    },
+    {
+      "id": "184553343",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "67112837",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "67112851",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "16781218",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "64"
+    },
+    {
+      "id": "50335679",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "273"
+    },
+    {
+      "id": "16781255",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "67112906",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "73"
+    },
+    {
+      "id": "33558485",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "83890140",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "83890155",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "806"
+    },
+    {
+      "id": "4088",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "273"
+    },
+    {
+      "id": "4094",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "16781315",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "4102",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "273"
+    },
+    {
+      "id": "4104",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "273"
+    },
+    {
+      "id": "16781322",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "78"
+    },
+    {
+      "id": "16781325",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "4113",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "4114",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "4115",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "4122",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "4128",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "134221862",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "610"
+    },
+    {
+      "id": "4136",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "201330732",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "16777223"
+    },
+    {
+      "id": "4143",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "4145",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "610"
+    },
+    {
+      "id": "4147",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10509",
+      "species_id": "610"
+    },
+    {
+      "id": "4152",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "273"
+    },
+    {
+      "id": "4155",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "64"
+    },
+    {
+      "id": "134221894",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "4179",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "273"
+    },
+    {
+      "id": "67113045",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "74"
+    },
+    {
+      "id": "4185",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "806"
+    },
+    {
+      "id": "4200",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "273"
+    },
+    {
+      "id": "150999147",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "50335853",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "4209",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "73"
+    },
+    {
+      "id": "4219",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "78"
+    },
+    {
+      "id": "16781438",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "806"
+    },
+    {
+      "id": "201330827",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "64"
+    },
+    {
+      "id": "83890318",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "117444751",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "78"
+    },
+    {
+      "id": "83890331",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1241",
+      "species_id": "273"
+    },
+    {
+      "id": "134221981",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "16781482",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "33558717",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "50335938",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "33558726",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "117444822",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "16777228"
+    },
+    {
+      "id": "4323",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "100667625",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "273"
+    },
+    {
+      "id": "4334",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "806"
+    },
+    {
+      "id": "67113208",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "73"
+    },
+    {
+      "id": "4346",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "806"
+    },
+    {
+      "id": "134222106",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "33558816",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "73"
+    },
+    {
+      "id": "83890474",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "273"
+    },
+    {
+      "id": "50336046",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "134222133",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "33558847",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "73"
+    },
+    {
+      "id": "50336064",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "78"
+    },
+    {
+      "id": "117444931",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "50336069",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "73"
+    },
+    {
+      "id": "67113294",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "33558886",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "16777225"
+    },
+    {
+      "id": "83890536",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "33558889",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "100667755",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "16781680",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "74"
+    },
+    {
+      "id": "4478",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "806"
+    },
+    {
+      "id": "100667785",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "67113356",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "273"
+    },
+    {
+      "id": "134222230",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "33558935",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "806"
+    },
+    {
+      "id": "67113368",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "759"
+    },
+    {
+      "id": "83890585",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "4508",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "806"
+    },
+    {
+      "id": "50336163",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "134222252",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "83890607",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "50336180",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "273"
+    },
+    {
+      "id": "50336204",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "273"
+    },
+    {
+      "id": "16781775",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "73"
+    },
+    {
+      "id": "16781781",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "67113439",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "16781807",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "117445104",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "67113473",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "806"
+    },
+    {
+      "id": "83890702",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "806"
+    },
+    {
+      "id": "100667921",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "50336283",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "33559074",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "33559079",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "806"
+    },
+    {
+      "id": "83890739",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "83890741",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "67113528",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "83890759",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "4685",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "273"
+    },
+    {
+      "id": "4691",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "78"
+    },
+    {
+      "id": "83890789",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "273"
+    },
+    {
+      "id": "150999656",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "334",
+      "species_id": "273"
+    },
+    {
+      "id": "67113584",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "83890801",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "283"
+    },
+    {
+      "id": "100668025",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "761"
+    },
+    {
+      "id": "83890827",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "50336440",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "33559232",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "117445319",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "50336475",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "134222556",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "33559308",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "78"
+    },
+    {
+      "id": "4914",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "78"
+    },
+    {
+      "id": "50336564",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "273"
+    },
+    {
+      "id": "33559351",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "83891003",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "78"
+    },
+    {
+      "id": "117445437",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "73"
+    },
+    {
+      "id": "16782151",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "64"
+    },
+    {
+      "id": "33559377",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "83891029",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "134222683",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "768"
+    },
+    {
+      "id": "50336610",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "73"
+    },
+    {
+      "id": "16782181",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "33559413",
+      "type": "robotic_defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 200.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "634"
+    },
+    {
+      "id": "16782198",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "18"
+    },
+    {
+      "id": "16782203",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "4996",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "64"
+    },
+    {
+      "id": "150999974",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "67113913",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "50336702",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "16782278",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "16777228"
+    },
+    {
+      "id": "100668359",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "16782286",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "78"
+    },
+    {
+      "id": "5075",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10527",
+      "species_id": "610"
+    },
+    {
+      "id": "5080",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10527",
+      "species_id": "610"
+    },
+    {
+      "id": "67113958",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "33559527",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "5096",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "5097",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "806"
+    },
+    {
+      "id": "67113963",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "5100",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "273"
+    },
+    {
+      "id": "5104",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "273"
+    },
+    {
+      "id": "16782321",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "74"
+    },
+    {
+      "id": "167777268",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "73"
+    },
+    {
+      "id": "100668407",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3",
+      "species_id": "47"
+    },
+    {
+      "id": "16782331",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "273"
+    },
+    {
+      "id": "83891196",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "33559549",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "64"
+    },
+    {
+      "id": "33559568",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "18"
+    },
+    {
+      "id": "16782368",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10179",
+      "species_id": "273"
+    },
+    {
+      "id": "83891238",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "806"
+    },
+    {
+      "id": "67114024",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "2"
+    },
+    {
+      "id": "67114030",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "78"
+    },
+    {
+      "id": "33559601",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "100668480",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "273"
+    },
+    {
+      "id": "16782404",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "83891314",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "33559682",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "334",
+      "species_id": "3"
+    },
+    {
+      "id": "117445766",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "33559702",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "352326811",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "100668583",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "78"
+    },
+    {
+      "id": "33559720",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "50336941",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "50336956",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "67114181",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "218109126",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "67114185",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "16777228"
+    },
+    {
+      "id": "50336985",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "33559778",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "50337001",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "16782577",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "77"
+    },
+    {
+      "id": "33559795",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "151000317",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "16777221"
+    },
+    {
+      "id": "67114249",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "83891469",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "33559832",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "806"
+    },
+    {
+      "id": "117445937",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "301995314",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "100668727",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "73"
+    },
+    {
+      "id": "151000387",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "83891526",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "100668767",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "67114345",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "5500",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "74"
+    },
+    {
+      "id": "33559933",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "83891600",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "16777223"
+    },
+    {
+      "id": "33559954",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10489",
+      "species_id": "273"
+    },
+    {
+      "id": "50337172",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "50337174",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "33559965",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "73"
+    },
+    {
+      "id": "33559967",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "83891622",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "334",
+      "species_id": "338"
+    },
+    {
+      "id": "50337198",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "100668848",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "16777228"
+    },
+    {
+      "id": "67114419",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "33559992",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "5576",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "273"
+    },
+    {
+      "id": "5584",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "273"
+    },
+    {
+      "id": "5586",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "806"
+    },
+    {
+      "id": "33560020",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "472",
+      "species_id": "806"
+    },
+    {
+      "id": "33560038",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "33560069",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "100668956",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "83891748",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "33560105",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "50337331",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10528",
+      "species_id": "617"
+    },
+    {
+      "id": "67114555",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "33560128",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "16777221"
+    },
+    {
+      "id": "16782923",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "16782924",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "16782926",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "117446227",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "334",
+      "species_id": "16777228"
+    },
+    {
+      "id": "16782937",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "16782939",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "18"
+    },
+    {
+      "id": "33560163",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "16782950",
+      "type": "robotic_defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 200.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "634"
+    },
+    {
+      "id": "16782952",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "16782962",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "16782969",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "16782972",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "78"
+    },
+    {
+      "id": "16782978",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "50337411",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "610"
+    },
+    {
+      "id": "234886793",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "16777228"
+    },
+    {
+      "id": "50337420",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "764"
+    },
+    {
+      "id": "16782995",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "18"
+    },
+    {
+      "id": "117446301",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "33560234",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "33560236",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "16783022",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "73"
+    },
+    {
+      "id": "100669113",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "806"
+    },
+    {
+      "id": "33560261",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "5836",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "273"
+    },
+    {
+      "id": "100669135",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "16783056",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "16783060",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "16783068",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "184555229",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "117446366",
+      "type": "defense_army",
+      "health": 0.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "273"
+    },
+    {
+      "id": "83891937",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "64"
+    },
+    {
+      "id": "16783076",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 275.0,
+      "location_type": "planet",
+      "location_id": "333",
+      "experience": 100.0,
+      "species_id": "806"
+    },
+    {
+      "id": "67114731",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "16783103",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "16783105",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "67114760",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "78"
+    },
+    {
+      "id": "100669203",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "67114773",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "47"
+    },
+    {
+      "id": "100669215",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777225"
+    },
+    {
+      "id": "50337581",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "67114804",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "5941",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "806"
+    },
+    {
+      "id": "5957",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "610"
+    },
+    {
+      "id": "16783176",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "100669261",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "50337614",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "16783185",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "167778138",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "16777237"
+    },
+    {
+      "id": "16783195",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "64"
+    },
+    {
+      "id": "16783202",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "78"
+    },
+    {
+      "id": "67114852",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "33560426",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "6001",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "50337653",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "16777228"
+    },
+    {
+      "id": "50337655",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "73"
+    },
+    {
+      "id": "16783226",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "16783237",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10501",
+      "species_id": "761"
+    },
+    {
+      "id": "6033",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "16783264",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "6051",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "83892150",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10527",
+      "species_id": "16777228"
+    },
+    {
+      "id": "6083",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "16783311",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "273"
+    },
+    {
+      "id": "67114966",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "50337761",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "18"
+    },
+    {
+      "id": "50337768",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "16783338",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "50337775",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10528",
+      "species_id": "617"
+    },
+    {
+      "id": "33560574",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "64"
+    },
+    {
+      "id": "67115012",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10179",
+      "species_id": "166"
+    },
+    {
+      "id": "50337801",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "8531",
+      "species_id": "78"
+    },
+    {
+      "id": "16783371",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "16783382",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "6169",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "33560622",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "806"
+    },
+    {
+      "id": "6202",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "806"
+    },
+    {
+      "id": "16783420",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "64"
+    },
+    {
+      "id": "67115069",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "33560649",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "50337868",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "50337871",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "6228",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "806"
+    },
+    {
+      "id": "6230",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "33560668",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "67115107",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "6254",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "273"
+    },
+    {
+      "id": "6255",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "33560700",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "273"
+    },
+    {
+      "id": "100669568",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "273"
+    },
+    {
+      "id": "16783490",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "806"
+    },
+    {
+      "id": "6280",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "806"
+    },
+    {
+      "id": "67115148",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "73"
+    },
+    {
+      "id": "67115150",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10455",
+      "species_id": "806"
+    },
+    {
+      "id": "6290",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "6296",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "273"
+    },
+    {
+      "id": "6301",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "50337950",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "33560742",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10445",
+      "species_id": "64"
+    },
+    {
+      "id": "6314",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10448",
+      "species_id": "806"
+    },
+    {
+      "id": "6318",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "73"
+    },
+    {
+      "id": "6335",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1459",
+      "species_id": "78"
+    },
+    {
+      "id": "83892418",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "6339",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "3467",
+      "species_id": "273"
+    },
+    {
+      "id": "100669639",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "50337994",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "273"
+    },
+    {
+      "id": "67115211",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "768"
+    },
+    {
+      "id": "33560785",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "33560786",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "64"
+    },
+    {
+      "id": "33560792",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "117446874",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "16777237"
+    },
+    {
+      "id": "67115228",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "806"
+    },
+    {
+      "id": "16783584",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "16783597",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "67115248",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "806"
+    },
+    {
+      "id": "50338043",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "16783615",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10179",
+      "species_id": "806"
+    },
+    {
+      "id": "33560846",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "16783635",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "16783649",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10179",
+      "species_id": "70"
+    },
+    {
+      "id": "16783659",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "16783668",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10491",
+      "species_id": "273"
+    },
+    {
+      "id": "6453",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    },
+    {
+      "id": "50338114",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "74"
+    },
+    {
+      "id": "50338134",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "73"
+    },
+    {
+      "id": "67115351",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "273"
+    },
+    {
+      "id": "16783710",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "16783722",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "806"
+    },
+    {
+      "id": "33560948",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "334",
+      "species_id": "16777228"
+    },
+    {
+      "id": "6520",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "16783768",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "806"
+    },
+    {
+      "id": "50338216",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "16783786",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1215",
+      "species_id": "806"
+    },
+    {
+      "id": "50338221",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "67115446",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "273"
+    },
+    {
+      "id": "6594",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "273"
+    },
+    {
+      "id": "16783823",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "117447129",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "16777228"
+    },
+    {
+      "id": "16783845",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "16783882",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "806"
+    },
+    {
+      "id": "16783907",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "33561130",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "16783915",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "6701",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "50338350",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "273"
+    },
+    {
+      "id": "16783919",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10444",
+      "species_id": "74"
+    },
+    {
+      "id": "50338354",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "16783923",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "16783932",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5",
+      "species_id": "78"
+    },
+    {
+      "id": "6719",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "6722",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "6730",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "6734",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "6742",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "6753",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "33561189",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "6767",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "273"
+    },
+    {
+      "id": "83892848",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "83892862",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "16784010",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10446",
+      "species_id": "78"
+    },
+    {
+      "id": "16784020",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "6806",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "64"
+    },
+    {
+      "id": "6823",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "806"
+    },
+    {
+      "id": "83892907",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "806"
+    },
+    {
+      "id": "16784048",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "6835",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "78"
+    },
+    {
+      "id": "6843",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "64"
+    },
+    {
+      "id": "16784063",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "273"
+    },
+    {
+      "id": "6848",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "47"
+    },
+    {
+      "id": "33561282",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "5188",
+      "species_id": "806"
+    },
+    {
+      "id": "16784071",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10436",
+      "species_id": "28"
+    },
+    {
+      "id": "33561289",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "1224",
+      "species_id": "273"
+    },
+    {
+      "id": "6861",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10441",
+      "species_id": "806"
+    },
+    {
+      "id": "33561317",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "329",
+      "species_id": "806"
+    },
+    {
+      "id": "6912",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10435",
+      "species_id": "16777237"
+    },
+    {
+      "id": "6918",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10496",
+      "species_id": "16777237"
+    },
+    {
+      "id": "6930",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10528",
+      "species_id": "16777237"
+    },
+    {
+      "id": "6942",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10497",
+      "species_id": "16777228"
+    },
+    {
+      "id": "6952",
+      "type": "defense_army",
+      "health": 400.0,
+      "max_health": 400.0,
+      "morale": 250.0,
+      "location_type": "planet",
+      "location_id": "10507",
+      "species_id": "16777228"
+    }
+  ],
+  "count": 819,
+  "by_type": {
+    "defense_army": 816,
+    "robotic_defense_army": 3
+  },
+  "total_strength": 327600.0
+}
