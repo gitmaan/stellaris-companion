@@ -162,8 +162,8 @@
         "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(e.get_crisis_status())' (no errors)"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "14 regex calls to migrate"
+      "passes": true,
+      "notes": "Migrated get_crisis_status, get_lgate_status, get_menace, get_great_khan to Rust parser using iter_section_entries for country iteration. Uses hybrid approach: Rust for structured data (country_type, name, flags), regex for gamestate-wide flag searches (crisis_systems, khan_defeated). All 4 methods have _rust and _regex variants with fallback."
     },
     {
       "id": "MIG-POLITICS",
