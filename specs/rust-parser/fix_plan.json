@@ -112,8 +112,8 @@
         "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta --schema-version 999 2>&1; echo $? (exit code 3)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Already implemented in previous iterations - CLI accepts --schema-version flag with default of 1, validates against supported versions, and exits with code 3 for invalid versions"
     },
     {
       "id": "RUST-009",
