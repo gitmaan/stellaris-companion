@@ -98,8 +98,8 @@
         "RUN: python3 -c 'from save_extractor import SaveExtractor; print(SaveExtractor(\"test_save.sav\").get_resources().keys())' (no errors)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "29 regex calls to migrate"
+      "passes": true,
+      "notes": "get_resources already migrated to Rust parser using iter_section_entries for country iteration. Extracts stockpiles from standard_economy_module.resources and budget data from country.budget.current_month. Validation passes - output matches baseline exactly."
     },
     {
       "id": "MIG-SPECIES",
