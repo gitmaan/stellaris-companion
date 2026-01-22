@@ -70,8 +70,8 @@
         "RUN: python3 -c 'from save_extractor import SaveExtractor; print(SaveExtractor(\"test_save.sav\").get_fleets().keys())' (no errors)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "36 regex calls to migrate"
+      "passes": true,
+      "notes": "Migrated get_fleets to Rust parser using iter_section_entries for fleet iteration. Validation passes - output matches baseline exactly."
     },
     {
       "id": "MIG-DIPLOMACY",
