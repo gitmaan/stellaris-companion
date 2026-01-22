@@ -234,24 +234,30 @@ class MilitaryMixin:
         if not owned_fleet_ids:
             return result
 
-        fleet_section = self._extract_section("fleet")
-        ships_section = self._extract_section("ships")
-        designs_section = self._extract_section("ship_design")
-        if not fleet_section or not ships_section or not designs_section:
+        fleet_bounds = self._get_section_bounds("fleet")
+        ships_bounds = self._get_section_bounds("ships")
+        designs_bounds = self._get_section_bounds("ship_design")
+        if not fleet_bounds or not ships_bounds or not designs_bounds:
             return result
 
+        fleet_start, fleet_end = fleet_bounds
+        ships_start, ships_end = ships_bounds
+        designs_start, designs_end = designs_bounds
+
         design_to_size: dict[str, str] = {}
-        for m in re.finditer(r'\n\t(\d+)=\n\t\{', designs_section):
+        design_entry_re = re.compile(r"(?m)^\t(\d+)\s*=\s*\{")
+        for m in design_entry_re.finditer(self.gamestate, designs_start, designs_end):
             design_id = m.group(1)
-            snippet = designs_section[m.start() : m.start() + 2500]
+            snippet = self.gamestate[m.start() : min(m.start() + 2500, designs_end)]
             size_m = re.search(r'\bship_size="([^"]+)"', snippet)
             if size_m:
                 design_to_size[design_id] = size_m.group(1)
 
         ship_to_design: dict[str, str] = {}
-        for m in re.finditer(r'\n\t(\d+)=\n\t\{', ships_section):
+        ship_entry_re = re.compile(r"(?m)^\t(\d+)\s*=\s*\{")
+        for m in ship_entry_re.finditer(self.gamestate, ships_start, ships_end):
             ship_id = m.group(1)
-            snippet = ships_section[m.start() : m.start() + 3000]
+            snippet = self.gamestate[m.start() : min(m.start() + 3000, ships_end)]
             impl_m = re.search(r'\bship_design_implementation\s*=\s*\{[^}]*\bdesign\s*=\s*(\d+)', snippet)
             if impl_m:
                 ship_to_design[ship_id] = impl_m.group(1)
@@ -265,7 +271,8 @@ class MilitaryMixin:
         fleets: list[dict] = []
         by_class_total: dict[str, int] = {}
 
-        for match in re.finditer(r'\n\t(\d+)=\n\t\{', fleet_section):
+        fleet_entry_re = re.compile(r"(?m)^\t(\d+)\s*=\s*\{")
+        for match in fleet_entry_re.finditer(self.gamestate, fleet_start, fleet_end):
             fleet_id = match.group(1)
             if fleet_id not in owned_set:
                 continue
@@ -273,7 +280,8 @@ class MilitaryMixin:
             start = match.start()
             brace_count = 0
             end = None
-            for i, char in enumerate(fleet_section[start:], start):
+            for i in range(start, fleet_end):
+                char = self.gamestate[i]
                 if char == '{':
                     brace_count += 1
                 elif char == '}':
@@ -284,7 +292,7 @@ class MilitaryMixin:
             if end is None:
                 continue
 
-            fleet_block = fleet_section[start:end]
+            fleet_block = self.gamestate[start:end]
             header = fleet_block[:2500]
 
             if "station=yes" in header:

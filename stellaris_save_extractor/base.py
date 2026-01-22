@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import re
 import zipfile
 from datetime import datetime
@@ -7,6 +8,8 @@ from pathlib import Path
 
 class SaveExtractorBase:
     """Base implementation: file I/O, caches, and shared parsing helpers."""
+
+    _MAX_CACHED_SECTION_CHARS = 2_000_000
 
     def __init__(self, save_path: str):
         """Load and parse a Stellaris save file.
@@ -20,9 +23,28 @@ class SaveExtractorBase:
         self._load_meta()
 
         # Cache for parsed sections
-        self._section_cache = {}
+        self._section_cache: dict[str, str | None] = {}
+        self._section_bounds_cache: dict[str, tuple[int, int] | None] = {}
         self._building_types = None  # Lazy-loaded building ID→type map
         self._country_names = None  # Lazy-loaded country ID→name map
+
+    def close(self) -> None:
+        """Release large in-memory state (best-effort)."""
+        self.release_gamestate()
+
+    def release_gamestate(self) -> None:
+        """Free the extracted gamestate and any dependent caches."""
+        self._gamestate = None
+        self._section_cache.clear()
+        self._section_bounds_cache.clear()
+        self._building_types = None
+        self._country_names = None
+
+    def __enter__(self) -> SaveExtractorBase:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     @property
     def meta(self) -> str:
@@ -74,12 +96,24 @@ class SaveExtractorBase:
     def _load_meta(self) -> None:
         """Extract meta from the save file (cheap, used for Tier 0 status)."""
         with zipfile.ZipFile(self.save_path, 'r') as z:
-            self._meta = z.read('meta').decode('utf-8', errors='replace')
+            with z.open("meta") as raw:
+                with io.TextIOWrapper(raw, encoding="utf-8", errors="replace") as text:
+                    self._meta = text.read()
 
     def _load_gamestate(self) -> None:
         """Extract the full gamestate from the save file (expensive)."""
         with zipfile.ZipFile(self.save_path, 'r') as z:
-            self._gamestate = z.read('gamestate').decode('utf-8', errors='replace')
+            with z.open("gamestate") as raw:
+                with io.TextIOWrapper(raw, encoding="utf-8", errors="replace") as text:
+                    self._gamestate = text.read()
+
+    def _get_section_bounds(self, section_name: str) -> tuple[int, int] | None:
+        """Get cached (start, end) bounds for a top-level section."""
+        if section_name in self._section_bounds_cache:
+            return self._section_bounds_cache[section_name]
+        bounds = self._find_section_bounds(section_name)
+        self._section_bounds_cache[section_name] = bounds
+        return bounds
 
     def _find_section_bounds(self, section_name: str) -> tuple[int, int] | None:
         """Find the start and end positions of a top-level section.
@@ -91,7 +125,7 @@ class SaveExtractorBase:
             Tuple of (start, end) positions, or None if not found
         """
         # Look for "section_name={" or "section_name ={" at start of line
-        pattern = rf'^{section_name}\s*=\s*\{{'
+        pattern = rf'^{re.escape(section_name)}\s*=\s*\{{'
         match = re.search(pattern, self.gamestate, re.MULTILINE)
 
         if not match:
@@ -126,10 +160,11 @@ class SaveExtractorBase:
         if section_name in self._section_cache:
             return self._section_cache[section_name]
 
-        bounds = self._find_section_bounds(section_name)
+        bounds = self._get_section_bounds(section_name)
         if bounds:
-            content = self.gamestate[bounds[0]:bounds[1]]
-            self._section_cache[section_name] = content
+            content = self.gamestate[bounds[0] : bounds[1]]
+            if len(content) <= self._MAX_CACHED_SECTION_CHARS:
+                self._section_cache[section_name] = content
             return content
         return None
 
@@ -188,12 +223,10 @@ class SaveExtractorBase:
         Returns:
             Position of 'country=' for the block, or -1 if not found
         """
-        # Look for country= followed by newline and opening brace
-        # This distinguishes from country=0 (simple value)
-        match = re.search(r'\ncountry=\n\{', self.gamestate)
-        if match:
-            return match.start() + 1  # +1 to skip the leading \n
-        return -1
+        bounds = self._get_section_bounds("country")
+        if not bounds:
+            return -1
+        return bounds[0]
 
     def _find_player_country_content(self, player_id: int = 0) -> str | None:
         """Get the content of the player's country block.
@@ -204,30 +237,33 @@ class SaveExtractorBase:
         Returns:
             String content of the country block, or None if not found
         """
-        section_start = self._find_country_section_start()
-        if section_start == -1:
+        bounds = self._get_section_bounds("country")
+        if not bounds:
             return None
 
-        # Get a large chunk starting from the country section
-        chunk = self.gamestate[section_start:section_start + 1000000]
+        country_start, country_end = bounds
 
-        # Find the player's country entry: \n\t{player_id}=\n\t{
-        pattern = rf'\n\t{player_id}=\n\t\{{'
-        match = re.search(pattern, chunk)
+        # Search near the start of the country section (player entries are early).
+        search_end = min(country_end, country_start + 10_000_000)
+        entry_re = re.compile(rf"(?m)^\t{player_id}\s*=\s*\{{")
+        match = entry_re.search(self.gamestate, country_start, search_end)
         if not match:
             return None
 
         start = match.start()
+        brace_count = 0
+        started = False
 
-        # Find the next country entry to determine the end
-        next_pattern = rf'\n\t(?:{player_id + 1}|\d+)=\n\t\{{'
-        next_match = re.search(next_pattern, chunk[start + 10:])
-        if next_match:
-            end = start + 10 + next_match.start()
-        else:
-            end = min(start + 500000, len(chunk))
+        for i, ch in enumerate(self.gamestate[start:country_end], start):
+            if ch == "{":
+                brace_count += 1
+                started = True
+            elif ch == "}":
+                brace_count -= 1
+                if started and brace_count == 0:
+                    return self.gamestate[start : i + 1]
 
-        return chunk[start:end]
+        return None
 
     def _find_fleet_section_start(self) -> int:
         """Find the start of the fleet={} block.
@@ -235,11 +271,10 @@ class SaveExtractorBase:
         Returns:
             Position of 'fleet=' for the block, or -1 if not found
         """
-        # Look for fleet= followed by newline and opening brace
-        match = re.search(r'\nfleet=\n\{', self.gamestate)
-        if match:
-            return match.start() + 1
-        return -1
+        bounds = self._get_section_bounds("fleet")
+        if not bounds:
+            return -1
+        return bounds[0]
 
     def _get_owned_fleet_ids(self, country_content: str) -> list[str]:
         """Extract fleet IDs from owned_fleets section.
@@ -277,31 +312,20 @@ class SaveExtractorBase:
         Returns:
             Dict mapping ship_id (str) -> fleet_id (str)
         """
-        ships_match = re.search(r'^ships=\s*\{', self.gamestate, re.MULTILINE)
-        if not ships_match:
+        bounds = self._get_section_bounds("ships")
+        if not bounds:
             return {}
 
         ship_to_fleet = {}
-        ships_chunk = self.gamestate[ships_match.start():ships_match.start() + 80000000]
+        ships_start, ships_end = bounds
+        entry_re = re.compile(r'(?m)^\t(\d+)\s*=\s*\{')
 
-        # Find each ship entry and extract its fleet ID
-        # Ships may have auras={} or other blocks before fleet=
-        ship_entries = list(re.finditer(r'\n\t(\d+)=\n\t\{', ships_chunk))
-
-        for i, entry in enumerate(ship_entries):
+        for entry in entry_re.finditer(self.gamestate, ships_start, ships_end):
             ship_id = entry.group(1)
+            start = entry.start()
+            snippet = self.gamestate[start : min(start + 3000, ships_end)]
 
-            # Get content until next ship entry or 3000 chars
-            start = entry.start() + 1
-            if i + 1 < len(ship_entries):
-                end = min(ship_entries[i + 1].start(), start + 3000)
-            else:
-                end = start + 3000
-
-            content = ships_chunk[start:end]
-
-            # Find fleet= anywhere in this ship's content
-            fleet_m = re.search(r'\n\t\tfleet=(\d+)', content)
+            fleet_m = re.search(r'\bfleet=(\d+)\b', snippet)
             if fleet_m:
                 ship_to_fleet[ship_id] = fleet_m.group(1)
 
@@ -317,22 +341,10 @@ class SaveExtractorBase:
         """
         owned_fleet_ids = set()
 
-        # Find country section
-        country_match = re.search(r'\ncountry=\n\{', self.gamestate)
-        if not country_match:
-            return owned_fleet_ids
-
-        country_start = country_match.start() + 1
-        country_chunk = self.gamestate[country_start:country_start + 2000000]
-
-        # Find player country (usually 0=)
         player_id = self.get_player_empire_id()
-        player_pattern = rf'\n\t{player_id}=\n\t\{{'
-        player_match = re.search(player_pattern, country_chunk)
-        if not player_match:
+        player_content = self._find_player_country_content(player_id)
+        if not player_content:
             return owned_fleet_ids
-
-        player_content = country_chunk[player_match.start():player_match.start() + 500000]
 
         # Find fleets_manager.owned_fleets
         fleets_mgr_match = re.search(r'fleets_manager=\s*\{', player_content)
@@ -451,27 +463,15 @@ class SaveExtractorBase:
 
         country_names = {}
 
-        country_start = self._find_country_section_start()
-        if country_start == -1:
+        bounds = self._get_section_bounds("country")
+        if not bounds:
             self._country_names = country_names
             return country_names
+        country_start, country_end = bounds
 
-        # Get a chunk large enough for the country section
-        # Then find where the section actually ends to avoid bleeding into other sections
-        raw_chunk = self.gamestate[country_start:country_start + 50000000]
-
-        # Find the end of country section (next top-level section starts with \n<name>=\n{)
-        # Skip first 1000 chars to avoid matching "country=" itself
-        section_end_match = re.search(r'\n[a-z_]+=\n\{', raw_chunk[1000:])
-        if section_end_match:
-            country_chunk = raw_chunk[:section_end_match.start() + 1000]
-        else:
-            country_chunk = raw_chunk
-
-        # Find entries like \n\t0=\n\t{ ... name="United Nations of Earth" ... }
-        # Parse each country block to extract ID and name
-        country_entry_pattern = r'\n\t(\d+)=\n\t\{'
-        entries = list(re.finditer(country_entry_pattern, country_chunk))
+        # Find entries like: <tab>0={ ... name="United Nations of Earth" ... }
+        entry_re = re.compile(r'(?m)^\t(\d+)\s*=\s*\{')
+        entries = list(entry_re.finditer(self.gamestate, country_start, country_end))
 
         # Process all country entries - no artificial limit
         # Late-game saves can have 300+ countries (fallen empires, primitives,
@@ -487,24 +487,24 @@ class SaveExtractorBase:
             else:
                 entry_end = entry_start + 5000
 
-            block = country_chunk[entry_start:entry_end]
+            block = self.gamestate[entry_start : min(entry_end, country_end)]
 
             # Extract name - can be either:
             # 1. name="Direct Name" (simple string)
             # 2. name={ key="LOCALIZATION_KEY" } (localization reference)
             # 3. name={ key="%ADJECTIVE%" variables={...} } (template with variables)
             # First try direct string format
-            name_match = re.search(r'\n\t\tname\s*=\s*"([^"]+)"', block)
+            name_match = re.search(r'(?m)^\t\tname\s*=\s*"([^"]+)"', block)
             if name_match:
                 country_names[country_id] = name_match.group(1)
             else:
                 # Try localization key format: name={ key="..." }
-                key_match = re.search(r'\n\t\tname\s*=\s*\{\s*key\s*=\s*"([^"]+)"', block)
+                key_match = re.search(r'(?m)^\t\tname\s*=\s*\{\s*key\s*=\s*"([^"]+)"', block)
                 if key_match:
                     key = key_match.group(1)
                     # Check if name block has variables (look specifically in name={...} block)
                     # Extract name block first to check for variables
-                    name_block_match = re.search(r'\n\t\tname\s*=\s*\{', block)
+                    name_block_match = re.search(r'(?m)^\t\tname\s*=\s*\{', block)
                     has_name_vars = False
                     if name_block_match:
                         # Find extent of name block

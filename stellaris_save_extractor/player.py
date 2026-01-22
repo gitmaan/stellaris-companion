@@ -469,33 +469,9 @@ class PlayerMixin:
         }
 
         player_id = self.get_player_empire_id()
-        country_section = self._extract_section("country")
-        if not country_section:
+        player_block = self._find_player_country_content(player_id)
+        if not player_block:
             return result
-
-        entry_match = re.search(rf"\n\t{player_id}=\n\t\{{", country_section)
-        if not entry_match:
-            entry_match = re.search(rf"\n\t{player_id}\s*=\s*\{{", country_section)
-        if not entry_match:
-            return result
-
-        start = entry_match.start() + 1
-        brace_count = 0
-        started = False
-        end = None
-        for i, ch in enumerate(country_section[start:], start):
-            if ch == "{":
-                brace_count += 1
-                started = True
-            elif ch == "}":
-                brace_count -= 1
-                if started and brace_count == 0:
-                    end = i + 1
-                    break
-        if end is None:
-            return result
-
-        player_block = country_section[start:end]
 
         relics_block = self._extract_braced_block(player_block, "relics")
         relics = self._parse_simple_string_list_block(relics_block or "", prefix="r_")
