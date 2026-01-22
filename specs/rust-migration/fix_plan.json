@@ -137,8 +137,8 @@
         "RUN: python3 scripts/validate_migration.py get_technology --update (matches or improves, baseline updated if improved)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "14 regex calls to migrate"
+      "passes": true,
+      "notes": "get_technology already migrated to Rust parser using iter_section_entries for country iteration to find player's tech_status. Uses hybrid approach: Rust for structured data (queues, alternatives, budget), regex for researched techs list due to duplicate technology= keys. Validation passes - output matches baseline exactly."
     },
     {
       "id": "MIG-ARMIES",
