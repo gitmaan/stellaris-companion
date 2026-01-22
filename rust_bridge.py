@@ -3,7 +3,8 @@
 This module provides Python bindings to the stellaris-parser Rust binary.
 It handles subprocess communication, JSON parsing, and error handling.
 
-The Rust binary can be located in multiple places:
+The Rust binary can be located in multiple places (in order of priority):
+0. PARSER_BINARY environment variable (for testing/override)
 1. Development: stellaris-parser/target/release/stellaris-parser
 2. Packaged: bin/ directory relative to this file
 3. System: PATH-accessible stellaris-parser binary
@@ -12,6 +13,7 @@ The Rust binary can be located in multiple places:
 from __future__ import annotations
 
 import json
+import os
 import platform
 import subprocess
 from pathlib import Path
@@ -22,13 +24,19 @@ def _get_binary_path() -> Path:
     """Get path to stellaris-parser binary for current platform.
 
     Searches in order:
+    0. PARSER_BINARY environment variable (for testing/override)
     1. Development location: stellaris-parser/target/release/
     2. Package bin/ directory
-    3. System PATH (returns just the name)
+    3. Fallback to development path (even if not found, for error messages)
 
     Returns:
         Path to the binary (may not exist if not found)
     """
+    # 0. Environment variable override (useful for testing and custom deployments)
+    env_binary = os.environ.get("PARSER_BINARY")
+    if env_binary:
+        return Path(env_binary)
+
     base = Path(__file__).parent
     system = platform.system().lower()
     machine = platform.machine().lower()

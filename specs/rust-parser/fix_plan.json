@@ -8,7 +8,8 @@
     "jomini HashMap<String, Value> deserialization overwrites duplicate keys (last value wins); use TextTape or custom deserializers for duplicate preservation",
     "Condensed syntax parsing works when quoted strings provide delimiters (a={b=\"1\"c=\"2\"}); bare values adjacent to bare values may concatenate",
     "Stellaris saves use Windows-1252 encoding, not UTF-8; use jomini's from_windows1252_slice() for lossless decoding to Unicode",
-    "Use clap's try_parse() instead of parse() for custom exit codes; parse() always exits 2 for errors, try_parse() lets you control exit code"
+    "Use clap's try_parse() instead of parse() for custom exit codes; parse() always exits 2 for errors, try_parse() lets you control exit code",
+    "Use PARSER_BINARY environment variable to override binary path in tests and custom deployments"
   ],
   "stories": [
     {
@@ -150,8 +151,8 @@
         "Code review: rust_bridge.py checks binary exists before subprocess call"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added PARSER_BINARY environment variable support for testing and custom deployments. Binary existence is already checked before subprocess calls in both extract_sections() and iter_section_entries()."
     },
     {
       "id": "MIG-001",
