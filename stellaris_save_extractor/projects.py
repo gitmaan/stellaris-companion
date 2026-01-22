@@ -1,6 +1,17 @@
 from __future__ import annotations
 
+import logging
 import re
+
+# Rust bridge for fast Clausewitz parsing
+try:
+    from rust_bridge import iter_section_entries, ParserError
+    RUST_BRIDGE_AVAILABLE = True
+except ImportError:
+    RUST_BRIDGE_AVAILABLE = False
+    ParserError = Exception  # Fallback type for type hints
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectsMixin:
@@ -33,6 +44,8 @@ class ProjectsMixin:
     def get_special_projects(self) -> dict:
         """Get special projects, event chains, and precursor progress.
 
+        Uses Rust parser for fast extraction when available, falls back to regex.
+
         Returns:
             Dict with:
               - active_projects: List of active special projects with days_left
@@ -41,6 +54,177 @@ class ProjectsMixin:
               - completed_chains: List of completed event chain names
               - notable_completed: Human-readable notable completions
               - precursor_progress: Dict of precursor chain status
+        """
+        # Try Rust bridge first for faster parsing
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                return self._get_special_projects_rust()
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for special projects: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback: regex-based parsing
+        return self._get_special_projects_regex()
+
+    def _get_special_projects_rust(self) -> dict:
+        """Get special projects using Rust parser.
+
+        Uses Rust parser for country data and precursor flags, but regex for
+        completed_event_chain and special_project entries due to duplicate key issue.
+
+        Returns:
+            Dict with special project details
+        """
+        result = {
+            'active_projects': [],
+            'active_count': 0,
+            'soonest_completion': None,
+            'completed_chains': [],
+            'notable_completed': [],
+            'precursor_progress': {},
+        }
+
+        player_id = self.get_player_empire_id()
+        player_data = None
+
+        # Get player country data via Rust parser
+        for country_id, country_data in iter_section_entries(self.gamestate_path, "country"):
+            if str(country_id) == str(player_id):
+                player_data = country_data
+                break
+
+        if not player_data or not isinstance(player_data, dict):
+            return result
+
+        # For active projects and completed chains, we need regex due to duplicate keys
+        # The Rust parser collapses duplicate keys like completed_event_chain="x"
+        player_chunk = self._find_player_country_content(player_id)
+        completed_chains = []
+        if player_chunk:
+            # Extract active special projects
+            active_projects = self._extract_active_projects(player_chunk)
+            result['active_projects'] = active_projects
+            result['active_count'] = len(active_projects)
+
+            if active_projects:
+                days_list = [p['days_left'] for p in active_projects if p.get('days_left')]
+                if days_list:
+                    result['soonest_completion'] = min(days_list)
+
+            # Extract completed event chains (uses regex due to duplicate keys)
+            completed_chains = self._extract_completed_chains(player_chunk)
+            result['completed_chains'] = completed_chains
+
+            # Identify notable completed chains
+            notable = []
+            for chain in completed_chains:
+                chain_lower = chain.lower()
+                for key, name in self.NOTABLE_CHAINS.items():
+                    if key in chain_lower:
+                        notable.append(name)
+                        break
+            result['notable_completed'] = list(set(notable))
+
+        # Extract precursor progress from flags (Rust handles this well)
+        # Pass completed chains to check for completed precursor homeworlds
+        precursor_progress = self._extract_precursor_progress_from_flags(
+            player_data.get('flags', {}), completed_chains
+        )
+        result['precursor_progress'] = precursor_progress
+
+        return result
+
+    def _extract_precursor_progress_from_flags(self, flags: dict, completed_chains: list[str]) -> dict:
+        """Extract precursor chain progress from country flags.
+
+        Args:
+            flags: Dict of country flags from Rust parser
+            completed_chains: List of completed event chain names (for detecting completed precursors)
+
+        Returns:
+            Dict of precursor progress by precursor key
+        """
+        progress = {}
+
+        for precursor_key, precursor_name in self.PRECURSOR_CHAINS.items():
+            precursor_data = self._check_precursor_from_flags(flags, precursor_key, completed_chains)
+            if precursor_data['found']:
+                progress[precursor_key] = {
+                    'name': precursor_name,
+                    **precursor_data
+                }
+
+        return progress
+
+    def _check_precursor_from_flags(self, flags: dict, precursor: str, completed_chains: list[str]) -> dict:
+        """Check progress on a specific precursor chain using flags dict.
+
+        Args:
+            flags: Dict of country flags from Rust parser
+            precursor: Precursor chain key (e.g., 'yuht', 'cybrex')
+            completed_chains: List of completed event chain names
+
+        Returns:
+            Dict with precursor progress info
+        """
+        result = {
+            'found': False,
+            'stage': 'not_started',
+            'homeworld_found': False,
+            'artifacts': 0,
+        }
+
+        # Check for intro flag (chain started)
+        intro_key = f'{precursor}_intro'
+        if intro_key in flags:
+            result['found'] = True
+            result['stage'] = 'started'
+
+        # Check for various stage markers
+        stage_keys = [
+            (f'{precursor}_world_found', 'homeworld_found'),
+            (f'{precursor}_homeworld', 'homeworld_found'),
+            (f'{precursor}_system', 'system_located'),
+        ]
+
+        for flag_key, stage in stage_keys:
+            if flag_key in flags:
+                result['found'] = True
+                result['stage'] = stage
+                if 'homeworld' in stage or 'world' in stage:
+                    result['homeworld_found'] = True
+
+        # Count artifact-related entries (numbered stages like yuht_2, yuht_6)
+        artifact_count = 0
+        for flag_key in flags.keys():
+            # Match pattern: precursor_N where N is a digit
+            if flag_key.startswith(f'{precursor}_') and flag_key[len(precursor)+1:].isdigit():
+                artifact_count += 1
+
+        if artifact_count > 0:
+            result['found'] = True
+            result['artifacts'] = artifact_count
+            if result['stage'] == 'not_started':
+                result['stage'] = 'collecting_artifacts'
+
+        # Check for completed precursor homeworld chain
+        # Look for chains like "yuht_homeworld_chain" in completed chains
+        for chain in completed_chains:
+            chain_lower = chain.lower()
+            if precursor in chain_lower and 'homeworld' in chain_lower:
+                result['found'] = True
+                result['stage'] = 'completed'
+                result['homeworld_found'] = True
+                break
+
+        return result
+
+    def _get_special_projects_regex(self) -> dict:
+        """Get special projects using regex parsing (fallback method).
+
+        Returns:
+            Dict with special project details
         """
         result = {
             'active_projects': [],

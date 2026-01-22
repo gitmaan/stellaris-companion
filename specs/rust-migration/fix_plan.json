@@ -187,8 +187,8 @@
         "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(e.get_special_projects())' (no errors)"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "10 regex calls to migrate"
+      "passes": true,
+      "notes": "Migrated get_special_projects to Rust parser using iter_section_entries for country iteration to get player flags. Uses hybrid approach: Rust for precursor flags from country data, regex for active projects and completed chains (duplicate key issue). Precursor progress checks both flags and completed_event_chain entries for stage detection."
     },
     {
       "id": "MIG-LEVIATHANS",
