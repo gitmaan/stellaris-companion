@@ -68,14 +68,14 @@
       "file": "stellaris_save_extractor/technology.py",
       "method": "get_technology",
       "regex_count": 14,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: test -f tests/migration_baselines/get_technology.json (baseline exists)",
         "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/technology.py (Rust calls present)",
         "RUN: grep 'ParserError' stellaris_save_extractor/technology.py (fallback present)",
         "RUN: python3 scripts/validate_migration.py get_technology (output matches or improves)"
       ],
-      "notes": ""
+      "notes": "Completed 2026-01-22. Uses hybrid approach: Rust iter_section_entries to find player country, regex for researched techs list (duplicate keys issue). Extracts queues, alternatives, and budget from Rust-parsed data."
     },
     {
       "id": "MIGRATE-003",
