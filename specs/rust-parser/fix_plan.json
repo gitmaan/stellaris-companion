@@ -1,0 +1,243 @@
+{
+  "feature": "Rust Parser CLI",
+  "branch": "ralph/rust-parser",
+  "patterns": [
+    "Rust must be sourced from ~/.cargo/env before cargo commands will work",
+    "jomini text::de::from_utf8_slice requires target type annotation (HashMap<String, Value>)"
+  ],
+  "stories": [
+    {
+      "id": "RUST-001",
+      "title": "Initialize Rust project with jomini dependency",
+      "criteria": [
+        "RUN: ls stellaris-parser/Cargo.toml (file exists)",
+        "RUN: grep 'jomini' stellaris-parser/Cargo.toml (shows 0.28 or higher)",
+        "RUN: grep -A3 '\\[profile.release\\]' stellaris-parser/Cargo.toml (shows lto, codegen-units, strip)",
+        "RUN: ls stellaris-parser/src/main.rs stellaris-parser/src/commands/mod.rs (files exist)",
+        "RUN: cd stellaris-parser && cargo build --release (exit code 0)",
+        "RUN: cd stellaris-parser && cargo run -- --help (shows extract-save and iter-save subcommands)"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "RUST-002",
+      "title": "Implement .sav file reading (zip extraction)",
+      "criteria": [
+        "RUN: cd stellaris-parser && cargo test sav_reading (unit tests pass)",
+        "RUN: grep 'zip' stellaris-parser/Cargo.toml (zip crate in dependencies)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save ../test_save.sav --sections meta --output - 2>&1 (no 'failed to read' errors)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save nonexistent.sav --sections meta 2>&1; echo $? (exit code 1, JSON error on stderr)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "RUST-003",
+      "title": "Implement extract-save command for small sections",
+      "criteria": [
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta --output - | jq .schema_version (returns 1)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta --output - | jq .tool_version (returns version string)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta,galaxy --output - | jq 'keys' (contains meta and galaxy)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta --output - | jq . (valid JSON, no parse error)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "RUST-004",
+      "title": "Implement iter-save command for large sections",
+      "criteria": [
+        "RUN: ./stellaris-parser/target/release/stellaris-parser iter-save test_save.sav --section country --format jsonl | head -1 | jq .schema_version (returns 1)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser iter-save test_save.sav --section country --format jsonl | head -1 | jq .section (returns 'country')",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser iter-save test_save.sav --section country --format jsonl | wc -l (returns > 0 lines)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser iter-save test_save.sav --section country --format jsonl | tail -1 | jq .key (returns a key string)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "RUST-005",
+      "title": "Handle Clausewitz edge cases via Rust unit tests",
+      "criteria": [
+        "RUN: cd stellaris-parser && cargo test duplicate_keys (test exists and passes)",
+        "RUN: cd stellaris-parser && cargo test condensed_syntax (test exists and passes)",
+        "RUN: cd stellaris-parser && cargo test escape_sequences (test exists and passes)",
+        "RUN: cd stellaris-parser && cargo test (all tests pass)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Create unit tests for edge cases using test fixtures"
+    },
+    {
+      "id": "RUST-006",
+      "title": "Handle encoding edge cases",
+      "criteria": [
+        "RUN: cd stellaris-parser && cargo test encoding (encoding tests pass)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections species_db --output - | grep -v 'error' (no encoding errors)",
+        "Code review: src/output.rs handles non-UTF8 bytes (escapes or lossy conversion documented)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Marked ⚠️ in architecture doc - if test_save.sav lacks special chars, document limitation"
+    },
+    {
+      "id": "RUST-007",
+      "title": "Implement proper error handling and exit codes",
+      "criteria": [
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta --output -; echo \"exit:$?\" (shows exit:0)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save nonexistent.sav --sections meta 2>&1; echo \"exit:$?\" (shows exit:1 and JSON on stderr)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save 2>&1; echo \"exit:$?\" (shows exit:3 for missing args)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta 2>&1 | wc -l (stderr is 0-1 lines on success)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "RUST-008",
+      "title": "Add --schema-version flag support",
+      "criteria": [
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta --schema-version 1 --output - | jq .schema_version (returns 1)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta --output - | jq .schema_version (returns 1, default)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta --schema-version 999 2>&1; echo $? (exit code 3)"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "RUST-009",
+      "title": "Implement extract-gamestate debug command",
+      "criteria": [
+        "RUN: unzip -p test_save.sav gamestate > /tmp/gamestate_test && ./stellaris-parser/target/release/stellaris-parser extract-gamestate /tmp/gamestate_test --sections galaxy --output - | jq .galaxy (returns object)",
+        "RUN: ./stellaris-parser/target/release/stellaris-parser --help | grep extract-gamestate (command documented)",
+        "Code review: extract-gamestate marked as debug in help text"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Debug command for development/testing"
+    },
+    {
+      "id": "INT-001",
+      "title": "Create rust_bridge.py Python integration",
+      "criteria": [
+        "RUN: ls rust_bridge.py || ls backend/rust_bridge.py (file exists)",
+        "RUN: python -c \"from rust_bridge import extract_sections; print(type(extract_sections('test_save.sav', ['meta'])))\" (returns <class 'dict'>)",
+        "RUN: python -c \"from rust_bridge import iter_section_entries; print(list(iter_section_entries('test_save.sav', 'country'))[:1])\" (returns list with tuple)",
+        "RUN: python -c \"from rust_bridge import ParserError; print(ParserError.__bases__)\" (exception class exists)",
+        "RUN: grep 'timeout=60' rust_bridge.py || grep 'timeout=60' backend/rust_bridge.py (60 second timeout set)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "INT-002",
+      "title": "Add fallback detection when binary missing",
+      "criteria": [
+        "RUN: python -c \"from rust_bridge import _get_binary_path; print(_get_binary_path())\" (returns path string)",
+        "RUN: PARSER_BINARY=/nonexistent python -c \"from rust_bridge import extract_sections; extract_sections('test.sav', ['meta'])\" 2>&1 (raises FileNotFoundError)",
+        "Code review: rust_bridge.py checks binary exists before subprocess call"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "MIG-001",
+      "title": "Update SaveExtractorBase to use Rust bridge",
+      "criteria": [
+        "RUN: grep 'rust_bridge' backend/extractors/base.py || grep 'rust_bridge' save_extractor.py (import present)",
+        "RUN: grep 'gamestate_path' backend/extractors/base.py || grep 'gamestate_path' save_extractor.py (path stored)",
+        "RUN: grep -A2 'ParserError' backend/extractors/base.py || grep -A2 'ParserError' save_extractor.py (fallback logic present)",
+        "RUN: python -m pytest tests/ -v (existing tests pass)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Phase 3 from architecture doc"
+    },
+    {
+      "id": "MIG-002",
+      "title": "Migrate building extraction to Rust bridge",
+      "criteria": [
+        "RUN: grep 'extract_sections.*buildings' backend/extractors/*.py || grep 'extract_sections.*buildings' save_extractor.py (Rust call present)",
+        "RUN: grep -B5 -A10 '_get_building_types' save_extractor.py | grep -E '(extract_sections|ParserError)' (uses Rust with fallback)",
+        "RUN: python -m pytest tests/ -v -k building (building tests pass if they exist)",
+        "RUN: python -m pytest tests/ -v (all tests still pass)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Example migration shown in architecture doc"
+    },
+    {
+      "id": "MIG-003",
+      "title": "Migrate remaining extraction modules",
+      "criteria": [
+        "RUN: grep -r 'extract_sections' backend/extractors/ | wc -l (multiple usages)",
+        "RUN: grep -r 'ParserError' backend/extractors/ | wc -l (fallback in each)",
+        "RUN: python -m pytest tests/ -v (all tests pass)",
+        "RUN: python v2_native_tools.py test_save.sav --briefing 2>&1 | head -20 (briefing still works)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Migrate one module at a time"
+    },
+    {
+      "id": "BUILD-001",
+      "title": "Create GitHub Actions workflow for cross-platform builds",
+      "criteria": [
+        "RUN: ls .github/workflows/rust-parser.yml (file exists)",
+        "RUN: grep 'windows' .github/workflows/rust-parser.yml (Windows build configured)",
+        "RUN: grep 'macos' .github/workflows/rust-parser.yml (macOS build configured)",
+        "RUN: grep 'ubuntu' .github/workflows/rust-parser.yml (Linux build configured)",
+        "RUN: grep -E 'push:.*tags|workflow_dispatch' .github/workflows/rust-parser.yml (trigger configured)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "DIST-001",
+      "title": "Bundle binary in Python package structure",
+      "criteria": [
+        "RUN: ls bin/ || ls backend/bin/ (bin directory exists)",
+        "RUN: grep 'bin/' rust_bridge.py || grep 'bin/' backend/rust_bridge.py (binary path includes bin/)",
+        "RUN: ls README.md && grep -i 'binary\\|stellaris-parser' README.md (documented)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "DIST-002",
+      "title": "Bundle binary in Electron app",
+      "criteria": [
+        "RUN: ls electron/ || ls specs/electron-app/ (Electron app exists)",
+        "RUN: grep -r 'stellaris-parser' electron/ || grep -r 'stellaris-parser' specs/electron-app/ (binary referenced)",
+        "Code review: rust_bridge.py handles Electron resources path"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Depends on Electron app existing - skip if no Electron yet"
+    },
+    {
+      "id": "TEST-001",
+      "title": "Create comprehensive Rust test suite",
+      "criteria": [
+        "RUN: ls test_save.sav (test save exists in project root)",
+        "RUN: cd stellaris-parser && cargo test (all Rust tests pass)",
+        "RUN: cd stellaris-parser && cargo test -- --list 2>&1 | grep -c test (at least 5 tests)",
+        "RUN: python -c \"from rust_bridge import extract_sections; d=extract_sections('test_save.sav', ['meta']); assert 'meta' in d\" (Python integration works)"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    }
+  ],
+  "discovered": []
+}
