@@ -1,15 +1,44 @@
 {
   "leaders": [
     {
-      "id": "2785017864",
+      "id": "67109264",
       "class": "envoy",
-      "name": "Miriam",
+      "name": "IlT",
       "level": 1,
-      "age": 41
+      "age": 31
+    },
+    {
+      "id": "67110111",
+      "class": "commander",
+      "name": "Hilde",
+      "level": 2,
+      "age": 0,
+      "traits": [
+        "leader_trait_aggressive"
+      ]
+    },
+    {
+      "id": "83887154",
+      "class": "official",
+      "name": "Cimax",
+      "level": 1,
+      "age": 0,
+      "traits": [
+        "trait_ruler_industrialist",
+        "leader_trait_psionic"
+      ]
+    },
+    {
+      "id": "83887293",
+      "class": "envoy",
+      "name": "Rodrig",
+      "level": 1,
+      "age": 28
     },
     {
       "id": "100663421",
       "class": "commander",
+      "name": "Skrand Sharpbeak",
       "level": 8,
       "age": 40,
       "traits": [
@@ -23,233 +52,6 @@
         "leader_trait_resilient"
       ],
       "experience": 9127.16545
-    },
-    {
-      "id": "285212844",
-      "class": "commander",
-      "name": "Migg",
-      "level": 2,
-      "age": 0,
-      "traits": [
-        "leader_trait_psionic",
-        "leader_trait_trickster"
-      ]
-    },
-    {
-      "id": "167772393",
-      "class": "official",
-      "name": "Pogg",
-      "level": 1,
-      "age": 0,
-      "traits": [
-        "leader_trait_bureaucrat"
-      ]
-    },
-    {
-      "id": "251658520",
-      "class": "official",
-      "name": "Feti",
-      "level": 4,
-      "age": 0,
-      "traits": [
-        "subclass_official_delegate",
-        "leader_trait_principled_2",
-        "trait_ruler_fertility_preacher",
-        "leader_trait_cyborg",
-        "leader_trait_volatile"
-      ],
-      "experience": 1163.2
-    },
-    {
-      "id": "67109264",
-      "class": "envoy",
-      "name": "IlT",
-      "level": 1,
-      "age": 31
-    },
-    {
-      "id": "352321973",
-      "class": "scientist",
-      "name": "Arnold",
-      "level": 2,
-      "age": 0,
-      "traits": [
-        "leader_trait_spark_of_genius",
-        "leader_trait_psionic"
-      ]
-    },
-    {
-      "id": "234881482",
-      "class": "commander",
-      "name": "InD",
-      "level": 2,
-      "age": 0,
-      "traits": [
-        "trait_ruler_charismatic"
-      ]
-    },
-    {
-      "id": "385876453",
-      "class": "commander",
-      "name": "Wen",
-      "level": 2,
-      "age": 0,
-      "traits": [
-        "leader_trait_trickster"
-      ]
-    },
-    {
-      "id": "369099281",
-      "class": "official",
-      "name": "Juvina",
-      "level": 1,
-      "age": 0,
-      "traits": [
-        "leader_trait_bureaucrat"
-      ]
-    },
-    {
-      "id": "335544855",
-      "class": "scientist",
-      "level": 8,
-      "age": 0,
-      "traits": [
-        "subclass_scientist_scholar",
-        "leader_trait_educator",
-        "leader_trait_spark_of_genius",
-        "leader_trait_legendary_terraformation_nucleus_2_buds",
-        "leader_trait_xeno_cataloger",
-        "leader_trait_salvager_2",
-        "leader_trait_adventurous_spirit"
-      ],
-      "experience": 896.0
-    },
-    {
-      "id": "352322114",
-      "class": "envoy",
-      "name": "Ai",
-      "level": 1,
-      "age": 40
-    },
-    {
-      "id": "268436053",
-      "class": "scientist",
-      "name": "Gang",
-      "level": 2,
-      "age": 0,
-      "traits": [
-        "leader_trait_adaptable"
-      ]
-    },
-    {
-      "id": "251658840",
-      "class": "envoy",
-      "name": "Pudrig",
-      "level": 1,
-      "age": 30
-    },
-    {
-      "id": "486539872",
-      "class": "scientist",
-      "name": "Kul-Pox",
-      "level": 2,
-      "age": 0,
-      "traits": [
-        "leader_trait_synthetic",
-        "leader_trait_architectural_interest"
-      ]
-    },
-    {
-      "id": "268436073",
-      "class": "official",
-      "name": "VeK",
-      "level": 4,
-      "age": 0,
-      "traits": [
-        "subclass_official_economy_councilor",
-        "leader_trait_principled",
-        "leader_trait_cyborg",
-        "leader_trait_resilient",
-        "leader_trait_entrepreneur"
-      ],
-      "experience": 3090.7
-    },
-    {
-      "id": "184550075",
-      "class": "scientist",
-      "name": "Gerardo",
-      "level": 2,
-      "age": 0,
-      "traits": [
-        "leader_trait_resilient"
-      ]
-    },
-    {
-      "id": "301990619",
-      "class": "commander",
-      "name": "Edward",
-      "level": 4,
-      "age": 0,
-      "traits": [
-        "subclass_commander_admiral",
-        "leader_trait_defence_engineer",
-        "trait_ruler_warlike",
-        "leader_trait_cautious"
-      ],
-      "experience": 1041.41575
-    },
-    {
-      "id": "503317221",
-      "class": "commander",
-      "name": "Emmett",
-      "level": 2,
-      "age": 0,
-      "traits": [
-        "leader_trait_engineer"
-      ]
-    },
-    {
-      "id": "218104552",
-      "class": "scientist",
-      "name": "Takk",
-      "level": 3,
-      "age": 0,
-      "traits": [
-        "leader_trait_adaptable"
-      ],
-      "experience": 1007.5
-    },
-    {
-      "id": "469762793",
-      "class": "official",
-      "name": "Claws_of",
-      "level": 1,
-      "age": 0,
-      "traits": [
-        "leader_trait_resilient"
-      ]
-    },
-    {
-      "id": "234881976",
-      "class": "scientist",
-      "name": "Obr-Lend",
-      "level": 2,
-      "age": 0,
-      "traits": [
-        "leader_trait_synthetic",
-        "leader_trait_custom_AI_assistant"
-      ]
-    },
-    {
-      "id": "83887154",
-      "class": "official",
-      "name": "Cimax",
-      "level": 1,
-      "age": 0,
-      "traits": [
-        "trait_ruler_industrialist",
-        "leader_trait_psionic"
-      ]
     },
     {
       "id": "134218810",
@@ -274,13 +76,6 @@
       ]
     },
     {
-      "id": "83887293",
-      "class": "envoy",
-      "name": "Rodrig",
-      "level": 1,
-      "age": 28
-    },
-    {
       "id": "134218968",
       "class": "envoy",
       "name": "Galdrig",
@@ -288,21 +83,227 @@
       "age": 33
     },
     {
-      "id": "67110111",
-      "class": "commander",
-      "name": "Hilde",
+      "id": "167772393",
+      "class": "official",
+      "name": "Pogg",
+      "level": 1,
+      "age": 0,
+      "traits": [
+        "leader_trait_bureaucrat"
+      ]
+    },
+    {
+      "id": "184550075",
+      "class": "scientist",
+      "name": "Gerardo",
       "level": 2,
       "age": 0,
       "traits": [
-        "leader_trait_aggressive"
+        "leader_trait_resilient"
       ]
+    },
+    {
+      "id": "218104552",
+      "class": "scientist",
+      "name": "Takk",
+      "level": 3,
+      "age": 0,
+      "traits": [
+        "leader_trait_adaptable"
+      ],
+      "experience": 1007.5
+    },
+    {
+      "id": "234881482",
+      "class": "commander",
+      "name": "InD",
+      "level": 2,
+      "age": 0,
+      "traits": [
+        "trait_ruler_charismatic"
+      ]
+    },
+    {
+      "id": "234881976",
+      "class": "scientist",
+      "name": "Obr-Lend",
+      "level": 2,
+      "age": 0,
+      "traits": [
+        "leader_trait_synthetic",
+        "leader_trait_custom_AI_assistant"
+      ]
+    },
+    {
+      "id": "251658520",
+      "class": "official",
+      "name": "Feti",
+      "level": 4,
+      "age": 0,
+      "traits": [
+        "subclass_official_delegate",
+        "leader_trait_principled_2",
+        "trait_ruler_fertility_preacher",
+        "leader_trait_cyborg",
+        "leader_trait_volatile"
+      ],
+      "experience": 1163.2
+    },
+    {
+      "id": "251658840",
+      "class": "envoy",
+      "name": "Pudrig",
+      "level": 1,
+      "age": 30
+    },
+    {
+      "id": "268436053",
+      "class": "scientist",
+      "name": "Gang",
+      "level": 2,
+      "age": 0,
+      "traits": [
+        "leader_trait_adaptable"
+      ]
+    },
+    {
+      "id": "268436073",
+      "class": "official",
+      "name": "VeK",
+      "level": 4,
+      "age": 0,
+      "traits": [
+        "subclass_official_economy_councilor",
+        "leader_trait_principled",
+        "leader_trait_cyborg",
+        "leader_trait_resilient",
+        "leader_trait_entrepreneur"
+      ],
+      "experience": 3090.7
+    },
+    {
+      "id": "285212844",
+      "class": "commander",
+      "name": "Migg",
+      "level": 2,
+      "age": 0,
+      "traits": [
+        "leader_trait_psionic",
+        "leader_trait_trickster"
+      ]
+    },
+    {
+      "id": "301990619",
+      "class": "commander",
+      "name": "Edward",
+      "level": 4,
+      "age": 0,
+      "traits": [
+        "subclass_commander_admiral",
+        "leader_trait_defence_engineer",
+        "trait_ruler_warlike",
+        "leader_trait_cautious"
+      ],
+      "experience": 1041.41575
+    },
+    {
+      "id": "335544855",
+      "class": "scientist",
+      "level": 8,
+      "age": 0,
+      "traits": [
+        "subclass_scientist_scholar",
+        "leader_trait_educator",
+        "leader_trait_spark_of_genius",
+        "leader_trait_legendary_terraformation_nucleus_2_buds",
+        "leader_trait_xeno_cataloger",
+        "leader_trait_salvager_2",
+        "leader_trait_adventurous_spirit"
+      ],
+      "experience": 896.0
+    },
+    {
+      "id": "352321973",
+      "class": "scientist",
+      "name": "Arnold",
+      "level": 2,
+      "age": 0,
+      "traits": [
+        "leader_trait_spark_of_genius",
+        "leader_trait_psionic"
+      ]
+    },
+    {
+      "id": "352322114",
+      "class": "envoy",
+      "name": "Ai",
+      "level": 1,
+      "age": 40
+    },
+    {
+      "id": "369099281",
+      "class": "official",
+      "name": "Juvina",
+      "level": 1,
+      "age": 0,
+      "traits": [
+        "leader_trait_bureaucrat"
+      ]
+    },
+    {
+      "id": "385876453",
+      "class": "commander",
+      "name": "Wen",
+      "level": 2,
+      "age": 0,
+      "traits": [
+        "leader_trait_trickster"
+      ]
+    },
+    {
+      "id": "469762793",
+      "class": "official",
+      "name": "Claws_of",
+      "level": 1,
+      "age": 0,
+      "traits": [
+        "leader_trait_resilient"
+      ]
+    },
+    {
+      "id": "486539872",
+      "class": "scientist",
+      "name": "Kul-Pox",
+      "level": 2,
+      "age": 0,
+      "traits": [
+        "leader_trait_synthetic",
+        "leader_trait_architectural_interest"
+      ]
+    },
+    {
+      "id": "503317221",
+      "class": "commander",
+      "name": "Emmett",
+      "level": 2,
+      "age": 0,
+      "traits": [
+        "leader_trait_engineer"
+      ]
+    },
+    {
+      "id": "2785017864",
+      "class": "envoy",
+      "name": "Miriam",
+      "level": 1,
+      "age": 41
     }
   ],
   "count": 28,
   "by_class": {
-    "envoy": 6,
     "commander": 7,
     "official": 8,
+    "envoy": 6,
     "scientist": 7
   }
 }

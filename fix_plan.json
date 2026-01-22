@@ -1,0 +1,194 @@
+{
+  "title": "Rust Parser Migration",
+  "description": "Migrate extraction methods from regex to Rust parser with validation against baselines",
+  "patterns": [
+    {
+      "id": "P001",
+      "learning": "Use python3, not bare python (bare python doesn't exist)",
+      "date": "2026-01-22"
+    },
+    {
+      "id": "P002",
+      "learning": "Extractors are in stellaris_save_extractor/, NOT backend/extractors/",
+      "date": "2026-01-22"
+    },
+    {
+      "id": "P003",
+      "learning": "Always capture baseline BEFORE making code changes",
+      "date": "2026-01-22"
+    },
+    {
+      "id": "P004",
+      "learning": "Planet names are in variables block, not key field directly",
+      "date": "2026-01-22"
+    },
+    {
+      "id": "P005",
+      "learning": "extract_sections() returns dict, iter_section_entries() yields (key, value) tuples",
+      "date": "2026-01-22"
+    },
+    {
+      "id": "P006",
+      "learning": "Rust parser doesn't handle duplicate keys - traits=\"x\" repeated becomes single value. Use hybrid: Rust for iteration, regex for traits",
+      "date": "2026-01-22"
+    },
+    {
+      "id": "P007",
+      "learning": "Leader names are under name.full_names.key - may be NAME_X format or %LEADER_2% with variables",
+      "date": "2026-01-22"
+    },
+    {
+      "id": "P008",
+      "learning": "iter_section_entries returns in numeric ID order, not file order. Sort results if order matters for baseline comparison",
+      "date": "2026-01-22"
+    }
+  ],
+  "stories": [
+    {
+      "id": "MIGRATE-001",
+      "title": "Migrate get_leaders to Rust parser",
+      "priority": 1,
+      "file": "stellaris_save_extractor/leaders.py",
+      "method": "get_leaders",
+      "regex_count": 11,
+      "passes": true,
+      "criteria": [
+        "RUN: test -f tests/migration_baselines/get_leaders.json (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/leaders.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/leaders.py (fallback present)",
+        "RUN: grep 'def _get_leaders_regex' stellaris_save_extractor/leaders.py (regex fallback method exists)",
+        "RUN: python3 scripts/validate_migration.py get_leaders (output matches or improves)"
+      ],
+      "notes": "Completed 2026-01-22. Uses hybrid approach: Rust iter_section_entries for main loop, regex for traits (duplicate keys issue). Baseline updated to reflect new ordering and improved name extraction."
+    },
+    {
+      "id": "MIGRATE-002",
+      "title": "Migrate get_technology to Rust parser",
+      "priority": 2,
+      "file": "stellaris_save_extractor/technology.py",
+      "method": "get_technology",
+      "regex_count": 14,
+      "passes": false,
+      "criteria": [
+        "RUN: test -f tests/migration_baselines/get_technology.json (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/technology.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/technology.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_technology (output matches or improves)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "MIGRATE-003",
+      "title": "Migrate get_armies to Rust parser",
+      "priority": 3,
+      "file": "stellaris_save_extractor/armies.py",
+      "method": "get_armies",
+      "regex_count": 12,
+      "passes": false,
+      "criteria": [
+        "RUN: test -f tests/migration_baselines/get_armies.json (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/armies.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/armies.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_armies (output matches or improves)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "MIGRATE-004",
+      "title": "Migrate get_species_full to Rust parser",
+      "priority": 4,
+      "file": "stellaris_save_extractor/species.py",
+      "method": "get_species_full",
+      "regex_count": 12,
+      "passes": false,
+      "criteria": [
+        "RUN: test -f tests/migration_baselines/get_species_full.json (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/species.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/species.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_species_full (output matches or improves)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "MIGRATE-005",
+      "title": "Migrate get_planets to Rust parser",
+      "priority": 5,
+      "file": "stellaris_save_extractor/planets.py",
+      "method": "get_planets",
+      "regex_count": 36,
+      "passes": false,
+      "criteria": [
+        "RUN: test -f tests/migration_baselines/get_planets.json (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/planets.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/planets.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_planets (output matches or improves)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "MIGRATE-006",
+      "title": "Migrate get_fleets to Rust parser",
+      "priority": 6,
+      "file": "stellaris_save_extractor/military.py",
+      "method": "get_fleets",
+      "regex_count": 39,
+      "passes": false,
+      "criteria": [
+        "RUN: test -f tests/migration_baselines/get_fleets.json (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/military.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/military.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_fleets (output matches or improves)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "MIGRATE-007",
+      "title": "Migrate get_diplomacy to Rust parser",
+      "priority": 7,
+      "file": "stellaris_save_extractor/diplomacy.py",
+      "method": "get_diplomacy",
+      "regex_count": 70,
+      "passes": false,
+      "criteria": [
+        "RUN: test -f tests/migration_baselines/get_diplomacy.json (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/diplomacy.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/diplomacy.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_diplomacy (output matches or improves)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "MIGRATE-008",
+      "title": "Migrate get_resources to Rust parser",
+      "priority": 8,
+      "file": "stellaris_save_extractor/economy.py",
+      "method": "get_resources",
+      "regex_count": 32,
+      "passes": false,
+      "criteria": [
+        "RUN: test -f tests/migration_baselines/get_resources.json (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/economy.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/economy.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_resources (output matches or improves)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "MIGRATE-009",
+      "title": "Migrate get_player_status to Rust parser",
+      "priority": 9,
+      "file": "stellaris_save_extractor/player.py",
+      "method": "get_player_status",
+      "regex_count": 35,
+      "passes": false,
+      "criteria": [
+        "RUN: test -f tests/migration_baselines/get_player_status.json (baseline exists)",
+        "RUN: grep 'extract_sections\\|iter_section_entries' stellaris_save_extractor/player.py (Rust calls present)",
+        "RUN: grep 'ParserError' stellaris_save_extractor/player.py (fallback present)",
+        "RUN: python3 scripts/validate_migration.py get_player_status (output matches or improves)"
+      ],
+      "notes": ""
+    }
+  ],
+  "discovered": []
+}
