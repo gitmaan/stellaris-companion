@@ -84,8 +84,8 @@
         "RUN: python3 -c 'from save_extractor import SaveExtractor; print(len(SaveExtractor(\"test_save.sav\").get_diplomacy()))' (returns count)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "69 regex calls - largest file to migrate"
+      "passes": true,
+      "notes": "Migrated get_diplomacy to Rust parser for federation ID extraction. Uses hybrid approach: Rust parser for country iteration to get federation ID, regex for relations_manager parsing due to duplicate 'relation' keys (Rust parser collapses duplicate keys)."
     },
     {
       "id": "MIG-ECONOMY",
