@@ -229,8 +229,8 @@
         "Code review: rust_bridge.py handles Electron resources path"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Depends on Electron app existing - skip if no Electron yet"
+      "passes": true,
+      "notes": "Updated electron-builder.yml to include rust-parser/ in extraResources (from ../bin to rust-parser). Updated rust_bridge.py to detect PyInstaller bundles (sys.frozen) and look for binary at resources/rust-parser/<binary_name>. Added documentation comment in main.js referencing the stellaris-parser bundling."
     },
     {
       "id": "TEST-001",

@@ -5,9 +5,10 @@ It handles subprocess communication, JSON parsing, and error handling.
 
 The Rust binary can be located in multiple places (in order of priority):
 0. PARSER_BINARY environment variable (for testing/override)
-1. Development: stellaris-parser/target/release/stellaris-parser
-2. Packaged: bin/ directory relative to this file
-3. System: PATH-accessible stellaris-parser binary
+1. Electron packaged app: rust-parser/ in Electron resources folder
+2. Development: stellaris-parser/target/release/stellaris-parser
+3. Packaged: bin/ directory relative to this file
+4. System: PATH-accessible stellaris-parser binary
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import json
 import os
 import platform
 import subprocess
+import sys
 from pathlib import Path
 from typing import Iterator
 
@@ -25,9 +27,11 @@ def _get_binary_path() -> Path:
 
     Searches in order:
     0. PARSER_BINARY environment variable (for testing/override)
-    1. Development location: stellaris-parser/target/release/
-    2. Package bin/ directory
-    3. Fallback to development path (even if not found, for error messages)
+    1. Electron packaged app: rust-parser/ folder in resources
+       (when running as PyInstaller bundle inside Electron)
+    2. Development location: stellaris-parser/target/release/
+    3. Package bin/ directory
+    4. Fallback to development path (even if not found, for error messages)
 
     Returns:
         Path to the binary (may not exist if not found)
@@ -37,7 +41,6 @@ def _get_binary_path() -> Path:
     if env_binary:
         return Path(env_binary)
 
-    base = Path(__file__).parent
     system = platform.system().lower()
     machine = platform.machine().lower()
 
@@ -52,19 +55,34 @@ def _get_binary_path() -> Path:
     else:
         binary_name = "stellaris-parser-linux-x64"
 
-    # 1. Development location (most common during development)
+    # 1. Electron packaged app detection
+    # When running as a PyInstaller bundle inside Electron, sys.frozen is set
+    # and the executable is at: resources/python-backend/stellaris-backend
+    # The Rust parser is at: resources/rust-parser/<binary_name>
+    if getattr(sys, 'frozen', False):
+        # Running as a PyInstaller bundle
+        # sys.executable points to the bundled executable
+        # e.g., /path/to/resources/python-backend/stellaris-backend
+        executable_path = Path(sys.executable)
+        resources_path = executable_path.parent.parent  # Go up from python-backend/
+        electron_parser_path = resources_path / "rust-parser" / binary_name
+        if electron_parser_path.exists():
+            return electron_parser_path
+
+    # 2. Development location (most common during development)
+    base = Path(__file__).parent
     dev_path = base / "stellaris-parser" / "target" / "release" / "stellaris-parser"
     if system == "windows":
         dev_path = dev_path.with_suffix(".exe")
     if dev_path.exists():
         return dev_path
 
-    # 2. Package bin/ directory
+    # 3. Package bin/ directory
     bin_path = base / "bin" / binary_name
     if bin_path.exists():
         return bin_path
 
-    # 3. Fallback to development path (even if not found, for error messages)
+    # 4. Fallback to development path (even if not found, for error messages)
     return dev_path
 
 

@@ -15,6 +15,12 @@ extraResources:
     to: python-backend
     filter:
       - "**/*"
+  # Rust parser binary (stellaris-parser)
+  # Binaries are placed in bin/ folder at project root
+  - from: ../bin
+    to: rust-parser
+    filter:
+      - "**/*"
 
 mac:
   category: public.app-category.games

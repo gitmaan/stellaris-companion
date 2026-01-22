@@ -1,6 +1,11 @@
 // Main process entry point
 // Implements ELEC-002: Python subprocess management
 // Implements ELEC-004: Settings IPC handlers (keytar + electron-store)
+//
+// Bundled Resources (see electron-builder.yml extraResources):
+// - python-backend/: PyInstaller-bundled Python backend (stellaris-backend executable)
+// - rust-parser/: Rust CLI parser binary (stellaris-parser) used by rust_bridge.py
+//   The Rust parser handles Clausewitz save file parsing with proper edge case handling.
 
 const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, shell } = require('electron')
 const path = require('path')
