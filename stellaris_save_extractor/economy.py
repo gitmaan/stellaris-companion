@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+import logging
 import re
 import zipfile
 from datetime import datetime
 from pathlib import Path
+
+# Rust bridge for fast Clausewitz parsing
+try:
+    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    RUST_BRIDGE_AVAILABLE = True
+except ImportError:
+    RUST_BRIDGE_AVAILABLE = False
+    ParserError = Exception  # Fallback type for type hints
+
+logger = logging.getLogger(__name__)
+
 
 class EconomyMixin:
     """Domain methods extracted from the original SaveExtractor."""
@@ -299,6 +311,142 @@ class EconomyMixin:
         Returns:
             Dict with resource stockpiles and monthly income/expenses
         """
+        # Try Rust parser first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                return self._get_resources_rust()
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for resources: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_resources_regex()
+
+    def _get_resources_rust(self) -> dict:
+        """Get resource information using Rust parser."""
+        result = {
+            'stockpiles': {},
+            'monthly_income': {},
+            'monthly_expenses': {},
+            'net_monthly': {}
+        }
+
+        player_id = self.get_player_empire_id()
+
+        # All tracked resources
+        ALL_RESOURCES = [
+            'energy', 'minerals', 'food', 'consumer_goods', 'alloys',
+            'physics_research', 'society_research', 'engineering_research',
+            'influence', 'unity', 'volatile_motes', 'exotic_gases', 'rare_crystals',
+            'sr_living_metal', 'sr_zro', 'sr_dark_matter', 'minor_artifacts', 'astral_threads'
+        ]
+
+        # Find player's country data using Rust iterator
+        player_data = None
+        for country_id, country_data in iter_section_entries(self.save_path, "country"):
+            if str(country_id) == str(player_id):
+                player_data = country_data
+                break
+
+        if not player_data:
+            result['error'] = "Could not find player country"
+            return result
+
+        # Extract stockpiles from standard_economy_module.resources
+        econ_module = player_data.get('standard_economy_module', {})
+        if isinstance(econ_module, dict):
+            resources = econ_module.get('resources', {})
+            if isinstance(resources, dict):
+                for resource in ALL_RESOURCES:
+                    if resource in resources:
+                        try:
+                            result['stockpiles'][resource] = float(resources[resource])
+                        except (ValueError, TypeError):
+                            pass
+
+        # Extract budget data
+        budget = player_data.get('budget', {})
+        if not isinstance(budget, dict):
+            result['error'] = "Could not find budget section"
+            return result
+
+        # The budget has current_month which contains income and expenses
+        current_month = budget.get('current_month', {})
+        if not isinstance(current_month, dict):
+            # Fallback - check for income/expenses directly on budget
+            current_month = budget
+
+        income_section = current_month.get('income', {})
+        expenses_section = current_month.get('expenses', {})
+
+        # Sum up income from all sources
+        income_resources = {}
+        if isinstance(income_section, dict):
+            for source, resources in income_section.items():
+                if isinstance(resources, dict):
+                    for resource, value_str in resources.items():
+                        if resource in ALL_RESOURCES:
+                            try:
+                                value = float(value_str)
+                                income_resources[resource] = income_resources.get(resource, 0) + value
+                            except (ValueError, TypeError):
+                                pass
+
+        result['monthly_income'] = income_resources
+
+        # Sum up expenses from all sources
+        expenses_resources = {}
+        if isinstance(expenses_section, dict):
+            for source, resources in expenses_section.items():
+                if isinstance(resources, dict):
+                    for resource, value_str in resources.items():
+                        if resource in ALL_RESOURCES:
+                            try:
+                                value = float(value_str)
+                                expenses_resources[resource] = expenses_resources.get(resource, 0) + value
+                            except (ValueError, TypeError):
+                                pass
+
+        result['monthly_expenses'] = expenses_resources
+
+        # Calculate net
+        for resource in set(list(income_resources.keys()) + list(expenses_resources.keys())):
+            income = income_resources.get(resource, 0)
+            expense = expenses_resources.get(resource, 0)
+            result['net_monthly'][resource] = round(income - expense, 2)
+
+        # Add a summary of key resources
+        result['summary'] = {
+            'energy_net': result['net_monthly'].get('energy', 0),
+            'minerals_net': result['net_monthly'].get('minerals', 0),
+            'food_net': result['net_monthly'].get('food', 0),
+            'alloys_net': result['net_monthly'].get('alloys', 0),
+            'consumer_goods_net': result['net_monthly'].get('consumer_goods', 0),
+            'research_total': (result['net_monthly'].get('physics_research', 0) +
+                              result['net_monthly'].get('society_research', 0) +
+                              result['net_monthly'].get('engineering_research', 0)),
+            'volatile_motes_net': result['net_monthly'].get('volatile_motes', 0),
+            'exotic_gases_net': result['net_monthly'].get('exotic_gases', 0),
+            'rare_crystals_net': result['net_monthly'].get('rare_crystals', 0),
+            'living_metal_net': result['net_monthly'].get('sr_living_metal', 0),
+            'zro_net': result['net_monthly'].get('sr_zro', 0),
+            'dark_matter_net': result['net_monthly'].get('sr_dark_matter', 0),
+            'minor_artifacts': result['stockpiles'].get('minor_artifacts', 0),
+        }
+
+        # Add strategic resource stockpiles (only if present)
+        strategic = {}
+        for res in ['sr_living_metal', 'sr_zro', 'sr_dark_matter']:
+            if res in result['stockpiles'] and result['stockpiles'][res] > 0:
+                strategic[res.replace('sr_', '')] = result['stockpiles'][res]
+        if strategic:
+            result['strategic_stockpiles'] = strategic
+
+        return result
+
+    def _get_resources_regex(self) -> dict:
+        """Get resource information using regex (fallback method)."""
         result = {
             'stockpiles': {},
             'monthly_income': {},
