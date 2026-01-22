@@ -45,8 +45,8 @@
         "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta --output - | jq . (valid JSON, no parse error)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implementation already complete - jomini parses gamestate and meta correctly, JSON output includes schema_version, tool_version, and game fields"
     },
     {
       "id": "RUST-004",
