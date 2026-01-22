@@ -124,8 +124,8 @@
         "Code review: extract-gamestate marked as debug in help text"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Debug command for development/testing"
+      "passes": true,
+      "notes": "Already implemented - run_gamestate function in extract.rs reads raw gamestate file directly without ZIP extraction. Help text includes '(debug only)' suffix."
     },
     {
       "id": "INT-001",
