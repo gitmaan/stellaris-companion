@@ -199,8 +199,8 @@
         "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(e.get_leviathans())' (no errors)"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "6 regex calls to migrate"
+      "passes": true,
+      "notes": "Migrated get_leviathans to Rust parser using iter_section_entries for country iteration to detect leviathan countries by type. Uses hybrid approach: Rust for country iteration (tiyanki, crystal, amoeba, cloud, drone), regex for guardian detection (ether_drake, dimensional_horror, etc.) and defeat flag searches. Regex fallback (_get_leviathans_regex) preserved for error cases."
     },
     {
       "id": "MIG-BASE",

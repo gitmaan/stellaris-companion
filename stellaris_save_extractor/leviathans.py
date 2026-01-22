@@ -1,6 +1,17 @@
 from __future__ import annotations
 
+import logging
 import re
+
+# Rust bridge for fast Clausewitz parsing
+try:
+    from rust_bridge import iter_section_entries, ParserError
+    RUST_BRIDGE_AVAILABLE = True
+except ImportError:
+    RUST_BRIDGE_AVAILABLE = False
+    ParserError = Exception  # Fallback type for type hints
+
+logger = logging.getLogger(__name__)
 
 
 class LeviathansMixin:
@@ -70,8 +81,20 @@ class LeviathansMixin:
         },
     }
 
+    # Country type mappings for leviathan detection via Rust parser
+    LEVIATHAN_COUNTRY_TYPES = {
+        'tiyanki_country': 'tiyanki',
+        'crystal_country': 'crystal',
+        'amoeba_country': 'amoeba',
+        'cloud_country': 'cloud',
+        'mining_drone_country': 'drone',
+        'drone_country': 'drone',
+    }
+
     def get_leviathans(self) -> dict:
         """Get status of Leviathans and Guardians in the galaxy.
+
+        Uses Rust parser for fast extraction when available, falls back to regex.
 
         Returns:
             Dict with:
@@ -79,6 +102,129 @@ class LeviathansMixin:
               - total_count: Number of leviathan types detected
               - defeated_count: Number defeated by player
               - alive_count: Number still active
+        """
+        # Try Rust bridge first for faster parsing
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                return self._get_leviathans_rust()
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for leviathans: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback: regex-based parsing
+        return self._get_leviathans_regex()
+
+    def _get_leviathans_rust(self) -> dict:
+        """Get leviathan status using Rust parser.
+
+        Uses hybrid approach:
+        - Rust parser for iterating over countries to find leviathan country types
+        - Regex for gamestate-wide flag searches (guardians, defeat markers)
+
+        Returns:
+            Dict with leviathan status details
+        """
+        result = {
+            'leviathans': [],
+            'total_count': 0,
+            'defeated_count': 0,
+            'alive_count': 0,
+        }
+
+        detected_types = set()
+
+        # First pass: detect leviathan countries via Rust parser iteration
+        for country_id, country_data in iter_section_entries(self.gamestate_path, "country"):
+            if not isinstance(country_data, dict):
+                continue
+
+            ctype = country_data.get("country_type") or country_data.get("type")
+            if ctype and ctype in self.LEVIATHAN_COUNTRY_TYPES:
+                detected_types.add(self.LEVIATHAN_COUNTRY_TYPES[ctype])
+
+            # Also check country name for additional identification
+            name_data = country_data.get("name", {})
+            if isinstance(name_data, dict):
+                name_key = name_data.get("key", "").lower()
+                # Check for specific leviathan name keys
+                if 'tiyanki' in name_key:
+                    detected_types.add('tiyanki')
+                elif 'crystal' in name_key or 'prism' in name_key:
+                    detected_types.add('crystal')
+                elif 'amoeba' in name_key or 'spaceborne_organic' in name_key:
+                    detected_types.add('amoeba')
+                elif 'cloud' in name_key:
+                    detected_types.add('cloud')
+                elif 'mining_drone' in name_key:
+                    detected_types.add('drone')
+
+        # Second pass: detect guardians via regex (they have specific flags/markers)
+        # These are the major guardians that may not have dedicated country types
+        guardian_patterns = {
+            'ether_drake': [
+                r'ether_drake',
+                r'dragon_armor',
+                r'NAME_Ether_Drake',
+            ],
+            'dimensional_horror': [
+                r'dimensional_horror',
+                r'NAME_Dimensional_Horror',
+            ],
+            'automated_dreadnought': [
+                r'automated_dreadnought',
+                r'NAME_Automated_Dreadnought',
+            ],
+            'stellarite': [
+                r'stellarite',
+                r'NAME_Stellarite',
+            ],
+            'enigmatic_fortress': [
+                r'enigmatic_fortress',
+                r'NAME_Enigmatic_Fortress',
+            ],
+            'voidspawn': [
+                r'voidspawn',
+                r'NAME_Voidspawn',
+            ],
+            'wraith': [
+                r'spectral_wraith',
+                r'NAME_Spectral_Wraith',
+            ],
+        }
+
+        for lev_key, patterns in guardian_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, self.gamestate, re.IGNORECASE):
+                    detected_types.add(lev_key)
+                    break
+
+        # Build result list with status
+        detected = []
+        for lev_key in detected_types:
+            info = self.LEVIATHAN_INFO.get(lev_key, {})
+            defeated = self._check_leviathan_defeated(lev_key)
+
+            detected.append({
+                'type': lev_key,
+                'name': info.get('name', lev_key.replace('_', ' ').title()),
+                'status': 'defeated' if defeated else 'alive',
+                'reward': info.get('reward', 'Unknown'),
+                'threat': info.get('threat', 'Unknown'),
+            })
+
+        result['leviathans'] = detected
+        result['total_count'] = len(detected)
+        result['defeated_count'] = sum(1 for l in detected if l['status'] == 'defeated')
+        result['alive_count'] = sum(1 for l in detected if l['status'] == 'alive')
+
+        return result
+
+    def _get_leviathans_regex(self) -> dict:
+        """Get leviathan status using regex parsing (fallback method).
+
+        Returns:
+            Dict with leviathan status details
         """
         result = {
             'leviathans': [],
