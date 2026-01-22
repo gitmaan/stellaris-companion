@@ -217,8 +217,8 @@
         "RUN: ls README.md && grep -i 'binary\\|stellaris-parser' README.md (documented)"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created bin/ directory with README.md documenting binary placement for each platform. Added .gitkeep to track directory. Updated main README.md with Rust Parser section documenting binary distribution and CLI usage."
     },
     {
       "id": "DIST-002",

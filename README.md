@@ -179,10 +179,41 @@ stellaris-companion/
 ├── save_extractor.py    # Save file parser with tools
 ├── save_loader.py       # Save file discovery
 ├── personality.py       # Dynamic advisor personality
+├── rust_bridge.py       # Python-Rust binary interface
+├── stellaris-parser/    # Rust CLI for fast save parsing
+├── bin/                 # Pre-built binaries for distribution
 ├── FINDINGS.md          # Development notes
 ├── PLAN.md              # Implementation roadmap
 └── requirements.txt     # Python dependencies
 ```
+
+## Rust Parser (stellaris-parser)
+
+The project uses a Rust-based parser (`stellaris-parser`) for fast, reliable parsing of Stellaris save files. The parser is built on the [jomini](https://crates.io/crates/jomini) library which handles all Clausewitz format edge cases.
+
+### Binary Distribution
+
+Pre-built binaries are available in the `bin/` directory or from [GitHub Releases](https://github.com/your-repo/stellaris-companion/releases).
+
+### Building from Source
+
+```bash
+cd stellaris-parser
+cargo build --release
+# Binary: stellaris-parser/target/release/stellaris-parser
+```
+
+### CLI Usage
+
+```bash
+# Extract sections from a save file
+./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta,galaxy --output -
+
+# Stream entries from large sections (JSONL format)
+./stellaris-parser/target/release/stellaris-parser iter-save test_save.sav --section country --format jsonl
+```
+
+The Python code uses the Rust parser automatically via `rust_bridge.py`. See `docs/RUST_PARSER_ARCHITECTURE.md` for the full architecture decision record.
 
 ## Development
 
