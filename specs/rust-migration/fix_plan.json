@@ -42,8 +42,8 @@
         "RUN: python3 -c 'from save_extractor import SaveExtractor; print(SaveExtractor(\"test_save.sav\").get_player_status())' (no errors)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "32 regex calls to migrate"
+      "passes": true,
+      "notes": "Migrated get_player_empire_id, get_empire_identity, get_traditions, get_ascension_perks, get_relics to Rust parser with regex fallback"
     },
     {
       "id": "MIG-PLANETS",

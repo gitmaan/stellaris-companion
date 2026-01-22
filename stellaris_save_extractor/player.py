@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+import logging
 import re
 import zipfile
 from datetime import datetime
 from pathlib import Path
+
+# Rust bridge for fast Clausewitz parsing
+try:
+    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    RUST_BRIDGE_AVAILABLE = True
+except ImportError:
+    RUST_BRIDGE_AVAILABLE = False
+    ParserError = Exception  # Fallback type
+
+logger = logging.getLogger(__name__)
+
 
 class PlayerMixin:
     """Domain methods extracted from the original SaveExtractor."""
@@ -64,11 +76,28 @@ class PlayerMixin:
         Returns:
             Player country ID (usually 0)
         """
-        # Look for player={ section
+        # Try Rust parser first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                data = extract_sections(self.save_path, ["player"])
+                player_list = data.get("player", [])
+                if player_list and isinstance(player_list, list) and len(player_list) > 0:
+                    country_id = player_list[0].get("country", "0")
+                    return int(country_id)
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for player: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_player_empire_id_regex()
+
+    def _get_player_empire_id_regex(self) -> int:
+        """Get player empire ID using regex (fallback method)."""
         match = re.search(r'player\s*=\s*\{[^}]*country\s*=\s*(\d+)', self.gamestate[:5000])
         if match:
             return int(match.group(1))
-        return 0  # Default to 0
+        return 0
 
     def get_player_status(self) -> dict:
         """Get the player's current empire status with clear, unambiguous metrics.
@@ -250,9 +279,78 @@ class PlayerMixin:
             'empire_name': self.get_metadata().get('name', 'Unknown'),
         }
 
+        # Try Rust parser first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                player_id = self.get_player_empire_id()
+                for key, country in iter_section_entries(self.save_path, "country"):
+                    if key == str(player_id):
+                        # Extract ethics
+                        ethos = country.get("ethos", {})
+                        if isinstance(ethos, dict):
+                            ethic = ethos.get("ethic", [])
+                            if isinstance(ethic, str):
+                                ethic = [ethic]
+                            result['ethics'] = [e.replace("ethic_", "") for e in ethic if isinstance(e, str)]
+
+                        # Extract government info
+                        gov = country.get("government", {})
+                        if isinstance(gov, dict):
+                            gov_type = gov.get("type", "")
+                            if gov_type:
+                                result['government'] = gov_type.replace("gov_", "")
+
+                            authority = gov.get("authority", "")
+                            if authority:
+                                result['authority'] = authority.replace("auth_", "")
+
+                            civics = gov.get("civics", [])
+                            if isinstance(civics, list):
+                                result['civics'] = [c.replace("civic_", "") for c in civics if isinstance(c, str)]
+
+                        # Check for gestalt
+                        if 'gestalt_consciousness' in result['ethics']:
+                            result['is_gestalt'] = True
+                        if result['authority'] == 'machine_intelligence':
+                            result['is_gestalt'] = True
+                            result['is_machine'] = True
+                        elif result['authority'] == 'hive_mind':
+                            result['is_gestalt'] = True
+                            result['is_hive_mind'] = True
+
+                        # Extract founder species
+                        founder_ref = country.get("founder_species_ref")
+                        if founder_ref:
+                            species_names = self._get_species_names()
+                            result['species_name'] = species_names.get(str(founder_ref))
+
+                        break
+                return result
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for empire_identity: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_empire_identity_regex()
+
+    def _get_empire_identity_regex(self) -> dict:
+        """Extract empire identity using regex (fallback method)."""
+        result = {
+            'ethics': [],
+            'government': None,
+            'civics': [],
+            'authority': None,
+            'species_class': None,
+            'species_name': None,
+            'is_gestalt': False,
+            'is_machine': False,
+            'is_hive_mind': False,
+            'empire_name': self.get_metadata().get('name', 'Unknown'),
+        }
+
         player_id = self.get_player_empire_id()
 
-        # Find the country section and player's data
         country_match = re.search(r'^country=\s*\{', self.gamestate, re.MULTILINE)
         if not country_match:
             result['error'] = "Could not find country section"
@@ -265,52 +363,40 @@ class PlayerMixin:
             return result
 
         player_start = start + player_match.start()
-        # Need larger chunk - government block can be far into the country data
         player_chunk = self.gamestate[player_start:player_start + 500000]
 
-        # Extract ethics from ethos={} block
-        # Format: ethos={ ethic="ethic_fanatic_egalitarian" ethic="ethic_xenophile" }
         ethos_match = re.search(r'ethos=\s*\{([^}]+)\}', player_chunk)
         if ethos_match:
             ethos_block = ethos_match.group(1)
             ethics_matches = re.findall(r'ethic="ethic_([^"]+)"', ethos_block)
             result['ethics'] = ethics_matches
 
-        # Check for gestalt consciousness
         if 'gestalt_consciousness' in str(result['ethics']):
             result['is_gestalt'] = True
-            # Determine if machine or hive mind from authority
             if 'auth_machine_intelligence' in player_chunk:
                 result['is_machine'] = True
             elif 'auth_hive_mind' in player_chunk:
                 result['is_hive_mind'] = True
 
-        # Extract government block
-        # Format: government={ type="gov_representative_democracy" authority="auth_democratic" civics={...} }
         gov_block_match = re.search(r'government=\s*\{', player_chunk)
         if gov_block_match:
             gov_start = gov_block_match.start()
-            # Extract a chunk for the government block
             gov_chunk = player_chunk[gov_start:gov_start + 2000]
 
-            # Extract government type
             type_match = re.search(r'type="([^"]+)"', gov_chunk)
             if type_match:
                 result['government'] = type_match.group(1).replace('gov_', '')
 
-            # Extract authority
             auth_match = re.search(r'authority="([^"]+)"', gov_chunk)
             if auth_match:
                 result['authority'] = auth_match.group(1).replace('auth_', '')
 
-            # Extract civics
             civics_match = re.search(r'civics=\s*\{([^}]+)\}', gov_chunk)
             if civics_match:
                 civics_block = civics_match.group(1)
                 civics = re.findall(r'"civic_([^"]+)"', civics_block)
                 result['civics'] = civics
 
-        # Update gestalt flags based on authority
         if result['authority'] == 'machine_intelligence':
             result['is_gestalt'] = True
             result['is_machine'] = True
@@ -318,18 +404,15 @@ class PlayerMixin:
             result['is_gestalt'] = True
             result['is_hive_mind'] = True
 
-        # Extract founder species info
         founder_match = re.search(r'founder_species_ref=(\d+)', player_chunk)
         if founder_match:
             species_id = founder_match.group(1)
-            # Look up species in species_db (first 2MB of file)
             species_chunk = self.gamestate[:2000000]
             species_pattern = rf'\b{species_id}=\s*\{{[^}}]*?class="([^"]+)"'
             species_match = re.search(species_pattern, species_chunk, re.DOTALL)
             if species_match:
                 result['species_class'] = species_match.group(1)
 
-            # Get species name
             species_name_pattern = rf'\b{species_id}=\s*\{{[^}}]*?name="([^"]+)"'
             name_match = re.search(species_name_pattern, species_chunk, re.DOTALL)
             if name_match:
@@ -346,6 +429,53 @@ class PlayerMixin:
               - by_tree: dict[str, {picked: list[str], adopted: bool, finished: bool}]
               - count: int
         """
+        result = {
+            "traditions": [],
+            "by_tree": {},
+            "count": 0,
+        }
+
+        # Try Rust parser first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                player_id = self.get_player_empire_id()
+                for key, country in iter_section_entries(self.save_path, "country"):
+                    if key == str(player_id):
+                        traditions = country.get("traditions", [])
+                        if isinstance(traditions, list):
+                            result["traditions"] = traditions
+                            result["count"] = len(traditions)
+
+                            # Build by_tree summary
+                            by_tree: dict[str, dict] = {}
+                            for tradition_id in traditions:
+                                tree = "unknown"
+                                if tradition_id.startswith("tr_"):
+                                    remainder = tradition_id[3:]
+                                    parts = remainder.split("_", 1)
+                                    if parts and parts[0]:
+                                        tree = parts[0]
+
+                                entry = by_tree.setdefault(tree, {"picked": [], "adopted": False, "finished": False})
+                                entry["picked"].append(tradition_id)
+                                if tradition_id.endswith("_adopt"):
+                                    entry["adopted"] = True
+                                if tradition_id.endswith("_finish"):
+                                    entry["finished"] = True
+
+                            result["by_tree"] = by_tree
+                        break
+                return result
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for traditions: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_traditions_regex()
+
+    def _get_traditions_regex(self) -> dict:
+        """Extract traditions using regex (fallback method)."""
         result = {
             "traditions": [],
             "by_tree": {},
@@ -389,6 +519,33 @@ class PlayerMixin:
               - ascension_perks: list[str]
               - count: int
         """
+        result = {
+            "ascension_perks": [],
+            "count": 0,
+        }
+
+        # Try Rust parser first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                player_id = self.get_player_empire_id()
+                for key, country in iter_section_entries(self.save_path, "country"):
+                    if key == str(player_id):
+                        perks = country.get("ascension_perks", [])
+                        if isinstance(perks, list):
+                            result["ascension_perks"] = perks
+                            result["count"] = len(perks)
+                        break
+                return result
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for ascension_perks: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_ascension_perks_regex()
+
+    def _get_ascension_perks_regex(self) -> dict:
+        """Extract ascension perks using regex (fallback method)."""
         result = {
             "ascension_perks": [],
             "count": 0,
@@ -460,6 +617,40 @@ class PlayerMixin:
               - last_received_relic: str|None
               - activation_cooldown_days: int|None
         """
+        result = {
+            "relics": [],
+            "count": 0,
+            "last_activated_relic": None,
+            "last_received_relic": None,
+            "activation_cooldown_days": None,
+        }
+
+        # Try Rust parser first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                player_id = self.get_player_empire_id()
+                for key, country in iter_section_entries(self.save_path, "country"):
+                    if key == str(player_id):
+                        relics = country.get("relics", [])
+                        if isinstance(relics, list):
+                            result["relics"] = relics
+                            result["count"] = len(relics)
+
+                        # These fields may not be in Rust output, try to get them
+                        result["last_activated_relic"] = country.get("last_activated_relic")
+                        result["last_received_relic"] = country.get("last_received_relic")
+                        break
+                return result
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for relics: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_relics_regex()
+
+    def _get_relics_regex(self) -> dict:
+        """Extract relics using regex (fallback method)."""
         result = {
             "relics": [],
             "count": 0,
