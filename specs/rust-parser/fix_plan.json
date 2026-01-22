@@ -7,7 +7,8 @@
     "Use a shared error.rs module for JSON error output to stderr with exit codes (1=file not found, 2=parse error, 3=invalid argument)",
     "jomini HashMap<String, Value> deserialization overwrites duplicate keys (last value wins); use TextTape or custom deserializers for duplicate preservation",
     "Condensed syntax parsing works when quoted strings provide delimiters (a={b=\"1\"c=\"2\"}); bare values adjacent to bare values may concatenate",
-    "Stellaris saves use Windows-1252 encoding, not UTF-8; use jomini's from_windows1252_slice() for lossless decoding to Unicode"
+    "Stellaris saves use Windows-1252 encoding, not UTF-8; use jomini's from_windows1252_slice() for lossless decoding to Unicode",
+    "Use clap's try_parse() instead of parse() for custom exit codes; parse() always exits 2 for errors, try_parse() lets you control exit code"
   ],
   "stories": [
     {
@@ -99,8 +100,8 @@
         "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save test_save.sav --sections meta 2>&1 | wc -l (stderr is 0-1 lines on success)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Custom clap error handling in main.rs - use try_parse() instead of parse() and exit(3) for argument errors to match architecture spec"
     },
     {
       "id": "RUST-008",

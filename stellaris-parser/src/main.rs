@@ -61,7 +61,16 @@ enum Commands {
 }
 
 fn main() {
-    let cli = Cli::parse();
+    // Custom error handling for clap to use exit code 3 for invalid arguments
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(e) => {
+            // Print clap's formatted error message to stderr
+            let _ = e.print();
+            // Exit with code 3 for invalid arguments (per architecture spec)
+            std::process::exit(3);
+        }
+    };
 
     let result = match cli.command {
         Commands::ExtractSave {
