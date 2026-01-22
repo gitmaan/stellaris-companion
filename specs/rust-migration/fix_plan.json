@@ -7,7 +7,8 @@
     "Always capture baseline BEFORE changing code",
     "Planet names use key/variables structure - extract from variables for real name",
     "Species names similarly need variable extraction",
-    "extract_sections() returns dict, iter_section_entries() yields (key, value) tuples"
+    "extract_sections() returns dict, iter_section_entries() yields (key, value) tuples",
+    "Faction names also use key/variables structure - recursively extract deepest meaningful name from nested variables"
   ],
   "stories": [
     {
@@ -174,8 +175,8 @@
         "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(e.get_factions())' (no errors)"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "9 regex calls to migrate"
+      "passes": true,
+      "notes": "Migrated get_factions to Rust parser using iter_section_entries for pop_factions iteration. Uses Rust for all structured data (type, support_percent, support_power, approval, members). Improved faction name resolution - now extracts actual names from nested variable structures instead of showing raw %ADJ% keys. Regex fallback (_get_factions_regex) preserved for error cases."
     },
     {
       "id": "MIG-PROJECTS",
