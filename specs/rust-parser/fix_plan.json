@@ -6,7 +6,8 @@
     "jomini text::de::from_utf8_slice requires target type annotation (HashMap<String, Value>)",
     "Use a shared error.rs module for JSON error output to stderr with exit codes (1=file not found, 2=parse error, 3=invalid argument)",
     "jomini HashMap<String, Value> deserialization overwrites duplicate keys (last value wins); use TextTape or custom deserializers for duplicate preservation",
-    "Condensed syntax parsing works when quoted strings provide delimiters (a={b=\"1\"c=\"2\"}); bare values adjacent to bare values may concatenate"
+    "Condensed syntax parsing works when quoted strings provide delimiters (a={b=\"1\"c=\"2\"}); bare values adjacent to bare values may concatenate",
+    "Stellaris saves use Windows-1252 encoding, not UTF-8; use jomini's from_windows1252_slice() for lossless decoding to Unicode"
   ],
   "stories": [
     {
@@ -85,8 +86,8 @@
         "Code review: src/output.rs handles non-UTF8 bytes (escapes or lossy conversion documented)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Marked ⚠️ in architecture doc - if test_save.sav lacks special chars, document limitation"
+      "passes": true,
+      "notes": "Created src/output.rs with comprehensive encoding documentation. Changed extract.rs and iter.rs to use jomini's from_windows1252_slice() instead of from_utf8_slice(). Added 6 encoding tests covering Windows-1252 special characters (0x80-0x9F range), high bytes (0xA0-0xFF), color codes, and ASCII passthrough. Windows-1252 is a lossless conversion to Unicode."
     },
     {
       "id": "RUST-007",

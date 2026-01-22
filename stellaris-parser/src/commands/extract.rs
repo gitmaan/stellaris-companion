@@ -1,6 +1,6 @@
 use crate::error::{exit_with_error, ErrorKind, SCHEMA_VERSION, TOOL_VERSION};
 use anyhow::{Context, Result};
-use jomini::text::de::from_utf8_slice;
+use jomini::text::de::from_windows1252_slice;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -76,15 +76,16 @@ fn extract_sections(gamestate: &[u8], meta: Option<&[u8]>, sections: &[&str]) ->
     result.insert("tool_version".to_string(), json!(TOOL_VERSION));
     result.insert("game".to_string(), json!("stellaris"));
 
-    // Parse the full gamestate once
-    let parsed: HashMap<String, Value> = from_utf8_slice(gamestate)
+    // Parse the full gamestate once using Windows-1252 encoding
+    // (Stellaris saves use Windows-1252, not UTF-8)
+    let parsed: HashMap<String, Value> = from_windows1252_slice(gamestate)
         .with_context(|| "Failed to parse gamestate")?;
 
     // Extract requested sections from gamestate
     for section in sections {
         if *section == "meta" {
             if let Some(meta_bytes) = meta {
-                let meta_parsed: HashMap<String, Value> = from_utf8_slice(meta_bytes)
+                let meta_parsed: HashMap<String, Value> = from_windows1252_slice(meta_bytes)
                     .with_context(|| "Failed to parse meta file")?;
                 result.insert("meta".to_string(), json!(meta_parsed));
             }

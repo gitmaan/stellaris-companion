@@ -1,6 +1,6 @@
 use crate::error::{exit_with_error, ErrorKind, SCHEMA_VERSION, TOOL_VERSION};
 use anyhow::{Context, Result};
-use jomini::text::de::from_utf8_slice;
+use jomini::text::de::from_windows1252_slice;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs::File;
@@ -34,8 +34,9 @@ pub fn run_save(path: &str, section: &str, schema_version: &str, format: &str) -
         content
     };
 
-    // Parse the full gamestate
-    let parsed: HashMap<String, Value> = from_utf8_slice(&gamestate_content)
+    // Parse the full gamestate using Windows-1252 encoding
+    // (Stellaris saves use Windows-1252, not UTF-8)
+    let parsed: HashMap<String, Value> = from_windows1252_slice(&gamestate_content)
         .with_context(|| "Failed to parse gamestate")?;
 
     // Get the requested section
