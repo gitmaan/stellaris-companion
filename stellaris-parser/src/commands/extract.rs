@@ -1,3 +1,4 @@
+use crate::error::{exit_with_error, ErrorKind, SCHEMA_VERSION, TOOL_VERSION};
 use anyhow::{Context, Result};
 use jomini::text::de::from_utf8_slice;
 use serde_json::{json, Map, Value};
@@ -6,24 +7,10 @@ use std::fs::File;
 use std::io::{BufWriter, Read, Write};
 use zip::ZipArchive;
 
-const SCHEMA_VERSION: u32 = 1;
-const TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
-
 /// Run extraction on a .sav file (ZIP archive containing gamestate and meta)
 pub fn run_save(path: &str, sections: &str, schema_version: &str, output: &str) -> Result<()> {
     // Validate schema version
-    let requested_version: u32 = schema_version
-        .parse()
-        .context("Invalid schema version")?;
-    if requested_version != SCHEMA_VERSION {
-        eprintln!("{}", json!({
-            "schema_version": SCHEMA_VERSION,
-            "tool_version": TOOL_VERSION,
-            "error": "UnsupportedSchemaVersion",
-            "message": format!("Requested schema version {} is not supported. Supported: {}", requested_version, SCHEMA_VERSION)
-        }));
-        std::process::exit(3);
-    }
+    validate_schema_version(schema_version);
 
     let section_list: Vec<&str> = sections.split(',').map(|s| s.trim()).collect();
 
@@ -65,18 +52,7 @@ pub fn run_save(path: &str, sections: &str, schema_version: &str, output: &str) 
 /// Run extraction on an already-extracted gamestate file (debug command)
 pub fn run_gamestate(path: &str, sections: &str, schema_version: &str, output: &str) -> Result<()> {
     // Validate schema version
-    let requested_version: u32 = schema_version
-        .parse()
-        .context("Invalid schema version")?;
-    if requested_version != SCHEMA_VERSION {
-        eprintln!("{}", json!({
-            "schema_version": SCHEMA_VERSION,
-            "tool_version": TOOL_VERSION,
-            "error": "UnsupportedSchemaVersion",
-            "message": format!("Requested schema version {} is not supported. Supported: {}", requested_version, SCHEMA_VERSION)
-        }));
-        std::process::exit(3);
-    }
+    validate_schema_version(schema_version);
 
     let section_list: Vec<&str> = sections.split(',').map(|s| s.trim()).collect();
 
@@ -134,13 +110,94 @@ fn write_output(result: &Value, output: &str) -> Result<()> {
     Ok(())
 }
 
+/// Validate schema version or exit with error
+fn validate_schema_version(schema_version: &str) {
+    match schema_version.parse::<u32>() {
+        Ok(v) if v == SCHEMA_VERSION => {}
+        Ok(v) => {
+            exit_with_error(
+                ErrorKind::InvalidArgument,
+                &format!(
+                    "Requested schema version {} is not supported. Supported: {}",
+                    v, SCHEMA_VERSION
+                ),
+            );
+        }
+        Err(_) => {
+            exit_with_error(
+                ErrorKind::InvalidArgument,
+                &format!("Invalid schema version: {}", schema_version),
+            );
+        }
+    }
+}
+
+/// Read gamestate and optionally meta from a .sav ZIP archive
+pub fn read_sav_file(path: &str) -> Result<(Vec<u8>, Option<Vec<u8>>)> {
+    let file = File::open(path).with_context(|| format!("Failed to open file: {}", path))?;
+    let mut archive = ZipArchive::new(file).with_context(|| "Failed to read ZIP archive")?;
+
+    // Extract gamestate content
+    let gamestate_content = {
+        let mut gamestate_file = archive
+            .by_name("gamestate")
+            .with_context(|| "No gamestate file in archive")?;
+        let mut content = Vec::new();
+        gamestate_file.read_to_end(&mut content)?;
+        content
+    };
+
+    // Try to extract meta content (may not always need it)
+    let meta_content = match archive.by_name("meta") {
+        Ok(mut meta_file) => {
+            let mut content = Vec::new();
+            meta_file.read_to_end(&mut content)?;
+            Some(content)
+        }
+        Err(_) => None,
+    };
+
+    Ok((gamestate_content, meta_content))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     #[test]
     fn test_schema_version_validation() {
         // Schema version 1 should be valid
         assert_eq!(SCHEMA_VERSION, 1);
+    }
+
+    #[test]
+    fn test_sav_reading_file_structure() {
+        // Test that we can detect ZIP structure from a .sav file
+        // This test uses the actual test_save.sav if available
+        let test_path = "../test_save.sav";
+        if Path::new(test_path).exists() {
+            let result = read_sav_file(test_path);
+            assert!(result.is_ok(), "Should be able to read test_save.sav as ZIP");
+            let (gamestate, meta) = result.unwrap();
+            assert!(!gamestate.is_empty(), "Gamestate should not be empty");
+            assert!(meta.is_some(), "Meta should be present in test save");
+            assert!(
+                !meta.as_ref().unwrap().is_empty(),
+                "Meta should not be empty"
+            );
+        }
+    }
+
+    #[test]
+    fn test_sav_reading_nonexistent_file() {
+        // Test that nonexistent files return proper error
+        let result = read_sav_file("nonexistent.sav");
+        assert!(result.is_err(), "Should fail for nonexistent file");
+        let err_msg = format!("{:#}", result.unwrap_err());
+        assert!(
+            err_msg.contains("Failed to open file"),
+            "Error should mention file open failure"
+        );
     }
 }

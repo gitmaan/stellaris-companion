@@ -1,7 +1,7 @@
-use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 mod commands;
+mod error;
 
 #[derive(Parser)]
 #[command(name = "stellaris-parser")]
@@ -58,10 +58,10 @@ enum Commands {
     },
 }
 
-fn main() -> Result<()> {
+fn main() {
     let cli = Cli::parse();
 
-    match cli.command {
+    let result = match cli.command {
         Commands::ExtractSave {
             path,
             sections,
@@ -80,5 +80,9 @@ fn main() -> Result<()> {
             schema_version,
             output,
         } => commands::extract::run_gamestate(&path, &sections, &schema_version, &output),
+    };
+
+    if let Err(e) = result {
+        error::handle_error(e);
     }
 }

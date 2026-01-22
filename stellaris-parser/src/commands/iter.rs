@@ -1,3 +1,4 @@
+use crate::error::{exit_with_error, ErrorKind, SCHEMA_VERSION, TOOL_VERSION};
 use anyhow::{Context, Result};
 use jomini::text::de::from_utf8_slice;
 use serde_json::{json, Value};
@@ -6,33 +7,17 @@ use std::fs::File;
 use std::io::Read;
 use zip::ZipArchive;
 
-const SCHEMA_VERSION: u32 = 1;
-const TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
-
 /// Stream entries from a large section in a .sav file as JSONL
 pub fn run_save(path: &str, section: &str, schema_version: &str, format: &str) -> Result<()> {
     // Validate schema version
-    let requested_version: u32 = schema_version
-        .parse()
-        .context("Invalid schema version")?;
-    if requested_version != SCHEMA_VERSION {
-        eprintln!("{}", json!({
-            "schema_version": SCHEMA_VERSION,
-            "tool_version": TOOL_VERSION,
-            "error": "UnsupportedSchemaVersion",
-            "message": format!("Requested schema version {} is not supported. Supported: {}", requested_version, SCHEMA_VERSION)
-        }));
-        std::process::exit(3);
-    }
+    validate_schema_version(schema_version);
 
+    // Validate format
     if format != "jsonl" {
-        eprintln!("{}", json!({
-            "schema_version": SCHEMA_VERSION,
-            "tool_version": TOOL_VERSION,
-            "error": "UnsupportedFormat",
-            "message": format!("Unsupported format: {}. Only 'jsonl' is supported.", format)
-        }));
-        std::process::exit(3);
+        exit_with_error(
+            ErrorKind::InvalidArgument,
+            &format!("Unsupported format: {}. Only 'jsonl' is supported.", format),
+        );
     }
 
     // Read the .sav file (ZIP archive)
@@ -83,6 +68,28 @@ pub fn run_save(path: &str, section: &str, schema_version: &str, format: &str) -
     }
 
     Ok(())
+}
+
+/// Validate schema version or exit with error
+fn validate_schema_version(schema_version: &str) {
+    match schema_version.parse::<u32>() {
+        Ok(v) if v == SCHEMA_VERSION => {}
+        Ok(v) => {
+            exit_with_error(
+                ErrorKind::InvalidArgument,
+                &format!(
+                    "Requested schema version {} is not supported. Supported: {}",
+                    v, SCHEMA_VERSION
+                ),
+            );
+        }
+        Err(_) => {
+            exit_with_error(
+                ErrorKind::InvalidArgument,
+                &format!("Invalid schema version: {}", schema_version),
+            );
+        }
+    }
 }
 
 #[cfg(test)]

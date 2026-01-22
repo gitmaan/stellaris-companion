@@ -3,7 +3,8 @@
   "branch": "ralph/rust-parser",
   "patterns": [
     "Rust must be sourced from ~/.cargo/env before cargo commands will work",
-    "jomini text::de::from_utf8_slice requires target type annotation (HashMap<String, Value>)"
+    "jomini text::de::from_utf8_slice requires target type annotation (HashMap<String, Value>)",
+    "Use a shared error.rs module for JSON error output to stderr with exit codes (1=file not found, 2=parse error, 3=invalid argument)"
   ],
   "stories": [
     {
@@ -31,8 +32,8 @@
         "RUN: ./stellaris-parser/target/release/stellaris-parser extract-save nonexistent.sav --sections meta 2>&1; echo $? (exit code 1, JSON error on stderr)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added sav_reading tests and JSON error output on stderr via error.rs module"
     },
     {
       "id": "RUST-003",
