@@ -21,8 +21,27 @@
       "last_district": "district_generator"
     },
     {
+      "id": "5",
+      "name": "Mars",
+      "type": "continental",
+      "size": 13,
+      "population": 5951,
+      "stability": 92.07278,
+      "amenities": 9442.19167,
+      "free_amenities": 3300.52667,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat"
+      ],
+      "district_count": 3,
+      "last_building": "building_executive_retreat",
+      "last_district": "district_generator"
+    },
+    {
       "id": "329",
-      "name": "Proxima_Centauri_b",
+      "name": "Proxima Centauri b",
       "type": "tropical",
       "size": 20,
       "population": 7454,
@@ -49,7 +68,7 @@
     },
     {
       "id": "333",
-      "name": "NEW_COLONY_1",
+      "name": "Alpha Centauri 1",
       "type": "continental",
       "size": 13,
       "population": 5904,
@@ -69,7 +88,7 @@
     },
     {
       "id": "334",
-      "name": "NEW_COLONY_2",
+      "name": "Alpha Centauri 2",
       "type": "gaia",
       "size": 12,
       "population": 2426,
@@ -94,7 +113,7 @@
     },
     {
       "id": "472",
-      "name": "NEW_COLONY_1",
+      "name": "Sirius 1",
       "type": "continental",
       "size": 19,
       "population": 8084,
@@ -151,7 +170,7 @@
     },
     {
       "id": "1224",
-      "name": "HUMAN2_PLANET_StCaspar",
+      "name": "StCaspar",
       "type": "tundra",
       "size": 18,
       "population": 6589,
@@ -171,7 +190,7 @@
     },
     {
       "id": "1241",
-      "name": "HUMAN2_PLANET_Rhea",
+      "name": "Rhea",
       "type": "continental",
       "size": 19,
       "population": 7041,
@@ -191,7 +210,7 @@
     },
     {
       "id": "1459",
-      "name": "NEW_COLONY_1",
+      "name": "Daranma 1",
       "type": "continental",
       "size": 14,
       "population": 5454,
@@ -211,7 +230,7 @@
     },
     {
       "id": "1571",
-      "name": "NEW_COLONY_1",
+      "name": "Dradim 1",
       "type": "ocean",
       "size": 22,
       "population": 8285,
@@ -231,7 +250,7 @@
     },
     {
       "id": "3467",
-      "name": "HUMAN2_PLANET_Treadway",
+      "name": "Treadway",
       "type": "tropical",
       "size": 12,
       "population": 6164,
@@ -259,7 +278,7 @@
     },
     {
       "id": "5188",
-      "name": "NEW_COLONY_1",
+      "name": "Edor Vang 1",
       "type": "continental",
       "size": 16,
       "population": 6066,
@@ -278,7 +297,7 @@
     },
     {
       "id": "8531",
-      "name": "NEW_COLONY_1",
+      "name": "Dimm 1",
       "type": "ocean",
       "size": 13,
       "population": 6357,
@@ -298,7 +317,7 @@
     },
     {
       "id": "10179",
-      "name": "REP1_PLANET_RoDoman",
+      "name": "RoDoman",
       "type": "tropical",
       "size": 10,
       "population": 2110,
@@ -306,7 +325,7 @@
       "amenities": 5235.625,
       "free_amenities": 2843.2075,
       "crime": 0.0,
-      "planet_modifier": "weak_magnetic_field",
+      "planet_modifier": "mineral_rich",
       "modifiers": [
         {
           "name": "weak_magnetic_field",
@@ -330,7 +349,7 @@
     },
     {
       "id": "10435",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Omicron Persei Habitat",
       "type": "habitat",
       "size": 6,
       "population": 4182,
@@ -350,7 +369,7 @@
     },
     {
       "id": "10436",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Edor Vang Habitat",
       "type": "habitat",
       "size": 6,
       "population": 5258,
@@ -370,7 +389,7 @@
     },
     {
       "id": "10441",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Yuhtaan Habitat",
       "type": "habitat",
       "size": 6,
       "population": 6887,
@@ -397,7 +416,7 @@
     },
     {
       "id": "10444",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Xirak Habitat",
       "type": "habitat",
       "size": 6,
       "population": 5571,
@@ -417,7 +436,7 @@
     },
     {
       "id": "10445",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Ethiuq Habitat",
       "type": "habitat",
       "size": 6,
       "population": 3831,
@@ -437,7 +456,7 @@
     },
     {
       "id": "10446",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Ler Zumon Habitat",
       "type": "habitat",
       "size": 6,
       "population": 3721,
@@ -455,7 +474,7 @@
     },
     {
       "id": "10448",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Obetellus Habitat",
       "type": "habitat",
       "size": 6,
       "population": 3870,
@@ -475,7 +494,7 @@
     },
     {
       "id": "10455",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "T'u Habitat",
       "type": "habitat",
       "size": 6,
       "population": 4824,
@@ -495,7 +514,7 @@
     },
     {
       "id": "10489",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Ofeogliea Habitat",
       "type": "habitat",
       "size": 6,
       "population": 7200,
@@ -515,7 +534,7 @@
     },
     {
       "id": "10491",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Mesarthim Habitat",
       "type": "habitat",
       "size": 6,
       "population": 6122,
@@ -534,8 +553,28 @@
       "last_district": "district_hab_housing"
     },
     {
+      "id": "10496",
+      "name": "Kenn Hijal Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 4465,
+      "stability": 100.0,
+      "amenities": 14492.8875,
+      "free_amenities": 9755.725,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_research_initiative"
+      ],
+      "district_count": 3,
+      "last_building": "building_foundry_1",
+      "last_district": "district_hab_energy"
+    },
+    {
       "id": "10497",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Poaa Habitat",
       "type": "habitat",
       "size": 6,
       "population": 3690,
@@ -555,7 +594,7 @@
     },
     {
       "id": "10501",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Nicor Habitat",
       "type": "habitat",
       "size": 6,
       "population": 3165,
@@ -573,7 +612,7 @@
     },
     {
       "id": "10507",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Barnards Star Habitat",
       "type": "habitat",
       "size": 6,
       "population": 6767,
@@ -592,7 +631,7 @@
     },
     {
       "id": "10509",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Marath Habitat",
       "type": "habitat",
       "size": 6,
       "population": 2144,
@@ -610,7 +649,7 @@
     },
     {
       "id": "10527",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Lisswyn Habitat",
       "type": "habitat",
       "size": 6,
       "population": 897,
@@ -624,7 +663,7 @@
     },
     {
       "id": "10528",
-      "name": "HABITAT_PLANET_NAME",
+      "name": "Deneb Habitat",
       "type": "habitat",
       "size": 6,
       "population": 1309,
@@ -637,14 +676,14 @@
       "last_district": "district_hab_energy"
     }
   ],
-  "count": 30,
-  "total_pops": 161308,
+  "count": 32,
+  "total_pops": 171724,
   "by_type": {
-    "continental": 7,
+    "continental": 8,
     "tropical": 3,
     "gaia": 1,
     "tundra": 1,
     "ocean": 2,
-    "habitat": 16
+    "habitat": 17
   }
 }

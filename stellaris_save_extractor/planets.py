@@ -1,15 +1,335 @@
 from __future__ import annotations
 
+import logging
 import re
 import zipfile
 from datetime import datetime
 from pathlib import Path
+
+# Rust bridge for fast Clausewitz parsing
+try:
+    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    RUST_BRIDGE_AVAILABLE = True
+except ImportError:
+    RUST_BRIDGE_AVAILABLE = False
+    ParserError = Exception  # Fallback type for type hints
+
+logger = logging.getLogger(__name__)
+
 
 class PlanetsMixin:
     """Domain methods extracted from the original SaveExtractor."""
 
     def get_planets(self) -> dict:
         """Get the player's colonized planets.
+
+        Uses Rust parser for fast extraction when available, falls back to regex.
+
+        Returns:
+            Dict with planet details including population and districts
+        """
+        # Try Rust parser first for faster extraction
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                return self._get_planets_rust()
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for planets: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback: regex-based parsing
+        return self._get_planets_regex()
+
+    def _extract_planet_name(self, name_data) -> str:
+        """Extract readable planet name from Rust-parsed name data.
+
+        Handles formats:
+        - {"key": "NAME_Earth"} -> "Earth"
+        - {"key": "NEW_COLONY_NAME_1", "variables": [{"key": "NAME", "value": {"key": "NAME_Alpha_Centauri"}}]} -> "Alpha Centauri 1"
+        - {"key": "HABITAT_PLANET_NAME", "variables": [{"key": "FROM.from.solar_system.GetName", "value": {"key": "Omicron_Persei"}}]} -> "Omicron Persei Habitat"
+        - {"key": "HUMAN2_PLANET_StCaspar"} -> "StCaspar"
+
+        Args:
+            name_data: Dict with key and optional variables
+
+        Returns:
+            Human-readable planet name
+        """
+        if not isinstance(name_data, dict):
+            return str(name_data) if name_data else "Unknown"
+
+        key = name_data.get("key", "Unknown")
+        variables = name_data.get("variables", [])
+
+        def clean_name(raw_name: str) -> str:
+            """Clean up a raw name value (strip NAME_ prefix, replace underscores)."""
+            if raw_name.startswith("NAME_"):
+                raw_name = raw_name[5:]
+            return raw_name.replace("_", " ")
+
+        # Handle NEW_COLONY_NAME_X with variables
+        # e.g., NEW_COLONY_NAME_1 with NAME=Alpha_Centauri -> "Alpha Centauri 1"
+        if key.startswith("NEW_COLONY_NAME_"):
+            colony_num = key.replace("NEW_COLONY_NAME_", "")
+            for var in variables:
+                if var.get("key") == "NAME":
+                    value = var.get("value", {})
+                    if isinstance(value, dict):
+                        system_name = clean_name(value.get("key", ""))
+                        if system_name:
+                            return f"{system_name} {colony_num}"
+            # Fallback if no variable found
+            return f"Colony {colony_num}"
+
+        # Handle HABITAT_PLANET_NAME with variables
+        # e.g., HABITAT_PLANET_NAME with FROM.from.solar_system.GetName=Omicron_Persei -> "Omicron Persei Habitat"
+        if key == "HABITAT_PLANET_NAME":
+            for var in variables:
+                if "solar_system" in var.get("key", "") or var.get("key") == "NAME":
+                    value = var.get("value", {})
+                    if isinstance(value, dict):
+                        system_name = clean_name(value.get("key", ""))
+                        if system_name:
+                            return f"{system_name} Habitat"
+            # Fallback if no variable found
+            return "Habitat"
+
+        # Check for direct NAME_ pattern (e.g., "NAME_Earth" -> "Earth")
+        if key.startswith("NAME_"):
+            return clean_name(key)
+
+        # Check for HUMAN2_PLANET_ or similar _PLANET_ patterns (e.g., "HUMAN2_PLANET_StCaspar" -> "StCaspar")
+        if "_PLANET_" in key:
+            return key.split("_PLANET_")[-1].replace("_", " ")
+
+        return key
+
+    def _get_planets_rust(self) -> dict:
+        """Get planets using Rust parser.
+
+        Returns:
+            Dict with planet details including population and districts
+        """
+        result = {
+            'planets': [],
+            'count': 0,
+            'total_pops': 0
+        }
+
+        player_id = self.get_player_empire_id()
+
+        # Build population map from pop_groups section
+        pop_by_planet = self._get_population_by_planet_rust()
+
+        # Get building types mapping
+        building_types = self._get_building_types()
+
+        # Non-habitable planet types to skip
+        non_habitable = {'asteroid', 'barren', 'barren_cold', 'molten', 'toxic', 'frozen', 'gas_giant'}
+
+        # Extract planets section
+        data = extract_sections(self.save_path, ["planets"])
+        planets_data = data.get("planets", {}).get("planet", {})
+
+        planets_found = []
+
+        for planet_id, planet in planets_data.items():
+            if not isinstance(planet, dict):
+                continue
+
+            # Check if this planet is owned by the player
+            owner = planet.get("owner")
+            if owner is None or int(owner) != player_id:
+                continue
+
+            # Get planet class and skip non-habitable
+            planet_class = planet.get("planet_class", "")
+            ptype = planet_class.replace("pc_", "") if planet_class else ""
+
+            # Skip stars and non-habitable types
+            if ptype.endswith("_star") or ptype in non_habitable:
+                continue
+
+            planet_info = {'id': str(planet_id)}
+
+            # Extract name
+            name_data = planet.get("name")
+            if name_data:
+                planet_info['name'] = self._extract_planet_name(name_data)
+
+            # Extract type
+            if ptype:
+                planet_info['type'] = ptype
+
+            # Extract planet size
+            size = planet.get("planet_size")
+            if size is not None:
+                planet_info['size'] = int(size)
+
+            # Get population from pop_groups
+            planet_id_int = int(planet_id)
+            planet_info['population'] = pop_by_planet.get(planet_id_int, 0)
+            result['total_pops'] += planet_info['population']
+
+            # Extract stability
+            stability = planet.get("stability")
+            if stability is not None:
+                planet_info['stability'] = float(stability)
+
+            # Extract amenities
+            amenities = planet.get("amenities")
+            if amenities is not None:
+                planet_info['amenities'] = float(amenities)
+
+            # Extract free amenities (surplus/deficit)
+            free_amenities = planet.get("free_amenities")
+            if free_amenities is not None:
+                planet_info['free_amenities'] = float(free_amenities)
+
+            # Extract crime
+            crime = planet.get("crime")
+            if crime is not None:
+                planet_info['crime'] = round(float(crime), 1)
+
+            # Extract permanent planet modifier
+            pm = planet.get("planet_modifier")
+            if pm:
+                planet_info['planet_modifier'] = pm.replace("pm_", "")
+
+            # Extract timed modifiers
+            timed_mods = self._extract_timed_modifiers_rust(planet.get("timed_modifier"))
+            if timed_mods:
+                planet_info['modifiers'] = timed_mods
+
+            # Extract buildings - resolve IDs to building type names
+            # The baseline extracts from externally_owned_buildings (megacorp branch offices, etc.)
+            # This matches what the regex pattern `buildings=\s*\{[^}]*buildings=\s*\{([^}]+)\}` finds
+            ext_buildings = planet.get("externally_owned_buildings", [])
+            if ext_buildings and isinstance(ext_buildings, list):
+                resolved_buildings = []
+                for ext_entry in ext_buildings:
+                    if isinstance(ext_entry, dict):
+                        building_ids = ext_entry.get("buildings", [])
+                        for bid in building_ids:
+                            bid_str = str(bid)
+                            if bid_str in building_types:
+                                resolved_buildings.append(building_types[bid_str].replace('building_', ''))
+                if resolved_buildings:
+                    planet_info['buildings'] = resolved_buildings
+
+            # Extract districts count
+            districts = planet.get("districts", [])
+            if isinstance(districts, list):
+                planet_info['district_count'] = len(districts)
+
+            # Extract last building/district changed for context
+            last_building = planet.get("last_building_changed")
+            if last_building:
+                planet_info['last_building'] = last_building
+
+            last_district = planet.get("last_district_changed")
+            if last_district:
+                planet_info['last_district'] = last_district
+
+            planets_found.append(planet_info)
+
+        # Sort by planet ID for consistent ordering
+        planets_found.sort(key=lambda x: int(x['id']))
+
+        result['planets'] = planets_found
+        result['count'] = len(planets_found)
+
+        # Summary by type
+        type_counts = {}
+        for planet in planets_found:
+            ptype = planet.get('type', 'unknown')
+            if ptype not in type_counts:
+                type_counts[ptype] = 0
+            type_counts[ptype] += 1
+
+        result['by_type'] = type_counts
+
+        return result
+
+    def _extract_timed_modifiers_rust(self, timed_modifier_data) -> list[dict]:
+        """Extract timed modifiers from Rust-parsed data.
+
+        Args:
+            timed_modifier_data: Dict with items list, e.g., {"items": [{"modifier": "...", "days": N}]}
+
+        Returns:
+            List of modifier dicts with name, display_name, days, permanent
+        """
+        modifiers = []
+
+        if not isinstance(timed_modifier_data, dict):
+            return modifiers
+
+        items = timed_modifier_data.get("items", [])
+        if not isinstance(items, list):
+            return modifiers
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            mod_name = item.get("modifier")
+            days_str = item.get("days")
+
+            if not mod_name:
+                continue
+
+            try:
+                days = int(days_str) if days_str is not None else 0
+            except (ValueError, TypeError):
+                days = 0
+
+            display_name = mod_name.replace('_', ' ').title()
+
+            modifiers.append({
+                'name': mod_name,
+                'display_name': display_name,
+                'days': days,
+                'permanent': days < 0,
+            })
+
+        return modifiers
+
+    def _get_population_by_planet_rust(self) -> dict[int, int]:
+        """Build a mapping of planet_id -> total population using Rust parser.
+
+        Returns:
+            Dict mapping planet_id (int) to total population (int)
+        """
+        pop_by_planet: dict[int, int] = {}
+
+        try:
+            for key, pop_group in iter_section_entries(self.save_path, "pop_groups"):
+                if not isinstance(pop_group, dict):
+                    continue
+
+                planet_id = pop_group.get("planet")
+                size = pop_group.get("size")
+
+                if planet_id is None or size is None:
+                    continue
+
+                try:
+                    planet_id_int = int(planet_id)
+                    pop_size = int(size)
+                    if pop_size > 0:
+                        pop_by_planet[planet_id_int] = pop_by_planet.get(planet_id_int, 0) + pop_size
+                except (ValueError, TypeError):
+                    continue
+
+        except ParserError as e:
+            logger.warning(f"Rust parser failed for pop_groups: {e}, using regex fallback")
+            return self._get_population_by_planet()
+
+        return pop_by_planet
+
+    def _get_planets_regex(self) -> dict:
+        """Get planets using regex parsing (fallback method).
 
         Returns:
             Dict with planet details including population and districts

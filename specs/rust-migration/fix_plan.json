@@ -56,8 +56,8 @@
         "RUN: python3 -c 'from save_extractor import SaveExtractor; e=SaveExtractor(\"test_save.sav\"); print(len(e.get_planets()))' (returns count)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "36 regex calls. Planet names should IMPROVE (show real names not NEW_COLONY_1)"
+      "passes": true,
+      "notes": "Migrated with Rust parser. Planet names now properly resolved: NEW_COLONY_NAME_X -> 'SystemName X', HABITAT_PLANET_NAME -> 'SystemName Habitat'"
     },
     {
       "id": "MIG-MILITARY",
