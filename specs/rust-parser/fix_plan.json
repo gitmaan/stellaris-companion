@@ -58,8 +58,8 @@
         "RUN: ./stellaris-parser/target/release/stellaris-parser iter-save test_save.sav --section country --format jsonl | tail -1 | jq .key (returns a key string)"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implementation already complete - iter-save outputs JSONL with schema_version, section, key, value on first line and key, value on subsequent lines. 66 country entries found in test_save.sav."
     },
     {
       "id": "RUST-005",
