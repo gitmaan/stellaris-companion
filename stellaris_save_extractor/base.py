@@ -833,6 +833,40 @@ class SaveExtractorBase:
     def _get_species_names(self) -> dict:
         """Build a mapping of species IDs to their display names.
 
+        Uses Rust bridge for fast parsing when available, falls back to regex.
+
+        Returns:
+            Dict mapping species ID (as string) to species name
+        """
+        # Try Rust bridge first for faster parsing
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                sections = extract_sections(self.gamestate_path, ["species_db"])
+                species_db = sections.get("species_db", {})
+                species_names = {}
+                for species_id, data in species_db.items():
+                    if isinstance(data, dict):
+                        # Name can be a string or a dict with key field
+                        name = data.get("name")
+                        if isinstance(name, dict):
+                            name = name.get("key")
+                        if name:
+                            species_names[species_id] = name
+                        elif data.get("class"):
+                            # Fallback to class name
+                            species_names[species_id] = data["class"]
+                return species_names
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for species_db: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback: regex-based parsing
+        return self._get_species_names_regex()
+
+    def _get_species_names_regex(self) -> dict:
+        """Build species ID to name mapping using regex (fallback method).
+
         Returns:
             Dict mapping species ID (as string) to species name
         """
