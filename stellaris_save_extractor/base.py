@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 import io
+import logging
 import re
 import zipfile
 from datetime import datetime
 from pathlib import Path
+
+# Rust bridge for fast Clausewitz parsing
+try:
+    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    RUST_BRIDGE_AVAILABLE = True
+except ImportError:
+    RUST_BRIDGE_AVAILABLE = False
+    ParserError = Exception  # Fallback type for type hints
+
+logger = logging.getLogger(__name__)
+
 
 class SaveExtractorBase:
     """Base implementation: file I/O, caches, and shared parsing helpers."""
@@ -66,8 +78,19 @@ class SaveExtractorBase:
     def gamestate(self, value: str | None) -> None:
         self._gamestate = value
 
+    @property
+    def gamestate_path(self) -> Path:
+        """Path to the save file for Rust bridge integration.
+
+        The Rust parser expects .sav file paths to extract sections directly.
+        This is an alias for save_path for compatibility with rust_bridge.py.
+        """
+        return self.save_path
+
     def _get_building_types(self) -> dict:
         """Parse the global buildings section to get ID→type mapping.
+
+        Uses Rust bridge for fast parsing when available, falls back to regex.
 
         Returns:
             Dict mapping building IDs (as strings) to building type names
@@ -77,6 +100,31 @@ class SaveExtractorBase:
 
         self._building_types = {}
 
+        # Try Rust bridge first for faster parsing
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                sections = extract_sections(self.gamestate_path, ["buildings"])
+                buildings = sections.get("buildings", {})
+                self._building_types = {
+                    bid: data.get("type")
+                    for bid, data in buildings.items()
+                    if isinstance(data, dict) and "type" in data
+                }
+                return self._building_types
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for buildings: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback: regex-based parsing
+        return self._get_building_types_regex()
+
+    def _get_building_types_regex(self) -> dict:
+        """Parse buildings section using regex (fallback method).
+
+        Returns:
+            Dict mapping building IDs (as strings) to building type names
+        """
         # Find the top-level buildings section (near end of file)
         match = re.search(r'^buildings=\s*\{', self.gamestate, re.MULTILINE)
         if not match:

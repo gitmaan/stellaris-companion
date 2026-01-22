@@ -5,11 +5,26 @@ The implementation of `SaveExtractor` lives in `stellaris_save_extractor/`.
 This module preserves the original import path:
 
     from save_extractor import SaveExtractor
+
+SaveExtractor provides these attributes:
+    - save_path: Path to the .sav file
+    - gamestate_path: Alias for save_path (for Rust bridge integration)
+    - gamestate: Raw gamestate text (loaded lazily)
+    - meta: Raw meta text (loaded on init)
 """
 
 from __future__ import annotations
 
 from stellaris_save_extractor import SaveExtractor
+
+# Re-export rust_bridge for direct access (used by extractors)
+try:
+    from rust_bridge import ParserError, extract_sections, iter_section_entries
+except ImportError:
+    # Rust bridge not available - extractors will use regex fallback
+    ParserError = None
+    extract_sections = None
+    iter_section_entries = None
 
 __all__ = [
     "SaveExtractor",
