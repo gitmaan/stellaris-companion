@@ -72,3 +72,7 @@ grep -c 're\.' stellaris_save_extractor/*.py | sort -t: -k2 -nr
 - relations_manager.relation has multiple entries with same key - must use regex for parsing relations
 - When extracting sections with regex, ALWAYS properly bound the section using brace matching - don't use fixed offsets like species_start + 2000000, or you'll match entries from other sections
 - Species traits have duplicate keys (trait="x" repeated) - use regex for traits extraction
+- planets section has nested structure: data['planets']['planet'][id] - not top-level
+- starbase_mgr section has nested structure: data['starbase_mgr']['starbases'][id]
+- Base utility methods (_find_section_bounds, _extract_nested_block) can stay regex - focus on main extraction methods
+- Country names use same key/variables template pattern as planet/faction names

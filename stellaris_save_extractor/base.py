@@ -357,6 +357,42 @@ class SaveExtractorBase:
     def _get_ship_to_fleet_mapping(self) -> dict[str, str]:
         """Build a mapping of ship IDs to their fleet IDs.
 
+        Uses Rust bridge for fast parsing when available, falls back to regex.
+
+        Returns:
+            Dict mapping ship_id (str) -> fleet_id (str)
+        """
+        # Try Rust bridge first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                return self._get_ship_to_fleet_mapping_rust()
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for ship mapping: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_ship_to_fleet_mapping_regex()
+
+    def _get_ship_to_fleet_mapping_rust(self) -> dict[str, str]:
+        """Build ship to fleet mapping using Rust parser.
+
+        Returns:
+            Dict mapping ship_id (str) -> fleet_id (str)
+        """
+        ship_to_fleet = {}
+
+        for ship_id, ship_data in iter_section_entries(self.save_path, "ships"):
+            if isinstance(ship_data, dict):
+                fleet_id = ship_data.get("fleet")
+                if fleet_id:
+                    ship_to_fleet[ship_id] = str(fleet_id)
+
+        return ship_to_fleet
+
+    def _get_ship_to_fleet_mapping_regex(self) -> dict[str, str]:
+        """Build ship to fleet mapping using regex (fallback method).
+
         Returns:
             Dict mapping ship_id (str) -> fleet_id (str)
         """
@@ -410,6 +446,8 @@ class SaveExtractorBase:
 
         Traces ownership: starbase.station (ship ID) → ship.fleet → player's owned_fleets
 
+        Uses Rust bridge for fast parsing when available, falls back to regex.
+
         Args:
             owned_fleet_ids: Optional pre-computed set of player fleet IDs
 
@@ -440,6 +478,88 @@ class SaveExtractorBase:
         if not ship_to_fleet:
             return result
 
+        # Try Rust bridge first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                return self._count_player_starbases_rust(owned_fleet_ids, ship_to_fleet, result)
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for starbases: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._count_player_starbases_regex(owned_fleet_ids, ship_to_fleet, result)
+
+    def _count_player_starbases_rust(self, owned_fleet_ids: set[str], ship_to_fleet: dict, result: dict) -> dict:
+        """Count player starbases using Rust parser.
+
+        Args:
+            owned_fleet_ids: Set of player's fleet IDs
+            ship_to_fleet: Mapping of ship ID to fleet ID
+            result: Result dict to populate
+
+        Returns:
+            Dict with starbase counts
+        """
+        data = extract_sections(self.save_path, ["starbase_mgr"])
+        starbases = data.get("starbase_mgr", {}).get("starbases", {})
+
+        for sb_id, sb_data in starbases.items():
+            if not isinstance(sb_data, dict):
+                continue
+
+            station = sb_data.get("station")
+            level = sb_data.get("level", "unknown")
+
+            if station is None:
+                continue
+
+            ship_id = str(station)
+
+            # Trace ownership: ship → fleet → player?
+            fleet_id = ship_to_fleet.get(ship_id)
+            if not fleet_id or fleet_id not in owned_fleet_ids:
+                continue
+
+            # This starbase belongs to the player
+            result['total'] += 1
+
+            if 'citadel' in level:
+                result['citadels'] += 1
+                result['total_upgraded'] += 1
+                result['total_systems'] += 1
+            elif 'starfortress' in level:
+                result['star_fortresses'] += 1
+                result['total_upgraded'] += 1
+                result['total_systems'] += 1
+            elif 'starhold' in level:
+                result['starholds'] += 1
+                result['total_upgraded'] += 1
+                result['total_systems'] += 1
+            elif 'starport' in level:
+                result['starports'] += 1
+                result['total_upgraded'] += 1
+                result['total_systems'] += 1
+            elif 'orbital_ring' in level:
+                result['orbital_rings'] += 1
+                # Orbital rings don't count against starbase capacity or as systems
+            elif 'outpost' in level:
+                result['outposts'] += 1
+                result['total_systems'] += 1
+
+        return result
+
+    def _count_player_starbases_regex(self, owned_fleet_ids: set[str], ship_to_fleet: dict, result: dict) -> dict:
+        """Count player starbases using regex (fallback method).
+
+        Args:
+            owned_fleet_ids: Set of player's fleet IDs
+            ship_to_fleet: Mapping of ship ID to fleet ID
+            result: Result dict to populate
+
+        Returns:
+            Dict with starbase counts
+        """
         # Find starbase_mgr section
         starbase_match = re.search(r'^starbase_mgr=\s*\{', self.gamestate, re.MULTILINE)
         if not starbase_match:
@@ -502,6 +622,8 @@ class SaveExtractorBase:
         extraction session. Late-game saves can have 300+ countries including
         primitives, pirates, marauders, caravaneers, fallen/awakened empires, etc.
 
+        Uses Rust bridge for fast parsing when available, falls back to regex.
+
         Returns:
             Dict mapping integer country IDs to their empire names
         """
@@ -509,11 +631,117 @@ class SaveExtractorBase:
         if self._country_names is not None:
             return self._country_names
 
+        # Try Rust bridge first for faster parsing
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                self._country_names = self._get_country_names_map_rust()
+                return self._country_names
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for country names: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        self._country_names = self._get_country_names_map_regex()
+        return self._country_names
+
+    def _get_country_names_map_rust(self) -> dict:
+        """Build country ID to name mapping using Rust parser.
+
+        Returns:
+            Dict mapping integer country IDs to their empire names
+        """
+        country_names = {}
+
+        for country_id_str, country_data in iter_section_entries(self.save_path, "country"):
+            if not isinstance(country_data, dict):
+                continue
+
+            country_id = int(country_id_str)
+            name_block = country_data.get("name")
+
+            if name_block is None:
+                continue
+
+            # Handle different name formats
+            if isinstance(name_block, str):
+                # Direct string name
+                country_names[country_id] = name_block
+            elif isinstance(name_block, dict):
+                key = name_block.get("key", "")
+                variables = name_block.get("variables", [])
+
+                if variables and isinstance(variables, list):
+                    # Template name with variables - resolve it
+                    readable = self._resolve_template_name_from_rust(name_block)
+                    country_names[country_id] = readable
+                elif key:
+                    # Localization key - convert to readable name
+                    country_names[country_id] = self._localization_key_to_readable_name(key)
+
+        return country_names
+
+    def _resolve_template_name_from_rust(self, name_block: dict) -> str:
+        """Resolve a template name from Rust-parsed name block.
+
+        Args:
+            name_block: Dict with 'key' and 'variables' fields
+
+        Returns:
+            Resolved human-readable name
+        """
+        variables = name_block.get("variables", [])
+        if not variables:
+            key = name_block.get("key", "Unknown Empire")
+            return self._localization_key_to_readable_name(key)
+
+        # Extract all non-template values from variables recursively
+        parts = []
+
+        def extract_values(var_list):
+            """Recursively extract meaningful values from variable structures."""
+            for var in var_list:
+                if not isinstance(var, dict):
+                    continue
+                value = var.get("value")
+                if isinstance(value, dict):
+                    nested_key = value.get("key", "")
+                    nested_vars = value.get("variables", [])
+                    if nested_vars:
+                        # Recurse into nested variables
+                        extract_values(nested_vars)
+                    elif nested_key and not nested_key.startswith("%"):
+                        # Found a concrete value - clean it up
+                        clean = nested_key
+                        for prefix in ['SPEC_', 'ADJ_', 'NAME_', 'SUFFIX_']:
+                            if clean.startswith(prefix):
+                                clean = clean[len(prefix):]
+                                break
+                        clean = clean.replace('_', ' ').strip()
+                        if clean:
+                            parts.append(clean)
+                elif isinstance(value, str) and not value.startswith("%"):
+                    parts.append(value)
+
+        extract_values(variables)
+
+        if parts:
+            return ' '.join(parts)
+
+        # Fallback to key processing
+        key = name_block.get("key", "Unknown Empire")
+        return self._localization_key_to_readable_name(key)
+
+    def _get_country_names_map_regex(self) -> dict:
+        """Build country ID to name mapping using regex (fallback method).
+
+        Returns:
+            Dict mapping integer country IDs to their empire names
+        """
         country_names = {}
 
         bounds = self._get_section_bounds("country")
         if not bounds:
-            self._country_names = country_names
             return country_names
         country_start, country_end = bounds
 
@@ -573,8 +801,6 @@ class SaveExtractorBase:
                         readable = self._localization_key_to_readable_name(key)
                     country_names[country_id] = readable
 
-        # Cache the result for subsequent calls
-        self._country_names = country_names
         return country_names
 
     def _localization_key_to_readable_name(self, key: str) -> str:
@@ -909,6 +1135,48 @@ class SaveExtractorBase:
     def _get_player_planet_ids(self) -> list[str]:
         """Get IDs of all planets owned by the player.
 
+        Uses Rust bridge for fast parsing when available, falls back to regex.
+
+        Returns:
+            List of planet ID strings
+        """
+        # Try Rust bridge first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                return self._get_player_planet_ids_rust()
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for player planets: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_player_planet_ids_regex()
+
+    def _get_player_planet_ids_rust(self) -> list[str]:
+        """Get player planet IDs using Rust parser.
+
+        Returns:
+            List of planet ID strings
+        """
+        player_id = self.get_player_empire_id()
+        player_id_str = str(player_id)
+        planet_ids = []
+
+        # Extract planets section
+        data = extract_sections(self.save_path, ["planets"])
+        planets = data.get("planets", {}).get("planet", {})
+
+        for planet_id, planet_data in planets.items():
+            if isinstance(planet_data, dict):
+                owner = planet_data.get("owner")
+                if owner == player_id_str:
+                    planet_ids.append(planet_id)
+
+        return planet_ids
+
+    def _get_player_planet_ids_regex(self) -> list[str]:
+        """Get player planet IDs using regex (fallback method).
+
         Returns:
             List of planet ID strings
         """
@@ -941,6 +1209,56 @@ class SaveExtractorBase:
 
     def _get_pop_ids_for_planets(self, planet_ids: list[str]) -> list[str]:
         """Get all pop IDs from the specified planets.
+
+        Uses Rust bridge for fast parsing when available, falls back to regex.
+
+        Args:
+            planet_ids: List of planet ID strings to get pops from
+
+        Returns:
+            List of pop ID strings
+        """
+        # Try Rust bridge first
+        if RUST_BRIDGE_AVAILABLE:
+            try:
+                return self._get_pop_ids_for_planets_rust(planet_ids)
+            except ParserError as e:
+                logger.warning(f"Rust parser failed for pop IDs: {e}, falling back to regex")
+            except Exception as e:
+                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+
+        # Fallback to regex
+        return self._get_pop_ids_for_planets_regex(planet_ids)
+
+    def _get_pop_ids_for_planets_rust(self, planet_ids: list[str]) -> list[str]:
+        """Get pop IDs using Rust parser.
+
+        Args:
+            planet_ids: List of planet ID strings to get pops from
+
+        Returns:
+            List of pop ID strings
+        """
+        pop_ids = []
+        planet_id_set = set(planet_ids)
+
+        # Extract planets section
+        data = extract_sections(self.save_path, ["planets"])
+        planets = data.get("planets", {}).get("planet", {})
+
+        for planet_id, planet_data in planets.items():
+            if planet_id not in planet_id_set:
+                continue
+
+            if isinstance(planet_data, dict):
+                pop_jobs = planet_data.get("pop_jobs", [])
+                if isinstance(pop_jobs, list):
+                    pop_ids.extend(pop_jobs)
+
+        return pop_ids
+
+    def _get_pop_ids_for_planets_regex(self, planet_ids: list[str]) -> list[str]:
+        """Get pop IDs using regex (fallback method).
 
         Args:
             planet_ids: List of planet ID strings to get pops from
