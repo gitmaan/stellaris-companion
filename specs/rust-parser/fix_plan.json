@@ -172,14 +172,14 @@
       "id": "MIG-002",
       "title": "Migrate building extraction to Rust bridge",
       "criteria": [
-        "RUN: grep 'extract_sections.*buildings' backend/extractors/*.py || grep 'extract_sections.*buildings' save_extractor.py (Rust call present)",
-        "RUN: grep -B5 -A10 '_get_building_types' save_extractor.py | grep -E '(extract_sections|ParserError)' (uses Rust with fallback)",
-        "RUN: python -m pytest tests/ -v -k building (building tests pass if they exist)",
-        "RUN: python -m pytest tests/ -v (all tests still pass)"
+        "RUN: grep 'extract_sections.*buildings' stellaris_save_extractor/base.py (Rust call present in _get_building_types)",
+        "RUN: grep -A30 'def _get_building_types' stellaris_save_extractor/base.py | grep -E '(extract_sections|ParserError)' (uses Rust with fallback)",
+        "RUN: venv/bin/python -m pytest tests/ -v -k building (building tests pass if they exist)",
+        "RUN: venv/bin/python -m pytest tests/ -v (all tests still pass)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": "Example migration shown in architecture doc"
+      "passes": true,
+      "notes": "Implementation was completed in MIG-001. Criteria paths corrected from backend/extractors/*.py and save_extractor.py to stellaris_save_extractor/base.py where SaveExtractorBase actually lives. _get_building_types uses extract_sections with ParserError fallback to regex."
     },
     {
       "id": "MIG-003",
