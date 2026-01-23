@@ -1,0 +1,335 @@
+//! Session mode server for the Stellaris parser.
+//!
+//! Loads and parses a save file once, then responds to JSON requests via stdin/stdout.
+//! This eliminates re-parsing overhead when making multiple queries against the same save.
+
+use crate::error::{ErrorKind, SCHEMA_VERSION, TOOL_VERSION};
+use anyhow::{Context, Result};
+use jomini::text::de::from_windows1252_slice;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Map, Value};
+use std::collections::HashMap;
+use std::io::{self, BufRead, Write};
+
+/// Request types for session mode
+#[derive(Debug, Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case")]
+enum Request {
+    ExtractSections { sections: Vec<String> },
+    IterSection { section: String },
+    Close,
+}
+
+/// Successful response wrapper
+#[derive(Debug, Serialize)]
+struct SuccessResponse {
+    ok: bool,
+    #[serde(flatten)]
+    data: ResponseData,
+}
+
+/// Response data variants
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum ResponseData {
+    Extract {
+        data: Value,
+    },
+    StreamHeader {
+        stream: bool,
+        op: String,
+        section: String,
+    },
+    StreamEntry {
+        entry: EntryData,
+    },
+    StreamDone {
+        done: bool,
+        op: String,
+        section: String,
+    },
+    Closed {
+        closed: bool,
+    },
+}
+
+#[derive(Debug, Serialize)]
+struct EntryData {
+    key: String,
+    value: Value,
+}
+
+/// Error response matching the ParserError contract
+#[derive(Debug, Serialize)]
+struct ErrorResponse {
+    ok: bool,
+    error: String,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    line: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    col: Option<u32>,
+    exit_code: i32,
+    schema_version: u32,
+    tool_version: &'static str,
+    game: &'static str,
+}
+
+impl ErrorResponse {
+    fn new(error: &str, message: &str, exit_code: i32) -> Self {
+        Self {
+            ok: false,
+            error: error.to_string(),
+            message: message.to_string(),
+            line: None,
+            col: None,
+            exit_code,
+            schema_version: SCHEMA_VERSION,
+            tool_version: TOOL_VERSION,
+            game: "stellaris",
+        }
+    }
+}
+
+/// Parsed save data held in memory for the session
+struct ParsedSave {
+    gamestate: HashMap<String, Value>,
+    meta: Option<HashMap<String, Value>>,
+}
+
+impl ParsedSave {
+    /// Load and parse a .sav file
+    fn load(path: &str) -> Result<Self> {
+        let (gamestate_bytes, meta_bytes) = crate::commands::extract::read_sav_file(path)?;
+
+        let gamestate: HashMap<String, Value> = from_windows1252_slice(&gamestate_bytes)
+            .with_context(|| "Failed to parse gamestate")?;
+
+        let meta = if let Some(meta_bytes) = meta_bytes {
+            Some(
+                from_windows1252_slice(&meta_bytes)
+                    .with_context(|| "Failed to parse meta file")?,
+            )
+        } else {
+            None
+        };
+
+        Ok(Self { gamestate, meta })
+    }
+
+    /// Extract specific sections from the parsed data
+    fn extract_sections(&self, sections: &[String]) -> Value {
+        let mut result = Map::new();
+        result.insert("schema_version".to_string(), json!(SCHEMA_VERSION));
+        result.insert("tool_version".to_string(), json!(TOOL_VERSION));
+        result.insert("game".to_string(), json!("stellaris"));
+
+        for section in sections {
+            if section == "meta" {
+                if let Some(ref meta) = self.meta {
+                    result.insert("meta".to_string(), json!(meta));
+                }
+            } else if let Some(value) = self.gamestate.get(section) {
+                result.insert(section.clone(), value.clone());
+            }
+        }
+
+        Value::Object(result)
+    }
+
+}
+
+/// Write a JSON line to stdout (protocol output)
+fn write_response<T: Serialize>(response: &T) -> io::Result<()> {
+    let mut stdout = io::stdout().lock();
+    serde_json::to_writer(&mut stdout, response)?;
+    stdout.write_all(b"\n")?;
+    stdout.flush()?;
+    Ok(())
+}
+
+/// Write an error response
+fn write_error(error: &str, message: &str, exit_code: i32) -> io::Result<()> {
+    write_response(&ErrorResponse::new(error, message, exit_code))
+}
+
+/// Handle extract_sections operation
+fn handle_extract_sections(parsed: &ParsedSave, sections: Vec<String>) -> io::Result<()> {
+    let data = parsed.extract_sections(&sections);
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::Extract { data },
+    })
+}
+
+/// Handle iter_section operation (streaming)
+fn handle_iter_section(parsed: &ParsedSave, section: String) -> io::Result<()> {
+    // Write stream header
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::StreamHeader {
+            stream: true,
+            op: "iter_section".to_string(),
+            section: section.clone(),
+        },
+    })?;
+
+    // Get section and iterate
+    if let Some(section_value) = parsed.gamestate.get(&section) {
+        if let Value::Object(map) = section_value {
+            for (key, value) in map {
+                write_response(&SuccessResponse {
+                    ok: true,
+                    data: ResponseData::StreamEntry {
+                        entry: EntryData {
+                            key: key.clone(),
+                            value: value.clone(),
+                        },
+                    },
+                })?;
+            }
+        }
+    }
+
+    // Write done marker
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::StreamDone {
+            done: true,
+            op: "iter_section".to_string(),
+            section,
+        },
+    })
+}
+
+/// Main serve loop
+pub fn run(path: &str) -> Result<()> {
+    // Log startup to stderr (stdout is reserved for protocol)
+    eprintln!(
+        "[serve] Loading save file: {} (tool_version={})",
+        path, TOOL_VERSION
+    );
+
+    // Load and parse the save file once
+    let parsed = match ParsedSave::load(path) {
+        Ok(p) => {
+            eprintln!("[serve] Save loaded successfully, entering request loop");
+            p
+        }
+        Err(e) => {
+            // Write error response and exit directly (don't propagate to main error handler)
+            let message = format!("{:#}", e);
+            let exit_code = if message.contains("Failed to open file")
+                || message.contains("No such file")
+            {
+                ErrorKind::FileNotFound.exit_code()
+            } else {
+                ErrorKind::ParseError.exit_code()
+            };
+            let _ = write_error("ParseError", &message, exit_code);
+            std::process::exit(exit_code);
+        }
+    };
+
+    // Enter stdin read loop
+    let stdin = io::stdin();
+    let reader = stdin.lock();
+
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("[serve] Error reading stdin: {}", e);
+                break;
+            }
+        };
+
+        // Empty line or EOF
+        if line.is_empty() {
+            continue;
+        }
+
+        // Parse the request
+        let request: Request = match serde_json::from_str(&line) {
+            Ok(r) => r,
+            Err(e) => {
+                let _ = write_error(
+                    "InvalidRequest",
+                    &format!("Failed to parse request: {}", e),
+                    ErrorKind::InvalidArgument.exit_code(),
+                );
+                continue;
+            }
+        };
+
+        // Handle the request
+        let result = match request {
+            Request::ExtractSections { sections } => {
+                handle_extract_sections(&parsed, sections)
+            }
+            Request::IterSection { section } => {
+                handle_iter_section(&parsed, section)
+            }
+            Request::Close => {
+                eprintln!("[serve] Received close request, shutting down");
+                write_response(&SuccessResponse {
+                    ok: true,
+                    data: ResponseData::Closed { closed: true },
+                })?;
+                break;
+            }
+        };
+
+        if let Err(e) = result {
+            eprintln!("[serve] Error writing response: {}", e);
+            break;
+        }
+    }
+
+    eprintln!("[serve] Session ended");
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_request_parsing() {
+        let json = r#"{"op": "extract_sections", "sections": ["meta", "player"]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::ExtractSections { sections } => {
+                assert_eq!(sections, vec!["meta", "player"]);
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_iter_section_request() {
+        let json = r#"{"op": "iter_section", "section": "country"}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::IterSection { section } => {
+                assert_eq!(section, "country");
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_close_request() {
+        let json = r#"{"op": "close"}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        assert!(matches!(req, Request::Close));
+    }
+
+    #[test]
+    fn test_error_response_serialization() {
+        let err = ErrorResponse::new("SectionNotFound", "Section 'foo' not found", 2);
+        let json = serde_json::to_string(&err).unwrap();
+        assert!(json.contains(r#""ok":false"#));
+        assert!(json.contains(r#""error":"SectionNotFound""#));
+    }
+}

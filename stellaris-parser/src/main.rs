@@ -58,6 +58,12 @@ enum Commands {
         #[arg(long, default_value = "-")]
         output: String,
     },
+    /// Start a session server (parse once, respond to multiple queries via stdin/stdout)
+    Serve {
+        /// Path to .sav file
+        #[arg(long)]
+        path: String,
+    },
 }
 
 fn main() {
@@ -91,6 +97,7 @@ fn main() {
             schema_version,
             output,
         } => commands::extract::run_gamestate(&path, &sections, &schema_version, &output),
+        Commands::Serve { path } => commands::serve::run(&path),
     };
 
     if let Err(e) = result {

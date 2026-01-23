@@ -82,15 +82,19 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
         tier = job["tier"]
         save_path = job["save_path"]
 
-        extractor = SaveExtractor(str(save_path))
+        # Use session mode to parse save once and reuse for all extractor calls
+        from rust_bridge import session as rust_session
 
-        if tier == "t1":
-            payload = {"status": _build_t1_status(extractor=extractor)}
-            out_q.put({"ok": True, "payload": payload, "worker_pid": os.getpid()})
-            return
+        with rust_session(save_path):
+            extractor = SaveExtractor(str(save_path))
 
-        if tier == "t2":
-            briefing = extractor.get_complete_briefing()
+            if tier == "t1":
+                payload = {"status": _build_t1_status(extractor=extractor)}
+                out_q.put({"ok": True, "payload": payload, "worker_pid": os.getpid()})
+                return
+
+            if tier == "t2":
+                briefing = extractor.get_complete_briefing()
 
             # Add history/event enrichment for DB + recap/event detection.
             try:
