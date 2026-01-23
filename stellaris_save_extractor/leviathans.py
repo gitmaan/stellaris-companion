@@ -5,11 +5,12 @@ import re
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import iter_section_entries, ParserError
+    from rust_bridge import iter_section_entries, _get_active_session, ParserError
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None  # Fallback
 
 logger = logging.getLogger(__name__)
 
@@ -159,51 +160,66 @@ class LeviathansMixin:
                 elif 'mining_drone' in name_key:
                     detected_types.add('drone')
 
-        # Second pass: detect guardians via regex (they have specific flags/markers)
+        # Second pass: detect guardians via contains_tokens (fast Aho-Corasick scan)
         # These are the major guardians that may not have dedicated country types
-        guardian_patterns = {
+        guardian_tokens = {
             'ether_drake': [
-                r'ether_drake',
-                r'dragon_armor',
-                r'NAME_Ether_Drake',
+                'ether_drake',
+                'dragon_armor',
+                'NAME_Ether_Drake',
             ],
             'dimensional_horror': [
-                r'dimensional_horror',
-                r'NAME_Dimensional_Horror',
+                'dimensional_horror',
+                'NAME_Dimensional_Horror',
             ],
             'automated_dreadnought': [
-                r'automated_dreadnought',
-                r'NAME_Automated_Dreadnought',
+                'automated_dreadnought',
+                'NAME_Automated_Dreadnought',
             ],
             'stellarite': [
-                r'stellarite',
-                r'NAME_Stellarite',
+                'stellarite',
+                'NAME_Stellarite',
             ],
             'enigmatic_fortress': [
-                r'enigmatic_fortress',
-                r'NAME_Enigmatic_Fortress',
+                'enigmatic_fortress',
+                'NAME_Enigmatic_Fortress',
             ],
             'voidspawn': [
-                r'voidspawn',
-                r'NAME_Voidspawn',
+                'voidspawn',
+                'NAME_Voidspawn',
             ],
             'wraith': [
-                r'spectral_wraith',
-                r'NAME_Spectral_Wraith',
+                'spectral_wraith',
+                'NAME_Spectral_Wraith',
             ],
         }
 
-        for lev_key, patterns in guardian_patterns.items():
-            for pattern in patterns:
-                if re.search(pattern, self.gamestate, re.IGNORECASE):
-                    detected_types.add(lev_key)
-                    break
+        # Use contains_tokens for fast multi-pattern matching
+        session = _get_active_session()
+        if session:
+            # Collect all tokens for a single Aho-Corasick scan
+            all_tokens = []
+            token_to_guardian = {}
+            for lev_key, tokens in guardian_tokens.items():
+                for token in tokens:
+                    all_tokens.append(token)
+                    token_to_guardian[token] = lev_key
+
+            result_data = session.contains_tokens(all_tokens)
+            matches = result_data.get('matches', {})
+            for token, found in matches.items():
+                if found and token in token_to_guardian:
+                    detected_types.add(token_to_guardian[token])
 
         # Build result list with status
+        # Pre-compute defeat status for all detected types using contains_tokens
+        defeat_status = self._check_leviathans_defeated_rust(detected_types, session) if session else {}
+
         detected = []
         for lev_key in detected_types:
             info = self.LEVIATHAN_INFO.get(lev_key, {})
-            defeated = self._check_leviathan_defeated(lev_key)
+            # Use pre-computed status if available, fall back to regex check
+            defeated = defeat_status.get(lev_key, False) if session else self._check_leviathan_defeated(lev_key)
 
             detected.append({
                 'type': lev_key,
@@ -356,6 +372,72 @@ class LeviathansMixin:
                 return True
 
         return False
+
+    def _check_leviathans_defeated_rust(self, leviathan_types: set, session) -> dict:
+        """Check defeat status for multiple leviathans using contains_tokens.
+
+        This is faster than calling _check_leviathan_defeated() for each type
+        because it batches all token checks into a single Aho-Corasick scan.
+
+        Args:
+            leviathan_types: Set of leviathan type keys to check
+            session: Active RustSession instance
+
+        Returns:
+            Dict mapping leviathan_type -> bool (True if defeated)
+        """
+        if not session or not leviathan_types:
+            return {}
+
+        # Build all defeat tokens for all leviathan types
+        all_tokens = []
+        token_to_leviathan = {}
+
+        for lev_type in leviathan_types:
+            # Common defeat patterns
+            defeat_tokens = [
+                f'killed_{lev_type}',
+                f'{lev_type}_defeated',
+                f'{lev_type}_dead',
+                f'defeated_{lev_type}',
+            ]
+
+            # Special cases
+            if lev_type == 'ether_drake':
+                defeat_tokens.extend([
+                    'killed_dragon',
+                    'dragon_killed',
+                    'ether_drake_killed',
+                    'relic_dragon_trophy',
+                ])
+            elif lev_type == 'automated_dreadnought':
+                defeat_tokens.extend([
+                    'dreadnought_captured',
+                    'owns_dreadnought',
+                ])
+            elif lev_type == 'enigmatic_fortress':
+                defeat_tokens.extend([
+                    'fortress_solved',
+                    'enigmatic_cache',
+                ])
+
+            for token in defeat_tokens:
+                all_tokens.append(token)
+                # Map token back to leviathan type (many-to-one)
+                if token not in token_to_leviathan:
+                    token_to_leviathan[token] = lev_type
+
+        # Single Aho-Corasick scan for all defeat tokens
+        result_data = session.contains_tokens(all_tokens)
+        matches = result_data.get('matches', {})
+
+        # Build defeat status dict
+        defeat_status = {lev_type: False for lev_type in leviathan_types}
+        for token, found in matches.items():
+            if found and token in token_to_leviathan:
+                defeat_status[token_to_leviathan[token]] = True
+
+        return defeat_status
 
     def get_guardians_summary(self) -> dict:
         """Get a quick summary of guardian status for briefings.
