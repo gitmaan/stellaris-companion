@@ -322,6 +322,23 @@ class RustSession:
                 entry = frame["entry"]
                 yield entry.get("key", ""), entry.get("value", {})
 
+    def count_keys(self, keys: list[str]) -> dict:
+        """Count occurrences of specific keys throughout the parsed save.
+
+        Traverses the entire parsed JSON tree and counts how many times
+        each specified key appears. Useful for checking flags, crisis systems, etc.
+
+        Args:
+            keys: List of key names to count (e.g., ["prethoryn_system", "contingency_system"])
+
+        Returns:
+            Dict with "counts" key containing a mapping of key -> count.
+            Example: {"counts": {"prethoryn_system": 5, "contingency_system": 0}}
+        """
+        self._send({"op": "count_keys", "keys": keys})
+        response = self._recv()
+        return response
+
     def close(self):
         """Close the session and terminate the subprocess."""
         if self._closed:

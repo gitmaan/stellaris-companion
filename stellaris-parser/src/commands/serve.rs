@@ -21,6 +21,7 @@ enum Request {
         #[serde(default = "default_batch_size")]
         batch_size: usize,
     },
+    CountKeys { keys: Vec<String> },
     Close,
 }
 
@@ -62,6 +63,9 @@ enum ResponseData {
     },
     Closed {
         closed: bool,
+    },
+    KeyCounts {
+        counts: HashMap<String, usize>,
     },
 }
 
@@ -254,6 +258,44 @@ fn handle_iter_section(parsed: &ParsedSave, section: String, batch_size: usize) 
     })
 }
 
+/// Handle count_keys operation - traverse tree and count occurrences of specified keys
+fn handle_count_keys(parsed: &ParsedSave, keys: Vec<String>) -> io::Result<()> {
+    use std::collections::HashSet;
+
+    let key_set: HashSet<&str> = keys.iter().map(|s| s.as_str()).collect();
+    let mut counts: HashMap<String, usize> = keys.iter().map(|k| (k.clone(), 0)).collect();
+
+    /// Recursively traverse a Value tree and count key occurrences
+    fn traverse(value: &Value, key_set: &HashSet<&str>, counts: &mut HashMap<String, usize>) {
+        match value {
+            Value::Object(map) => {
+                for (k, v) in map {
+                    if key_set.contains(k.as_str()) {
+                        *counts.get_mut(k.as_str()).unwrap() += 1;
+                    }
+                    traverse(v, key_set, counts);
+                }
+            }
+            Value::Array(arr) => {
+                for v in arr {
+                    traverse(v, key_set, counts);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Traverse all sections in the gamestate
+    for section in parsed.gamestate.values() {
+        traverse(section, &key_set, &mut counts);
+    }
+
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::KeyCounts { counts },
+    })
+}
+
 /// Main serve loop
 pub fn run(path: &str) -> Result<()> {
     // Log startup to stderr (stdout is reserved for protocol)
@@ -322,6 +364,9 @@ pub fn run(path: &str) -> Result<()> {
             Request::IterSection { section, batch_size } => {
                 handle_iter_section(&parsed, section, batch_size)
             }
+            Request::CountKeys { keys } => {
+                handle_count_keys(&parsed, keys)
+            }
             Request::Close => {
                 eprintln!("[serve] Received close request, shutting down");
                 write_response(&SuccessResponse {
@@ -389,6 +434,18 @@ mod tests {
         let json = r#"{"op": "close"}"#;
         let req: Request = serde_json::from_str(json).unwrap();
         assert!(matches!(req, Request::Close));
+    }
+
+    #[test]
+    fn test_count_keys_request() {
+        let json = r#"{"op": "count_keys", "keys": ["name", "type", "flag"]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::CountKeys { keys } => {
+                assert_eq!(keys, vec!["name", "type", "flag"]);
+            }
+            _ => panic!("Wrong request type"),
+        }
     }
 
     #[test]

@@ -78,7 +78,7 @@
       "priority": 3,
       "description": "Tree traversal to count occurrences of specific keys - replaces regex findall patterns",
       "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'count_keys' stellaris-parser/src/commands/serve.rs (operation implemented)",
         "RUN: grep -q 'count_keys' rust_bridge.py (Python wrapper exists)",
