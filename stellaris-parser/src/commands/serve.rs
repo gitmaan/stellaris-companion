@@ -24,6 +24,7 @@ enum Request {
     },
     CountKeys { keys: Vec<String> },
     ContainsTokens { tokens: Vec<String> },
+    GetCountrySummaries { fields: Vec<String> },
     Close,
 }
 
@@ -71,6 +72,9 @@ enum ResponseData {
     },
     TokenMatches {
         matches: HashMap<String, bool>,
+    },
+    CountrySummaries {
+        countries: Vec<Value>,
     },
 }
 
@@ -323,6 +327,37 @@ fn handle_contains_tokens(gamestate_bytes: &[u8], tokens: Vec<String>) -> io::Re
     })
 }
 
+/// Handle get_country_summaries operation - return lightweight country projections
+fn handle_get_country_summaries(parsed: &ParsedSave, fields: Vec<String>) -> io::Result<()> {
+    let mut countries: Vec<Value> = Vec::new();
+
+    // Get the country section from gamestate
+    if let Some(country_section) = parsed.gamestate.get("country") {
+        if let Value::Object(country_map) = country_section {
+            for (country_id, country_data) in country_map {
+                let mut summary = Map::new();
+                summary.insert("id".to_string(), json!(country_id));
+
+                // Extract only the requested fields
+                if let Value::Object(country_obj) = country_data {
+                    for field in &fields {
+                        if let Some(value) = country_obj.get(field) {
+                            summary.insert(field.clone(), value.clone());
+                        }
+                    }
+                }
+
+                countries.push(Value::Object(summary));
+            }
+        }
+    }
+
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::CountrySummaries { countries },
+    })
+}
+
 /// Main serve loop
 pub fn run(path: &str) -> Result<()> {
     // Log startup to stderr (stdout is reserved for protocol)
@@ -396,6 +431,9 @@ pub fn run(path: &str) -> Result<()> {
             }
             Request::ContainsTokens { tokens } => {
                 handle_contains_tokens(&parsed.gamestate_bytes, tokens)
+            }
+            Request::GetCountrySummaries { fields } => {
+                handle_get_country_summaries(&parsed, fields)
             }
             Request::Close => {
                 eprintln!("[serve] Received close request, shutting down");
@@ -493,6 +531,18 @@ mod tests {
         match req {
             Request::ContainsTokens { tokens } => {
                 assert_eq!(tokens, vec!["country", "fleet", "xyz123"]);
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_get_country_summaries_request() {
+        let json = r#"{"op": "get_country_summaries", "fields": ["name", "type", "flag"]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::GetCountrySummaries { fields } => {
+                assert_eq!(fields, vec!["name", "type", "flag"]);
             }
             _ => panic!("Wrong request type"),
         }

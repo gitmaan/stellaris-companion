@@ -144,7 +144,7 @@
       "priority": 7,
       "description": "Return lightweight country projections to replace 15 full iterations",
       "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_country_summaries' stellaris-parser/src/commands/serve.rs (operation implemented)",
         "RUN: grep -q 'get_country_summaries' rust_bridge.py (Python wrapper exists)",

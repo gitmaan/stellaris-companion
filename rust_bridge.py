@@ -356,6 +356,25 @@ class RustSession:
         response = self._recv()
         return response
 
+    def get_country_summaries(self, fields: list[str]) -> dict:
+        """Get lightweight country projections with only the requested fields.
+
+        Returns a list of country summaries containing only the specified fields,
+        which is much more efficient than iterating over the full country section
+        when you only need a few fields.
+
+        Args:
+            fields: List of field names to extract (e.g., ["name", "type", "flag", "ruler"])
+
+        Returns:
+            Dict with "countries" key containing a list of country objects.
+            Each country has an "id" field plus the requested fields.
+            Example: {"countries": [{"id": "0", "name": "UNE", "type": "default"}, ...]}
+        """
+        self._send({"op": "get_country_summaries", "fields": fields})
+        response = self._recv()
+        return response
+
     def close(self):
         """Close the session and terminate the subprocess."""
         if self._closed:
