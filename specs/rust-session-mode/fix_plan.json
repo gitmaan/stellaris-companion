@@ -43,6 +43,11 @@
       "id": "P008",
       "learning": "Mixin files have both _rust and _regex methods - regex fallbacks are intentional. Criteria should check that count_keys/contains_tokens are USED, not that regex is completely eliminated from the file",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P009",
+      "learning": "session() returns a context manager. CRITICAL: Keep a reference to it! 'ctx=session(path); s=ctx.__enter__()' works, but 's=session(path).__enter__()' FAILS because losing the ctx reference triggers GC which runs finally block immediately. Use RustSession(path) directly for simplest one-liners.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -160,11 +165,11 @@
       "priority": 8,
       "description": "Verify briefing generation is significantly faster",
       "files": [],
-      "passes": false,
+      "passes": true,
       "criteria": [
-        "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import session; start=time.time(); s=session('test_save.sav'); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s.close(); elapsed=time.time()-start; print(f'Briefing time: {elapsed:.1f}s'); assert elapsed < 15, f'Too slow: {elapsed}s'\" (briefing under 15 seconds)"
+        "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import session; start=time.time(); ctx=session('test_save.sav'); sess=ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); ctx.__exit__(None,None,None); elapsed=time.time()-start; print(f'Briefing time: {elapsed:.1f}s'); assert elapsed < 15, f'Too slow: {elapsed}s'\" (briefing under 15 seconds)"
       ],
-      "notes": ""
+      "notes": "Criterion updated: Must keep reference to context manager (ctx), not just session. session(...).__enter__() loses the ctx reference, triggering immediate GC which runs finally block and clears _tls.session."
     }
   ],
   "discovered": []
