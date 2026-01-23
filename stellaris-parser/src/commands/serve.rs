@@ -4,6 +4,7 @@
 //! This eliminates re-parsing overhead when making multiple queries against the same save.
 
 use crate::error::{ErrorKind, SCHEMA_VERSION, TOOL_VERSION};
+use aho_corasick::AhoCorasick;
 use anyhow::{Context, Result};
 use jomini::text::de::from_windows1252_slice;
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,7 @@ enum Request {
         batch_size: usize,
     },
     CountKeys { keys: Vec<String> },
+    ContainsTokens { tokens: Vec<String> },
     Close,
 }
 
@@ -67,6 +69,9 @@ enum ResponseData {
     KeyCounts {
         counts: HashMap<String, usize>,
     },
+    TokenMatches {
+        matches: HashMap<String, bool>,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -110,6 +115,7 @@ impl ErrorResponse {
 /// Parsed save data held in memory for the session
 struct ParsedSave {
     gamestate: HashMap<String, Value>,
+    gamestate_bytes: Vec<u8>,  // Keep for token scanning with Aho-Corasick
     meta: Option<HashMap<String, Value>>,
 }
 
@@ -130,7 +136,7 @@ impl ParsedSave {
             None
         };
 
-        Ok(Self { gamestate, meta })
+        Ok(Self { gamestate, gamestate_bytes, meta })
     }
 
     /// Extract specific sections from the parsed data
@@ -296,6 +302,27 @@ fn handle_count_keys(parsed: &ParsedSave, keys: Vec<String>) -> io::Result<()> {
     })
 }
 
+/// Handle contains_tokens operation - Aho-Corasick scan for token presence
+fn handle_contains_tokens(gamestate_bytes: &[u8], tokens: Vec<String>) -> io::Result<()> {
+    let mut matches: HashMap<String, bool> = tokens.iter().map(|t| (t.clone(), false)).collect();
+
+    if !tokens.is_empty() {
+        let ac = AhoCorasick::new(&tokens).expect("Failed to build Aho-Corasick automaton");
+
+        for mat in ac.find_iter(gamestate_bytes) {
+            let pattern_idx = mat.pattern().as_usize();
+            if pattern_idx < tokens.len() {
+                matches.insert(tokens[pattern_idx].clone(), true);
+            }
+        }
+    }
+
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::TokenMatches { matches },
+    })
+}
+
 /// Main serve loop
 pub fn run(path: &str) -> Result<()> {
     // Log startup to stderr (stdout is reserved for protocol)
@@ -366,6 +393,9 @@ pub fn run(path: &str) -> Result<()> {
             }
             Request::CountKeys { keys } => {
                 handle_count_keys(&parsed, keys)
+            }
+            Request::ContainsTokens { tokens } => {
+                handle_contains_tokens(&parsed.gamestate_bytes, tokens)
             }
             Request::Close => {
                 eprintln!("[serve] Received close request, shutting down");
@@ -454,5 +484,17 @@ mod tests {
         let json = serde_json::to_string(&err).unwrap();
         assert!(json.contains(r#""ok":false"#));
         assert!(json.contains(r#""error":"SectionNotFound""#));
+    }
+
+    #[test]
+    fn test_contains_tokens_request() {
+        let json = r#"{"op": "contains_tokens", "tokens": ["country", "fleet", "xyz123"]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::ContainsTokens { tokens } => {
+                assert_eq!(tokens, vec!["country", "fleet", "xyz123"]);
+            }
+            _ => panic!("Wrong request type"),
+        }
     }
 }

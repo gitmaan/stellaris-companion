@@ -94,7 +94,7 @@
       "priority": 4,
       "description": "Aho-Corasick scan for simple string presence checks - replaces re.search patterns",
       "files": ["stellaris-parser/src/commands/serve.rs", "stellaris-parser/Cargo.toml", "rust_bridge.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'aho-corasick' stellaris-parser/Cargo.toml (dependency added)",
         "RUN: grep -q 'contains_tokens' stellaris-parser/src/commands/serve.rs (operation implemented)",

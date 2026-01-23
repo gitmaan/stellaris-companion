@@ -339,6 +339,23 @@ class RustSession:
         response = self._recv()
         return response
 
+    def contains_tokens(self, tokens: list[str]) -> dict:
+        """Check if specific tokens appear anywhere in the raw gamestate bytes.
+
+        Uses Aho-Corasick algorithm for efficient multi-pattern matching.
+        This is faster than regex for simple "does string exist" checks.
+
+        Args:
+            tokens: List of tokens to search for (e.g., ["killed_dragon", "ether_drake_killed"])
+
+        Returns:
+            Dict with "matches" key containing a mapping of token -> bool.
+            Example: {"matches": {"killed_dragon": true, "ether_drake_killed": false}}
+        """
+        self._send({"op": "contains_tokens", "tokens": tokens})
+        response = self._recv()
+        return response
+
     def close(self):
         """Close the session and terminate the subprocess."""
         if self._closed:
