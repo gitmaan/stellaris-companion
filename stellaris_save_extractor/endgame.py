@@ -5,11 +5,12 @@ import re
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import iter_section_entries, ParserError
+    from rust_bridge import iter_section_entries, ParserError, _get_active_session
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None  # Fallback for type hints
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +156,8 @@ class EndgameMixin:
                 except (ValueError, TypeError):
                     pass
 
-        # Count crisis-controlled systems via regex (flags are spread across gamestate)
-        # This is more efficient as regex since flags appear throughout the file
+        # Count crisis-controlled systems via count_keys (tree traversal)
+        # This is faster than regex since we traverse the already-parsed JSON tree
         crisis_system_flags = [
             'prethoryn_system',           # Prethoryn infested systems
             'prethoryn_invasion_system',  # Prethoryn invasion target
@@ -165,9 +166,18 @@ class EndgameMixin:
             'unbidden_portal_system',     # Unbidden dimensional anchor
             'extradimensional_system',    # Generic extradimensional flag
         ]
-        total_crisis_systems = 0
-        for flag in crisis_system_flags:
-            total_crisis_systems += len(re.findall(rf'\b{flag}=', self.gamestate))
+
+        # Use count_keys operation if session is active
+        sess = _get_active_session()
+        if sess is not None:
+            counts_result = sess.count_keys(crisis_system_flags)
+            counts = counts_result.get('counts', {})
+            total_crisis_systems = sum(counts.values())
+        else:
+            # Fallback to regex if no active session
+            total_crisis_systems = 0
+            for flag in crisis_system_flags:
+                total_crisis_systems += len(re.findall(rf'\b{flag}=', self.gamestate))
 
         result['crisis_systems_count'] = total_crisis_systems
 
