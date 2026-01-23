@@ -281,11 +281,13 @@ class RustSession:
         response = self._recv()
         return response.get("data", {})
 
-    def iter_section(self, section: str) -> Iterator[tuple[str, dict]]:
+    def iter_section(self, section: str, batch_size: int = 100) -> Iterator[tuple[str, dict]]:
         """Stream entries from a section.
 
         Args:
             section: Section name (e.g., "country", "fleet")
+            batch_size: Number of entries per batch (default: 100).
+                       Use 1 for single-entry mode (backward compatible).
 
         Yields:
             Tuples of (key, value) for each entry
@@ -294,7 +296,7 @@ class RustSession:
             If you break out of the iterator early, remaining entries will be
             automatically drained before the next request.
         """
-        self._send({"op": "iter_section", "section": section})
+        self._send({"op": "iter_section", "section": section, "batch_size": batch_size})
 
         # First frame: stream header
         header = self._recv()
@@ -305,13 +307,20 @@ class RustSession:
         self._in_stream = True
 
         # Read entry frames until done
+        # Handle both single entry and batched formats
         while True:
             frame = self._recv()
             if frame.get("done"):
                 self._in_stream = False
                 return
-            entry = frame.get("entry", {})
-            yield entry.get("key", ""), entry.get("value", {})
+            # Handle batched format: {"entries": [...]}
+            if "entries" in frame:
+                for entry in frame["entries"]:
+                    yield entry.get("key", ""), entry.get("value", {})
+            # Handle single entry format: {"entry": {...}}
+            elif "entry" in frame:
+                entry = frame["entry"]
+                yield entry.get("key", ""), entry.get("value", {})
 
     def close(self):
         """Close the session and terminate the subprocess."""

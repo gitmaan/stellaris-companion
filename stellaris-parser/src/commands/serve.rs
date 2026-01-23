@@ -16,8 +16,17 @@ use std::io::{self, BufRead, Write};
 #[serde(tag = "op", rename_all = "snake_case")]
 enum Request {
     ExtractSections { sections: Vec<String> },
-    IterSection { section: String },
+    IterSection {
+        section: String,
+        #[serde(default = "default_batch_size")]
+        batch_size: usize,
+    },
     Close,
+}
+
+/// Default batch size for iter_section (100 entries per message)
+fn default_batch_size() -> usize {
+    100
 }
 
 /// Successful response wrapper
@@ -42,6 +51,9 @@ enum ResponseData {
     },
     StreamEntry {
         entry: EntryData,
+    },
+    StreamBatch {
+        entries: Vec<EntryData>,
     },
     StreamDone {
         done: bool,
@@ -160,6 +172,25 @@ fn write_stream_entry(key: &str, value: &Value) -> io::Result<()> {
     Ok(())
 }
 
+/// Write a batch of stream entries directly without cloning.
+/// Each entry's value is serialized in place to avoid deep clones.
+fn write_stream_batch(entries: &[(&str, &Value)]) -> io::Result<()> {
+    let mut stdout = io::stdout().lock();
+    // Build JSON: {"ok":true,"entries":[{"key":"...","value":...},...]}
+    stdout.write_all(b"{\"ok\":true,\"entries\":[")?;
+    for (i, (key, value)) in entries.iter().enumerate() {
+        if i > 0 {
+            stdout.write_all(b",")?;
+        }
+        write!(stdout, r#"{{"key":"{}","value":"#, key)?;
+        serde_json::to_writer(&mut stdout, value)?;
+        stdout.write_all(b"}")?;
+    }
+    stdout.write_all(b"]}\n")?;
+    stdout.flush()?;
+    Ok(())
+}
+
 /// Write an error response
 fn write_error(error: &str, message: &str, exit_code: i32) -> io::Result<()> {
     write_response(&ErrorResponse::new(error, message, exit_code))
@@ -175,7 +206,7 @@ fn handle_extract_sections(parsed: &ParsedSave, sections: Vec<String>) -> io::Re
 }
 
 /// Handle iter_section operation (streaming)
-fn handle_iter_section(parsed: &ParsedSave, section: String) -> io::Result<()> {
+fn handle_iter_section(parsed: &ParsedSave, section: String, batch_size: usize) -> io::Result<()> {
     // Write stream header
     write_response(&SuccessResponse {
         ok: true,
@@ -189,9 +220,25 @@ fn handle_iter_section(parsed: &ParsedSave, section: String) -> io::Result<()> {
     // Get section and iterate
     if let Some(section_value) = parsed.gamestate.get(&section) {
         if let Value::Object(map) = section_value {
-            for (key, value) in map {
-                // Use direct serialization to avoid cloning the entire Value tree
-                write_stream_entry(key, value)?;
+            if batch_size <= 1 {
+                // Single-entry mode (backward compatible)
+                for (key, value) in map {
+                    write_stream_entry(key, value)?;
+                }
+            } else {
+                // Batched mode - collect entries and write in batches
+                let mut batch: Vec<(&str, &Value)> = Vec::with_capacity(batch_size);
+                for (key, value) in map {
+                    batch.push((key.as_str(), value));
+                    if batch.len() >= batch_size {
+                        write_stream_batch(&batch)?;
+                        batch.clear();
+                    }
+                }
+                // Write remaining entries
+                if !batch.is_empty() {
+                    write_stream_batch(&batch)?;
+                }
             }
         }
     }
@@ -272,8 +319,8 @@ pub fn run(path: &str) -> Result<()> {
             Request::ExtractSections { sections } => {
                 handle_extract_sections(&parsed, sections)
             }
-            Request::IterSection { section } => {
-                handle_iter_section(&parsed, section)
+            Request::IterSection { section, batch_size } => {
+                handle_iter_section(&parsed, section, batch_size)
             }
             Request::Close => {
                 eprintln!("[serve] Received close request, shutting down");
@@ -316,8 +363,22 @@ mod tests {
         let json = r#"{"op": "iter_section", "section": "country"}"#;
         let req: Request = serde_json::from_str(json).unwrap();
         match req {
-            Request::IterSection { section } => {
+            Request::IterSection { section, batch_size } => {
                 assert_eq!(section, "country");
+                assert_eq!(batch_size, 100); // Default batch size
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_iter_section_request_with_batch_size() {
+        let json = r#"{"op": "iter_section", "section": "country", "batch_size": 50}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::IterSection { section, batch_size } => {
+                assert_eq!(section, "country");
+                assert_eq!(batch_size, 50);
             }
             _ => panic!("Wrong request type"),
         }

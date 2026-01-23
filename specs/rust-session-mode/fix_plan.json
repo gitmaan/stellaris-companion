@@ -62,7 +62,7 @@
       "priority": 2,
       "description": "Batch entries (100 per message) to reduce IPC overhead from 104K to ~1K messages",
       "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'batch_size' stellaris-parser/src/commands/serve.rs (batch_size parameter exists)",
         "RUN: grep -q 'entries' stellaris-parser/src/commands/serve.rs (batched entries field exists)",
