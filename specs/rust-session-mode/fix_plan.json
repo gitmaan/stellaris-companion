@@ -1,0 +1,166 @@
+{
+  "feature": "Rust Session Mode Optimization",
+  "description": "Optimize session mode performance by fixing IPC overhead and eliminating regex scans",
+  "spec_dir": "specs/rust-session-mode",
+  "branch": "ralph/session-optimization",
+  "patterns": [
+    {
+      "id": "P001",
+      "learning": "Use python3, not bare python",
+      "date": "2026-01-22"
+    },
+    {
+      "id": "P002",
+      "learning": "Rust cargo is at ~/.cargo/bin/cargo",
+      "date": "2026-01-23"
+    },
+    {
+      "id": "P003",
+      "learning": "Session mode already implemented in rust_bridge.py and serve.rs",
+      "date": "2026-01-23"
+    },
+    {
+      "id": "P004",
+      "learning": "Profiling shows: 77s regex (54%), 14s IPC (10%), 51s Python processing (36%)",
+      "date": "2026-01-23"
+    },
+    {
+      "id": "P005",
+      "learning": "Use count_keys (tree traversal) not Aho-Corasick for structured key counting - avoids boundary issues",
+      "date": "2026-01-23"
+    },
+    {
+      "id": "P006",
+      "learning": "Keep game logic in Python, Rust provides fast primitives only",
+      "date": "2026-01-23"
+    },
+    {
+      "id": "P007",
+      "learning": "Criterion checks should target specific functions (use sed -n '/fn name/,/^fn /p') not whole files when checking for patterns like value.clone()",
+      "date": "2026-01-24"
+    }
+  ],
+  "stories": [
+    {
+      "id": "OPT-001",
+      "title": "Remove value.clone() in serve.rs streaming",
+      "priority": 1,
+      "description": "Serialize entries directly without cloning the entire Value tree",
+      "files": ["stellaris-parser/src/commands/serve.rs"],
+      "passes": true,
+      "criteria": [
+        "RUN: sed -n '/fn handle_iter_section/,/^fn /p' stellaris-parser/src/commands/serve.rs | grep -c 'value.clone()' | grep -q '^0$' (no value.clone in streaming function)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo test 2>&1 | grep -q 'test result: ok' (tests pass)",
+        "RUN: echo '{\"op\":\"iter_section\",\"section\":\"country\"}' | ./stellaris-parser/target/release/stellaris-parser serve --path test_save.sav 2>/dev/null | head -3 | grep -q 'ok.*true' (iter_section still works)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "OPT-002",
+      "title": "Add batched streaming to serve.rs",
+      "priority": 2,
+      "description": "Batch entries (100 per message) to reduce IPC overhead from 104K to ~1K messages",
+      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'batch_size' stellaris-parser/src/commands/serve.rs (batch_size parameter exists)",
+        "RUN: grep -q 'entries' stellaris-parser/src/commands/serve.rs (batched entries field exists)",
+        "RUN: grep -q 'entries' rust_bridge.py (Python handles batched responses)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); c=sum(1 for _ in s.iter_section('country')); s.close(); print(f'Got {c} countries'); assert c > 0\" (batched iteration works)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "OPT-003",
+      "title": "Add count_keys operation to serve.rs",
+      "priority": 3,
+      "description": "Tree traversal to count occurrences of specific keys - replaces regex findall patterns",
+      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'count_keys' stellaris-parser/src/commands/serve.rs (operation implemented)",
+        "RUN: grep -q 'count_keys' rust_bridge.py (Python wrapper exists)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
+        "RUN: echo '{\"op\":\"count_keys\",\"keys\":[\"name\",\"type\",\"flag\"]}' | ./stellaris-parser/target/release/stellaris-parser serve --path test_save.sav 2>/dev/null | grep -q 'counts' (returns counts)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.count_keys(['name','type']); s.close(); print(r); assert 'counts' in r\" (Python wrapper works)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "OPT-004",
+      "title": "Add contains_tokens operation to serve.rs",
+      "priority": 4,
+      "description": "Aho-Corasick scan for simple string presence checks - replaces re.search patterns",
+      "files": ["stellaris-parser/src/commands/serve.rs", "stellaris-parser/Cargo.toml", "rust_bridge.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'aho-corasick' stellaris-parser/Cargo.toml (dependency added)",
+        "RUN: grep -q 'contains_tokens' stellaris-parser/src/commands/serve.rs (operation implemented)",
+        "RUN: grep -q 'contains_tokens' rust_bridge.py (Python wrapper exists)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
+        "RUN: echo '{\"op\":\"contains_tokens\",\"tokens\":[\"country\",\"nonexistent_xyz\"]}' | ./stellaris-parser/target/release/stellaris-parser serve --path test_save.sav 2>/dev/null | grep -q 'matches' (returns matches)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.contains_tokens(['country','xyz123']); s.close(); print(r); assert r.get('matches',{}).get('country')==True\" (Python wrapper works)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "OPT-005",
+      "title": "Update endgame.py to use count_keys",
+      "priority": 5,
+      "description": "Replace re.findall crisis counting with count_keys operation",
+      "files": ["stellaris_save_extractor/endgame.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're.findall.*self.gamestate' stellaris_save_extractor/endgame.py | xargs test 0 -eq (no re.findall on gamestate)",
+        "RUN: grep -q 'count_keys' stellaris_save_extractor/endgame.py (uses count_keys)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; s=session('test_save.sav'); e=SaveExtractor('test_save.sav'); r=e.get_crisis_status(); print(r); s.close()\" 2>&1 | grep -v 'Error' (get_crisis_status works)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "OPT-006",
+      "title": "Update leviathans.py to use contains_tokens",
+      "priority": 6,
+      "description": "Replace re.search defeat checks with contains_tokens operation",
+      "files": ["stellaris_save_extractor/leviathans.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're.search.*self.gamestate' stellaris_save_extractor/leviathans.py | xargs test 0 -eq (no re.search on gamestate)",
+        "RUN: grep -q 'contains_tokens' stellaris_save_extractor/leviathans.py (uses contains_tokens)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; s=session('test_save.sav'); e=SaveExtractor('test_save.sav'); r=e.get_leviathans(); print(r); s.close()\" 2>&1 | grep -v 'Error' (get_leviathans works)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "OPT-007",
+      "title": "Add get_country_summaries operation",
+      "priority": 7,
+      "description": "Return lightweight country projections to replace 15 full iterations",
+      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_country_summaries' stellaris-parser/src/commands/serve.rs (operation implemented)",
+        "RUN: grep -q 'get_country_summaries' rust_bridge.py (Python wrapper exists)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
+        "RUN: echo '{\"op\":\"get_country_summaries\",\"fields\":[\"name\",\"type\"]}' | ./stellaris-parser/target/release/stellaris-parser serve --path test_save.sav 2>/dev/null | grep -q 'countries' (returns countries)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_country_summaries(['name']); s.close(); print(len(r.get('countries',[]))); assert len(r.get('countries',[])) > 0\" (Python wrapper works)"
+      ],
+      "notes": ""
+    },
+    {
+      "id": "OPT-008",
+      "title": "Performance validation",
+      "priority": 8,
+      "description": "Verify briefing generation is significantly faster",
+      "files": [],
+      "passes": false,
+      "criteria": [
+        "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import session; start=time.time(); s=session('test_save.sav'); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s.close(); elapsed=time.time()-start; print(f'Briefing time: {elapsed:.1f}s'); assert elapsed < 15, f'Too slow: {elapsed}s'\" (briefing under 15 seconds)"
+      ],
+      "notes": ""
+    }
+  ],
+  "discovered": []
+}

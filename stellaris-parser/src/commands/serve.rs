@@ -148,6 +148,18 @@ fn write_response<T: Serialize>(response: &T) -> io::Result<()> {
     Ok(())
 }
 
+/// Write a stream entry directly without cloning the value.
+/// This avoids expensive deep clones of large Value trees.
+fn write_stream_entry(key: &str, value: &Value) -> io::Result<()> {
+    let mut stdout = io::stdout().lock();
+    // Write the JSON structure directly, serializing value in place
+    write!(stdout, r#"{{"ok":true,"entry":{{"key":"{}","value":"#, key)?;
+    serde_json::to_writer(&mut stdout, value)?;
+    stdout.write_all(b"}}\n")?;
+    stdout.flush()?;
+    Ok(())
+}
+
 /// Write an error response
 fn write_error(error: &str, message: &str, exit_code: i32) -> io::Result<()> {
     write_response(&ErrorResponse::new(error, message, exit_code))
@@ -178,15 +190,8 @@ fn handle_iter_section(parsed: &ParsedSave, section: String) -> io::Result<()> {
     if let Some(section_value) = parsed.gamestate.get(&section) {
         if let Value::Object(map) = section_value {
             for (key, value) in map {
-                write_response(&SuccessResponse {
-                    ok: true,
-                    data: ResponseData::StreamEntry {
-                        entry: EntryData {
-                            key: key.clone(),
-                            value: value.clone(),
-                        },
-                    },
-                })?;
+                // Use direct serialization to avoid cloning the entire Value tree
+                write_stream_entry(key, value)?;
             }
         }
     }
