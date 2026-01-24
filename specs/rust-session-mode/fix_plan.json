@@ -558,12 +558,12 @@
       "priority": 21,
       "description": "Delete all _regex methods from military.py.",
       "files": ["stellaris_save_extractor/military.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q 'def _get.*_regex' stellaris_save_extractor/military.py (removed)",
         "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); e.get_wars(); e.get_fleets(); ctx.__exit__(None,None,None); print('OK')\" (works)"
       ],
-      "notes": "Only proceed if MIG-040 passed."
+      "notes": "Completed 2026-01-25. Removed all _regex methods: _get_wars_regex (~147 lines), _get_fleets_regex (~41 lines), _get_fleet_composition_regex (~143 lines), _get_starbases_regex (~167 lines), _get_megastructures_regex (~123 lines). Total ~621 lines of regex code removed (file went from 1468 to ~820 lines). Also removed unused _extract_braced_block helper, RUST_BRIDGE_AVAILABLE check, and unused imports (re, zipfile, datetime, extract_sections, iter_section_entries). All 5 functions updated to use session.iter_section() directly per P031. All military functions tested: get_wars (1 war), get_fleets (10 military, 344K power), get_fleet_composition (10 fleets, 6 classes), get_starbases (37 count, 25K defense), get_megastructures (92 count, 8 types)."
     },
     {
       "id": "MIG-045",
