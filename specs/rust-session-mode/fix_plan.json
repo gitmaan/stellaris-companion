@@ -610,12 +610,12 @@
       "priority": 22,
       "description": "Remove all RUST_BRIDGE_AVAILABLE conditionals. Rust is now required.",
       "files": ["stellaris_save_extractor/base.py", "stellaris_save_extractor/economy.py", "stellaris_save_extractor/planets.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q 'RUST_BRIDGE_AVAILABLE' stellaris_save_extractor/*.py (no optional checks)",
         "RUN: grep -q 'from rust_bridge import' stellaris_save_extractor/base.py (direct import)"
       ],
-      "notes": "Final cleanup. Rust is now a hard requirement."
+      "notes": "Completed 2026-01-25. Removed RUST_BRIDGE_AVAILABLE from all 11 extractor files: endgame.py, species.py, player.py, diplomacy.py, armies.py, politics.py, projects.py, planets.py, briefing.py, leviathans.py, economy.py. Changed try/except imports to direct 'from rust_bridge import ParserError, _get_active_session'. Rust session mode is now a hard requirement - no optional fallbacks."
     },
     {
       "id": "MIG-049",
@@ -623,12 +623,12 @@
       "priority": 23,
       "description": "Document that Rust build is required.",
       "files": ["README.md"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'cargo build' README.md (build instructions)",
         "RUN: grep -qi 'rust.*require' README.md (requirement documented)"
       ],
-      "notes": "Final documentation."
+      "notes": "Completed 2026-01-25. Added Requirements section at top documenting Rust parser requirement. Added 'cargo build --release' to Quick Start setup instructions. Updated Rust Parser section to emphasize requirement status and link to rustup.rs. Both criteria pass."
     }
   ],
   "discovered": []

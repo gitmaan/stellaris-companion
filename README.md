@@ -11,6 +11,12 @@ AI-powered strategic advisor for Stellaris using Gemini 3 Flash. Chat with an in
 - **Auto Save Detection** - Automatically finds your most recent Stellaris save
 - **Discord Bot** - In-game friendly interface via Discord overlay
 
+## Requirements
+
+- **Python 3.10+** with dependencies from `requirements.txt`
+- **Rust parser** (required) - See [Building the Rust Parser](#building-from-source) below
+- **Gemini API key** - Get one from [Google AI Studio](https://aistudio.google.com/)
+
 ## Quick Start
 
 ### CLI (local terminal)
@@ -21,6 +27,11 @@ cd ~/stellaris-companion
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+
+# Build the Rust parser (required)
+cd stellaris-parser
+cargo build --release
+cd ..
 
 # Set your API key
 export GOOGLE_API_KEY="your-gemini-api-key"
@@ -189,13 +200,17 @@ stellaris-companion/
 
 ## Rust Parser (stellaris-parser)
 
-The project uses a Rust-based parser (`stellaris-parser`) for fast, reliable parsing of Stellaris save files. The parser is built on the [jomini](https://crates.io/crates/jomini) library which handles all Clausewitz format edge cases.
+The project uses a Rust-based parser (`stellaris-parser`) for fast, reliable parsing of Stellaris save files. **The Rust parser is required** - without it, the companion cannot extract data from save files.
+
+The parser is built on the [jomini](https://crates.io/crates/jomini) library which handles all Clausewitz format edge cases, and provides 67x faster extraction compared to pure Python regex parsing.
 
 ### Binary Distribution
 
 Pre-built binaries are available in the `bin/` directory or from [GitHub Releases](https://github.com/your-repo/stellaris-companion/releases).
 
 ### Building from Source
+
+**Rust is required.** Install Rust from [rustup.rs](https://rustup.rs/) if you don't have it.
 
 ```bash
 cd stellaris-parser
