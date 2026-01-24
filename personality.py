@@ -10,7 +10,93 @@ and current game situation. The personality is derived from:
 3. Civics (quirks and special behaviors)
 4. Species (flavor text)
 5. Situation (tone modifiers based on game state)
+6. Game version (patch-specific mechanics via patches/*.md)
 """
+
+import os
+import re
+from pathlib import Path
+
+# Directory containing patch notes
+PATCHES_DIR = Path(__file__).parent / "patches"
+
+
+def load_patch_notes(version: str, cumulative: bool = True) -> str | None:
+    """Load pre-processed patch notes for a given game version.
+
+    Patch notes are stored in patches/{major}.{minor}.md files,
+    pre-transformed by LLM to contain present-tense facts about
+    game mechanics (no change-oriented language).
+
+    Args:
+        version: Game version string, e.g., "Corvus v4.2.4"
+        cumulative: If True, load all patches from 4.0 up to this version
+
+    Returns:
+        Patch notes content, or None if not found
+    """
+    if not version:
+        return None
+
+    # Extract major.minor from version string (e.g., "Corvus v4.2.4" -> "4.2")
+    match = re.search(r'(\d+\.\d+)', version)
+    if not match:
+        return None
+
+    target_version = match.group(1)
+
+    def _load_single_patch(ver: str) -> str | None:
+        """Load a single patch file."""
+        patch_file = PATCHES_DIR / f"{ver}.md"
+        if patch_file.exists():
+            try:
+                content = patch_file.read_text(encoding='utf-8')
+                lines = content.split('\n')
+                content_lines = [
+                    line for line in lines
+                    if not line.startswith('#') and not line.startswith('<!--')
+                ]
+                return '\n'.join(content_lines).strip()
+            except Exception:
+                return None
+        return None
+
+    if not cumulative:
+        return _load_single_patch(target_version)
+
+    # Load all patches from 4.0 up to target version (cumulative)
+    all_patches = get_available_patches()
+    combined = []
+
+    for patch_ver in sorted(all_patches):
+        # Compare versions numerically
+        try:
+            if float(patch_ver) <= float(target_version):
+                content = _load_single_patch(patch_ver)
+                if content:
+                    combined.append(content)
+        except ValueError:
+            continue
+
+    return '\n\n'.join(combined) if combined else None
+
+
+def get_available_patches() -> list[str]:
+    """Get list of available patch versions.
+
+    Returns:
+        List of version strings (e.g., ['4.0', '4.1', '4.2'])
+    """
+    if not PATCHES_DIR.exists():
+        return []
+
+    patches = []
+    for f in PATCHES_DIR.glob("*.md"):
+        version = f.stem  # e.g., "4.0"
+        patches.append(version)
+
+    return sorted(patches)
+
 
 # Ethics -> Personality mapping
 ETHICS_PERSONALITY = {
@@ -639,7 +725,11 @@ def _build_game_context_block(game_context: dict) -> str:
     dlcs_str = ', '.join(dlcs) if dlcs else 'None (base game only)'
     missing_str = ', '.join(missing) if missing else 'None'
 
-    return f"""
+    # Load patch notes for this version
+    patch_notes = load_patch_notes(version)
+
+    # Build the base context
+    context = f"""
 
 [INTERNAL CONTEXT - never mention this to the user]
 Game version: {version}
@@ -649,9 +739,19 @@ Missing major DLCs: {missing_str}
 VERSION & DLC AWARENESS:
 - Only recommend features, mechanics, and content available with the active DLCs listed above
 - Do NOT suggest content from missing DLCs (e.g., don't recommend Become the Crisis if Nemesis is missing)
-- Consider how game mechanics and balance work in this specific version
-- If the version is newer than your training data, rely on fundamental Stellaris strategy principles
-- Never explicitly mention version numbers or DLC status to the user - just seamlessly avoid unavailable content"""
+- Never explicitly mention version numbers or DLC status to the user"""
+
+    # Add patch-specific mechanics if available
+    if patch_notes:
+        context += f"""
+
+[GAME MECHANICS - current version facts]
+The following describes how mechanics work in {version}.
+Use these as ground truth for your advice. Do not reference patches, updates, or changes.
+
+{patch_notes}"""
+
+    return context
 
 
 def _build_machine_optimized(empire_name: str, civics: list, situation: dict) -> str:
