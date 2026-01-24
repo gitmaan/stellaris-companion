@@ -186,6 +186,23 @@ class GameDatabase:
                 # full_briefing_json is not retained.
                 "ALTER TABLE snapshots ADD COLUMN event_state_json TEXT;",
             ],
+            3: [
+                # Chronicle cache table for LLM-generated narratives
+                """
+                CREATE TABLE IF NOT EXISTS cached_chronicles (
+                    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+                    session_id TEXT NOT NULL,
+                    chronicle_text TEXT NOT NULL,
+                    chapters_json TEXT,
+                    event_count INTEGER NOT NULL,
+                    snapshot_count INTEGER NOT NULL,
+                    generated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    UNIQUE(session_id),
+                    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS idx_cached_chronicles_session ON cached_chronicles(session_id);",
+            ],
         }
 
         current = self.get_schema_version()
@@ -1014,6 +1031,78 @@ class GameDatabase:
                 (session_id,),
             ).fetchone()
             return dict(row) if row else None
+
+    # --- Chronicle generation support ---
+
+    def get_all_events(self, *, session_id: str) -> list[dict[str, Any]]:
+        """Get ALL events for a session (no limit cap).
+
+        Used by chronicle generation which needs full history.
+        Note: get_recent_events() has a hard 100-event cap.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT id, captured_at, game_date, event_type, summary, data_json
+                FROM events
+                WHERE session_id = ?
+                ORDER BY game_date ASC, captured_at ASC;
+                """,
+                (session_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_cached_chronicle(self, session_id: str) -> dict[str, Any] | None:
+        """Get cached chronicle if it exists."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM cached_chronicles WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_event_count(self, session_id: str) -> int:
+        """Get total event count for a session."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT COUNT(*) as cnt FROM events WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+            return row["cnt"] if row else 0
+
+    def get_snapshot_count(self, session_id: str) -> int:
+        """Get total snapshot count for a session."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT COUNT(*) as cnt FROM snapshots WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+            return row["cnt"] if row else 0
+
+    def upsert_cached_chronicle(
+        self,
+        session_id: str,
+        chronicle_text: str,
+        event_count: int,
+        snapshot_count: int,
+        chapters_json: str | None = None,
+    ) -> None:
+        """Insert or update cached chronicle."""
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO cached_chronicles
+                    (id, session_id, chronicle_text, chapters_json, event_count, snapshot_count)
+                VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    chronicle_text = excluded.chronicle_text,
+                    chapters_json = excluded.chapters_json,
+                    event_count = excluded.event_count,
+                    snapshot_count = excluded.snapshot_count,
+                    generated_at = datetime('now')
+                """,
+                (session_id, chronicle_text, chapters_json, event_count, snapshot_count),
+            )
 
 
 _default_db: GameDatabase | None = None

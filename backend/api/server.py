@@ -33,6 +33,14 @@ class RecapRequest(BaseModel):
     """Request body for /api/recap endpoint."""
 
     session_id: str
+    style: str = "summary"  # "summary" (deterministic) or "dramatic" (LLM-powered)
+
+
+class ChronicleRequest(BaseModel):
+    """Request body for /api/chronicle endpoint."""
+
+    session_id: str
+    force_refresh: bool = False
 
 
 def get_auth_token() -> str | None:
@@ -441,10 +449,16 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/recap", dependencies=[Depends(verify_token)])
-    async def generate_recap(request: Request, body: RecapRequest) -> dict[str, Any]:
+    def generate_recap(request: Request, body: RecapRequest) -> dict[str, Any]:
         """Generate a recap summary for a session.
 
         Returns a narrative recap of events and key changes during the session.
+        Supports two styles:
+        - "summary": Fast deterministic recap (default)
+        - "dramatic": LLM-powered dramatic narrative
+
+        Note: This is a sync endpoint because the LLM client is synchronous.
+        FastAPI runs sync endpoints in a threadpool.
         """
         db = getattr(request.app.state, "db", None)
 
@@ -462,7 +476,7 @@ def create_app() -> FastAPI:
                 detail={"error": "Session not found"},
             )
 
-        # Get session stats for date range and event count
+        # Get session stats for date range
         stats = db.get_session_snapshot_stats(body.session_id)
         first_date = stats.get("first_game_date")
         last_date = stats.get("last_game_date")
@@ -477,23 +491,69 @@ def create_app() -> FastAPI:
         else:
             date_range = "No snapshots"
 
-        # Get events count
-        events = db.get_recent_events(session_id=body.session_id, limit=100)
-        events_summarized = len(events)
+        # Use ChronicleGenerator for both styles
+        from backend.core.chronicle import ChronicleGenerator
 
-        # Generate recap using existing reporting function
-        from backend.core.reporting import build_session_report_text
+        generator = ChronicleGenerator(db=db)
 
-        recap = build_session_report_text(
-            db=db,
-            session_id=body.session_id,
-            max_events=50,
-        )
+        try:
+            result = generator.generate_recap(
+                session_id=body.session_id,
+                style=body.style,
+            )
+            result["date_range"] = date_range
+            return result
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail={"error": str(e)})
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail={"error": f"Recap generation failed: {str(e)}"},
+            )
 
-        return {
-            "recap": recap,
-            "events_summarized": events_summarized,
-            "date_range": date_range,
-        }
+    @app.post("/api/chronicle", dependencies=[Depends(verify_token)])
+    def generate_chronicle(request: Request, body: ChronicleRequest) -> dict[str, Any]:
+        """Generate a full LLM-powered chronicle for a session.
+
+        Returns a dramatic, multi-chapter narrative of the empire's history.
+        Chronicles are cached and regenerated when significant new events occur.
+
+        Note: This is a sync endpoint (def, not async def) because the
+        Gemini client is synchronous. FastAPI runs sync endpoints in a
+        threadpool, avoiding event loop blocking.
+        """
+        db = getattr(request.app.state, "db", None)
+
+        if db is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Database not initialized"},
+            )
+
+        # Check if session exists
+        session = db.get_session_by_id(body.session_id)
+        if session is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "Session not found"},
+            )
+
+        from backend.core.chronicle import ChronicleGenerator
+
+        generator = ChronicleGenerator(db=db)
+
+        try:
+            result = generator.generate_chronicle(
+                session_id=body.session_id,
+                force_refresh=body.force_refresh,
+            )
+            return result
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail={"error": str(e)})
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail={"error": f"Chronicle generation failed: {str(e)}"},
+            )
 
     return app

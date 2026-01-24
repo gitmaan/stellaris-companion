@@ -845,11 +845,22 @@ ipcMain.handle('backend:session-events', async (event, { session_id, limit }) =>
   }
 })
 
-ipcMain.handle('backend:recap', async (event, { session_id }) => {
+ipcMain.handle('backend:recap', async (event, { session_id, style }) => {
   try {
     return await callBackendApi('/api/recap', {
       method: 'POST',
-      body: JSON.stringify({ session_id }),
+      body: JSON.stringify({ session_id, style: style || 'summary' }),
+    })
+  } catch (e) {
+    return { error: e.message }
+  }
+})
+
+ipcMain.handle('backend:chronicle', async (event, { session_id, force_refresh }) => {
+  try {
+    return await callBackendApi('/api/chronicle', {
+      method: 'POST',
+      body: JSON.stringify({ session_id, force_refresh: force_refresh || false }),
     })
   } catch (e) {
     return { error: e.message }

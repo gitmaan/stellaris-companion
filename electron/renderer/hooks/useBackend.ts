@@ -102,6 +102,14 @@ export interface RecapResponse {
   recap: string
   events_summarized: number
   date_range: string
+  style?: string
+}
+
+export interface ChronicleResponse {
+  chronicle: string
+  cached: boolean
+  event_count: number
+  generated_at: string
 }
 
 export interface EndSessionResponse {
@@ -129,7 +137,8 @@ declare global {
         status: () => Promise<StatusResponse | ErrorResponse>
         sessions: () => Promise<SessionsResponse | ErrorResponse>
         sessionEvents: (sessionId: string, limit?: number) => Promise<SessionEventsResponse | ErrorResponse>
-        recap: (sessionId: string) => Promise<RecapResponse | ErrorResponse>
+        recap: (sessionId: string, style?: string) => Promise<RecapResponse | ErrorResponse>
+        chronicle: (sessionId: string, forceRefresh?: boolean) => Promise<ChronicleResponse | ErrorResponse>
         endSession: () => Promise<EndSessionResponse | ErrorResponse>
       }
       getSettings: () => Promise<unknown>
@@ -300,12 +309,27 @@ export function useBackend() {
 
   /**
    * Generate a recap for a session
+   * @param style - "summary" (deterministic) or "dramatic" (LLM-powered)
    */
   const recap = useCallback(async (
-    sessionId: string
+    sessionId: string,
+    style?: string
   ): Promise<UseBackendResult<RecapResponse>> => {
     return callApi<RecapResponse>('recap', () =>
-      window.electronAPI!.backend.recap(sessionId)
+      window.electronAPI!.backend.recap(sessionId, style)
+    )
+  }, [callApi])
+
+  /**
+   * Generate a full chronicle for a session
+   * @param forceRefresh - If true, regenerate even if cached
+   */
+  const chronicle = useCallback(async (
+    sessionId: string,
+    forceRefresh?: boolean
+  ): Promise<UseBackendResult<ChronicleResponse>> => {
+    return callApi<ChronicleResponse>('chronicle', () =>
+      window.electronAPI!.backend.chronicle(sessionId, forceRefresh)
     )
   }, [callApi])
 
@@ -330,6 +354,7 @@ export function useBackend() {
     sessions,
     sessionEvents,
     recap,
+    chronicle,
     endSession,
 
     // Loading states (for UI components that need to track multiple calls)
@@ -339,7 +364,7 @@ export function useBackend() {
     // Type guards for consumers
     isErrorResponse,
     isChatRetryResponse,
-  }), [health, chat, status, sessions, sessionEvents, recap, endSession, loadingStates])
+  }), [health, chat, status, sessions, sessionEvents, recap, chronicle, endSession, loadingStates])
 }
 
 export default useBackend
