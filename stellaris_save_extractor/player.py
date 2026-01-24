@@ -749,6 +749,62 @@ class PlayerMixin:
               - starbase_capacity: Max starbases allowed
               - used_starbase_capacity: Current starbase count
         """
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_naval_capacity_rust()
+        return self._get_naval_capacity_regex()
+
+    def _get_naval_capacity_rust(self) -> dict:
+        """Rust-optimized naval capacity extraction using get_entry.
+
+        Uses _get_player_country_entry for fast O(1) lookup instead of
+        scanning the gamestate with regex.
+        """
+        result = {
+            "used": 0,
+            "fleet_size": 0,
+            "starbase_capacity": None,
+            "used_starbase_capacity": None,
+        }
+
+        player_id = self.get_player_empire_id()
+        player_country = self._get_player_country_entry(player_id)
+
+        if player_country and isinstance(player_country, dict):
+            # Extract metrics directly from parsed dict
+            used = player_country.get("used_naval_capacity")
+            if used is not None:
+                try:
+                    result["used"] = int(float(used))
+                except (ValueError, TypeError):
+                    pass
+
+            fleet_size = player_country.get("fleet_size")
+            if fleet_size is not None:
+                try:
+                    result["fleet_size"] = int(fleet_size)
+                except (ValueError, TypeError):
+                    pass
+
+            starbase_cap = player_country.get("starbase_capacity")
+            if starbase_cap is not None:
+                try:
+                    result["starbase_capacity"] = int(starbase_cap)
+                except (ValueError, TypeError):
+                    pass
+
+            used_starbase = player_country.get("used_starbase_capacity")
+            if used_starbase is not None:
+                try:
+                    result["used_starbase_capacity"] = int(used_starbase)
+                except (ValueError, TypeError):
+                    pass
+
+        return result
+
+    def _get_naval_capacity_regex(self) -> dict:
+        """Original regex-based naval capacity extraction (fallback)."""
         result = {
             "used": 0,
             "fleet_size": 0,
