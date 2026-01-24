@@ -119,20 +119,16 @@ class DiplomacyMixin:
         # Get country name mappings for resolving IDs to empire names
         country_names = self._get_country_names_map()
 
-        # Use Rust parser to get federation ID from player country
+        # Use cached player country entry for federation ID lookup
         federation_id = None
-        for country_id_str, country_data in iter_section_entries(self.save_path, "country"):
-            if country_id_str != str(player_id):
-                continue
-
-            # Get federation ID from player country
-            fed_val = country_data.get("federation")
+        player_country = self._get_player_country_entry(player_id)
+        if player_country and isinstance(player_country, dict):
+            fed_val = player_country.get("federation")
             if fed_val and fed_val != "4294967295" and fed_val != 4294967295:
                 try:
                     federation_id = int(fed_val)
                 except (ValueError, TypeError):
                     pass
-            break
 
         # For relations, use regex since Rust parser collapses duplicate 'relation' keys
         player_chunk = self._find_player_country_content(player_id)
@@ -549,6 +545,155 @@ class DiplomacyMixin:
         limit_council: int = 10,
     ) -> dict:
         """Get a compact summary of the Galactic Community and Council."""
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_galactic_community_rust(limit_members, limit_resolutions, limit_council)
+        return self._get_galactic_community_regex(limit_members, limit_resolutions, limit_council)
+
+    def _get_galactic_community_rust(
+        self,
+        limit_members: int = 50,
+        limit_resolutions: int = 25,
+        limit_council: int = 10,
+    ) -> dict:
+        """Rust-optimized version using extract_sections.
+
+        Uses direct parsed JSON access instead of regex on raw gamestate.
+        Benefits:
+        - No regex parsing on raw text
+        - No truncation limits
+        - Handles nested structures correctly
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_galactic_community_regex(limit_members, limit_resolutions, limit_council)
+
+        result = {
+            "members": [],
+            "members_count": 0,
+            "player_is_member": False,
+            "council_members": [],
+            "council_positions": None,
+            "council_veto": None,
+            "emissaries_count": 0,
+            "voting_resolution_id": None,
+            "last_resolution_id": None,
+            "days_until_election": None,
+            "community_formed": None,
+            "council_established": None,
+            "proposed_count": 0,
+            "passed_count": 0,
+            "failed_count": 0,
+            "resolutions": {
+                "proposed": [],
+                "passed": [],
+                "failed": [],
+            },
+        }
+
+        # Use extract_sections for this small top-level section
+        data = session.extract_sections(['galactic_community'])
+        gc = data.get('galactic_community')
+
+        # Section might not exist if no galactic community formed
+        if not gc or not isinstance(gc, dict):
+            return result
+
+        def parse_int_list(value) -> list[int]:
+            """Convert parsed list of string IDs to integers, filtering invalid values."""
+            if not value:
+                return []
+            if isinstance(value, list):
+                result_list = []
+                for v in value:
+                    try:
+                        int_val = int(v)
+                        # Filter out 4294967295 (represents "none" in Stellaris)
+                        if int_val != 4294967295:
+                            result_list.append(int_val)
+                    except (ValueError, TypeError):
+                        continue
+                return result_list
+            return []
+
+        # Extract member lists
+        members = parse_int_list(gc.get('members'))
+        council = parse_int_list(gc.get('council'))
+        proposed = parse_int_list(gc.get('proposed'))
+        passed = parse_int_list(gc.get('passed'))
+        failed = parse_int_list(gc.get('failed'))
+        emissaries = parse_int_list(gc.get('emissaries'))
+
+        result["members_count"] = len(members)
+        result["members"] = members[: max(0, int(limit_members))]
+        result["council_members"] = council[: max(0, int(limit_council))]
+
+        player_id = self.get_player_empire_id()
+        result["player_is_member"] = player_id in members
+
+        result["proposed_count"] = len(proposed)
+        result["passed_count"] = len(passed)
+        result["failed_count"] = len(failed)
+        result["resolutions"]["proposed"] = proposed[: max(0, int(limit_resolutions))]
+        result["resolutions"]["passed"] = passed[: max(0, int(limit_resolutions))]
+        result["resolutions"]["failed"] = failed[: max(0, int(limit_resolutions))]
+
+        # Extract scalar values from parsed dict
+        voting = gc.get('voting')
+        if voting is not None:
+            try:
+                result["voting_resolution_id"] = int(voting)
+            except (ValueError, TypeError):
+                pass
+
+        last = gc.get('last')
+        if last is not None:
+            try:
+                result["last_resolution_id"] = int(last)
+            except (ValueError, TypeError):
+                pass
+
+        days = gc.get('days')
+        if days is not None:
+            try:
+                result["days_until_election"] = int(days)
+            except (ValueError, TypeError):
+                pass
+
+        # String values
+        community_formed = gc.get('community_formed')
+        if community_formed and isinstance(community_formed, str):
+            result["community_formed"] = community_formed
+
+        council_established = gc.get('council_established')
+        if council_established and isinstance(council_established, str):
+            result["council_established"] = council_established
+
+        # Integer values
+        council_positions = gc.get('council_positions')
+        if council_positions is not None:
+            try:
+                result["council_positions"] = int(council_positions)
+            except (ValueError, TypeError):
+                pass
+
+        # Boolean value (stored as "yes"/"no" string)
+        council_veto = gc.get('council_veto')
+        if council_veto is not None:
+            result["council_veto"] = council_veto == 'yes'
+
+        result["emissaries_count"] = len(emissaries)
+
+        return result
+
+    def _get_galactic_community_regex(
+        self,
+        limit_members: int = 50,
+        limit_resolutions: int = 25,
+        limit_council: int = 10,
+    ) -> dict:
+        """Original regex implementation - fallback for non-session use."""
         result = {
             "members": [],
             "members_count": 0,
