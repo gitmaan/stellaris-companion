@@ -5,12 +5,13 @@ import re
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import iter_section_entries, ParserError
+    from rust_bridge import iter_section_entries, ParserError, _get_active_session
 
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -42,26 +43,16 @@ class PoliticsMixin:
     def get_factions(self, limit: int = 10) -> dict:
         """Get a compact summary of the player's political factions.
 
-        Uses Rust parser for fast extraction when available, falls back to regex.
+        Uses Rust session for fast extraction when available, falls back to regex.
 
         Notes:
         - Returns an empty list for gestalt empires.
         - Does not return raw pop IDs (members are summarized as a count).
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_factions_rust(limit)
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for factions: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback: regex-based parsing
+        # Dispatch to Rust version when session is active (P030)
+        session = _get_active_session()
+        if session:
+            return self._get_factions_rust(limit)
         return self._get_factions_regex(limit)
 
     def _resolve_faction_name(self, name_block: dict | str) -> str:
@@ -109,11 +100,16 @@ class PoliticsMixin:
         return resolved if resolved else key
 
     def _get_factions_rust(self, limit: int = 10) -> dict:
-        """Get factions using Rust parser.
+        """Get factions using Rust session (P030/P031).
 
         Returns:
             Dict with faction details
         """
+        # P030: Check for active session, delegate to regex if none
+        session = _get_active_session()
+        if not session:
+            return self._get_factions_regex(limit)
+
         identity = self.get_empire_identity()
         is_gestalt = bool(identity.get("is_gestalt", False))
 
@@ -129,13 +125,13 @@ class PoliticsMixin:
         player_id = self.get_player_empire_id()
         factions: list[dict] = []
 
-        # Iterate over pop_factions section using Rust parser
-        for faction_id, faction_data in iter_section_entries(
-            self.gamestate_path, "pop_factions"
-        ):
+        # P031: Use session.iter_section() directly
+        for faction_id, faction_data in session.iter_section("pop_factions"):
+            # P010: Entry might be string "none" - always check isinstance
             if not isinstance(faction_data, dict):
                 continue
 
+            # P011: Use .get() with defaults
             # Check country - only include player's factions
             country = faction_data.get("country")
             if country is None:
@@ -153,7 +149,7 @@ class PoliticsMixin:
             name_block = faction_data.get("name", {})
             name = self._resolve_faction_name(name_block)
 
-            # Extract support values
+            # Extract support values - P012: fields can be str, int, float
             support_percent = 0.0
             support_power = 0.0
             approval = 0.0
@@ -185,7 +181,7 @@ class PoliticsMixin:
 
             factions.append(
                 {
-                    "id": str(faction_id),
+                    "id": str(faction_id),  # P013: Entry IDs are strings
                     "country_id": player_id,
                     "type": faction_type,
                     "name": name,
