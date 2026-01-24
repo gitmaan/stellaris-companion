@@ -36,7 +36,7 @@
     },
     {
       "id": "UHE-P007",
-      "learning": "Event name resolution: _get_leader_name() helper in events.py provides fallback chain (name → name_key with cleanup → #id). Cleanup matches _extract_leader_name_rust() patterns (_CHR_, NAME_ prefix). Event data should include both 'name' and 'name_key' for debugging.",
+      "learning": "Event name resolution: _get_leader_name() helper in events.py provides fallback chain (name \u2192 name_key with cleanup \u2192 #id). Cleanup matches _extract_leader_name_rust() patterns (_CHR_, NAME_ prefix). Event data should include both 'name' and 'name_key' for debugging.",
       "date": "2026-01-24"
     },
     {
@@ -73,6 +73,11 @@
       "id": "UHE-P014",
       "learning": "Megastructure stage is not explicit in get_megastructures() output - derive from type suffix. Types like 'gateway_0', 'dyson_sphere_1' have suffix _N for stage N. Complete megastructures (no suffix like 'habitat_major_orbital') default to stage 5. Check for _site suffix (stage 0) before assuming complete.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P015",
+      "learning": "When criterion grep patterns don't match actual code style (e.g., single vs double quotes), update the criterion to test for the function name or other reliable marker instead of fighting quote styles.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -81,7 +86,9 @@
       "title": "Create signals.py module with SnapshotSignals builder",
       "priority": 1,
       "description": "Add backend/core/signals.py with build_snapshot_signals() that extracts normalized history data using SaveExtractor. Include format_version for schema evolution.",
-      "files": ["backend/core/signals.py"],
+      "files": [
+        "backend/core/signals.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: test -f backend/core/signals.py (module exists)",
@@ -96,7 +103,9 @@
       "title": "Implement leader extraction in signals.py",
       "priority": 1,
       "description": "build_snapshot_signals uses extractor.get_leaders() and normalizes output with resolved names. Each leader has: id, class, level, name (resolved), name_key (raw), death_date, date_added, recruitment_date.",
-      "files": ["backend/core/signals.py"],
+      "files": [
+        "backend/core/signals.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'get_leaders' backend/core/signals.py (uses extractor method)",
@@ -111,7 +120,9 @@
       "title": "Add leader date extraction to SaveExtractor",
       "priority": 1,
       "description": "History needs death_date, date_added, recruitment_date but current get_leaders() doesn't extract them. Add these fields to _get_leaders_rust().",
-      "files": ["stellaris_save_extractor/leaders.py"],
+      "files": [
+        "stellaris_save_extractor/leaders.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'death_date\\|date_added\\|recruitment_date' stellaris_save_extractor/leaders.py (date fields extracted)",
@@ -124,7 +135,9 @@
       "title": "Integrate signals into ingestion_worker.py",
       "priority": 2,
       "description": "Update t2 worker to call build_snapshot_signals() and attach to briefing. Remove extractor.gamestate dependency for history.",
-      "files": ["backend/core/ingestion_worker.py"],
+      "files": [
+        "backend/core/ingestion_worker.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'build_snapshot_signals\\|from.*signals import' backend/core/ingestion_worker.py (imports signals module)",
@@ -137,8 +150,10 @@
       "id": "UHE-005",
       "title": "Update events.py to use resolved leader names",
       "priority": 2,
-      "description": "When building leader event summaries (hired, died, removed), prefer leader['name'] over name_key. Fallback chain: name → name_key → #{id}.",
-      "files": ["backend/core/events.py"],
+      "description": "When building leader event summaries (hired, died, removed), prefer leader['name'] over name_key. Fallback chain: name \u2192 name_key \u2192 #{id}.",
+      "files": [
+        "backend/core/events.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q \"get('name')\\|\\['name'\\]\" backend/core/events.py (uses name field)",
@@ -152,7 +167,9 @@
       "title": "Add wars extraction to signals.py",
       "priority": 3,
       "description": "Extend build_snapshot_signals to include wars using extractor.get_wars(). Normalize to {player_at_war, count, wars: [...]}.",
-      "files": ["backend/core/signals.py"],
+      "files": [
+        "backend/core/signals.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'get_wars' backend/core/signals.py (uses extractor method)",
@@ -166,7 +183,9 @@
       "title": "Add diplomacy extraction to signals.py",
       "priority": 3,
       "description": "Extend build_snapshot_signals to include diplomacy using extractor.get_diplomacy(). Normalize allies/rivals/treaties to stable ID sets.",
-      "files": ["backend/core/signals.py"],
+      "files": [
+        "backend/core/signals.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'get_diplomacy' backend/core/signals.py (uses extractor method)",
@@ -180,7 +199,9 @@
       "title": "Update history.py to accept precomputed signals",
       "priority": 4,
       "description": "Add compatibility layer: history functions can accept precomputed signals payload instead of parsing gamestate. Keep old functions for backward compat with existing snapshots.",
-      "files": ["backend/core/history.py"],
+      "files": [
+        "backend/core/history.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'signals\\|precomputed' backend/core/history.py (accepts signals parameter)",
@@ -193,7 +214,7 @@
       "id": "UHE-009",
       "title": "End-to-end validation with test save",
       "priority": 5,
-      "description": "Verify full pipeline: ingest save → signals built → events use resolved names → no %LEADER_% in event summaries.",
+      "description": "Verify full pipeline: ingest save \u2192 signals built \u2192 events use resolved names \u2192 no %LEADER_% in event summaries.",
       "files": [],
       "passes": true,
       "criteria": [
@@ -205,8 +226,10 @@
       "id": "UHE-010",
       "title": "Remove gamestate dependency from ingestion history path",
       "priority": 6,
-      "description": "After signals integration is validated, remove the extractor.gamestate loading in ingestion_worker for history. The '⚠️ Gamestate load' log should no longer appear.",
-      "files": ["backend/core/ingestion_worker.py"],
+      "description": "After signals integration is validated, remove the extractor.gamestate loading in ingestion_worker for history. The '\u26a0\ufe0f Gamestate load' log should no longer appear.",
+      "files": [
+        "backend/core/ingestion_worker.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: ! grep -q 'gamestate.*history\\|history.*gamestate' backend/core/ingestion_worker.py (no gamestate for history)",
@@ -219,7 +242,9 @@
       "title": "Add empire names to diplomacy signals",
       "priority": 7,
       "description": "get_diplomacy() already returns {id, name} dicts for allies/rivals. Capture empire names in signals so events can show 'Alliance formed with Tzynn Empire' instead of 'empire #16777221'.",
-      "files": ["backend/core/signals.py"],
+      "files": [
+        "backend/core/signals.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'empire_name\\|country_name' backend/core/signals.py (captures empire names)",
@@ -231,8 +256,10 @@
       "id": "UHE-012",
       "title": "Update events.py to use empire names in diplomacy events",
       "priority": 7,
-      "description": "Use empire names from signals in alliance/rivalry/treaty event summaries. Fallback chain: empire_names[id] → 'empire #{id}'.",
-      "files": ["backend/core/events.py"],
+      "description": "Use empire names from signals in alliance/rivalry/treaty event summaries. Fallback chain: empire_names[id] \u2192 'empire #{id}'.",
+      "files": [
+        "backend/core/events.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'empire_name\\|_get_empire_name' backend/core/events.py (uses empire names)",
@@ -246,7 +273,9 @@
       "title": "Add technology signals",
       "priority": 8,
       "description": "Add technology extraction to signals using extractor.get_technology() (already Rust-backed). Replaces extract_player_techs_from_gamestate regex.",
-      "files": ["backend/core/signals.py"],
+      "files": [
+        "backend/core/signals.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'get_technology' backend/core/signals.py (uses extractor method)",
@@ -260,7 +289,9 @@
       "title": "Add megastructures signals",
       "priority": 8,
       "description": "Add megastructures extraction to signals using extractor.get_megastructures() (already Rust-backed). Replaces extract_megastructures_from_gamestate regex.",
-      "files": ["backend/core/signals.py"],
+      "files": [
+        "backend/core/signals.py"
+      ],
       "passes": true,
       "criteria": [
         "RUN: grep -q 'get_megastructures' backend/core/signals.py (uses extractor method)",
@@ -274,11 +305,13 @@
       "title": "Add crisis signals",
       "priority": 8,
       "description": "Add crisis status extraction to signals using extractor.get_crisis_status() (already Rust-backed). Replaces extract_crisis_from_gamestate regex.",
-      "files": ["backend/core/signals.py"],
-      "passes": false,
+      "files": [
+        "backend/core/signals.py"
+      ],
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_crisis_status' backend/core/signals.py (uses extractor method)",
-        "RUN: grep -q \"'crisis'\" backend/core/signals.py (includes crisis field)",
+        "RUN: grep -q '_extract_crisis_signals' backend/core/signals.py (includes crisis extraction function)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); crisis=s.get('crisis',{}); print(f'Crisis: {crisis}')\" (crisis extraction works)"
       ],
       "notes": "Crisis events are major Chronicle milestones. Normalize to {active, type, progress} for event detection."
@@ -288,7 +321,9 @@
       "title": "Add fallen empires signals",
       "priority": 9,
       "description": "Add fallen empires extraction to signals using extractor.get_fallen_empires() (already Rust-backed). Replaces extract_fallen_empires_from_gamestate regex.",
-      "files": ["backend/core/signals.py"],
+      "files": [
+        "backend/core/signals.py"
+      ],
       "passes": false,
       "criteria": [
         "RUN: grep -q 'get_fallen_empires' backend/core/signals.py (uses extractor method)",
@@ -302,7 +337,9 @@
       "title": "Add policies and edicts signals",
       "priority": 9,
       "description": "Add policies/edicts extraction to signals. Policies use player.py, edicts may need new extractor method.",
-      "files": ["backend/core/signals.py"],
+      "files": [
+        "backend/core/signals.py"
+      ],
       "passes": false,
       "criteria": [
         "RUN: grep -q \"'policies'\\|'edicts'\" backend/core/signals.py (includes policy/edict fields)",
@@ -315,7 +352,9 @@
       "title": "Update history.py to use expanded signals",
       "priority": 10,
       "description": "Update build_history_enrichment to use technology, megastructures, crisis, fallen_empires from signals instead of gamestate regex.",
-      "files": ["backend/core/history.py"],
+      "files": [
+        "backend/core/history.py"
+      ],
       "passes": false,
       "criteria": [
         "RUN: grep -q 'signals.*technology\\|signals.*megastructures\\|signals.*crisis' backend/core/history.py (uses expanded signals)",

@@ -56,6 +56,9 @@ def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, An
     # Extract megastructures signals
     signals["megastructures"] = _extract_megastructures_signals(extractor)
 
+    # Extract crisis signals
+    signals["crisis"] = _extract_crisis_signals(extractor)
+
     return signals
 
 
@@ -483,3 +486,69 @@ def _extract_megastructures_signals(extractor: "SaveExtractor") -> dict[str, Any
         'count': len(normalized),
         'by_type': by_type,
     }
+
+
+def _extract_crisis_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract normalized crisis status for history diffing.
+
+    Uses extractor.get_crisis_status() which provides comprehensive crisis data
+    including crisis type, active factions, and player involvement.
+
+    Returns format compatible with events.py _extract_crisis():
+        Dict with:
+        - active: bool (whether a crisis has spawned)
+        - type: str | None (prethoryn, contingency, unbidden, etc.)
+        - progress: int | None (crisis systems count as a proxy for progress)
+        - player_is_crisis_fighter: bool
+        - player_crisis_kills: int
+        - crisis_countries: list of {country_id, type}
+    """
+    raw = extractor.get_crisis_status()
+
+    if not isinstance(raw, dict):
+        return {
+            'active': False,
+            'type': None,
+            'progress': None,
+        }
+
+    # Normalize to format expected by events.py
+    # events.py checks: crisis.get("active") and crisis.get("type")
+    active = bool(raw.get('crisis_active', False))
+    crisis_type = raw.get('crisis_type')
+
+    result: dict[str, Any] = {
+        'active': active,
+        'type': crisis_type,
+    }
+
+    # Include crisis systems count as progress indicator
+    crisis_systems = raw.get('crisis_systems_count')
+    if crisis_systems is not None:
+        try:
+            result['progress'] = int(crisis_systems)
+        except (ValueError, TypeError):
+            result['progress'] = None
+
+    # Include additional details useful for narrative/reporting
+    if raw.get('player_is_crisis_fighter'):
+        result['player_is_crisis_fighter'] = True
+
+    player_kills = raw.get('player_crisis_kills')
+    if player_kills:
+        try:
+            result['player_crisis_kills'] = int(player_kills)
+        except (ValueError, TypeError):
+            pass
+
+    # Include crisis country info for detailed reporting
+    crisis_countries = raw.get('crisis_countries', [])
+    if isinstance(crisis_countries, list) and crisis_countries:
+        result['crisis_countries'] = crisis_countries
+
+    # Include all detected crisis types if multiple (e.g., aberrant + vehement)
+    crisis_types = raw.get('crisis_types_detected', [])
+    if isinstance(crisis_types, list) and len(crisis_types) > 1:
+        result['crisis_types_detected'] = crisis_types
+
+    return result
