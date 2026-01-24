@@ -46,7 +46,7 @@
     },
     {
       "id": "UHE-P009",
-      "learning": "Backward compatibility: build_history_enrichment accepts precomputed_signals param. Uses signals for leaders/wars/diplomacy when available, falls back to gamestate extraction. Galaxy settings, techs, policies, edicts, megastructures, crisis, systems, fallen_empires still use gamestate (not yet in signals).",
+      "learning": "Backward compatibility: build_history_enrichment accepts precomputed_signals param. Uses signals for most fields when available, falls back to gamestate extraction. Only galaxy settings and systems count still require gamestate.",
       "date": "2026-01-24"
     },
     {
@@ -82,6 +82,11 @@
     {
       "id": "UHE-P016",
       "learning": "Policies and edicts are available directly from Rust-parsed player country entry (_get_player_country_entry). active_policies is list of {policy, selected} dicts; edicts is list of {edict, date, perpetual, start_date} dicts. No separate get_policies() or get_edicts() extractor method needed.",
+      "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P017",
+      "learning": "build_history_enrichment now uses signals for: leaders, wars, diplomacy, technology, megastructures, crisis, fallen_empires, policies, edicts. Only galaxy settings and systems count still require gamestate. With gamestate=None, history will be built entirely from signals for these fields.",
       "date": "2026-01-24"
     }
   ],
@@ -360,12 +365,12 @@
       "files": [
         "backend/core/history.py"
       ],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'signals.*technology\\|signals.*megastructures\\|signals.*crisis' backend/core/history.py (uses expanded signals)",
         "RUN: python3 -c \"from backend.core.history import build_history_enrichment; print('Import OK')\" (importable)"
       ],
-      "notes": "Incremental migration - each signal type replaces corresponding extract_*_from_gamestate call. Eventually all history extraction uses signals."
+      "notes": "Incremental migration - each signal type replaces corresponding extract_*_from_gamestate call. Now also uses signals for policies and edicts. Galaxy and systems still require gamestate."
     },
     {
       "id": "UHE-019",
