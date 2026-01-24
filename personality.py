@@ -527,7 +527,7 @@ Always use tools to get current data rather than guessing."""
     return prompt
 
 
-def build_optimized_prompt(identity: dict, situation: dict) -> str:
+def build_optimized_prompt(identity: dict, situation: dict, game_context: dict | None = None) -> str:
     """Generate the optimal production prompt based on empirical testing.
 
     Key findings from the Final Showdown test (2026-01-13):
@@ -552,9 +552,10 @@ def build_optimized_prompt(identity: dict, situation: dict) -> str:
     Args:
         identity: Empire identity from get_empire_identity()
         situation: Game situation from get_situation()
+        game_context: Optional dict with 'version' and 'required_dlcs' for DLC/version awareness
 
     Returns:
-        Optimized system prompt (~750 chars)
+        Optimized system prompt (~750 chars + game context)
     """
     empire_name = identity.get('empire_name', 'the Empire')
     ethics = identity.get('ethics', [])
@@ -584,19 +585,19 @@ def build_optimized_prompt(identity: dict, situation: dict) -> str:
 
     # Handle gestalt consciousness specially
     if is_machine:
-        return _build_machine_optimized(empire_name, civics, situation)
+        prompt = _build_machine_optimized(empire_name, civics, situation)
     elif is_hive_mind:
-        return _build_hive_optimized(empire_name, civics, situation)
+        prompt = _build_hive_optimized(empire_name, civics, situation)
+    else:
+        # Build optimized prompt for standard empires
+        ethics_str = ', '.join(ethics) if ethics else 'unknown'
+        civics_str = ', '.join(civics) if civics else 'none'
+        war_status = "AT WAR" if at_war else "peace"
 
-    # Build optimized prompt for standard empires
-    ethics_str = ', '.join(ethics) if ethics else 'unknown'
-    civics_str = ', '.join(civics) if civics else 'none'
-    war_status = "AT WAR" if at_war else "peace"
+        # Address instruction (only thing that needs explicit mapping)
+        address_line = f"Address the ruler as \"{address}\"." if address else ""
 
-    # Address instruction (only thing that needs explicit mapping)
-    address_line = f"Address the ruler as \"{address}\"." if address else ""
-
-    prompt = f"""You are the strategic advisor to {empire_name}.
+        prompt = f"""You are the strategic advisor to {empire_name}.
 
 EMPIRE: Ethics: {ethics_str} | Authority: {authority} | Civics: {civics_str}
 STATE: Year {year} ({game_phase}), {war_status}, {deficits} deficits, {contact_count} contacts
@@ -610,7 +611,47 @@ You know Stellaris deeply. Use that knowledge to:
 
 Facts must come from provided game state. Never guess numbers."""
 
+    # Append game context (version/DLC awareness) if provided
+    if game_context:
+        prompt += _build_game_context_block(game_context)
+
     return prompt
+
+
+def _build_game_context_block(game_context: dict) -> str:
+    """Build the internal game context block for version/DLC awareness.
+
+    This block is appended to the system prompt but should never be
+    mentioned to the user. It helps the model avoid recommending
+    features from DLCs the player doesn't own, and consider how
+    mechanics work in the specific game version.
+
+    Args:
+        game_context: Dict with 'version', 'required_dlcs', 'missing_dlcs'
+
+    Returns:
+        Formatted context block string
+    """
+    version = game_context.get('version', 'unknown')
+    dlcs = game_context.get('required_dlcs', [])
+    missing = game_context.get('missing_dlcs', [])
+
+    dlcs_str = ', '.join(dlcs) if dlcs else 'None (base game only)'
+    missing_str = ', '.join(missing) if missing else 'None'
+
+    return f"""
+
+[INTERNAL CONTEXT - never mention this to the user]
+Game version: {version}
+Active DLCs: {dlcs_str}
+Missing major DLCs: {missing_str}
+
+VERSION & DLC AWARENESS:
+- Only recommend features, mechanics, and content available with the active DLCs listed above
+- Do NOT suggest content from missing DLCs (e.g., don't recommend Become the Crisis if Nemesis is missing)
+- Consider how game mechanics and balance work in this specific version
+- If the version is newer than your training data, rely on fundamental Stellaris strategy principles
+- Never explicitly mention version numbers or DLC status to the user - just seamlessly avoid unavailable content"""
 
 
 def _build_machine_optimized(empire_name: str, civics: list, situation: dict) -> str:

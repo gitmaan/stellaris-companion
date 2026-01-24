@@ -227,6 +227,7 @@ class Companion:
 
         Uses optimized prompt (625 chars) that trusts Gemini's Stellaris knowledge.
         Only hardcodes address style (model can't infer). Handles all empire types.
+        Includes version/DLC awareness to avoid recommending unavailable content.
         """
         if not self.identity or not self.situation:
             self.system_prompt = FALLBACK_SYSTEM_PROMPT
@@ -234,12 +235,43 @@ class Companion:
             return
 
         try:
-            self.system_prompt = build_optimized_prompt(self.identity, self.situation)
+            # Build game context for version/DLC awareness
+            game_context = self._build_game_context()
+
+            self.system_prompt = build_optimized_prompt(
+                self.identity, self.situation, game_context
+            )
             self.personality_summary = get_personality_summary(self.identity, self.situation)
         except Exception as e:
             print(f"Warning: Failed to build personality ({e}), using fallback")
             self.system_prompt = FALLBACK_SYSTEM_PROMPT
             self.personality_summary = "Fallback: Generic advisor"
+
+    def _build_game_context(self) -> dict | None:
+        """Build game context dict for version/DLC awareness.
+
+        Returns:
+            Dict with version, required_dlcs, and missing_dlcs, or None if unavailable
+        """
+        if not self.metadata:
+            return None
+
+        version = self.metadata.get('version')
+        required_dlcs = self.metadata.get('required_dlcs', [])
+
+        # Compute missing DLCs if extractor is available
+        missing_dlcs = []
+        if self.extractor and hasattr(self.extractor, 'get_missing_dlcs'):
+            try:
+                missing_dlcs = self.extractor.get_missing_dlcs()
+            except Exception:
+                pass  # Fall back to empty list
+
+        return {
+            'version': version,
+            'required_dlcs': required_dlcs,
+            'missing_dlcs': missing_dlcs,
+        }
 
     def _compute_save_hash(self) -> str:
         """Compute a hash of the current save state for staleness detection.
