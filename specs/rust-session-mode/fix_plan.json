@@ -96,12 +96,12 @@
       "priority": 1,
       "description": "briefing.py pre-warms player country content unconditionally. In session mode, use get_entry('country', player_id) instead of raw gamestate slicing.",
       "files": ["stellaris_save_extractor/briefing.py", "stellaris_save_extractor/base.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q '_find_player_country_content' stellaris_save_extractor/briefing.py || grep -B5 '_find_player_country_content' stellaris_save_extractor/briefing.py | grep -q 'not.*session\\|_regex\\|fallback' (prewarm removed or guarded)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); ctx.__exit__(None,None,None); print('OK')\" (briefing works without prewarm)"
       ],
-      "notes": "The _get_player_country_entry() method added in MIG-008 provides O(1) lookup. Use that instead of pre-warming raw text."
+      "notes": "Completed 2026-01-24. Added session check guard: 'if not _get_active_session()' before prewarm call. In session mode, methods use _get_player_country_entry() for O(1) lookup instead of raw text cache."
     },
     {
       "id": "MIG-011",

@@ -268,8 +268,10 @@ class BriefingMixin:
 
         # Pre-warm the player country content cache for methods that still use regex
         # This saves ~0.45s as many methods share this data
+        # In session mode, skip prewarm - use _get_player_country_entry() for O(1) lookup
         player_id = self.get_player_empire_id()
-        self._find_player_country_content(player_id)
+        if not _get_active_session():
+            self._find_player_country_content(player_id)
 
         # Call methods that get_situation() would call - we'll build situation inline
         diplomacy = self.get_diplomacy()
