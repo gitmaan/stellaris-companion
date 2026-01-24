@@ -532,12 +532,12 @@
       "priority": 21,
       "description": "Delete all _regex methods from player.py.",
       "files": ["stellaris_save_extractor/player.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q '_regex' stellaris_save_extractor/player.py (removed)",
         "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_player_status(); ctx.__exit__(None,None,None); print('OK')\" (works)"
       ],
-      "notes": "Only proceed if MIG-040 passed."
+      "notes": "Completed 2026-01-25. Removed all _regex methods: _get_player_empire_id_regex (~7 lines), _get_player_status_regex (~94 lines), _get_empire_identity_regex (~88 lines), _get_traditions_regex (~38 lines), _get_ascension_perks_regex (~19 lines), _get_naval_capacity_regex (~32 lines), _get_relics_regex (~39 lines). Total ~317 lines of regex code removed. All functions now require Rust session mode - get_player_empire_id raises ParserError if no session, other functions rely on that check. Output matches baseline exactly."
     },
     {
       "id": "MIG-043",
