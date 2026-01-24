@@ -127,9 +127,17 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
             try:
                 t0 = time.time()
                 from backend.core.history import build_history_enrichment
+                from backend.core.signals import build_snapshot_signals
+
+                # Build signals from Rust session (fast, resolved names)
+                t_signals = time.time()
+                signals = build_snapshot_signals(extractor=extractor, briefing=briefing)
+                timings["signals_build"] = time.time() - t_signals
+                log_timing("Signals build (Rust-backed)", timings["signals_build"])
 
                 # NOTE: getattr(extractor, "gamestate") triggers loading the entire 70MB+ file!
-                # This is a known bottleneck - history enrichment should use Rust session instead.
+                # This is a known bottleneck - signals extraction above replaces leaders.
+                # Wars/diplomacy still use gamestate until migrated (UHE-006, UHE-007).
                 t_gs = time.time()
                 gamestate = getattr(extractor, "gamestate", None)
                 timings["gamestate_load"] = time.time() - t_gs
@@ -139,6 +147,16 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
                     gamestate=gamestate,
                     player_id=briefing.get("meta", {}).get("player_id") if isinstance(briefing, dict) else None,
                 )
+
+                # Merge signals into history - signals leaders have resolved names
+                # which fixes Chronicle placeholder issues (%LEADER_N%)
+                if signals:
+                    if not history:
+                        history = {}
+                    # Signals leaders replace history leaders (resolved names vs name_key only)
+                    if signals.get("leaders"):
+                        history["leaders"] = signals["leaders"]
+
                 if history:
                     briefing = dict(briefing)
                     briefing["history"] = history

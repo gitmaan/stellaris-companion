@@ -28,6 +28,11 @@
       "id": "UHE-P005",
       "learning": "Leader date fields: recruitment_date may be stored as 'recruitment_date', 'pre_ruler_date' (for rulers), or 'date' - check all three with fallback chain. death_date is null for living leaders. date_added tracks when leader joined empire roster.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P006",
+      "learning": "Integration pattern: build signals first (fast, Rust-backed), then build history enrichment from gamestate (slow, regex), then merge signals into history (signals.leaders replaces history.leaders). This allows incremental migration.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -80,7 +85,7 @@
       "priority": 2,
       "description": "Update t2 worker to call build_snapshot_signals() and attach to briefing. Remove extractor.gamestate dependency for history.",
       "files": ["backend/core/ingestion_worker.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'build_snapshot_signals\\|from.*signals import' backend/core/ingestion_worker.py (imports signals module)",
         "RUN: grep -q 'signals' backend/core/ingestion_worker.py (uses signals)",
