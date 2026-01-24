@@ -461,6 +461,40 @@ class RustSession:
         response = self._recv()
         return response
 
+    def get_duplicate_values(self, section: str, key: str, field: str) -> list[str]:
+        """Extract all values for a field that has duplicate keys in Clausewitz format.
+
+        Stellaris save files use duplicate keys for list-like structures (e.g.,
+        `traits="x"` appearing multiple times for a leader). The standard JSON-style
+        parser only keeps the last value. This method scans the raw bytes to extract
+        ALL values for the specified field.
+
+        Args:
+            section: Section name (e.g., "leaders", "species_db")
+            key: Entry ID/key within the section (e.g., "123" for leader ID)
+            field: Field name that has duplicate values (e.g., "traits")
+
+        Returns:
+            List of all values for that field. Empty list if entry not found
+            or field has no values.
+
+        Example:
+            >>> sess.get_duplicate_values("leaders", "12345", "traits")
+            ["leader_trait_resilient", "leader_trait_carefree", "leader_trait_spark_of_genius"]
+
+        Note:
+            This is specifically for fields with duplicate keys in Clausewitz format.
+            For normal fields, use get_entry() instead.
+        """
+        self._send({
+            "op": "get_duplicate_values",
+            "section": section,
+            "key": key,
+            "field": field,
+        })
+        response = self._recv()
+        return response.get("values", [])
+
     def close(self):
         """Close the session and terminate the subprocess."""
         if self._closed:

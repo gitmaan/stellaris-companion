@@ -33,6 +33,11 @@ enum Request {
     ContainsTokens { tokens: Vec<String> },
     ContainsKv { pairs: Vec<(String, String)> },
     GetCountrySummaries { fields: Vec<String> },
+    GetDuplicateValues {
+        section: String,
+        key: String,
+        field: String,
+    },
     Close,
 }
 
@@ -93,6 +98,10 @@ enum ResponseData {
     },
     CountrySummaries {
         countries: Vec<Value>,
+    },
+    DuplicateValues {
+        values: Vec<String>,
+        found: bool,
     },
 }
 
@@ -539,6 +548,109 @@ fn handle_get_country_summaries(parsed: &ParsedSave, fields: Vec<String>) -> io:
     })
 }
 
+/// Handle get_duplicate_values operation - extract all values for a field with duplicate keys
+///
+/// This is needed because jomini's JSON-style deserialization collapses duplicate keys,
+/// but Stellaris save files use duplicate keys for list-like structures (e.g., traits="x"
+/// appearing multiple times for a leader).
+///
+/// This function scans the raw gamestate bytes to find the entry and extracts all values
+/// for the specified field using byte-level parsing.
+fn handle_get_duplicate_values(
+    gamestate_bytes: &[u8],
+    section: String,
+    key: String,
+    field: String,
+) -> io::Result<()> {
+    // Strategy:
+    // 1. Find the section start (e.g., "leaders={")
+    // 2. Find the specific entry by key (e.g., "\n\t12345=")
+    // 3. Extract all values for the field (e.g., traits="value")
+
+    let mut values: Vec<String> = Vec::new();
+    let mut found = false;
+
+    // Convert to string for searching (save files are Windows-1252 encoded, mostly ASCII-compatible)
+    let content = String::from_utf8_lossy(gamestate_bytes);
+
+    // Find section start: section={
+    let section_pattern = format!("\n{}=", section);
+    if let Some(section_start) = content.find(&section_pattern) {
+        // Find the opening brace
+        let section_content_start = match content[section_start..].find('{') {
+            Some(pos) => section_start + pos + 1,
+            None => {
+                return write_response(&SuccessResponse {
+                    ok: true,
+                    data: ResponseData::DuplicateValues { values, found: false },
+                });
+            }
+        };
+
+        // Look for the entry: \n\t<key>=
+        // Note: keys at top level of section are tab-indented once
+        let entry_patterns = [
+            format!("\n\t{}=\n\t{{", key),  // Standard format with newline before brace
+            format!("\n\t{}={{", key),       // Compact format without newline
+            format!("\n\t{} =", key),        // With space before equals
+        ];
+
+        let mut entry_start: Option<usize> = None;
+        for pattern in &entry_patterns {
+            if let Some(pos) = content[section_content_start..].find(pattern) {
+                entry_start = Some(section_content_start + pos);
+                break;
+            }
+        }
+
+        if let Some(start) = entry_start {
+            found = true;
+
+            // Find the entry's content by counting braces
+            let entry_content = &content[start..];
+            let mut brace_count = 0;
+            let mut entry_end = entry_content.len();
+            let mut in_entry = false;
+
+            for (i, ch) in entry_content.chars().enumerate() {
+                if ch == '{' {
+                    brace_count += 1;
+                    in_entry = true;
+                } else if ch == '}' {
+                    brace_count -= 1;
+                    if in_entry && brace_count == 0 {
+                        entry_end = i + 1;
+                        break;
+                    }
+                }
+            }
+
+            let entry_block = &entry_content[..entry_end];
+
+            // Extract all values for the field: field="value"
+            // Pattern: field="<value>"
+            let field_pattern = format!("{}=\"", field);
+            let mut search_pos = 0;
+
+            while let Some(field_start) = entry_block[search_pos..].find(&field_pattern) {
+                let value_start = search_pos + field_start + field_pattern.len();
+                if let Some(value_end) = entry_block[value_start..].find('"') {
+                    let value = &entry_block[value_start..value_start + value_end];
+                    values.push(value.to_string());
+                    search_pos = value_start + value_end + 1;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::DuplicateValues { values, found },
+    })
+}
+
 /// Main serve loop
 pub fn run(path: &str) -> Result<()> {
     // Log startup to stderr (stdout is reserved for protocol)
@@ -624,6 +736,9 @@ pub fn run(path: &str) -> Result<()> {
             }
             Request::GetCountrySummaries { fields } => {
                 handle_get_country_summaries(&parsed, fields)
+            }
+            Request::GetDuplicateValues { section, key, field } => {
+                handle_get_duplicate_values(&parsed.gamestate_bytes, section, key, field)
             }
             Request::Close => {
                 eprintln!("[serve] Received close request, shutting down");
@@ -788,6 +903,20 @@ mod tests {
                 assert_eq!(pairs.len(), 2);
                 assert_eq!(pairs[0], ("war_in_heaven".to_string(), "yes".to_string()));
                 assert_eq!(pairs[1], ("version".to_string(), "3".to_string()));
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_get_duplicate_values_request() {
+        let json = r#"{"op": "get_duplicate_values", "section": "leaders", "key": "123", "field": "traits"}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::GetDuplicateValues { section, key, field } => {
+                assert_eq!(section, "leaders");
+                assert_eq!(key, "123");
+                assert_eq!(field, "traits");
             }
             _ => panic!("Wrong request type"),
         }

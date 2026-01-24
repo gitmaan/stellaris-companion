@@ -83,6 +83,11 @@
       "id": "P022",
       "learning": "Regex re.search finds first match which may come from nested structures (e.g., log entries) rather than parent-level fields. Rust parsed dict access correctly reads the parent-level field. This can cause regex to return wrong values from nested data.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P023",
+      "learning": "get_duplicate_values(section, key, field) extracts ALL values for a field with duplicate keys by scanning raw bytes. Use for traits, technologies, species traits, etc. Returns list of strings. Entry must exist for values to be found.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -173,14 +178,14 @@
       "priority": 3,
       "description": "Jomini collapses duplicate keys but leader traits need all values. Add get_entry_raw or get_duplicate_values op that preserves repeated keys.",
       "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py", "stellaris_save_extractor/leaders.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_duplicate_values\\|get_entry_raw\\|preserve.*duplicate' stellaris-parser/src/commands/serve.rs (Rust op exists)",
         "RUN: grep -q 'get_duplicate_values\\|get_entry_raw' rust_bridge.py (Python wrapper exists)",
         "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
         "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); print('Rust bridge works'); s.close()\" (bridge works)"
       ],
-      "notes": "This fixes both accuracy (get all traits) and performance (remove gamestate fallback in leaders.py). Could return {key: [val1, val2, ...]} for specified duplicate-key fields."
+      "notes": "Completed 2026-01-24. Added get_duplicate_values Rust op that scans raw bytes to extract all values for fields with duplicate keys (e.g., traits= appearing multiple times). Python wrapper returns list of strings. Tested with leader traits - correctly extracts all traits where regex was needed before."
     },
     {
       "id": "MIG-016",
