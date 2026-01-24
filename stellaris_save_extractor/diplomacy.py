@@ -8,11 +8,12 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -831,6 +832,138 @@ class DiplomacyMixin:
                 - awakened_count: Number that have awakened
                 - war_in_heaven: Whether War in Heaven is active
         """
+        # Use Rust-optimized version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_fallen_empires_rust()
+        return self._get_fallen_empires_regex()
+
+    def _get_fallen_empires_rust(self) -> dict:
+        """Optimized Rust-based implementation of get_fallen_empires.
+
+        Uses iter_section to iterate countries once instead of regex scanning
+        the 84MB gamestate multiple times.
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_fallen_empires_regex()
+
+        result = {
+            'fallen_empires': [],
+            'dormant_count': 0,
+            'awakened_count': 0,
+            'total_count': 0,
+            'war_in_heaven': False,
+        }
+
+        # Get player military power for comparison
+        player_status = self.get_player_status()
+        player_military = player_status.get('military_power', 0)
+
+        # Check for War in Heaven using contains_tokens
+        try:
+            wih_result = session.contains_tokens(['war_in_heaven=yes'])
+            if wih_result.get('matches', {}).get('war_in_heaven=yes'):
+                result['war_in_heaven'] = True
+        except Exception:
+            pass
+
+        # FE archetype mapping
+        FE_ARCHETYPES = {
+            'xenophile': ('Benevolent Interventionists', 'May awaken to "guide" younger races'),
+            'xenophobe': ('Militant Isolationists', 'Hostile if you colonize near them'),
+            'materialist': ('Ancient Caretakers', 'Protect galaxy from synthetic threats'),
+            'spiritualist': ('Holy Guardians', 'Protect holy worlds, hate tomb worlds'),
+        }
+
+        # Iterate countries once and filter for fallen empires
+        for cid, country in session.iter_section('country'):
+            if not isinstance(country, dict):
+                continue
+
+            ctype = country.get('type')
+            if ctype not in ('fallen_empire', 'awakened_fallen_empire'):
+                continue
+
+            status = 'awakened' if ctype == 'awakened_fallen_empire' else 'dormant'
+
+            empire_info = {
+                'country_id': int(cid),
+                'name': 'Unknown Fallen Empire',
+                'status': status,
+                'archetype': 'Unknown',
+                'archetype_behavior': '',
+                'military_power': 0,
+                'power_ratio': 0.0,
+                'ethics': None,
+            }
+
+            # Extract name from nested structure
+            name_data = country.get('name')
+            if isinstance(name_data, dict):
+                variables = name_data.get('variables', [])
+                for var in variables:
+                    if isinstance(var, dict) and var.get('key') == 'adjective':
+                        value = var.get('value', {})
+                        if isinstance(value, dict):
+                            raw_name = value.get('key', '')
+                            empire_info['name'] = raw_name.replace('SPEC_', '').replace('_', ' ').title()
+                            break
+
+            # Extract ethics
+            ethos_data = country.get('ethos')
+            if isinstance(ethos_data, dict):
+                ethic = ethos_data.get('ethic')
+                if isinstance(ethic, list):
+                    # Multiple ethics - prefer fanatic
+                    for e in ethic:
+                        if 'fanatic' in str(e):
+                            empire_info['ethics'] = e
+                            break
+                    if not empire_info['ethics'] and ethic:
+                        empire_info['ethics'] = ethic[0]
+                elif ethic:
+                    empire_info['ethics'] = ethic
+
+                # Map to FE archetype
+                if empire_info['ethics']:
+                    for key, (archetype, behavior) in FE_ARCHETYPES.items():
+                        if key in empire_info['ethics']:
+                            empire_info['archetype'] = archetype
+                            empire_info['archetype_behavior'] = behavior
+                            break
+
+            # Extract military power
+            mil_power = country.get('military_power')
+            if mil_power is not None:
+                empire_info['military_power'] = float(mil_power)
+                if player_military > 0:
+                    empire_info['power_ratio'] = round(empire_info['military_power'] / player_military, 1)
+
+            # Extract opinion of player from relations_manager
+            rm = country.get('relations_manager')
+            if isinstance(rm, dict):
+                relations = rm.get('relation', [])
+                if isinstance(relations, list):
+                    for rel in relations:
+                        if isinstance(rel, dict) and rel.get('country') == 0:
+                            opinion = rel.get('opinion')
+                            if opinion is not None:
+                                empire_info['opinion_of_player'] = int(opinion)
+                            break
+
+            result['fallen_empires'].append(empire_info)
+
+        # Count by status
+        result['dormant_count'] = sum(1 for fe in result['fallen_empires'] if fe['status'] == 'dormant')
+        result['awakened_count'] = sum(1 for fe in result['fallen_empires'] if fe['status'] == 'awakened')
+        result['total_count'] = len(result['fallen_empires'])
+
+        return result
+
+    def _get_fallen_empires_regex(self) -> dict:
+        """Original regex-based implementation - used as fallback."""
+        # This is the original implementation, kept for fallback
         result = {
             'fallen_empires': [],
             'dormant_count': 0,
@@ -900,7 +1033,7 @@ class DiplomacyMixin:
             empire_info = {
                 'country_id': country_id,
                 'name': 'Unknown Fallen Empire',
-                'status': status,  # 'dormant' or 'awakened'
+                'status': status,
                 'archetype': 'Unknown',
                 'archetype_behavior': '',
                 'military_power': 0,
