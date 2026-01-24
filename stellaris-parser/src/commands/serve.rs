@@ -31,6 +31,7 @@ enum Request {
     },
     CountKeys { keys: Vec<String> },
     ContainsTokens { tokens: Vec<String> },
+    ContainsKv { pairs: Vec<(String, String)> },
     GetCountrySummaries { fields: Vec<String> },
     Close,
 }
@@ -85,6 +86,9 @@ enum ResponseData {
         counts: HashMap<String, usize>,
     },
     TokenMatches {
+        matches: HashMap<String, bool>,
+    },
+    KvMatches {
         matches: HashMap<String, bool>,
     },
     CountrySummaries {
@@ -420,6 +424,90 @@ fn handle_contains_tokens(gamestate_bytes: &[u8], tokens: Vec<String>) -> io::Re
     })
 }
 
+/// Handle contains_kv operation - whitespace-insensitive key=value check in parsed tree
+/// This traverses the JSON tree looking for keys with matching values, handling
+/// both `key=value` and `key = value` formatting variations that regex struggles with.
+fn handle_contains_kv(parsed: &ParsedSave, pairs: Vec<(String, String)>) -> io::Result<()> {
+    use std::collections::HashSet;
+
+    // Build a lookup structure: key -> set of values we're looking for
+    let mut key_to_values: HashMap<String, HashSet<String>> = HashMap::new();
+    for (key, value) in &pairs {
+        key_to_values
+            .entry(key.clone())
+            .or_insert_with(HashSet::new)
+            .insert(value.clone());
+    }
+
+    // Track which pairs we've found (using "key=value" as the result key)
+    let mut matches: HashMap<String, bool> = pairs
+        .iter()
+        .map(|(k, v)| (format!("{}={}", k, v), false))
+        .collect();
+
+    /// Recursively traverse a Value tree and check for key=value matches
+    fn traverse(
+        value: &Value,
+        key_to_values: &HashMap<String, HashSet<String>>,
+        matches: &mut HashMap<String, bool>,
+    ) {
+        match value {
+            Value::Object(map) => {
+                for (k, v) in map {
+                    // Check if this key is one we're looking for
+                    if let Some(target_values) = key_to_values.get(k.as_str()) {
+                        // Check if the value matches any of our targets
+                        let value_str = match v {
+                            Value::String(s) => Some(s.as_str()),
+                            Value::Number(n) => None, // Will handle below
+                            Value::Bool(b) => {
+                                if *b {
+                                    Some("yes")
+                                } else {
+                                    Some("no")
+                                }
+                            }
+                            _ => None,
+                        };
+
+                        if let Some(vs) = value_str {
+                            if target_values.contains(vs) {
+                                matches.insert(format!("{}={}", k, vs), true);
+                            }
+                        }
+
+                        // Handle numbers - compare as string
+                        if let Value::Number(n) = v {
+                            let num_str = n.to_string();
+                            if target_values.contains(&num_str) {
+                                matches.insert(format!("{}={}", k, num_str), true);
+                            }
+                        }
+                    }
+                    // Recurse into the value
+                    traverse(v, key_to_values, matches);
+                }
+            }
+            Value::Array(arr) => {
+                for v in arr {
+                    traverse(v, key_to_values, matches);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Traverse all sections in the gamestate
+    for section in parsed.gamestate.values() {
+        traverse(section, &key_to_values, &mut matches);
+    }
+
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::KvMatches { matches },
+    })
+}
+
 /// Handle get_country_summaries operation - return lightweight country projections
 fn handle_get_country_summaries(parsed: &ParsedSave, fields: Vec<String>) -> io::Result<()> {
     let mut countries: Vec<Value> = Vec::new();
@@ -530,6 +618,9 @@ pub fn run(path: &str) -> Result<()> {
             }
             Request::ContainsTokens { tokens } => {
                 handle_contains_tokens(&parsed.gamestate_bytes, tokens)
+            }
+            Request::ContainsKv { pairs } => {
+                handle_contains_kv(&parsed, pairs)
             }
             Request::GetCountrySummaries { fields } => {
                 handle_get_country_summaries(&parsed, fields)
@@ -683,6 +774,20 @@ mod tests {
         match req {
             Request::GetCountrySummaries { fields } => {
                 assert_eq!(fields, vec!["name", "type", "flag"]);
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_contains_kv_request() {
+        let json = r#"{"op": "contains_kv", "pairs": [["war_in_heaven", "yes"], ["version", "3"]]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::ContainsKv { pairs } => {
+                assert_eq!(pairs.len(), 2);
+                assert_eq!(pairs[0], ("war_in_heaven".to_string(), "yes".to_string()));
+                assert_eq!(pairs[1], ("version".to_string(), "3".to_string()));
             }
             _ => panic!("Wrong request type"),
         }

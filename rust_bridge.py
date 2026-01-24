@@ -418,6 +418,30 @@ class RustSession:
         response = self._recv()
         return response
 
+    def contains_kv(self, pairs: list[tuple[str, str]]) -> dict:
+        """Check if specific key=value pairs exist anywhere in the parsed gamestate.
+
+        This is whitespace-insensitive, handling both 'key=value' and 'key = value'
+        formatting variations. It traverses the parsed JSON tree, so it's more
+        accurate than regex for structured data like booleans and nested keys.
+
+        Args:
+            pairs: List of (key, value) tuples to search for.
+                   Example: [("war_in_heaven", "yes"), ("version", "3")]
+
+        Returns:
+            Dict with "matches" key containing a mapping of "key=value" -> bool.
+            Example: {"matches": {"war_in_heaven=yes": true, "version=3": false}}
+
+        Note:
+            - Boolean values in Stellaris saves are stored as "yes"/"no" strings
+            - Numeric values are compared as strings
+            - This searches the entire parsed tree, not just top-level keys
+        """
+        self._send({"op": "contains_kv", "pairs": pairs})
+        response = self._recv()
+        return response
+
     def get_country_summaries(self, fields: list[str]) -> dict:
         """Get lightweight country projections with only the requested fields.
 

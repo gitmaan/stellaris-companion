@@ -48,6 +48,11 @@
       "id": "P015",
       "learning": "get_entries returns list of dicts with _key field. With projection: {_key, field1, field2...}. Without projection: {_key, _value}. Missing keys silently skipped.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P016",
+      "learning": "contains_kv returns matches dict keyed by 'key=value' strings. Boolean values use 'yes'/'no' strings, numbers compared as strings. Traverses entire parsed tree.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -89,14 +94,14 @@
       "priority": 2,
       "description": "Whitespace-insensitive key=value check - fixes contains_tokens limitation for patterns like 'war_in_heaven=yes'",
       "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'contains_kv' stellaris-parser/src/commands/serve.rs (operation exists)",
         "RUN: grep -q 'def contains_kv' rust_bridge.py (Python wrapper exists)",
         "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
         "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.contains_kv([('version', '3')]); s.close(); print(r); assert 'matches' in r\" (returns matches dict)"
       ],
-      "notes": "Should handle both 'key=value' and 'key = value' formatting"
+      "notes": "Implemented 2026-01-24. Traverses parsed JSON tree for whitespace-insensitive k=v matching. Booleans use 'yes'/'no', numbers compared as strings. Returns matches dict keyed by 'key=value' strings."
     },
     {
       "id": "MIG-004",
