@@ -325,13 +325,13 @@
       "priority": 9,
       "description": "military.py _get_fleet_composition_regex() has triple nested loops with small snippet slicing. Use iter_section for ships/designs.",
       "files": ["stellaris_save_extractor/military.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q '_get_fleet_composition_rust' stellaris_save_extractor/military.py (Rust method exists)",
         "RUN: grep -q '_get_fleet_composition_regex' stellaris_save_extractor/military.py (fallback exists)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_fleet_composition(); ctx.__exit__(None,None,None); print(f'Fleets: {len(r.get(\\\"fleets\\\", []))}'); assert isinstance(r, dict)\" (works with session)"
       ],
-      "notes": "Complex extraction: design→size mapping, then ship→design lookup, then aggregate by fleet. Use batch_ops (P025) for multiple get_entry calls."
+      "notes": "Already implemented. Uses iter_section for ship_design, ships, and fleet sections. Builds design_id→ship_size and ship_id→design_id mappings, then aggregates ship classes per fleet. Returns 10 fleets with correct composition data."
     },
     {
       "id": "MIG-025",
