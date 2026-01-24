@@ -62,6 +62,12 @@ def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, An
     # Extract fallen empires signals
     signals["fallen_empires"] = _extract_fallen_empires_signals(extractor)
 
+    # Extract policies signals
+    signals["policies"] = _extract_policies_signals(extractor)
+
+    # Extract edicts signals
+    signals["edicts"] = _extract_edicts_signals(extractor)
+
     return signals
 
 
@@ -658,4 +664,112 @@ def _extract_fallen_empires_signals(extractor: "SaveExtractor") -> dict[str, Any
         'dormant_count': dormant_count,
         'awakened_count': awakened_count,
         'war_in_heaven': war_in_heaven,
+    }
+
+
+def _extract_policies_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract normalized policies data for history diffing.
+
+    Uses Rust-parsed player country entry which contains active_policies
+    as a list of {policy, selected} dicts.
+
+    Returns format compatible with events.py _extract_policies():
+        Dict with:
+        - player_id: int | None
+        - policies: dict mapping policy name to selected value
+        - count: int
+    """
+    # Get player ID
+    try:
+        player_id = extractor.get_player_empire_id()
+    except Exception:
+        player_id = None
+
+    # Get player country entry from Rust session
+    country = extractor._get_player_country_entry(player_id or 0)
+    if not isinstance(country, dict):
+        return {
+            'player_id': player_id,
+            'policies': {},
+            'count': 0,
+        }
+
+    # Extract active_policies list
+    active_policies = country.get('active_policies', [])
+    if not isinstance(active_policies, list):
+        return {
+            'player_id': player_id,
+            'policies': {},
+            'count': 0,
+        }
+
+    # Convert to {policy_name: selected_value} format matching history.py
+    policies: dict[str, str] = {}
+    for p in active_policies:
+        if not isinstance(p, dict):
+            continue
+        policy_name = p.get('policy')
+        selected = p.get('selected')
+        if policy_name and selected and isinstance(policy_name, str) and isinstance(selected, str):
+            policies[policy_name] = selected
+
+    return {
+        'player_id': player_id,
+        'policies': policies,
+        'count': len(policies),
+    }
+
+
+def _extract_edicts_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract normalized edicts data for history diffing.
+
+    Uses Rust-parsed player country entry which contains edicts
+    as a list of {edict, date, perpetual, start_date} dicts.
+
+    Returns format compatible with events.py _extract_edicts():
+        Dict with:
+        - player_id: int | None
+        - edicts: sorted list of active edict names
+        - count: int
+    """
+    # Get player ID
+    try:
+        player_id = extractor.get_player_empire_id()
+    except Exception:
+        player_id = None
+
+    # Get player country entry from Rust session
+    country = extractor._get_player_country_entry(player_id or 0)
+    if not isinstance(country, dict):
+        return {
+            'player_id': player_id,
+            'edicts': [],
+            'count': 0,
+        }
+
+    # Extract edicts list
+    raw_edicts = country.get('edicts', [])
+    if not isinstance(raw_edicts, list):
+        return {
+            'player_id': player_id,
+            'edicts': [],
+            'count': 0,
+        }
+
+    # Extract edict names
+    edict_names: list[str] = []
+    for ed in raw_edicts:
+        if not isinstance(ed, dict):
+            continue
+        edict_name = ed.get('edict')
+        if edict_name and isinstance(edict_name, str):
+            edict_names.append(edict_name)
+
+    # Sort and dedupe
+    unique_edicts = sorted(set(edict_names))
+
+    return {
+        'player_id': player_id,
+        'edicts': unique_edicts,
+        'count': len(unique_edicts),
     }

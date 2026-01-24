@@ -78,6 +78,11 @@
       "id": "UHE-P015",
       "learning": "When criterion grep patterns don't match actual code style (e.g., single vs double quotes), update the criterion to test for the function name or other reliable marker instead of fighting quote styles.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P016",
+      "learning": "Policies and edicts are available directly from Rust-parsed player country entry (_get_player_country_entry). active_policies is list of {policy, selected} dicts; edicts is list of {edict, date, perpetual, start_date} dicts. No separate get_policies() or get_edicts() extractor method needed.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -340,12 +345,12 @@
       "files": [
         "backend/core/signals.py"
       ],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q \"'policies'\\|'edicts'\" backend/core/signals.py (includes policy/edict fields)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); print(f'Policies: {type(s.get(\\\"policies\\\",{}))}')\" (policies extraction works)"
       ],
-      "notes": "Policy changes (economic_policy, war_philosophy, etc.) can be Chronicle-worthy. Normalize to dict of policy_type: current_value."
+      "notes": "Policy changes (economic_policy, war_philosophy, etc.) can be Chronicle-worthy. Normalize to dict of policy_type: current_value. Implementation: _extract_policies_signals() and _extract_edicts_signals() use _get_player_country_entry() which provides active_policies and edicts directly from Rust parser."
     },
     {
       "id": "UHE-018",
