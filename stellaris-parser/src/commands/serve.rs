@@ -681,12 +681,100 @@ fn handle_get_duplicate_values(
     })
 }
 
+/// Helper to extract duplicate values from raw bytes with optional cached section offset.
+/// Returns (values, found, section_end_for_caching).
+fn extract_duplicate_values(
+    content: &str,
+    section: &str,
+    key: &str,
+    field: &str,
+    cached_section_start: Option<usize>,
+) -> (Vec<String>, bool, Option<usize>) {
+    let mut values: Vec<String> = Vec::new();
+
+    // Find section start (use cache if available)
+    let section_content_start = if let Some(start) = cached_section_start {
+        start
+    } else {
+        let section_pattern = format!("\n{}=", section);
+        if let Some(section_start) = content.find(&section_pattern) {
+            match content[section_start..].find('{') {
+                Some(pos) => section_start + pos + 1,
+                None => return (values, false, None),
+            }
+        } else {
+            return (values, false, None);
+        }
+    };
+
+    // Look for the entry: \n\t<key>=
+    let entry_patterns = [
+        format!("\n\t{}=\n\t{{", key),
+        format!("\n\t{}={{", key),
+        format!("\n\t{} =", key),
+    ];
+
+    let mut entry_start: Option<usize> = None;
+    for pattern in &entry_patterns {
+        if let Some(pos) = content[section_content_start..].find(pattern) {
+            entry_start = Some(section_content_start + pos);
+            break;
+        }
+    }
+
+    let Some(start) = entry_start else {
+        return (values, false, Some(section_content_start));
+    };
+
+    // Find the entry's content by counting braces
+    let entry_content = &content[start..];
+    let mut brace_count = 0;
+    let mut entry_end = entry_content.len();
+    let mut in_entry = false;
+
+    for (i, ch) in entry_content.chars().enumerate() {
+        if ch == '{' {
+            brace_count += 1;
+            in_entry = true;
+        } else if ch == '}' {
+            brace_count -= 1;
+            if in_entry && brace_count == 0 {
+                entry_end = i + 1;
+                break;
+            }
+        }
+    }
+
+    let entry_block = &entry_content[..entry_end];
+
+    // Extract all values for the field: field="value"
+    let field_pattern = format!("{}=\"", field);
+    let mut search_pos = 0;
+
+    while let Some(field_start) = entry_block[search_pos..].find(&field_pattern) {
+        let value_start = search_pos + field_start + field_pattern.len();
+        if let Some(value_end) = entry_block[value_start..].find('"') {
+            let value = &entry_block[value_start..value_start + value_end];
+            values.push(value.to_string());
+            search_pos = value_start + value_end + 1;
+        } else {
+            break;
+        }
+    }
+
+    (values, true, Some(section_content_start))
+}
+
 /// Handle multi-op batch request - execute multiple operations in one request
 /// to reduce IPC round-trip overhead.
 ///
 /// Returns results in the same order as the input operations.
 fn handle_multi_op(parsed: &ParsedSave, ops: Vec<MultiOp>) -> io::Result<()> {
     let mut results: Vec<Value> = Vec::with_capacity(ops.len());
+
+    // Cache for section offsets in get_duplicate_values (section_name -> content_start_offset)
+    let mut section_offset_cache: HashMap<String, usize> = HashMap::new();
+    let content = String::from_utf8_lossy(&parsed.gamestate_bytes);
 
     for op in ops {
         let result = match op {
@@ -865,71 +953,18 @@ fn handle_multi_op(parsed: &ParsedSave, ops: Vec<MultiOp>) -> io::Result<()> {
                 json!({ "countries": countries })
             }
             MultiOp::GetDuplicateValues { section, key, field } => {
-                // Delegate to the raw bytes scanning logic
-                // Note: We inline a simplified version here to avoid io::Result handling
-                let mut values: Vec<String> = Vec::new();
-                let mut found = false;
-
-                let content = String::from_utf8_lossy(&parsed.gamestate_bytes);
-                let section_pattern = format!("\n{}=", section);
-                if let Some(section_start) = content.find(&section_pattern) {
-                    let section_content_start = match content[section_start..].find('{') {
-                        Some(pos) => section_start + pos + 1,
-                        None => {
-                            results.push(json!({ "values": values, "found": false }));
-                            continue;
-                        }
-                    };
-
-                    let entry_patterns = [
-                        format!("\n\t{}=\n\t{{", key),
-                        format!("\n\t{}={{", key),
-                        format!("\n\t{} =", key),
-                    ];
-
-                    let mut entry_start: Option<usize> = None;
-                    for pattern in &entry_patterns {
-                        if let Some(pos) = content[section_content_start..].find(pattern) {
-                            entry_start = Some(section_content_start + pos);
-                            break;
-                        }
-                    }
-
-                    if let Some(start) = entry_start {
-                        found = true;
-                        let entry_content = &content[start..];
-                        let mut brace_count = 0;
-                        let mut entry_end = entry_content.len();
-                        let mut in_entry = false;
-
-                        for (i, ch) in entry_content.chars().enumerate() {
-                            if ch == '{' {
-                                brace_count += 1;
-                                in_entry = true;
-                            } else if ch == '}' {
-                                brace_count -= 1;
-                                if in_entry && brace_count == 0 {
-                                    entry_end = i + 1;
-                                    break;
-                                }
-                            }
-                        }
-
-                        let entry_block = &entry_content[..entry_end];
-                        let field_pattern = format!("{}=\"", field);
-                        let mut search_pos = 0;
-
-                        while let Some(field_start) = entry_block[search_pos..].find(&field_pattern) {
-                            let value_start = search_pos + field_start + field_pattern.len();
-                            if let Some(value_end) = entry_block[value_start..].find('"') {
-                                let value = &entry_block[value_start..value_start + value_end];
-                                values.push(value.to_string());
-                                search_pos = value_start + value_end + 1;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
+                // Use cached section offset if available to avoid re-scanning 84MB gamestate
+                let cached_offset = section_offset_cache.get(&section).copied();
+                let (values, found, new_offset) = extract_duplicate_values(
+                    &content,
+                    &section,
+                    &key,
+                    &field,
+                    cached_offset,
+                );
+                // Cache the section offset for future ops in this batch
+                if let Some(offset) = new_offset {
+                    section_offset_cache.insert(section.clone(), offset);
                 }
                 json!({ "values": values, "found": found })
             }

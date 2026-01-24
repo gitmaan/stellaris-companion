@@ -103,6 +103,11 @@
       "id": "P026",
       "learning": "orjson.dumps() returns bytes (not str), orjson.loads() accepts both bytes and str. orjson raises ValueError on decode errors (not JSONDecodeError). Use _json_loads/_json_dumps wrappers from rust_bridge for consistent interface. Check _ORJSON_AVAILABLE for feature detection.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P027",
+      "learning": "batch_ops with multiple get_duplicate_values targeting the SAME section now caches section offset in Rust - first call finds section, subsequent calls skip 84MB scan. For N leader traits this gives ~25x speedup. Use batch_ops for multiple get_duplicate_values calls.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -252,11 +257,11 @@
       "priority": 6,
       "description": "Verify full briefing meets <2s target after all optimizations.",
       "files": [],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); times=[]; exec('for _ in range(3):\\n  start=time.time()\\n  b=e.get_complete_briefing()\\n  times.append(time.time()-start)'); ctx.__exit__(None,None,None); avg=sum(times)/len(times); print(f'Avg: {avg:.2f}s'); assert avg < 2.5, f'Too slow: {avg}s'\" (briefing under 2.5 seconds)"
       ],
-      "notes": "Target is <2s, criterion allows 2.5s buffer. Current baseline: 2.83s."
+      "notes": "Completed 2026-01-24. Achieved 1.53s average (target was <2.5s). Key optimization: added section offset caching in Rust batch_ops for get_duplicate_values, reducing N round-trips and repeated 84MB string scans. Updated _get_leaders_rust to use batch_ops for trait extraction (P025). Speedup: get_leaders went from ~0.9s to ~0.04s after warmup."
     },
     {
       "id": "MIG-020",

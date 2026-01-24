@@ -38,11 +38,12 @@ class LeadersMixin:
     def _get_leaders_rust(self) -> dict:
         """Rust-optimized leader extraction using session methods.
 
-        Uses iter_section for leader iteration and get_duplicate_values for traits.
+        Uses iter_section for leader iteration and batch_ops for traits.
         No self.gamestate access needed - all data from Rust session.
 
         Note: Uses two-phase approach because iter_section and get_duplicate_values
-        cannot be interleaved (both use the same stdin/stdout pipe).
+        cannot be interleaved (both use the same stdin/stdout pipe). Phase 2 uses
+        batch_ops to fetch all traits in a single IPC call (P025).
 
         Returns:
             Dict with leader details
@@ -81,9 +82,17 @@ class LeadersMixin:
             # Store leader data for phase 2
             player_leaders_data.append((str(leader_id), leader_data, leader_class))
 
-        # Phase 2: Build leader info with traits (get_duplicate_values calls)
+        # Phase 2: Batch fetch all traits in one IPC call (P025: use batch_ops)
+        # This avoids N round-trips and leverages section offset caching in Rust
+        trait_ops = [
+            {'op': 'get_duplicate_values', 'section': 'leaders', 'key': lid, 'field': 'traits'}
+            for lid, _, _ in player_leaders_data
+        ]
+        trait_results = session.batch_ops(trait_ops) if trait_ops else []
+
+        # Phase 3: Build leader info with traits
         leaders_found = []
-        for leader_id, leader_data, leader_class in player_leaders_data:
+        for i, (leader_id, leader_data, leader_class) in enumerate(player_leaders_data):
             leader_info = {
                 'id': leader_id,
                 'class': leader_class,
@@ -104,8 +113,8 @@ class LeadersMixin:
             if age is not None:
                 leader_info['age'] = int(age)
 
-            # P023: Use get_duplicate_values for traits (handles duplicate keys)
-            traits = session.get_duplicate_values("leaders", leader_id, "traits")
+            # Get traits from batch result
+            traits = trait_results[i].get('values', []) if i < len(trait_results) else []
             if traits:
                 leader_info['traits'] = traits
 
