@@ -7,7 +7,8 @@ interface ChronicleContentProps {
   onRegenerate: (chapterNumber: number) => void
   confirmingRegen: number | null
   onCancelRegen: () => void
-  regenerating: boolean
+  regeneratingChapter: number | null
+  justRegenerated: number | null
 }
 
 /**
@@ -26,8 +27,11 @@ function ChronicleContent({
   onRegenerate,
   confirmingRegen,
   onCancelRegen,
-  regenerating,
+  regeneratingChapter,
+  justRegenerated,
 }: ChronicleContentProps) {
+  const isRegenerating = chapter && regeneratingChapter === chapter.number
+  const wasJustRegenerated = chapter && justRegenerated === chapter.number
   // Show current era if no chapter selected
   if (currentEra && !chapter) {
     return (
@@ -72,7 +76,15 @@ function ChronicleContent({
           <h1 className="empire-title">THE CHRONICLES OF {empireName.toUpperCase()}</h1>
         </header>
 
-        <div className="chronicle-chapter">
+        <div className={`chronicle-chapter ${wasJustRegenerated ? 'just-regenerated' : ''}`}>
+          {/* Regenerating overlay */}
+          {isRegenerating && (
+            <div className="chapter-regenerating-overlay">
+              <div className="loading-spinner" />
+              <p>Rewriting history...</p>
+            </div>
+          )}
+
           <div className="chapter-header">
             <div className="chapter-title-block">
               <span className="chapter-label">CHAPTER {toRoman(chapter.number)}</span>
@@ -93,12 +105,12 @@ function ChronicleContent({
 
           <div className="chapter-divider" />
 
-          <div className="chapter-narrative">
+          <div className={`chapter-narrative ${isRegenerating ? 'regenerating-blur' : ''}`}>
             {renderNarrative(chapter.narrative)}
           </div>
 
           {/* Regenerate controls */}
-          {chapter.can_regenerate && (
+          {chapter.can_regenerate && !isRegenerating && (
             <div className="chapter-actions">
               {isConfirming ? (
                 <div className="regen-confirm">
@@ -110,14 +122,12 @@ function ChronicleContent({
                     <button
                       className="regen-confirm-btn"
                       onClick={() => onRegenerate(chapter.number)}
-                      disabled={regenerating}
                     >
-                      {regenerating ? 'Regenerating...' : 'Confirm Regenerate'}
+                      Confirm Regenerate
                     </button>
                     <button
                       className="regen-cancel-btn"
                       onClick={onCancelRegen}
-                      disabled={regenerating}
                     >
                       Cancel
                     </button>

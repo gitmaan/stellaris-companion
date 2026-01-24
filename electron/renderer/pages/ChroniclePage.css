@@ -631,3 +631,99 @@
   color: var(--text-secondary);
   font-size: 14px;
 }
+
+/* ============================================
+   Regeneration Loading States
+   ============================================ */
+
+/* Sidebar: Regenerating chapter spinner */
+.chapter-spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+.chapter-item.regenerating {
+  opacity: 0.7;
+}
+
+.chapter-item.regenerating .chapter-title {
+  font-style: italic;
+}
+
+.status-regenerating {
+  animation: pulse 1.5s ease-in-out infinite;
+  color: var(--accent-blue);
+}
+
+/* Sidebar: Disable hover during regeneration */
+.chapters-list.regenerating .chapter-item {
+  cursor: not-allowed;
+}
+
+.chapters-list.regenerating .chapter-item:hover {
+  background-color: transparent;
+}
+
+.chapters-list.regenerating .chapter-item.selected:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Content: Regenerating overlay */
+.chronicle-chapter {
+  position: relative;
+}
+
+.chapter-regenerating-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(var(--bg-primary-rgb, 17, 17, 17), 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 10;
+  border-radius: 12px;
+}
+
+.chapter-regenerating-overlay p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* Content: Blur narrative while regenerating */
+.chapter-narrative.regenerating-blur {
+  filter: blur(4px);
+  opacity: 0.5;
+  pointer-events: none;
+  transition: filter 0.3s, opacity 0.3s;
+}
+
+/* Content: Just regenerated highlight */
+.chronicle-chapter.just-regenerated {
+  animation: highlight-flash 2s ease-out;
+}
+
+@keyframes highlight-flash {
+  0% {
+    box-shadow: 0 0 0 2px var(--accent-blue);
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(31, 111, 235, 0.15) 100%);
+  }
+  100% {
+    box-shadow: none;
+    background: var(--bg-secondary);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

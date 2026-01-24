@@ -19,6 +19,7 @@ interface ChronicleChapterListProps {
   pendingChapters: number
   eventCount: number
   loading: boolean
+  regeneratingChapter: number | null
   onRefresh: () => void
 }
 
@@ -42,8 +43,10 @@ function ChronicleChapterList({
   pendingChapters,
   eventCount,
   loading,
+  regeneratingChapter,
   onRefresh,
 }: ChronicleChapterListProps) {
+  const isRegenerating = regeneratingChapter !== null
   const selectedSave = saves.find(s => s.save_id === selectedSaveId)
 
   return (
@@ -91,21 +94,32 @@ function ChronicleChapterList({
             </p>
           </div>
         ) : (
-          <ul className="chapters-list">
-            {chapters.map(chapter => (
-              <li
-                key={chapter.number}
-                className={`chapter-item ${selectedChapter === chapter.number ? 'selected' : ''} ${chapter.context_stale ? 'stale' : ''}`}
-                onClick={() => onSelectChapter(chapter.number)}
-              >
-                <span className="chapter-number">{toRoman(chapter.number)}</span>
-                <span className="chapter-title">{truncateTitle(chapter.title)}</span>
-                <span className="chapter-status">
-                  {chapter.context_stale && <span className="status-stale" title="Context may be stale">⚠️</span>}
-                  {chapter.is_finalized && <span className="status-finalized" title="Finalized">🔒</span>}
-                </span>
-              </li>
-            ))}
+          <ul className={`chapters-list ${isRegenerating ? 'regenerating' : ''}`}>
+            {chapters.map(chapter => {
+              const isThisRegenerating = regeneratingChapter === chapter.number
+              return (
+                <li
+                  key={chapter.number}
+                  className={`chapter-item ${selectedChapter === chapter.number ? 'selected' : ''} ${chapter.context_stale ? 'stale' : ''} ${isThisRegenerating ? 'regenerating' : ''}`}
+                  onClick={() => !isRegenerating && onSelectChapter(chapter.number)}
+                >
+                  <span className="chapter-number">
+                    {isThisRegenerating ? <span className="chapter-spinner">↻</span> : toRoman(chapter.number)}
+                  </span>
+                  <span className="chapter-title">{truncateTitle(chapter.title)}</span>
+                  <span className="chapter-status">
+                    {isThisRegenerating ? (
+                      <span className="status-regenerating" title="Regenerating...">⟳</span>
+                    ) : (
+                      <>
+                        {chapter.context_stale && <span className="status-stale" title="Context may be stale">⚠️</span>}
+                        {chapter.is_finalized && <span className="status-finalized" title="Finalized">🔒</span>}
+                      </>
+                    )}
+                  </span>
+                </li>
+              )
+            })}
 
             {/* Current Era entry */}
             {currentEra && (
@@ -113,7 +127,7 @@ function ChronicleChapterList({
                 <li className="chapter-divider" />
                 <li
                   className={`chapter-item current-era ${selectedChapter === null || selectedChapter === 0 ? 'selected' : ''}`}
-                  onClick={() => onSelectChapter(null)}
+                  onClick={() => !isRegenerating && onSelectChapter(null)}
                 >
                   <span className="chapter-number">⏳</span>
                   <span className="chapter-title">Current Era</span>

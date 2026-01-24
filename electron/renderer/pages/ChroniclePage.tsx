@@ -36,9 +36,10 @@ function ChroniclePage() {
   // Selected chapter (null = show current era)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
 
-  // Regeneration state
-  const [regenerating, setRegenerating] = useState(false)
+  // Regeneration state - tracks which chapter is being regenerated
+  const [regeneratingChapter, setRegeneratingChapter] = useState<number | null>(null)
   const [confirmRegen, setConfirmRegen] = useState<number | null>(null)
+  const [justRegenerated, setJustRegenerated] = useState<number | null>(null)
 
   // Load available saves from sessions
   const loadSaves = useCallback(async () => {
@@ -148,10 +149,12 @@ function ChroniclePage() {
     }
   }, [selectedSaveId, loadChronicle])
 
-  // Handle chapter selection
+  // Handle chapter selection - disabled during regeneration
   const handleSelectChapter = useCallback((chapterNumber: number | null) => {
+    if (regeneratingChapter !== null) return // Prevent navigation during regen
     setSelectedChapter(chapterNumber)
-  }, [])
+    setJustRegenerated(null) // Clear highlight when navigating
+  }, [regeneratingChapter])
 
   // Handle save/game change
   const handleSelectSave = useCallback((saveId: string) => {
@@ -175,7 +178,8 @@ function ChroniclePage() {
 
     // Second click - do the regeneration
     setConfirmRegen(null)
-    setRegenerating(true)
+    setRegeneratingChapter(chapterNumber)
+    setJustRegenerated(null)
 
     // Find session for this save
     const sessionsResult = await backend.sessions()
@@ -187,7 +191,7 @@ function ChroniclePage() {
 
     if (!session) {
       setError('Session not found')
-      setRegenerating(false)
+      setRegeneratingChapter(null)
       return
     }
 
@@ -197,13 +201,25 @@ function ChroniclePage() {
 
     if (result.error) {
       setError(result.error)
-    } else {
-      // Reload chronicle to get updated chapters
-      await loadChronicle()
+      setRegeneratingChapter(null)
+      return
     }
 
-    setRegenerating(false)
-  }, [backend, selectedSaveId, confirmRegen, loadChronicle])
+    // Silently reload chronicle data without showing loading spinner
+    const chronicleResult = await backend.chronicle(session.id, false)
+    if (!isMountedRef.current) return
+
+    if (chronicleResult.data) {
+      setChronicle(chronicleResult.data)
+      setJustRegenerated(chapterNumber)
+      // Clear highlight after animation
+      setTimeout(() => {
+        if (isMountedRef.current) setJustRegenerated(null)
+      }, 2000)
+    }
+
+    setRegeneratingChapter(null)
+  }, [backend, selectedSaveId, confirmRegen])
 
   // Cancel regeneration confirmation
   const handleCancelRegen = useCallback(() => {
@@ -243,6 +259,7 @@ function ChroniclePage() {
           pendingChapters={chronicle?.pending_chapters || 0}
           eventCount={chronicle?.event_count || 0}
           loading={savesLoading || loading}
+          regeneratingChapter={regeneratingChapter}
           onRefresh={handleRefresh}
         />
 
@@ -273,7 +290,8 @@ function ChroniclePage() {
               onRegenerate={handleRegenerateChapter}
               confirmingRegen={confirmRegen}
               onCancelRegen={handleCancelRegen}
-              regenerating={regenerating}
+              regeneratingChapter={regeneratingChapter}
+              justRegenerated={justRegenerated}
             />
           ) : (
             <div className="chronicle-empty">
