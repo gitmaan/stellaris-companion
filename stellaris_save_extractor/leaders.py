@@ -123,6 +123,27 @@ class LeadersMixin:
             if experience is not None:
                 leader_info['experience'] = float(experience)
 
+            # Extract date fields for history diffing (hire/death events)
+            # death_date: When leader died (null for living leaders)
+            death_date = leader_data.get("death_date")
+            if death_date:
+                leader_info['death_date'] = death_date
+
+            # date_added: When leader was added to empire roster
+            date_added = leader_data.get("date_added")
+            if date_added:
+                leader_info['date_added'] = date_added
+
+            # recruitment_date: When leader was recruited
+            # May be stored as recruitment_date, pre_ruler_date (for rulers), or date
+            recruitment_date = leader_data.get("recruitment_date")
+            if not recruitment_date:
+                recruitment_date = leader_data.get("pre_ruler_date")
+            if not recruitment_date:
+                recruitment_date = leader_data.get("date")
+            if recruitment_date:
+                leader_info['recruitment_date'] = recruitment_date
+
             leaders_found.append(leader_info)
 
             # Count by class
@@ -298,6 +319,24 @@ class LeadersMixin:
             exp_match = re.search(r'experience=([\d.]+)', leader_block)
             if exp_match:
                 leader_info['experience'] = float(exp_match.group(1))
+
+            # Extract date fields for history diffing (hire/death events)
+            death_match = re.search(r'death_date=\s*"(\d{4}\.\d{2}\.\d{2})"', leader_block)
+            if death_match:
+                leader_info['death_date'] = death_match.group(1)
+
+            date_added_match = re.search(r'date_added=\s*"(\d{4}\.\d{2}\.\d{2})"', leader_block)
+            if date_added_match:
+                leader_info['date_added'] = date_added_match.group(1)
+
+            # recruitment_date may also be stored as pre_ruler_date or date
+            recruit_match = re.search(r'recruitment_date=\s*"(\d{4}\.\d{2}\.\d{2})"', leader_block)
+            if recruit_match:
+                leader_info['recruitment_date'] = recruit_match.group(1)
+            else:
+                pre_ruler_match = re.search(r'pre_ruler_date=\s*"(\d{4}\.\d{2}\.\d{2})"', leader_block)
+                if pre_ruler_match:
+                    leader_info['recruitment_date'] = pre_ruler_match.group(1)
 
             leaders_found.append(leader_info)
 

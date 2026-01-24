@@ -23,6 +23,11 @@
       "id": "UHE-P004",
       "learning": "Criteria using grep for string patterns must match exact quote style. Use single quotes for dict keys in signals.py to match grep patterns like \"'name'\".",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P005",
+      "learning": "Leader date fields: recruitment_date may be stored as 'recruitment_date', 'pre_ruler_date' (for rulers), or 'date' - check all three with fallback chain. death_date is null for living leaders. date_added tracks when leader joined empire roster.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -62,7 +67,7 @@
       "priority": 1,
       "description": "History needs death_date, date_added, recruitment_date but current get_leaders() doesn't extract them. Add these fields to _get_leaders_rust().",
       "files": ["stellaris_save_extractor/leaders.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'death_date\\|date_added\\|recruitment_date' stellaris_save_extractor/leaders.py (date fields extracted)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_leaders(); ctx.__exit__(None,None,None); leaders=r.get('leaders',[]); print(f'Sample leader keys: {list(leaders[0].keys()) if leaders else []}')\" (shows date fields if present)"
