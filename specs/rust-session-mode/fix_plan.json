@@ -78,6 +78,11 @@
       "id": "P021",
       "learning": "Use session.get_entry(section, key) for O(1) lookup of a single entry by ID, instead of iter_section which scans all entries. Ideal when you already know the specific ID (e.g., federation ID from player country).",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P022",
+      "learning": "Regex re.search finds first match which may come from nested structures (e.g., log entries) rather than parent-level fields. Rust parsed dict access correctly reads the parent-level field. This can cause regex to return wrong values from nested data.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -155,12 +160,12 @@
       "priority": 3,
       "description": "diplomacy.py uses _extract_section('espionage_operations'). Migrate to Rust-backed access.",
       "files": ["stellaris_save_extractor/diplomacy.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'extract_sections.*espionage\\|iter_section.*espionage' stellaris_save_extractor/diplomacy.py (Rust-backed access)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); print('OK'); ctx.__exit__(None,None,None)\" (no crash)"
       ],
-      "notes": "espionage_operations may not exist in all saves - handle missing gracefully."
+      "notes": "Completed 2026-01-24. Uses session.extract_sections(['espionage_operations']) for parsed dict access. ACCURACY FIX: Rust version correctly extracts operation-level 'info' field; regex version incorrectly matched log entry 'info' values due to greedy regex matching first occurrence."
     },
     {
       "id": "MIG-015",

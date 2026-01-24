@@ -1566,6 +1566,129 @@ class DiplomacyMixin:
 
     def get_espionage(self, limit: int = 20) -> dict:
         """Get active espionage operations (summary-first, capped)."""
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_espionage_rust(limit)
+        return self._get_espionage_regex(limit)
+
+    def _get_espionage_rust(self, limit: int = 20) -> dict:
+        """Rust-optimized version using extract_sections.
+
+        Uses direct parsed JSON access instead of regex on raw gamestate.
+        Benefits:
+        - No regex parsing on raw text
+        - No truncation limits
+        - Handles nested structures correctly
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_espionage_regex(limit)
+
+        limit = max(1, min(int(limit or 20), 50))
+
+        result = {
+            'player_id': self.get_player_empire_id(),
+            'operations': [],
+            'count': 0,
+        }
+
+        # Use extract_sections to get the espionage_operations section
+        data = session.extract_sections(['espionage_operations'])
+        espionage_section = data.get('espionage_operations')
+
+        # Section might not exist if no espionage operations
+        if not espionage_section or not isinstance(espionage_section, dict):
+            return result
+
+        # The inner 'operations' dict contains the actual entries
+        operations_dict = espionage_section.get('operations')
+        if not operations_dict or not isinstance(operations_dict, dict):
+            return result
+
+        operations_found: list[dict] = []
+
+        for op_id, op_data in operations_dict.items():
+            # P010: Entry might be string "none" (deleted)
+            if not isinstance(op_data, dict):
+                continue
+
+            entry = {
+                'operation_id': op_id,
+                'target_country_id': None,
+                'spy_network_id': None,
+                'type': None,
+                'difficulty': None,
+                'days_left': None,
+                'info': None,
+                'log_entries': 0,
+                'last_log': None,
+            }
+
+            # Extract target country ID
+            target_data = op_data.get('target')
+            if isinstance(target_data, dict):
+                target_id = target_data.get('id')
+                if target_id is not None:
+                    try:
+                        entry['target_country_id'] = int(target_id)
+                    except (ValueError, TypeError):
+                        pass
+
+            # Extract spy_network ID
+            spy_network = op_data.get('spy_network')
+            if spy_network is not None:
+                try:
+                    entry['spy_network_id'] = int(spy_network)
+                except (ValueError, TypeError):
+                    pass
+
+            # Extract type
+            op_type = op_data.get('type')
+            if op_type and isinstance(op_type, str):
+                entry['type'] = op_type
+
+            # Extract numeric fields
+            for key in ['difficulty', 'days_left', 'info']:
+                val = op_data.get(key)
+                if val is not None:
+                    try:
+                        entry[key] = int(val)
+                    except (ValueError, TypeError):
+                        pass
+
+            # Extract log entries
+            log_data = op_data.get('log')
+            if log_data and isinstance(log_data, list) and len(log_data) > 0:
+                entry['log_entries'] = len(log_data)
+                # Get last log entry
+                last_entry = log_data[-1]
+                if isinstance(last_entry, dict):
+                    entry['last_log'] = {
+                        'date': last_entry.get('date'),
+                        'roll': None,
+                        'skill': None,
+                        'info': None,
+                        'difficulty': None,
+                    }
+                    for log_key in ['roll', 'skill', 'info', 'difficulty']:
+                        val = last_entry.get(log_key)
+                        if val is not None:
+                            try:
+                                entry['last_log'][log_key] = int(val)
+                            except (ValueError, TypeError):
+                                pass
+
+            operations_found.append(entry)
+            if len(operations_found) >= limit:
+                break
+
+        result['operations'] = operations_found
+        result['count'] = len(operations_found)
+        return result
+
+    def _get_espionage_regex(self, limit: int = 20) -> dict:
+        """Original regex implementation - fallback for non-session mode."""
         limit = max(1, min(int(limit or 20), 50))
 
         result = {
