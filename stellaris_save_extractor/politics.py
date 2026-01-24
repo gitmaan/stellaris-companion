@@ -6,6 +6,7 @@ import re
 # Rust bridge for fast Clausewitz parsing
 try:
     from rust_bridge import iter_section_entries, ParserError
+
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
@@ -19,7 +20,7 @@ class PoliticsMixin:
 
     def _extract_braced_block(self, content: str, key: str) -> str | None:
         """Extract the full `key={...}` block from a larger text chunk."""
-        match = re.search(rf'\b{re.escape(key)}\s*=\s*\{{', content)
+        match = re.search(rf"\b{re.escape(key)}\s*=\s*\{{", content)
         if not match:
             return None
 
@@ -28,10 +29,10 @@ class PoliticsMixin:
         started = False
 
         for i, char in enumerate(content[start:], start):
-            if char == '{':
+            if char == "{":
                 brace_count += 1
                 started = True
-            elif char == '}':
+            elif char == "}":
                 brace_count -= 1
                 if started and brace_count == 0:
                     return content[start : i + 1]
@@ -52,9 +53,13 @@ class PoliticsMixin:
             try:
                 return self._get_factions_rust(limit)
             except ParserError as e:
-                logger.warning(f"Rust parser failed for factions: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for factions: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback: regex-based parsing
         return self._get_factions_regex(limit)
@@ -125,7 +130,9 @@ class PoliticsMixin:
         factions: list[dict] = []
 
         # Iterate over pop_factions section using Rust parser
-        for faction_id, faction_data in iter_section_entries(self.gamestate_path, "pop_factions"):
+        for faction_id, faction_data in iter_section_entries(
+            self.gamestate_path, "pop_factions"
+        ):
             if not isinstance(faction_data, dict):
                 continue
 
@@ -176,16 +183,18 @@ class PoliticsMixin:
             members = faction_data.get("members", [])
             members_count = len(members) if isinstance(members, list) else 0
 
-            factions.append({
-                "id": str(faction_id),
-                "country_id": player_id,
-                "type": faction_type,
-                "name": name,
-                "support_percent": support_percent,
-                "support_power": support_power,
-                "approval": approval,
-                "members_count": members_count,
-            })
+            factions.append(
+                {
+                    "id": str(faction_id),
+                    "country_id": player_id,
+                    "type": faction_type,
+                    "name": name,
+                    "support_percent": support_percent,
+                    "support_power": support_power,
+                    "approval": approval,
+                    "members_count": members_count,
+                }
+            )
 
         # Sort by support percent descending
         factions.sort(key=lambda f: f.get("support_percent", 0.0), reverse=True)
@@ -219,16 +228,16 @@ class PoliticsMixin:
 
         factions: list[dict] = []
 
-        for match in re.finditer(r'\n\t(-?\d+)\s*=\s*\{', factions_section):
+        for match in re.finditer(r"\n\t(-?\d+)\s*=\s*\{", factions_section):
             faction_id = match.group(1)
             start = match.start()
 
             brace_count = 0
             end = None
             for i, char in enumerate(factions_section[start:], start):
-                if char == '{':
+                if char == "{":
                     brace_count += 1
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if brace_count == 0:
                         end = i + 1
@@ -238,14 +247,14 @@ class PoliticsMixin:
 
             block = factions_section[start:end]
 
-            country_match = re.search(r'\bcountry=(\d+)', block)
+            country_match = re.search(r"\bcountry=(\d+)", block)
             if not country_match or int(country_match.group(1)) != player_id:
                 continue
 
             faction_type_match = re.search(r'\btype="([^"]+)"', block)
-            support_percent_match = re.search(r'\bsupport_percent=([\d.]+)', block)
-            support_power_match = re.search(r'\bsupport_power=([\d.]+)', block)
-            approval_match = re.search(r'\bfaction_approval=([\d.]+)', block)
+            support_percent_match = re.search(r"\bsupport_percent=([\d.]+)", block)
+            support_power_match = re.search(r"\bsupport_power=([\d.]+)", block)
+            approval_match = re.search(r"\bfaction_approval=([\d.]+)", block)
 
             name = "Unknown"
             name_block = self._extract_braced_block(block, "name")
@@ -257,21 +266,33 @@ class PoliticsMixin:
             members_count = 0
             members_block = self._extract_braced_block(block, "members")
             if members_block:
-                open_brace = members_block.find('{')
-                close_brace = members_block.rfind('}')
+                open_brace = members_block.find("{")
+                close_brace = members_block.rfind("}")
                 if open_brace != -1 and close_brace != -1 and close_brace > open_brace:
                     inner = members_block[open_brace + 1 : close_brace]
-                    members_count = len(re.findall(r'\d+', inner))
+                    members_count = len(re.findall(r"\d+", inner))
 
             factions.append(
                 {
                     "id": str(faction_id),
                     "country_id": player_id,
-                    "type": faction_type_match.group(1) if faction_type_match else "unknown",
+                    "type": (
+                        faction_type_match.group(1) if faction_type_match else "unknown"
+                    ),
                     "name": name,
-                    "support_percent": float(support_percent_match.group(1)) if support_percent_match else 0.0,
-                    "support_power": float(support_power_match.group(1)) if support_power_match else 0.0,
-                    "approval": float(approval_match.group(1)) if approval_match else 0.0,
+                    "support_percent": (
+                        float(support_percent_match.group(1))
+                        if support_percent_match
+                        else 0.0
+                    ),
+                    "support_power": (
+                        float(support_power_match.group(1))
+                        if support_power_match
+                        else 0.0
+                    ),
+                    "approval": (
+                        float(approval_match.group(1)) if approval_match else 0.0
+                    ),
                     "members_count": members_count,
                 }
             )
@@ -281,4 +302,3 @@ class PoliticsMixin:
         result["count"] = len(factions)
         result["factions"] = factions[: max(0, min(int(limit), 25))]
         return result
-

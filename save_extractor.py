@@ -114,4 +114,3 @@ if __name__ == "__main__":
 
     print("\n=== Summary ===")
     print(extractor.get_summary())
-

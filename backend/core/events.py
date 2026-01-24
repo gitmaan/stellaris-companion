@@ -109,25 +109,25 @@ def _get_leader_name(leader: dict[str, Any]) -> str:
     instead of placeholders like %LEADER_2%.
     """
     # Prefer resolved name (from signals/Rust extraction)
-    name = leader.get('name')
+    name = leader.get("name")
     if name and isinstance(name, str) and name.strip():
         return name.strip()
 
     # Fallback to name_key with cleanup
-    name_key = leader.get('name_key')
+    name_key = leader.get("name_key")
     if name_key and isinstance(name_key, str):
         key = name_key.strip()
         # Clean up common patterns (same logic as _extract_leader_name_rust)
-        if '_CHR_' in key:
-            return key.split('_CHR_')[-1]
-        if key.startswith('NAME_'):
-            return key[5:].replace('_', ' ')
+        if "_CHR_" in key:
+            return key.split("_CHR_")[-1]
+        if key.startswith("NAME_"):
+            return key[5:].replace("_", " ")
         # Return as-is if not a placeholder template
-        if not key.startswith('%'):
+        if not key.startswith("%"):
             return key
 
     # Final fallback to ID
-    lid = leader.get('id')
+    lid = leader.get("id")
     return f"#{lid}" if lid is not None else "#unknown"
 
 
@@ -173,7 +173,9 @@ def _get_empire_name(cid: int, empire_names: dict[int, str]) -> str:
     return f"empire #{cid}"
 
 
-def _extract_diplomacy_sets(briefing: dict[str, Any]) -> tuple[set[int], set[int], dict[str, set[int]]]:
+def _extract_diplomacy_sets(
+    briefing: dict[str, Any],
+) -> tuple[set[int], set[int], dict[str, set[int]]]:
     history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
     dip = history.get("diplomacy") if isinstance(history, dict) else None
     if not isinstance(dip, dict):
@@ -218,6 +220,7 @@ def _extract_galaxy_settings(briefing: dict[str, Any]) -> dict[str, Any]:
 
 
 # ===== PHASE 6 HELPER FUNCTIONS =====
+
 
 def _extract_tech_list(briefing: dict[str, Any]) -> set[str]:
     """Extract the set of completed technology names."""
@@ -335,7 +338,9 @@ def compute_events(
         pct = _pct_change(prev_mil, curr_mil)
         delta = curr_mil - prev_mil
         # Only log if meaningful: >=15% and >=2000 absolute, or >=10000 absolute.
-        if (pct is not None and abs(pct) >= 0.15 and abs(delta) >= 2000) or abs(delta) >= 10000:
+        if (pct is not None and abs(pct) >= 0.15 and abs(delta) >= 2000) or abs(
+            delta
+        ) >= 10000:
             sign = "+" if delta > 0 else ""
             pct_text = f"{pct * 100:+.0f}%" if pct is not None else "n/a"
             events.append(
@@ -358,7 +363,11 @@ def compute_events(
     # Only log if meaningful change (>= 2 fleets gained or lost)
     prev_mil_fleets = _safe_int(prev.get("military", {}).get("military_fleets"))
     curr_mil_fleets = _safe_int(curr.get("military", {}).get("military_fleets"))
-    if prev_mil_fleets is not None and curr_mil_fleets is not None and prev_mil_fleets != curr_mil_fleets:
+    if (
+        prev_mil_fleets is not None
+        and curr_mil_fleets is not None
+        and prev_mil_fleets != curr_mil_fleets
+    ):
         diff = curr_mil_fleets - prev_mil_fleets
         if abs(diff) >= 2:  # Threshold to avoid noise
             sign = "+" if diff > 0 else ""
@@ -377,9 +386,17 @@ def compute_events(
                 )
             )
 
-    prev_colonies = _safe_int(prev.get("territory", {}).get("colonies", {}).get("total_count"))
-    curr_colonies = _safe_int(curr.get("territory", {}).get("colonies", {}).get("total_count"))
-    if prev_colonies is not None and curr_colonies is not None and prev_colonies != curr_colonies:
+    prev_colonies = _safe_int(
+        prev.get("territory", {}).get("colonies", {}).get("total_count")
+    )
+    curr_colonies = _safe_int(
+        curr.get("territory", {}).get("colonies", {}).get("total_count")
+    )
+    if (
+        prev_colonies is not None
+        and curr_colonies is not None
+        and prev_colonies != curr_colonies
+    ):
         diff = curr_colonies - prev_colonies
         sign = "+" if diff > 0 else ""
         events.append(
@@ -416,12 +433,22 @@ def compute_events(
             )
         )
 
-    prev_energy = _safe_float(prev.get("economy", {}).get("net_monthly", {}).get("energy"))
-    curr_energy = _safe_float(curr.get("economy", {}).get("net_monthly", {}).get("energy"))
-    if prev_energy is not None and curr_energy is not None and prev_energy != curr_energy:
+    prev_energy = _safe_float(
+        prev.get("economy", {}).get("net_monthly", {}).get("energy")
+    )
+    curr_energy = _safe_float(
+        curr.get("economy", {}).get("net_monthly", {}).get("energy")
+    )
+    if (
+        prev_energy is not None
+        and curr_energy is not None
+        and prev_energy != curr_energy
+    ):
         delta = curr_energy - prev_energy
         pct = _pct_change(prev_energy, curr_energy)
-        if _sign_changed(prev_energy, curr_energy) or abs(delta) >= max(20.0, abs(prev_energy) * 0.25):
+        if _sign_changed(prev_energy, curr_energy) or abs(delta) >= max(
+            20.0, abs(prev_energy) * 0.25
+        ):
             events.append(
                 DetectedEvent(
                     event_type="energy_net_change",
@@ -438,12 +465,22 @@ def compute_events(
                 )
             )
 
-    prev_alloys = _safe_float(prev.get("economy", {}).get("net_monthly", {}).get("alloys"))
-    curr_alloys = _safe_float(curr.get("economy", {}).get("net_monthly", {}).get("alloys"))
-    if prev_alloys is not None and curr_alloys is not None and prev_alloys != curr_alloys:
+    prev_alloys = _safe_float(
+        prev.get("economy", {}).get("net_monthly", {}).get("alloys")
+    )
+    curr_alloys = _safe_float(
+        curr.get("economy", {}).get("net_monthly", {}).get("alloys")
+    )
+    if (
+        prev_alloys is not None
+        and curr_alloys is not None
+        and prev_alloys != curr_alloys
+    ):
         delta = curr_alloys - prev_alloys
         pct = _pct_change(prev_alloys, curr_alloys)
-        if _sign_changed(prev_alloys, curr_alloys) or abs(delta) >= max(5.0, abs(prev_alloys) * 0.25):
+        if _sign_changed(prev_alloys, curr_alloys) or abs(delta) >= max(
+            5.0, abs(prev_alloys) * 0.25
+        ):
             events.append(
                 DetectedEvent(
                     event_type="alloys_net_change",
@@ -472,7 +509,9 @@ def compute_events(
             continue
         delta = curr_val - prev_val
         pct = _pct_change(prev_val, curr_val)
-        if _sign_changed(prev_val, curr_val) or abs(delta) >= max(min_abs, abs(prev_val) * 0.25):
+        if _sign_changed(prev_val, curr_val) or abs(delta) >= max(
+            min_abs, abs(prev_val) * 0.25
+        ):
             events.append(
                 DetectedEvent(
                     event_type=f"{key}_net_change",
@@ -497,7 +536,12 @@ def compute_events(
                 DetectedEvent(
                     event_type="federation_joined",
                     summary=f"Joined a federation: {curr_fed}",
-                    data={"before": None, "after": curr_fed, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "before": None,
+                        "after": curr_fed,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
         elif prev_fed is not None and curr_fed is None:
@@ -505,7 +549,12 @@ def compute_events(
                 DetectedEvent(
                     event_type="federation_left",
                     summary=f"Left federation: {prev_fed}",
-                    data={"before": prev_fed, "after": None, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "before": prev_fed,
+                        "after": None,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
         elif prev_fed and curr_fed:
@@ -513,7 +562,12 @@ def compute_events(
                 DetectedEvent(
                     event_type="federation_changed",
                     summary=f"Federation changed: {prev_fed} → {curr_fed}",
-                    data={"before": prev_fed, "after": curr_fed, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "before": prev_fed,
+                        "after": curr_fed,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
 
@@ -526,7 +580,11 @@ def compute_events(
             DetectedEvent(
                 event_type="war_started",
                 summary=f"War started: {name}",
-                data={"war_name": name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "war_name": name,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
     for name in ended[:5]:
@@ -534,7 +592,11 @@ def compute_events(
             DetectedEvent(
                 event_type="war_ended",
                 summary=f"War ended: {name}",
-                data={"war_name": name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "war_name": name,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
 
@@ -557,7 +619,15 @@ def compute_events(
             DetectedEvent(
                 event_type="leader_hired",
                 summary=f"Hired {cls}: {name}{lvl_text}",
-                data={"leader_id": lid, "class": cls, "level": lvl, "name": l.get("name"), "name_key": l.get("name_key"), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "leader_id": lid,
+                    "class": cls,
+                    "level": lvl,
+                    "name": l.get("name"),
+                    "name_key": l.get("name_key"),
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
 
@@ -569,7 +639,14 @@ def compute_events(
             DetectedEvent(
                 event_type="leader_removed",
                 summary=f"Leader removed: {cls} {name}",
-                data={"leader_id": lid, "class": cls, "name": l.get("name"), "name_key": l.get("name_key"), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "leader_id": lid,
+                    "class": cls,
+                    "name": l.get("name"),
+                    "name_key": l.get("name_key"),
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
 
@@ -583,7 +660,15 @@ def compute_events(
                 DetectedEvent(
                     event_type="leader_died",
                     summary=f"Leader died: {cls} {name} (death_date {after.get('death_date')})",
-                    data={"leader_id": lid, "class": cls, "name": after.get("name"), "name_key": after.get("name_key"), "death_date": after.get("death_date"), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "leader_id": lid,
+                        "class": cls,
+                        "name": after.get("name"),
+                        "name_key": after.get("name_key"),
+                        "death_date": after.get("death_date"),
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
 
@@ -601,7 +686,12 @@ def compute_events(
             DetectedEvent(
                 event_type="alliance_formed",
                 summary=f"Alliance formed with {empire_name}",
-                data={"country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "country_id": cid,
+                    "empire_name": empire_name,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
     for cid in sorted(prev_allies - curr_allies)[:5]:
@@ -610,7 +700,12 @@ def compute_events(
             DetectedEvent(
                 event_type="alliance_ended",
                 summary=f"Alliance ended with {empire_name}",
-                data={"country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "country_id": cid,
+                    "empire_name": empire_name,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
     for cid in sorted(curr_rivals - prev_rivals)[:5]:
@@ -619,7 +714,12 @@ def compute_events(
             DetectedEvent(
                 event_type="rivalry_declared",
                 summary=f"Rivalry declared with {empire_name}",
-                data={"country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "country_id": cid,
+                    "empire_name": empire_name,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
     for cid in sorted(prev_rivals - curr_rivals)[:5]:
@@ -628,7 +728,12 @@ def compute_events(
             DetectedEvent(
                 event_type="rivalry_ended",
                 summary=f"Rivalry ended with {empire_name}",
-                data={"country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "country_id": cid,
+                    "empire_name": empire_name,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
 
@@ -640,7 +745,13 @@ def compute_events(
                 DetectedEvent(
                     event_type="treaty_signed",
                     summary=f"Treaty signed ({treaty}) with {empire_name}",
-                    data={"treaty": treaty, "country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "treaty": treaty,
+                        "country_id": cid,
+                        "empire_name": empire_name,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
         for cid in sorted(prev_set - curr_set)[:5]:
@@ -649,7 +760,13 @@ def compute_events(
                 DetectedEvent(
                     event_type="treaty_ended",
                     summary=f"Treaty ended ({treaty}) with {empire_name}",
-                    data={"treaty": treaty, "country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "treaty": treaty,
+                        "country_id": cid,
+                        "empire_name": empire_name,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
 
@@ -674,7 +791,11 @@ def compute_events(
                 DetectedEvent(
                     event_type="milestone_midgame",
                     summary=f"Entered Midgame (year {mid_year})",
-                    data={"milestone_year": mid_year, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "milestone_year": mid_year,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
         if end_year is not None and prev_year < end_year <= curr_year:
@@ -682,7 +803,11 @@ def compute_events(
                 DetectedEvent(
                     event_type="milestone_endgame",
                     summary=f"Entered Endgame (year {end_year})",
-                    data={"milestone_year": end_year, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "milestone_year": end_year,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
 
@@ -699,21 +824,35 @@ def compute_events(
             DetectedEvent(
                 event_type="technology_researched",
                 summary=f"Researched: {display_name}",
-                data={"tech": tech, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "tech": tech,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
 
     # System count changes (conquered/lost)
     prev_systems = _extract_system_count(prev)
     curr_systems = _extract_system_count(curr)
-    if prev_systems is not None and curr_systems is not None and prev_systems != curr_systems:
+    if (
+        prev_systems is not None
+        and curr_systems is not None
+        and prev_systems != curr_systems
+    ):
         diff = curr_systems - prev_systems
         if diff > 0:
             events.append(
                 DetectedEvent(
                     event_type="systems_gained",
                     summary=f"Gained {diff} system{'s' if diff != 1 else ''} ({prev_systems} → {curr_systems})",
-                    data={"before": prev_systems, "after": curr_systems, "delta": diff, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "before": prev_systems,
+                        "after": curr_systems,
+                        "delta": diff,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
         else:
@@ -721,7 +860,13 @@ def compute_events(
                 DetectedEvent(
                     event_type="systems_lost",
                     summary=f"Lost {-diff} system{'s' if diff != -1 else ''} ({prev_systems} → {curr_systems})",
-                    data={"before": prev_systems, "after": curr_systems, "delta": diff, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "before": prev_systems,
+                        "after": curr_systems,
+                        "delta": diff,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
 
@@ -735,7 +880,13 @@ def compute_events(
                 DetectedEvent(
                     event_type="policy_changed",
                     summary=f"Policy changed: {policy} ({old_val} → {new_val})",
-                    data={"policy": policy, "before": old_val, "after": new_val, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "policy": policy,
+                        "before": old_val,
+                        "after": new_val,
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
 
@@ -750,7 +901,11 @@ def compute_events(
             DetectedEvent(
                 event_type="edict_activated",
                 summary=f"Edict activated: {display_name}",
-                data={"edict": edict, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "edict": edict,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
     for edict in expired:
@@ -759,7 +914,11 @@ def compute_events(
             DetectedEvent(
                 event_type="edict_expired",
                 summary=f"Edict expired: {display_name}",
-                data={"edict": edict, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "edict": edict,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
 
@@ -777,7 +936,13 @@ def compute_events(
                 DetectedEvent(
                     event_type="megastructure_started",
                     summary=f"Megastructure started: {display_type}",
-                    data={"mega_id": mega_id, "type": mega_type, "stage": curr_mega.get("stage", 0), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={
+                        "mega_id": mega_id,
+                        "type": mega_type,
+                        "stage": curr_mega.get("stage", 0),
+                        "from_snapshot_id": from_snapshot_id,
+                        "to_snapshot_id": to_snapshot_id,
+                    },
                 )
             )
         else:
@@ -788,7 +953,14 @@ def compute_events(
                     DetectedEvent(
                         event_type="megastructure_upgraded",
                         summary=f"Megastructure upgraded: {display_type} (stage {prev_stage} → {curr_stage})",
-                        data={"mega_id": mega_id, "type": mega_type, "prev_stage": prev_stage, "stage": curr_stage, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                        data={
+                            "mega_id": mega_id,
+                            "type": mega_type,
+                            "prev_stage": prev_stage,
+                            "stage": curr_stage,
+                            "from_snapshot_id": from_snapshot_id,
+                            "to_snapshot_id": to_snapshot_id,
+                        },
                     )
                 )
 
@@ -801,7 +973,11 @@ def compute_events(
             DetectedEvent(
                 event_type="crisis_started",
                 summary=f"Crisis begun: {crisis_type.replace('_', ' ').title()}",
-                data={"crisis_type": crisis_type, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "crisis_type": crisis_type,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
     elif prev_crisis.get("active") and not curr_crisis.get("active"):
@@ -810,7 +986,11 @@ def compute_events(
             DetectedEvent(
                 event_type="crisis_defeated",
                 summary=f"Crisis defeated: {crisis_type.replace('_', ' ').title()}",
-                data={"crisis_type": crisis_type, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={
+                    "crisis_type": crisis_type,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
         )
 
@@ -842,10 +1022,16 @@ def compute_events(
                 )
 
     # War in Heaven detection (two awakened empires fighting)
-    prev_war_in_heaven = prev.get("history", {}).get("fallen_empires", {}).get("war_in_heaven", False)
-    curr_war_in_heaven = curr.get("history", {}).get("fallen_empires", {}).get("war_in_heaven", False)
+    prev_war_in_heaven = (
+        prev.get("history", {}).get("fallen_empires", {}).get("war_in_heaven", False)
+    )
+    curr_war_in_heaven = (
+        curr.get("history", {}).get("fallen_empires", {}).get("war_in_heaven", False)
+    )
     if not prev_war_in_heaven and curr_war_in_heaven:
-        awakened_names = [name for name, e in curr_fe.items() if e.get("status") == "awakened"]
+        awakened_names = [
+            name for name, e in curr_fe.items() if e.get("status") == "awakened"
+        ]
         events.append(
             DetectedEvent(
                 event_type="war_in_heaven_started",

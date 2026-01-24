@@ -95,15 +95,25 @@ def _extract_report_metrics(briefing: dict[str, Any]) -> dict[str, Any]:
     tech = briefing.get("technology", {}) if isinstance(briefing, dict) else {}
     dip = briefing.get("diplomacy", {}) if isinstance(briefing, dict) else {}
 
-    net = economy.get("net_monthly", {}) if isinstance(economy.get("net_monthly", {}), dict) else {}
-    colonies = territory.get("colonies", {}) if isinstance(territory.get("colonies", {}), dict) else {}
+    net = (
+        economy.get("net_monthly", {})
+        if isinstance(economy.get("net_monthly", {}), dict)
+        else {}
+    )
+    colonies = (
+        territory.get("colonies", {})
+        if isinstance(territory.get("colonies", {}), dict)
+        else {}
+    )
 
     federation = dip.get("federation")
     federation_label = None
     if isinstance(federation, str) and federation.strip():
         federation_label = federation.strip()
     elif isinstance(federation, dict) and federation:
-        federation_label = federation.get("name") or federation.get("federation_name") or "Federation"
+        federation_label = (
+            federation.get("name") or federation.get("federation_name") or "Federation"
+        )
 
     history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
     wars = history.get("wars") if isinstance(history, dict) else None
@@ -157,9 +167,13 @@ def build_session_report_text(
     last_metrics: dict[str, Any] = {}
 
     # Baseline metrics: prefer the baseline full briefing JSON if available, else fall back to event_state_json.
-    if first_row and isinstance(first_row.get("full_briefing_json") or first_row.get("event_state_json"), str):
+    if first_row and isinstance(
+        first_row.get("full_briefing_json") or first_row.get("event_state_json"), str
+    ):
         try:
-            first_payload = first_row.get("full_briefing_json") or first_row.get("event_state_json")
+            first_payload = first_row.get("full_briefing_json") or first_row.get(
+                "event_state_json"
+            )
             first_metrics = _extract_report_metrics(json.loads(first_payload))
         except Exception:
             first_metrics = {}
@@ -176,14 +190,22 @@ def build_session_report_text(
             last_metrics = _extract_report_metrics(json.loads(latest_json))
         except Exception:
             last_metrics = {}
-    elif last_row and isinstance(last_row.get("full_briefing_json") or last_row.get("event_state_json"), str):
+    elif last_row and isinstance(
+        last_row.get("full_briefing_json") or last_row.get("event_state_json"), str
+    ):
         try:
-            last_payload = last_row.get("full_briefing_json") or last_row.get("event_state_json")
+            last_payload = last_row.get("full_briefing_json") or last_row.get(
+                "event_state_json"
+            )
             last_metrics = _extract_report_metrics(json.loads(last_payload))
         except Exception:
             last_metrics = {}
 
-    empire = last_metrics.get("empire_name") or first_metrics.get("empire_name") or "Unknown Empire"
+    empire = (
+        last_metrics.get("empire_name")
+        or first_metrics.get("empire_name")
+        or "Unknown Empire"
+    )
     header = f"Session report — {empire}"
     if first_date and last_date:
         header += f"\nIn-game: {first_date} → {last_date}"

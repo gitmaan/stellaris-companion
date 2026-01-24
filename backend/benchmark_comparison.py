@@ -19,6 +19,7 @@ from datetime import datetime
 
 # Load environment variables from .env
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Add project paths
@@ -28,19 +29,16 @@ sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from core.companion import Companion
 
-
 # Test questions covering different aspects
 TEST_QUESTIONS = [
     # Simple factual questions (should be answerable from snapshot)
     "What is my current military power?",
     "How much energy am I producing per month?",
     "How many colonies do I have?",
-
     # Medium complexity (may need some context)
     "What is the state of my economy? Am I in deficit anywhere?",
     "Who are my allies and rivals?",
     "What technologies am I currently researching?",
-
     # Complex strategic questions
     "Give me a brief strategic assessment of my empire's current situation.",
     "Should I be worried about any neighboring empires?",
@@ -82,17 +80,21 @@ def evaluate_quality(result: dict) -> dict:
     response = result["response"]
 
     # Check for error indicators
-    has_error = any(phrase in response.lower() for phrase in [
-        "could not generate",
-        "error",
-        "i don't have",
-        "unable to",
-        "cannot determine",
-    ])
+    has_error = any(
+        phrase in response.lower()
+        for phrase in [
+            "could not generate",
+            "error",
+            "i don't have",
+            "unable to",
+            "cannot determine",
+        ]
+    )
 
     # Check for numeric content (indicates factual grounding)
     import re
-    numbers = re.findall(r'\d+(?:,\d{3})*(?:\.\d+)?', response)
+
+    numbers = re.findall(r"\d+(?:,\d{3})*(?:\.\d+)?", response)
     has_numbers = len(numbers) > 0
 
     # Check response completeness
@@ -100,7 +102,14 @@ def evaluate_quality(result: dict) -> dict:
     is_substantial = word_count > 30
 
     # Check for hedging language
-    hedging_phrases = ["might be", "could be", "possibly", "perhaps", "i think", "i believe"]
+    hedging_phrases = [
+        "might be",
+        "could be",
+        "possibly",
+        "perhaps",
+        "i think",
+        "i believe",
+    ]
     hedging_count = sum(1 for phrase in hedging_phrases if phrase in response.lower())
 
     return {
@@ -110,11 +119,11 @@ def evaluate_quality(result: dict) -> dict:
         "is_substantial": is_substantial,
         "hedging_count": hedging_count,
         "quality_score": (
-            (0 if has_error else 2) +
-            (1 if has_numbers else 0) +
-            (1 if is_substantial else 0) +
-            (1 if hedging_count < 2 else 0)
-        )  # Max score: 5
+            (0 if has_error else 2)
+            + (1 if has_numbers else 0)
+            + (1 if is_substantial else 0)
+            + (1 if hedging_count < 2 else 0)
+        ),  # Max score: 5
     }
 
 
@@ -150,7 +159,9 @@ def run_benchmark(save_path: str) -> dict:
         result = run_test(companion, question, "old")
         result["quality"] = evaluate_quality(result)
         results["old_approach"].append(result)
-        print(f"  Time: {result['elapsed_seconds']:.1f}s | Tools: {result['tool_calls']} | Words: {result['quality']['word_count']}")
+        print(
+            f"  Time: {result['elapsed_seconds']:.1f}s | Tools: {result['tool_calls']} | Words: {result['quality']['word_count']}"
+        )
 
     # Run NEW approach tests
     print("\n" + "=" * 60)
@@ -162,7 +173,9 @@ def run_benchmark(save_path: str) -> dict:
         result = run_test(companion, question, "new")
         result["quality"] = evaluate_quality(result)
         results["new_approach"].append(result)
-        print(f"  Time: {result['elapsed_seconds']:.1f}s | Tools: {result['tool_calls']} | Words: {result['quality']['word_count']}")
+        print(
+            f"  Time: {result['elapsed_seconds']:.1f}s | Tools: {result['tool_calls']} | Words: {result['quality']['word_count']}"
+        )
 
     return results
 
@@ -194,21 +207,31 @@ def generate_markdown_report(results: dict) -> str:
     avg_old_time = sum(old_times) / len(old_times)
     avg_new_time = sum(new_times) / len(new_times)
     time_improvement = ((avg_old_time - avg_new_time) / avg_old_time) * 100
-    md.append(f"| Avg Response Time | {avg_old_time:.1f}s | {avg_new_time:.1f}s | {time_improvement:+.0f}% |")
+    md.append(
+        f"| Avg Response Time | {avg_old_time:.1f}s | {avg_new_time:.1f}s | {time_improvement:+.0f}% |"
+    )
 
     avg_old_tools = sum(old_tools) / len(old_tools)
     avg_new_tools = sum(new_tools) / len(new_tools)
     tool_reduction = ((avg_old_tools - avg_new_tools) / max(avg_old_tools, 0.1)) * 100
-    md.append(f"| Avg Tool Calls | {avg_old_tools:.1f} | {avg_new_tools:.1f} | {tool_reduction:+.0f}% |")
+    md.append(
+        f"| Avg Tool Calls | {avg_old_tools:.1f} | {avg_new_tools:.1f} | {tool_reduction:+.0f}% |"
+    )
 
     avg_old_quality = sum(old_quality) / len(old_quality)
     avg_new_quality = sum(new_quality) / len(new_quality)
-    quality_change = ((avg_new_quality - avg_old_quality) / max(avg_old_quality, 0.1)) * 100
-    md.append(f"| Avg Quality Score | {avg_old_quality:.1f}/5 | {avg_new_quality:.1f}/5 | {quality_change:+.0f}% |")
+    quality_change = (
+        (avg_new_quality - avg_old_quality) / max(avg_old_quality, 0.1)
+    ) * 100
+    md.append(
+        f"| Avg Quality Score | {avg_old_quality:.1f}/5 | {avg_new_quality:.1f}/5 | {quality_change:+.0f}% |"
+    )
 
     total_old = sum(old_times)
     total_new = sum(new_times)
-    md.append(f"| Total Time | {total_old:.0f}s | {total_new:.0f}s | {total_old - total_new:.0f}s saved |")
+    md.append(
+        f"| Total Time | {total_old:.0f}s | {total_new:.0f}s | {total_old - total_new:.0f}s saved |"
+    )
 
     md.append("")
 
@@ -224,11 +247,19 @@ def generate_markdown_report(results: dict) -> str:
         md.append("")
         md.append("| Metric | Old | New |")
         md.append("|--------|-----|-----|")
-        md.append(f"| Response Time | {old['elapsed_seconds']:.1f}s | {new['elapsed_seconds']:.1f}s |")
+        md.append(
+            f"| Response Time | {old['elapsed_seconds']:.1f}s | {new['elapsed_seconds']:.1f}s |"
+        )
         md.append(f"| Tool Calls | {old['tool_calls']} | {new['tool_calls']} |")
-        md.append(f"| Tools Used | {', '.join(old['tools_used']) or 'None'} | {', '.join(new['tools_used']) or 'None'} |")
-        md.append(f"| Word Count | {old['quality']['word_count']} | {new['quality']['word_count']} |")
-        md.append(f"| Quality Score | {old['quality']['quality_score']}/5 | {new['quality']['quality_score']}/5 |")
+        md.append(
+            f"| Tools Used | {', '.join(old['tools_used']) or 'None'} | {', '.join(new['tools_used']) or 'None'} |"
+        )
+        md.append(
+            f"| Word Count | {old['quality']['word_count']} | {new['quality']['word_count']} |"
+        )
+        md.append(
+            f"| Quality Score | {old['quality']['quality_score']}/5 | {new['quality']['quality_score']}/5 |"
+        )
         md.append("")
 
         md.append("**Old Response:**")
@@ -249,15 +280,25 @@ def generate_markdown_report(results: dict) -> str:
 
     old_errors = sum(1 for r in results["old_approach"] if r["quality"]["has_error"])
     new_errors = sum(1 for r in results["new_approach"] if r["quality"]["has_error"])
-    md.append(f"- **Error responses:** Old: {old_errors}/{len(TEST_QUESTIONS)}, New: {new_errors}/{len(TEST_QUESTIONS)}")
+    md.append(
+        f"- **Error responses:** Old: {old_errors}/{len(TEST_QUESTIONS)}, New: {new_errors}/{len(TEST_QUESTIONS)}"
+    )
 
     old_numbers = sum(1 for r in results["old_approach"] if r["quality"]["has_numbers"])
     new_numbers = sum(1 for r in results["new_approach"] if r["quality"]["has_numbers"])
-    md.append(f"- **Responses with numbers:** Old: {old_numbers}/{len(TEST_QUESTIONS)}, New: {new_numbers}/{len(TEST_QUESTIONS)}")
+    md.append(
+        f"- **Responses with numbers:** Old: {old_numbers}/{len(TEST_QUESTIONS)}, New: {new_numbers}/{len(TEST_QUESTIONS)}"
+    )
 
-    old_substantial = sum(1 for r in results["old_approach"] if r["quality"]["is_substantial"])
-    new_substantial = sum(1 for r in results["new_approach"] if r["quality"]["is_substantial"])
-    md.append(f"- **Substantial responses (>30 words):** Old: {old_substantial}/{len(TEST_QUESTIONS)}, New: {new_substantial}/{len(TEST_QUESTIONS)}")
+    old_substantial = sum(
+        1 for r in results["old_approach"] if r["quality"]["is_substantial"]
+    )
+    new_substantial = sum(
+        1 for r in results["new_approach"] if r["quality"]["is_substantial"]
+    )
+    md.append(
+        f"- **Substantial responses (>30 words):** Old: {old_substantial}/{len(TEST_QUESTIONS)}, New: {new_substantial}/{len(TEST_QUESTIONS)}"
+    )
 
     md.append("")
 
@@ -266,17 +307,25 @@ def generate_markdown_report(results: dict) -> str:
     md.append("")
 
     if avg_new_time < avg_old_time:
-        md.append(f"- **Speed:** New approach is {time_improvement:.0f}% faster on average")
+        md.append(
+            f"- **Speed:** New approach is {time_improvement:.0f}% faster on average"
+        )
     else:
         md.append(f"- **Speed:** Old approach was faster by {-time_improvement:.0f}%")
 
     if avg_new_tools < avg_old_tools:
-        md.append(f"- **Efficiency:** New approach uses {tool_reduction:.0f}% fewer tool calls")
+        md.append(
+            f"- **Efficiency:** New approach uses {tool_reduction:.0f}% fewer tool calls"
+        )
 
     if avg_new_quality >= avg_old_quality:
-        md.append(f"- **Quality:** New approach maintains or improves quality ({avg_new_quality:.1f} vs {avg_old_quality:.1f})")
+        md.append(
+            f"- **Quality:** New approach maintains or improves quality ({avg_new_quality:.1f} vs {avg_old_quality:.1f})"
+        )
     else:
-        md.append(f"- **Quality:** Some quality regression ({avg_new_quality:.1f} vs {avg_old_quality:.1f}) - may need prompt tuning")
+        md.append(
+            f"- **Quality:** Some quality regression ({avg_new_quality:.1f} vs {avg_old_quality:.1f}) - may need prompt tuning"
+        )
 
     md.append("")
 

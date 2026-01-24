@@ -20,7 +20,9 @@ if TYPE_CHECKING:
 SIGNALS_FORMAT_VERSION = 1
 
 
-def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, Any]) -> dict[str, Any]:
+def build_snapshot_signals(
+    *, extractor: "SaveExtractor", briefing: dict[str, Any]
+) -> dict[str, Any]:
     """Build normalized signals payload from SaveExtractor.
 
     This is called in the ingestion worker subprocess where the Rust session
@@ -128,15 +130,15 @@ def _extract_leader_signals(extractor: "SaveExtractor") -> dict[str, Any]:
 
         # Name resolution: 'name' field from get_leaders() is already resolved
         # when Rust session is active (via _extract_leader_name_rust)
-        resolved_name = leader.get('name')
+        resolved_name = leader.get("name")
         if resolved_name:
-            entry['name'] = resolved_name
+            entry["name"] = resolved_name
 
         # Keep name_key for debugging/localization (extract from raw data if available)
         # This would be the %LEADER_N% or NAME_* key before resolution
-        name_key = leader.get('name_key')
+        name_key = leader.get("name_key")
         if name_key:
-            entry['name_key'] = name_key
+            entry["name_key"] = name_key
 
         # Date fields for history diffing (hire/death events)
         # These may be null/missing depending on leader state
@@ -170,13 +172,14 @@ def _clean_war_name_part(raw: str) -> str:
     # Remove common prefixes
     for prefix in ("SPEC_", "ADJ_", "NAME_", "PRESCRIPTED_adjective_", "PRESCRIPTED_"):
         if result.startswith(prefix):
-            result = result[len(prefix):]
+            result = result[len(prefix) :]
             break
 
     # Handle specific patterns like "humans1" -> "Human"
     # These are species prefixes followed by a number
     import re
-    species_match = re.match(r'^([a-zA-Z]+)(\d+)$', result)
+
+    species_match = re.match(r"^([a-zA-Z]+)(\d+)$", result)
     if species_match:
         result = species_match.group(1).title()
 
@@ -385,6 +388,7 @@ def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     # This is done when Rust session is active
     try:
         from rust_bridge import _get_active_session, iter_section_entries
+
         session = _get_active_session()
         if session:
             resolved_names = _resolve_war_names_from_raw(extractor, session)
@@ -394,9 +398,9 @@ def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         pass
 
     return {
-        'player_at_war': player_at_war,
-        'count': len(war_names),
-        'wars': war_names,
+        "player_at_war": player_at_war,
+        "count": len(war_names),
+        "wars": war_names,
     }
 
 
@@ -481,11 +485,11 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
 
     if not isinstance(raw, dict):
         return {
-            'player_id': None,
-            'allies': [],
-            'rivals': [],
-            'treaties': {},
-            'empire_names': {},
+            "player_id": None,
+            "allies": [],
+            "rivals": [],
+            "treaties": {},
+            "empire_names": {},
         }
 
     # Extract player ID from extractor
@@ -504,8 +508,8 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
             return
         for item in items:
             if isinstance(item, dict):
-                cid = item.get('id')
-                name = item.get('name')
+                cid = item.get("id")
+                name = item.get("name")
                 if cid is not None and name and isinstance(name, str):
                     try:
                         empire_names[int(cid)] = name
@@ -513,22 +517,22 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
                         continue
 
     # Collect names from all sources that have {id, name} format
-    collect_empire_names(raw.get('allies', []))
-    collect_empire_names(raw.get('rivals', []))
-    collect_empire_names(raw.get('defensive_pacts', []))
-    collect_empire_names(raw.get('non_aggression_pacts', []))
-    collect_empire_names(raw.get('commercial_pacts', []))
-    collect_empire_names(raw.get('migration_treaties', []))
-    collect_empire_names(raw.get('sensor_links', []))
-    collect_empire_names(raw.get('closed_borders', []))
+    collect_empire_names(raw.get("allies", []))
+    collect_empire_names(raw.get("rivals", []))
+    collect_empire_names(raw.get("defensive_pacts", []))
+    collect_empire_names(raw.get("non_aggression_pacts", []))
+    collect_empire_names(raw.get("commercial_pacts", []))
+    collect_empire_names(raw.get("migration_treaties", []))
+    collect_empire_names(raw.get("sensor_links", []))
+    collect_empire_names(raw.get("closed_borders", []))
 
     # Also collect from relations list which has more contacts
-    relations = raw.get('relations', [])
+    relations = raw.get("relations", [])
     if isinstance(relations, list):
         for rel in relations:
             if isinstance(rel, dict):
-                cid = rel.get('country_id')
-                name = rel.get('empire_name')
+                cid = rel.get("country_id")
+                name = rel.get("empire_name")
                 if cid is not None and name and isinstance(name, str):
                     try:
                         empire_names[int(cid)] = name
@@ -542,7 +546,7 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         ids: list[int] = []
         for item in items:
             if isinstance(item, dict):
-                cid = item.get('id')
+                cid = item.get("id")
                 if cid is not None:
                     try:
                         ids.append(int(cid))
@@ -556,8 +560,8 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         return sorted(ids)
 
     # Extract allies and rivals as sorted ID lists
-    allies = extract_ids(raw.get('allies', []))
-    rivals = extract_ids(raw.get('rivals', []))
+    allies = extract_ids(raw.get("allies", []))
+    rivals = extract_ids(raw.get("rivals", []))
 
     # Build treaties dict matching history.py format
     # Maps treaty type to list of country IDs
@@ -565,11 +569,11 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
 
     # Map from get_diplomacy() keys to treaty type names used in events.py
     treaty_mappings = [
-        ('defensive_pacts', 'defensive_pact'),
-        ('non_aggression_pacts', 'non_aggression_pact'),
-        ('commercial_pacts', 'commercial_pact'),
-        ('migration_treaties', 'migration_treaty'),
-        ('sensor_links', 'sensor_link'),
+        ("defensive_pacts", "defensive_pact"),
+        ("non_aggression_pacts", "non_aggression_pact"),
+        ("commercial_pacts", "commercial_pact"),
+        ("migration_treaties", "migration_treaty"),
+        ("sensor_links", "sensor_link"),
     ]
 
     for source_key, treaty_name in treaty_mappings:
@@ -579,7 +583,7 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
 
     # Also check treaties list for research_agreement and embassy
     # which may not have their own top-level keys
-    raw_treaties = raw.get('treaties', [])
+    raw_treaties = raw.get("treaties", [])
     if isinstance(raw_treaties, list):
         research_ids: list[int] = []
         embassy_ids: list[int] = []
@@ -588,33 +592,33 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         for t in raw_treaties:
             if not isinstance(t, dict):
                 continue
-            treaty_type = t.get('type')
-            cid = t.get('country_id')
+            treaty_type = t.get("type")
+            cid = t.get("country_id")
             if treaty_type and cid is not None:
                 try:
                     cid_int = int(cid)
-                    if treaty_type == 'research_agreement':
+                    if treaty_type == "research_agreement":
                         research_ids.append(cid_int)
-                    elif treaty_type == 'embassy':
+                    elif treaty_type == "embassy":
                         embassy_ids.append(cid_int)
-                    elif treaty_type == 'truce':
+                    elif treaty_type == "truce":
                         truce_ids.append(cid_int)
                 except (ValueError, TypeError):
                     continue
 
         if research_ids:
-            treaties['research_agreement'] = sorted(set(research_ids))
+            treaties["research_agreement"] = sorted(set(research_ids))
         if embassy_ids:
-            treaties['embassy'] = sorted(set(embassy_ids))
+            treaties["embassy"] = sorted(set(embassy_ids))
         if truce_ids:
-            treaties['truce'] = sorted(set(truce_ids))
+            treaties["truce"] = sorted(set(truce_ids))
 
     return {
-        'player_id': player_id,
-        'allies': allies,
-        'rivals': rivals,
-        'treaties': treaties,
-        'empire_names': empire_names,
+        "player_id": player_id,
+        "allies": allies,
+        "rivals": rivals,
+        "treaties": treaties,
+        "empire_names": empire_names,
     }
 
 
@@ -635,10 +639,10 @@ def _extract_technology_signals(extractor: "SaveExtractor") -> dict[str, Any]:
 
     if not isinstance(raw, dict):
         return {
-            'player_id': None,
-            'techs': [],
-            'count': 0,
-            'in_progress': [],
+            "player_id": None,
+            "techs": [],
+            "count": 0,
+            "in_progress": [],
         }
 
     # Extract player ID
@@ -648,7 +652,7 @@ def _extract_technology_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         player_id = None
 
     # Get completed technologies
-    researched = raw.get('researched_techs', [])
+    researched = raw.get("researched_techs", [])
     if not isinstance(researched, list):
         researched = []
 
@@ -656,24 +660,26 @@ def _extract_technology_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     techs = sorted([str(t) for t in researched if t])
 
     # Extract in-progress research
-    in_progress_raw = raw.get('in_progress', {})
+    in_progress_raw = raw.get("in_progress", {})
     in_progress: list[dict[str, Any]] = []
 
     if isinstance(in_progress_raw, dict):
-        for category in ('physics', 'society', 'engineering'):
+        for category in ("physics", "society", "engineering"):
             current = in_progress_raw.get(category)
-            if isinstance(current, dict) and current.get('tech'):
-                in_progress.append({
-                    'id': current.get('tech'),
-                    'category': category,
-                    'progress': current.get('progress', 0),
-                })
+            if isinstance(current, dict) and current.get("tech"):
+                in_progress.append(
+                    {
+                        "id": current.get("tech"),
+                        "category": category,
+                        "progress": current.get("progress", 0),
+                    }
+                )
 
     return {
-        'player_id': player_id,
-        'techs': techs,
-        'count': len(techs),
-        'in_progress': in_progress,
+        "player_id": player_id,
+        "techs": techs,
+        "count": len(techs),
+        "in_progress": in_progress,
     }
 
 
@@ -694,10 +700,10 @@ def _extract_megastructures_signals(extractor: "SaveExtractor") -> dict[str, Any
 
     if not isinstance(raw, dict):
         return {
-            'player_id': None,
-            'megastructures': [],
-            'count': 0,
-            'by_type': {},
+            "player_id": None,
+            "megastructures": [],
+            "count": 0,
+            "by_type": {},
         }
 
     # Extract player ID
@@ -706,7 +712,7 @@ def _extract_megastructures_signals(extractor: "SaveExtractor") -> dict[str, Any
     except Exception:
         player_id = None
 
-    raw_megas = raw.get('megastructures', [])
+    raw_megas = raw.get("megastructures", [])
     if not isinstance(raw_megas, list):
         raw_megas = []
 
@@ -717,7 +723,7 @@ def _extract_megastructures_signals(extractor: "SaveExtractor") -> dict[str, Any
         if not isinstance(mega, dict):
             continue
 
-        mega_id = mega.get('id')
+        mega_id = mega.get("id")
         try:
             mega_id_int = int(mega_id) if mega_id is not None else None
         except (ValueError, TypeError):
@@ -726,51 +732,51 @@ def _extract_megastructures_signals(extractor: "SaveExtractor") -> dict[str, Any
         if mega_id_int is None:
             continue
 
-        mega_type = mega.get('type', '')
+        mega_type = mega.get("type", "")
 
         # Derive stage from type suffix (e.g., _0, _1, _2, _3, _4, _5)
         # Complete megastructures have no numeric suffix
         stage = 0
         if isinstance(mega_type, str):
             for i in range(6):
-                if mega_type.endswith(f'_{i}'):
+                if mega_type.endswith(f"_{i}"):
                     stage = i
                     break
-            if '_site' in mega_type:
+            if "_site" in mega_type:
                 stage = 0
-            elif '_restored' in mega_type or 'ruined' not in mega_type:
+            elif "_restored" in mega_type or "ruined" not in mega_type:
                 # Check if it's a complete megastructure (no stage suffix)
-                if not any(mega_type.endswith(f'_{i}') for i in range(6)):
-                    if '_site' not in mega_type:
+                if not any(mega_type.endswith(f"_{i}") for i in range(6)):
+                    if "_site" not in mega_type:
                         # Complete megastructure typically at stage 5
                         stage = 5
 
         entry: dict[str, Any] = {
-            'id': mega_id_int,
-            'type': mega_type,
-            'stage': stage,
+            "id": mega_id_int,
+            "type": mega_type,
+            "stage": stage,
         }
 
         # Include display_type and status if available (useful for UI)
-        if mega.get('display_type'):
-            entry['display_type'] = mega.get('display_type')
-        if mega.get('status'):
-            entry['status'] = mega.get('status')
-        if mega.get('planet_id'):
-            entry['planet_id'] = mega.get('planet_id')
+        if mega.get("display_type"):
+            entry["display_type"] = mega.get("display_type")
+        if mega.get("status"):
+            entry["status"] = mega.get("status")
+        if mega.get("planet_id"):
+            entry["planet_id"] = mega.get("planet_id")
 
         normalized.append(entry)
 
     # Get by_type counts from raw data
-    by_type = raw.get('by_type', {})
+    by_type = raw.get("by_type", {})
     if not isinstance(by_type, dict):
         by_type = {}
 
     return {
-        'player_id': player_id,
-        'megastructures': normalized,
-        'count': len(normalized),
-        'by_type': by_type,
+        "player_id": player_id,
+        "megastructures": normalized,
+        "count": len(normalized),
+        "by_type": by_type,
     }
 
 
@@ -793,49 +799,49 @@ def _extract_crisis_signals(extractor: "SaveExtractor") -> dict[str, Any]:
 
     if not isinstance(raw, dict):
         return {
-            'active': False,
-            'type': None,
-            'progress': None,
+            "active": False,
+            "type": None,
+            "progress": None,
         }
 
     # Normalize to format expected by events.py
     # events.py checks: crisis.get("active") and crisis.get("type")
-    active = bool(raw.get('crisis_active', False))
-    crisis_type = raw.get('crisis_type')
+    active = bool(raw.get("crisis_active", False))
+    crisis_type = raw.get("crisis_type")
 
     result: dict[str, Any] = {
-        'active': active,
-        'type': crisis_type,
+        "active": active,
+        "type": crisis_type,
     }
 
     # Include crisis systems count as progress indicator
-    crisis_systems = raw.get('crisis_systems_count')
+    crisis_systems = raw.get("crisis_systems_count")
     if crisis_systems is not None:
         try:
-            result['progress'] = int(crisis_systems)
+            result["progress"] = int(crisis_systems)
         except (ValueError, TypeError):
-            result['progress'] = None
+            result["progress"] = None
 
     # Include additional details useful for narrative/reporting
-    if raw.get('player_is_crisis_fighter'):
-        result['player_is_crisis_fighter'] = True
+    if raw.get("player_is_crisis_fighter"):
+        result["player_is_crisis_fighter"] = True
 
-    player_kills = raw.get('player_crisis_kills')
+    player_kills = raw.get("player_crisis_kills")
     if player_kills:
         try:
-            result['player_crisis_kills'] = int(player_kills)
+            result["player_crisis_kills"] = int(player_kills)
         except (ValueError, TypeError):
             pass
 
     # Include crisis country info for detailed reporting
-    crisis_countries = raw.get('crisis_countries', [])
+    crisis_countries = raw.get("crisis_countries", [])
     if isinstance(crisis_countries, list) and crisis_countries:
-        result['crisis_countries'] = crisis_countries
+        result["crisis_countries"] = crisis_countries
 
     # Include all detected crisis types if multiple (e.g., aberrant + vehement)
-    crisis_types = raw.get('crisis_types_detected', [])
+    crisis_types = raw.get("crisis_types_detected", [])
     if isinstance(crisis_types, list) and len(crisis_types) > 1:
-        result['crisis_types_detected'] = crisis_types
+        result["crisis_types_detected"] = crisis_types
 
     return result
 
@@ -857,14 +863,14 @@ def _extract_fallen_empires_signals(extractor: "SaveExtractor") -> dict[str, Any
 
     if not isinstance(raw, dict):
         return {
-            'fallen_empires': [],
-            'dormant_count': 0,
-            'awakened_count': 0,
-            'war_in_heaven': False,
+            "fallen_empires": [],
+            "dormant_count": 0,
+            "awakened_count": 0,
+            "war_in_heaven": False,
         }
 
     # Extract fallen empires list
-    raw_fe_list = raw.get('fallen_empires', [])
+    raw_fe_list = raw.get("fallen_empires", [])
     if not isinstance(raw_fe_list, list):
         raw_fe_list = []
 
@@ -877,56 +883,56 @@ def _extract_fallen_empires_signals(extractor: "SaveExtractor") -> dict[str, Any
             continue
 
         # Get name - required field for events.py keying
-        name = fe.get('name')
+        name = fe.get("name")
         if not name:
             continue
 
         entry: dict[str, Any] = {
-            'name': name,
-            'status': fe.get('status', 'dormant'),
-            'archetype': fe.get('archetype', 'Unknown'),
+            "name": name,
+            "status": fe.get("status", "dormant"),
+            "archetype": fe.get("archetype", "Unknown"),
         }
 
         # Include military power if available
-        mil_power = fe.get('military_power')
+        mil_power = fe.get("military_power")
         if mil_power is not None:
             try:
-                entry['military_power'] = float(mil_power)
+                entry["military_power"] = float(mil_power)
             except (ValueError, TypeError):
                 pass
 
         # Include ethics if available
-        ethics = fe.get('ethics')
+        ethics = fe.get("ethics")
         if ethics is not None:
             # May be a string or list depending on source
             if isinstance(ethics, list):
-                entry['ethics'] = ethics
+                entry["ethics"] = ethics
             elif isinstance(ethics, str):
-                entry['ethics'] = [ethics]
+                entry["ethics"] = [ethics]
 
         # Include country_id for detailed tracking (useful for events/narrative)
-        cid = fe.get('country_id')
+        cid = fe.get("country_id")
         if cid is not None:
             try:
-                entry['country_id'] = int(cid)
+                entry["country_id"] = int(cid)
             except (ValueError, TypeError):
                 pass
 
         normalized.append(entry)
 
     # Get counts from raw data or compute from normalized list
-    dormant_count = raw.get('dormant_count')
+    dormant_count = raw.get("dormant_count")
     if dormant_count is None:
-        dormant_count = sum(1 for fe in normalized if fe.get('status') == 'dormant')
+        dormant_count = sum(1 for fe in normalized if fe.get("status") == "dormant")
     else:
         try:
             dormant_count = int(dormant_count)
         except (ValueError, TypeError):
             dormant_count = 0
 
-    awakened_count = raw.get('awakened_count')
+    awakened_count = raw.get("awakened_count")
     if awakened_count is None:
-        awakened_count = sum(1 for fe in normalized if fe.get('status') == 'awakened')
+        awakened_count = sum(1 for fe in normalized if fe.get("status") == "awakened")
     else:
         try:
             awakened_count = int(awakened_count)
@@ -934,13 +940,13 @@ def _extract_fallen_empires_signals(extractor: "SaveExtractor") -> dict[str, Any
             awakened_count = 0
 
     # War in Heaven detection
-    war_in_heaven = bool(raw.get('war_in_heaven', False))
+    war_in_heaven = bool(raw.get("war_in_heaven", False))
 
     return {
-        'fallen_empires': normalized,
-        'dormant_count': dormant_count,
-        'awakened_count': awakened_count,
-        'war_in_heaven': war_in_heaven,
+        "fallen_empires": normalized,
+        "dormant_count": dormant_count,
+        "awakened_count": awakened_count,
+        "war_in_heaven": war_in_heaven,
     }
 
 
@@ -966,18 +972,18 @@ def _extract_policies_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     country = extractor._get_player_country_entry(player_id or 0)
     if not isinstance(country, dict):
         return {
-            'player_id': player_id,
-            'policies': {},
-            'count': 0,
+            "player_id": player_id,
+            "policies": {},
+            "count": 0,
         }
 
     # Extract active_policies list
-    active_policies = country.get('active_policies', [])
+    active_policies = country.get("active_policies", [])
     if not isinstance(active_policies, list):
         return {
-            'player_id': player_id,
-            'policies': {},
-            'count': 0,
+            "player_id": player_id,
+            "policies": {},
+            "count": 0,
         }
 
     # Convert to {policy_name: selected_value} format matching history.py
@@ -985,15 +991,20 @@ def _extract_policies_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     for p in active_policies:
         if not isinstance(p, dict):
             continue
-        policy_name = p.get('policy')
-        selected = p.get('selected')
-        if policy_name and selected and isinstance(policy_name, str) and isinstance(selected, str):
+        policy_name = p.get("policy")
+        selected = p.get("selected")
+        if (
+            policy_name
+            and selected
+            and isinstance(policy_name, str)
+            and isinstance(selected, str)
+        ):
             policies[policy_name] = selected
 
     return {
-        'player_id': player_id,
-        'policies': policies,
-        'count': len(policies),
+        "player_id": player_id,
+        "policies": policies,
+        "count": len(policies),
     }
 
 
@@ -1019,18 +1030,18 @@ def _extract_edicts_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     country = extractor._get_player_country_entry(player_id or 0)
     if not isinstance(country, dict):
         return {
-            'player_id': player_id,
-            'edicts': [],
-            'count': 0,
+            "player_id": player_id,
+            "edicts": [],
+            "count": 0,
         }
 
     # Extract edicts list
-    raw_edicts = country.get('edicts', [])
+    raw_edicts = country.get("edicts", [])
     if not isinstance(raw_edicts, list):
         return {
-            'player_id': player_id,
-            'edicts': [],
-            'count': 0,
+            "player_id": player_id,
+            "edicts": [],
+            "count": 0,
         }
 
     # Extract edict names
@@ -1038,7 +1049,7 @@ def _extract_edicts_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     for ed in raw_edicts:
         if not isinstance(ed, dict):
             continue
-        edict_name = ed.get('edict')
+        edict_name = ed.get("edict")
         if edict_name and isinstance(edict_name, str):
             edict_names.append(edict_name)
 
@@ -1046,9 +1057,9 @@ def _extract_edicts_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     unique_edicts = sorted(set(edict_names))
 
     return {
-        'player_id': player_id,
-        'edicts': unique_edicts,
-        'count': len(unique_edicts),
+        "player_id": player_id,
+        "edicts": unique_edicts,
+        "count": len(unique_edicts),
     }
 
 
@@ -1074,6 +1085,7 @@ def _extract_galaxy_settings_signals(extractor: "SaveExtractor") -> dict[str, An
     # Try to use Rust session for fast parsed lookup
     try:
         from rust_bridge import _get_active_session
+
         session = _get_active_session()
         if session:
             return _extract_galaxy_settings_rust(session)
@@ -1094,8 +1106,8 @@ def _extract_galaxy_settings_rust(session) -> dict[str, Any]:
         Galaxy settings dict
     """
     try:
-        sections = session.extract_sections(['galaxy'])
-        galaxy = sections.get('galaxy', {})
+        sections = session.extract_sections(["galaxy"])
+        galaxy = sections.get("galaxy", {})
 
         if not isinstance(galaxy, dict):
             return {}
@@ -1118,13 +1130,13 @@ def _extract_galaxy_settings_rust(session) -> dict[str, Any]:
             return None
 
         return {
-            'galaxy_name': _safe_str(galaxy.get('name')),
-            'mid_game_start': _safe_int(galaxy.get('mid_game_start')),
-            'end_game_start': _safe_int(galaxy.get('end_game_start')),
-            'victory_year': _safe_int(galaxy.get('victory_year')),
-            'ironman': _safe_str(galaxy.get('ironman')),
-            'difficulty': _safe_str(galaxy.get('difficulty')),
-            'crisis_type': _safe_str(galaxy.get('crisis_type')),
+            "galaxy_name": _safe_str(galaxy.get("name")),
+            "mid_game_start": _safe_int(galaxy.get("mid_game_start")),
+            "end_game_start": _safe_int(galaxy.get("end_game_start")),
+            "victory_year": _safe_int(galaxy.get("victory_year")),
+            "ironman": _safe_str(galaxy.get("ironman")),
+            "difficulty": _safe_str(galaxy.get("difficulty")),
+            "crisis_type": _safe_str(galaxy.get("crisis_type")),
         }
     except Exception:
         # On any error, return empty dict (gamestate fallback in history.py)
@@ -1155,25 +1167,25 @@ def _extract_systems_signals(extractor: "SaveExtractor") -> dict[str, Any]:
 
     if not isinstance(raw, dict):
         return {
-            'player_id': player_id,
-            'count': 0,
-            'by_level': {},
+            "player_id": player_id,
+            "count": 0,
+            "by_level": {},
         }
 
     # Get count from starbases data
-    count = raw.get('count', 0)
+    count = raw.get("count", 0)
     try:
         count = int(count)
     except (ValueError, TypeError):
         count = 0
 
     # Get breakdown by starbase level (useful for expansion milestones)
-    by_level = raw.get('by_level', {})
+    by_level = raw.get("by_level", {})
     if not isinstance(by_level, dict):
         by_level = {}
 
     return {
-        'player_id': player_id,
-        'count': count,
-        'by_level': by_level,
+        "player_id": player_id,
+        "count": count,
+        "by_level": by_level,
     }

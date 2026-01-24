@@ -13,7 +13,11 @@ import discord
 from discord import app_commands
 
 from backend.core.database import get_default_db
-from backend.core.history import compute_save_id, extract_campaign_id_from_gamestate, extract_snapshot_metrics
+from backend.core.history import (
+    compute_save_id,
+    extract_campaign_id_from_gamestate,
+    extract_snapshot_metrics,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +26,7 @@ def setup(bot) -> None:
     """Register the /recap command with the bot."""
 
     @bot.tree.command(
-        name="recap",
-        description="Get a recap of your session's recent events"
+        name="recap", description="Get a recap of your session's recent events"
     )
     @app_commands.describe(
         style='Recap style: "summary" (fast) or "dramatic" (LLM-powered narrative)'
@@ -35,8 +38,7 @@ def setup(bot) -> None:
         ]
     )
     async def recap_command(
-        interaction: discord.Interaction,
-        style: str = "summary"
+        interaction: discord.Interaction, style: str = "summary"
     ) -> None:
         """Generate a recap for the current session."""
         if not bot.companion.is_loaded:
@@ -50,6 +52,7 @@ def setup(bot) -> None:
         await interaction.response.defer(thinking=True)
 
         try:
+
             def _generate_recap():
                 """Run recap generation in a thread."""
                 from backend.core.chronicle import ChronicleGenerator
@@ -58,17 +61,37 @@ def setup(bot) -> None:
 
                 # Get session ID for current campaign
                 briefing = getattr(bot.companion, "_current_snapshot", None) or {}
-                metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
+                metrics = (
+                    extract_snapshot_metrics(briefing)
+                    if isinstance(briefing, dict)
+                    else {}
+                )
 
                 campaign_id = None
-                if bot.companion.extractor and getattr(bot.companion.extractor, "gamestate", None):
-                    campaign_id = extract_campaign_id_from_gamestate(bot.companion.extractor.gamestate)
+                if bot.companion.extractor and getattr(
+                    bot.companion.extractor, "gamestate", None
+                ):
+                    campaign_id = extract_campaign_id_from_gamestate(
+                        bot.companion.extractor.gamestate
+                    )
 
                 save_id = compute_save_id(
                     campaign_id=campaign_id,
-                    player_id=bot.companion.extractor.get_player_empire_id() if bot.companion.extractor else None,
-                    empire_name=metrics.get("empire_name") if isinstance(metrics, dict) else None,
-                    save_path=bot.companion.save_path if isinstance(bot.companion.save_path, Path) else None,
+                    player_id=(
+                        bot.companion.extractor.get_player_empire_id()
+                        if bot.companion.extractor
+                        else None
+                    ),
+                    empire_name=(
+                        metrics.get("empire_name")
+                        if isinstance(metrics, dict)
+                        else None
+                    ),
+                    save_path=(
+                        bot.companion.save_path
+                        if isinstance(bot.companion.save_path, Path)
+                        else None
+                    ),
                 )
 
                 session_id = db.get_active_or_latest_session_id(save_id=save_id)

@@ -58,7 +58,7 @@ def setup(bot) -> None:
 
     @bot.tree.command(
         name="status",
-        description="Get a quick status overview of your empire (no AI call)"
+        description="Get a quick status overview of your empire (no AI call)",
     )
     async def status_command(interaction: discord.Interaction) -> None:
         """Handle the /status command.
@@ -71,7 +71,7 @@ def setup(bot) -> None:
             await interaction.response.send_message(
                 "No save file is currently loaded. Please wait for a save to be detected "
                 "or restart the bot with a valid save file.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -86,7 +86,7 @@ def setup(bot) -> None:
             embed = discord.Embed(
                 title=f"{data['empire_name']} | {data['date']}",
                 color=0x5865F2,  # Discord blurple
-                description=bot.companion.personality_summary
+                description=bot.companion.personality_summary,
             )
 
             # Military section
@@ -98,7 +98,7 @@ def setup(bot) -> None:
             embed.add_field(name="Military", value=military_text, inline=True)
 
             # Economy section
-            net = data.get('net_resources', {})
+            net = data.get("net_resources", {})
             economy_text = (
                 f"Energy: {format_net(net.get('energy'))}/mo\n"
                 f"Minerals: {format_net(net.get('minerals'))}/mo\n"
@@ -114,12 +114,12 @@ def setup(bot) -> None:
             embed.add_field(name="Research", value=research_text, inline=True)
 
             # Territory section
-            colonies = data.get('colonies', {})
+            colonies = data.get("colonies", {})
             if isinstance(colonies, dict):
-                colony_count = colonies.get('total_count', 'N/A')
-                total_pops = colonies.get('total_population', 'N/A')
-                habitats = colonies.get('habitats', {}).get('count', 0)
-                planets = colonies.get('planets', {}).get('count', 0)
+                colony_count = colonies.get("total_count", "N/A")
+                total_pops = colonies.get("total_population", "N/A")
+                habitats = colonies.get("habitats", {}).get("count", 0)
+                planets = colonies.get("planets", {}).get("count", 0)
 
                 territory_text = (
                     f"Colonies: {format_number(colony_count)}\n"
@@ -132,9 +132,9 @@ def setup(bot) -> None:
             embed.add_field(name="Territory", value=territory_text, inline=True)
 
             # Diplomacy section
-            diplo = data.get('diplomacy_summary', {})
-            allies = data.get('allies', [])
-            federation = data.get('federation')
+            diplo = data.get("diplomacy_summary", {})
+            allies = data.get("allies", [])
+            federation = data.get("federation")
 
             diplo_text = (
                 f"Contacts: {format_number(diplo.get('total_contacts', 0))}\n"
@@ -148,15 +148,16 @@ def setup(bot) -> None:
             embed.add_field(name="Diplomacy", value=diplo_text, inline=True)
 
             # Add footer with companion info
-            embed.set_footer(text="Use /ask for detailed analysis or /briefing for full strategic report")
+            embed.set_footer(
+                text="Use /ask for detailed analysis or /briefing for full strategic report"
+            )
 
             await interaction.followup.send(embed=embed)
 
         except Exception as e:
             logger.error(f"Error in /status command: {e}")
             await interaction.followup.send(
-                f"An error occurred while getting status: {str(e)}",
-                ephemeral=True
+                f"An error occurred while getting status: {str(e)}", ephemeral=True
             )
 
     logger.info("/status command registered")

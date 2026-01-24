@@ -18,7 +18,6 @@ import json
 
 from backend.core.events import compute_events
 
-
 DEFAULT_DB_FILENAME = "stellaris_history.db"
 ENV_DB_PATH = "STELLARIS_DB_PATH"
 
@@ -86,7 +85,9 @@ class GameDatabase:
 
     def get_schema_version(self) -> int:
         with self._lock:
-            row = self._conn.execute("SELECT version FROM schema_version LIMIT 1;").fetchone()
+            row = self._conn.execute(
+                "SELECT version FROM schema_version LIMIT 1;"
+            ).fetchone()
             return int(row["version"]) if row else 0
 
     def _set_schema_version(self, version: int) -> None:
@@ -101,16 +102,16 @@ class GameDatabase:
     def init_schema(self) -> None:
         """Create schema and apply migrations (idempotent)."""
         with self._lock:
-            self._conn.execute(
-                """
+            self._conn.execute("""
                 CREATE TABLE IF NOT EXISTS schema_version (
                     version INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
-                """
-            )
+                """)
             # Ensure schema_version has a row (version 0) before migrations.
-            row = self._conn.execute("SELECT version FROM schema_version LIMIT 1;").fetchone()
+            row = self._conn.execute(
+                "SELECT version FROM schema_version LIMIT 1;"
+            ).fetchone()
             if row is None:
                 self._conn.execute(
                     "INSERT INTO schema_version (version, updated_at) VALUES (0, strftime('%s','now'));"
@@ -336,7 +337,9 @@ class GameDatabase:
                 (latest_briefing_json, last_game_date, session_id),
             )
 
-    def backfill_session_latest_briefing_from_snapshots(self, *, session_id: str) -> bool:
+    def backfill_session_latest_briefing_from_snapshots(
+        self, *, session_id: str
+    ) -> bool:
         """Populate sessions.latest_briefing_json from the newest snapshot full briefing (best-effort).
 
         This is used when upgrading older DBs that stored full_briefing_json on snapshot rows.
@@ -372,7 +375,9 @@ class GameDatabase:
             )
             return True
 
-    def backfill_latest_briefings_all_sessions(self, *, limit_sessions: int = 500) -> int:
+    def backfill_latest_briefings_all_sessions(
+        self, *, limit_sessions: int = 500
+    ) -> int:
         """Backfill sessions.latest_briefing_json for many sessions (best-effort)."""
         lim = max(1, min(int(limit_sessions), 5000))
         with self._lock:
@@ -416,15 +421,13 @@ class GameDatabase:
     def get_latest_session_briefing_json_any(self) -> str | None:
         """Return the latest full briefing JSON across all sessions (best-effort)."""
         with self._lock:
-            row = self._conn.execute(
-                """
+            row = self._conn.execute("""
                 SELECT latest_briefing_json
                 FROM sessions
                 WHERE latest_briefing_json IS NOT NULL AND latest_briefing_json != ''
                 ORDER BY COALESCE(last_updated_at, started_at) DESC
                 LIMIT 1;
-                """
-            ).fetchone()
+                """).fetchone()
             if not row:
                 return None
             value = row["latest_briefing_json"]
@@ -465,15 +468,13 @@ class GameDatabase:
     def get_latest_snapshot_full_briefing_json_any(self) -> str | None:
         """Return the most recent snapshot JSON across all sessions."""
         with self._lock:
-            row = self._conn.execute(
-                """
+            row = self._conn.execute("""
                 SELECT full_briefing_json
                 FROM snapshots
                 WHERE full_briefing_json IS NOT NULL AND full_briefing_json != ''
                 ORDER BY captured_at DESC, id DESC
                 LIMIT 1;
-                """
-            ).fetchone()
+                """).fetchone()
             if not row:
                 return None
             value = row["full_briefing_json"]
@@ -733,7 +734,9 @@ class GameDatabase:
                 (ended_at, session_id),
             )
 
-    def end_active_sessions_for_save(self, *, save_id: str, ended_at: int | None = None) -> list[str]:
+    def end_active_sessions_for_save(
+        self, *, save_id: str, ended_at: int | None = None
+    ) -> list[str]:
         """End any active sessions for a given save_id (should normally be 0 or 1)."""
         with self._lock:
             rows = self._conn.execute(
@@ -774,7 +777,11 @@ class GameDatabase:
                 (session_id,),
             ).fetchone()
             if not row:
-                return {"snapshot_count": 0, "first_game_date": None, "last_game_date": None}
+                return {
+                    "snapshot_count": 0,
+                    "first_game_date": None,
+                    "last_game_date": None,
+                }
             return {
                 "snapshot_count": int(row["snapshot_count"]),
                 "first_game_date": row["first_game_date"],
@@ -797,7 +804,9 @@ class GameDatabase:
             ).fetchone()
             return dict(row) if row else None
 
-    def get_previous_snapshot_id(self, *, session_id: str, before_snapshot_id: int) -> int | None:
+    def get_previous_snapshot_id(
+        self, *, session_id: str, before_snapshot_id: int
+    ) -> int | None:
         with self._lock:
             row = self._conn.execute(
                 """
@@ -830,7 +839,9 @@ class GameDatabase:
                     game_date,
                     e["event_type"],
                     e["summary"],
-                    json.dumps(e.get("data") or {}, ensure_ascii=False, separators=(",", ":")),
+                    json.dumps(
+                        e.get("data") or {}, ensure_ascii=False, separators=(",", ":")
+                    ),
                 )
             )
         with self._lock:
@@ -854,7 +865,9 @@ class GameDatabase:
 
         Uses the previous snapshot in the same session as the baseline.
         """
-        prev_id = self.get_previous_snapshot_id(session_id=session_id, before_snapshot_id=int(snapshot_id))
+        prev_id = self.get_previous_snapshot_id(
+            session_id=session_id, before_snapshot_id=int(snapshot_id)
+        )
         if prev_id is None:
             return 0
 
@@ -863,7 +876,9 @@ class GameDatabase:
         if not prev_row or not curr_row:
             return 0
 
-        prev_state_json = prev_row.get("event_state_json") or prev_row.get("full_briefing_json")
+        prev_state_json = prev_row.get("event_state_json") or prev_row.get(
+            "full_briefing_json"
+        )
         if not isinstance(prev_state_json, str) or not prev_state_json:
             return 0
         try:
@@ -885,7 +900,10 @@ class GameDatabase:
             from_snapshot_id=int(prev_id),
             to_snapshot_id=int(snapshot_id),
         )
-        payloads = [{"event_type": e.event_type, "summary": e.summary, "data": e.data} for e in detected]
+        payloads = [
+            {"event_type": e.event_type, "summary": e.summary, "data": e.data}
+            for e in detected
+        ]
 
         return self.insert_events(
             session_id=session_id,
@@ -911,7 +929,9 @@ class GameDatabase:
             ).fetchone()
             return str(row["id"]) if row else None
 
-    def get_active_or_latest_session_id_for_save_path(self, *, save_path: str) -> str | None:
+    def get_active_or_latest_session_id_for_save_path(
+        self, *, save_path: str
+    ) -> str | None:
         """Best-effort lookup by last known save_path (useful on startup without parsing gamestate)."""
         if not save_path:
             return None
@@ -928,7 +948,9 @@ class GameDatabase:
             ).fetchone()
             return str(row["id"]) if row else None
 
-    def get_recent_events(self, *, session_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    def get_recent_events(
+        self, *, session_id: str, limit: int = 20
+    ) -> list[dict[str, Any]]:
         lim = max(1, min(int(limit), 100))
         with self._lock:
             rows = self._conn.execute(
@@ -943,7 +965,9 @@ class GameDatabase:
             ).fetchall()
             return [dict(r) for r in rows]
 
-    def get_first_last_snapshot_rows(self, *, session_id: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    def get_first_last_snapshot_rows(
+        self, *, session_id: str
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         with self._lock:
             first = self._conn.execute(
                 """
@@ -967,7 +991,9 @@ class GameDatabase:
             ).fetchone()
             return (dict(first) if first else None, dict(last) if last else None)
 
-    def get_recent_snapshot_points(self, *, session_id: str, limit: int = 8) -> list[dict[str, Any]]:
+    def get_recent_snapshot_points(
+        self, *, session_id: str, limit: int = 8
+    ) -> list[dict[str, Any]]:
         """Return a small set of snapshot metric points for trend questions."""
         lim = max(1, min(int(limit), 50))
         with self._lock:
@@ -1108,7 +1134,14 @@ class GameDatabase:
                     save_id = COALESCE(excluded.save_id, save_id),
                     generated_at = datetime('now')
                 """,
-                (session_id, chronicle_text, chapters_json, event_count, snapshot_count, save_id),
+                (
+                    session_id,
+                    chronicle_text,
+                    chapters_json,
+                    event_count,
+                    snapshot_count,
+                    save_id,
+                ),
             )
 
     # --- Incremental Chronicle Support ---
@@ -1247,7 +1280,14 @@ class GameDatabase:
                         generated_at = datetime('now')
                     WHERE save_id = ?
                     """,
-                    (chronicle_text, chapters_json, event_count, snapshot_count, session_id, save_id),
+                    (
+                        chronicle_text,
+                        chapters_json,
+                        event_count,
+                        snapshot_count,
+                        session_id,
+                        save_id,
+                    ),
                 )
             else:
                 # Check if there's a legacy record for this session_id (without save_id)
@@ -1269,7 +1309,14 @@ class GameDatabase:
                             generated_at = datetime('now')
                         WHERE session_id = ?
                         """,
-                        (save_id, chronicle_text, chapters_json, event_count, snapshot_count, session_id),
+                        (
+                            save_id,
+                            chronicle_text,
+                            chapters_json,
+                            event_count,
+                            snapshot_count,
+                            session_id,
+                        ),
                     )
                 else:
                     # Insert new record
@@ -1279,7 +1326,14 @@ class GameDatabase:
                             (id, session_id, save_id, chronicle_text, chapters_json, event_count, snapshot_count)
                         VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?)
                         """,
-                        (session_id, save_id, chronicle_text, chapters_json, event_count, snapshot_count),
+                        (
+                            session_id,
+                            save_id,
+                            chronicle_text,
+                            chapters_json,
+                            event_count,
+                            snapshot_count,
+                        ),
                     )
 
 
@@ -1297,6 +1351,7 @@ def get_default_db(db_path: str | Path | None = None) -> GameDatabase:
 
     if _default_db is None:
         _default_db = GameDatabase()
+
         # Best-effort background maintenance for older DBs.
         # Keeps startup fast while preventing unbounded full JSON accumulation.
         def _maintenance(db: GameDatabase) -> None:
@@ -1305,7 +1360,9 @@ def get_default_db(db_path: str | Path | None = None) -> GameDatabase:
             except Exception:
                 pass
             try:
-                db.enforce_full_briefing_retention_all_sessions(keep_recent=DEFAULT_KEEP_FULL_BRIEFINGS_RECENT, keep_first=True)
+                db.enforce_full_briefing_retention_all_sessions(
+                    keep_recent=DEFAULT_KEEP_FULL_BRIEFINGS_RECENT, keep_first=True
+                )
             except Exception:
                 pass
             try:
@@ -1314,7 +1371,12 @@ def get_default_db(db_path: str | Path | None = None) -> GameDatabase:
                 pass
 
         try:
-            threading.Thread(target=_maintenance, args=(_default_db,), daemon=True, name="db-maintenance").start()
+            threading.Thread(
+                target=_maintenance,
+                args=(_default_db,),
+                daemon=True,
+                name="db-maintenance",
+            ).start()
         except Exception:
             pass
     return _default_db

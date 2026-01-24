@@ -13,7 +13,11 @@ import discord
 from discord import app_commands
 
 from backend.core.database import get_default_db
-from backend.core.history import compute_save_id, extract_campaign_id_from_gamestate, extract_snapshot_metrics
+from backend.core.history import (
+    compute_save_id,
+    extract_campaign_id_from_gamestate,
+    extract_snapshot_metrics,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +32,12 @@ def setup(bot) -> None:
 
     @bot.tree.command(
         name="history",
-        description="Show recent changes (derived events) for the current campaign/session"
+        description="Show recent changes (derived events) for the current campaign/session",
     )
     @app_commands.describe(limit="How many events to show (default 10, max 25)")
-    async def history_command(interaction: discord.Interaction, limit: int = 10) -> None:
+    async def history_command(
+        interaction: discord.Interaction, limit: int = 10
+    ) -> None:
         if not bot.companion.is_loaded:
             await interaction.response.send_message(
                 "No save file is currently loaded, so there is no history to show yet.",
@@ -47,31 +53,55 @@ def setup(bot) -> None:
                 db = get_default_db()
 
                 briefing = getattr(bot.companion, "_current_snapshot", None) or {}
-                metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
+                metrics = (
+                    extract_snapshot_metrics(briefing)
+                    if isinstance(briefing, dict)
+                    else {}
+                )
 
                 campaign_id = None
-                if bot.companion.extractor and getattr(bot.companion.extractor, "gamestate", None):
-                    campaign_id = extract_campaign_id_from_gamestate(bot.companion.extractor.gamestate)
+                if bot.companion.extractor and getattr(
+                    bot.companion.extractor, "gamestate", None
+                ):
+                    campaign_id = extract_campaign_id_from_gamestate(
+                        bot.companion.extractor.gamestate
+                    )
 
                 save_id = compute_save_id(
                     campaign_id=campaign_id,
-                    player_id=bot.companion.extractor.get_player_empire_id() if bot.companion.extractor else None,
-                    empire_name=metrics.get("empire_name") if isinstance(metrics, dict) else None,
-                    save_path=bot.companion.save_path if isinstance(bot.companion.save_path, Path) else None,
+                    player_id=(
+                        bot.companion.extractor.get_player_empire_id()
+                        if bot.companion.extractor
+                        else None
+                    ),
+                    empire_name=(
+                        metrics.get("empire_name")
+                        if isinstance(metrics, dict)
+                        else None
+                    ),
+                    save_path=(
+                        bot.companion.save_path
+                        if isinstance(bot.companion.save_path, Path)
+                        else None
+                    ),
                 )
 
                 session_id = db.get_active_or_latest_session_id(save_id=save_id)
                 if not session_id:
                     return None, None, None
 
-                events = db.get_recent_events(session_id=session_id, limit=min(max(limit, 1), 25))
+                events = db.get_recent_events(
+                    session_id=session_id, limit=min(max(limit, 1), 25)
+                )
                 stats = db.get_session_snapshot_stats(session_id)
                 return session_id, events, stats
 
             session_id, events, stats = await asyncio.to_thread(_fetch_history_data)
 
             if not session_id:
-                await interaction.followup.send("No sessions found yet for this campaign.")
+                await interaction.followup.send(
+                    "No sessions found yet for this campaign."
+                )
                 return
 
             header = (
@@ -84,11 +114,17 @@ def setup(bot) -> None:
                 header += f"\nDate range: {first_date} → {last_date}"
 
             if not events:
-                await interaction.followup.send(header + "\n\nNo derived events yet. (Play a bit longer or wait for more autosaves.)")
+                await interaction.followup.send(
+                    header
+                    + "\n\nNo derived events yet. (Play a bit longer or wait for more autosaves.)"
+                )
                 return
 
             # Events are returned newest-first; display oldest-first for readability.
-            lines = [_format_event_line(e.get("game_date"), e.get("summary", "")) for e in reversed(events)]
+            lines = [
+                _format_event_line(e.get("game_date"), e.get("summary", ""))
+                for e in reversed(events)
+            ]
             body = "\n".join(lines)
             text = header + "\n\nRecent events:\n" + body
 
@@ -109,7 +145,8 @@ def setup(bot) -> None:
 
         except Exception as e:
             logger.error(f"Error in /history command: {e}")
-            await interaction.followup.send(f"An error occurred while retrieving history: {str(e)}")
+            await interaction.followup.send(
+                f"An error occurred while retrieving history: {str(e)}"
+            )
 
     logger.info("/history command registered")
-

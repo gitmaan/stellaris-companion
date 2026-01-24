@@ -8,7 +8,13 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
+    from rust_bridge import (
+        extract_sections,
+        iter_section_entries,
+        ParserError,
+        _get_active_session,
+    )
+
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
@@ -59,20 +65,24 @@ class MilitaryMixin:
             fleet_name = f"Fleet {fleet_id}"
 
         # Clean up localization keys
-        if fleet_name.startswith('shipclass_'):
-            fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
-        elif fleet_name.startswith('NAME_'):
-            fleet_name = fleet_name.replace('NAME_', '').replace('_', ' ')
-        elif fleet_name.startswith('TRANS_'):
-            fleet_name = 'Transport Fleet'
-        elif fleet_name.endswith('_FLEET'):
-            fleet_name = fleet_name.replace('_FLEET', '').replace('_', ' ').title() + ' Fleet'
+        if fleet_name.startswith("shipclass_"):
+            fleet_name = (
+                fleet_name.replace("shipclass_", "").replace("_name", "").title()
+            )
+        elif fleet_name.startswith("NAME_"):
+            fleet_name = fleet_name.replace("NAME_", "").replace("_", " ")
+        elif fleet_name.startswith("TRANS_"):
+            fleet_name = "Transport Fleet"
+        elif fleet_name.endswith("_FLEET"):
+            fleet_name = (
+                fleet_name.replace("_FLEET", "").replace("_", " ").title() + " Fleet"
+            )
 
         return fleet_name
 
     def _extract_braced_block(self, content: str, key: str) -> str | None:
         """Extract the full `key={...}` block from a larger text chunk."""
-        match = re.search(rf'\b{re.escape(key)}\s*=\s*\{{', content)
+        match = re.search(rf"\b{re.escape(key)}\s*=\s*\{{", content)
         if not match:
             return None
 
@@ -81,10 +91,10 @@ class MilitaryMixin:
         started = False
 
         for i, char in enumerate(content[start:], start):
-            if char == '{':
+            if char == "{":
                 brace_count += 1
                 started = True
-            elif char == '}':
+            elif char == "}":
                 brace_count -= 1
                 if started and brace_count == 0:
                     return content[start : i + 1]
@@ -105,9 +115,13 @@ class MilitaryMixin:
             try:
                 return self._get_wars_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for wars: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for wars: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         return self._get_wars_regex()
@@ -140,10 +154,10 @@ class MilitaryMixin:
         """Get war information using Rust parser."""
         from date_utils import days_between
 
-        result = {'wars': [], 'player_at_war': False, 'active_war_count': 0}
+        result = {"wars": [], "player_at_war": False, "active_war_count": 0}
 
         player_id = self.get_player_empire_id()
-        current_date = self.get_metadata().get('date', '')
+        current_date = self.get_metadata().get("date", "")
 
         # Build a country ID -> name mapping for lookups
         country_names = self._get_country_names_map()
@@ -203,16 +217,28 @@ class MilitaryMixin:
 
             # Extract war goal
             war_goal_block = war_data.get("attacker_war_goal", {})
-            war_goal = war_goal_block.get("type", "unknown") if isinstance(war_goal_block, dict) else "unknown"
+            war_goal = (
+                war_goal_block.get("type", "unknown")
+                if isinstance(war_goal_block, dict)
+                else "unknown"
+            )
 
             # Build war info
             our_side = "attacker" if player_is_attacker else "defender"
-            our_exhaustion = attacker_exhaustion if player_is_attacker else defender_exhaustion
-            their_exhaustion = defender_exhaustion if player_is_attacker else attacker_exhaustion
+            our_exhaustion = (
+                attacker_exhaustion if player_is_attacker else defender_exhaustion
+            )
+            their_exhaustion = (
+                defender_exhaustion if player_is_attacker else attacker_exhaustion
+            )
 
             # Resolve country names
-            attacker_names = [country_names.get(int(cid), f"Empire {cid}") for cid in attacker_ids]
-            defender_names = [country_names.get(int(cid), f"Empire {cid}") for cid in defender_ids]
+            attacker_names = [
+                country_names.get(int(cid), f"Empire {cid}") for cid in attacker_ids
+            ]
+            defender_names = [
+                country_names.get(int(cid), f"Empire {cid}") for cid in defender_ids
+            ]
 
             # Calculate duration
             duration_days = None
@@ -220,25 +246,25 @@ class MilitaryMixin:
                 duration_days = days_between(start_date, current_date)
 
             war_info = {
-                'name': war_name,
-                'start_date': start_date,
-                'duration_days': duration_days,
-                'our_side': our_side,
-                'our_exhaustion': round(our_exhaustion, 1),
-                'their_exhaustion': round(their_exhaustion, 1),
-                'participants': {
-                    'attackers': attacker_names,
-                    'defenders': defender_names
+                "name": war_name,
+                "start_date": start_date,
+                "duration_days": duration_days,
+                "our_side": our_side,
+                "our_exhaustion": round(our_exhaustion, 1),
+                "their_exhaustion": round(their_exhaustion, 1),
+                "participants": {
+                    "attackers": attacker_names,
+                    "defenders": defender_names,
                 },
-                'war_goal': war_goal,
-                'status': 'in_progress'  # All wars in the war section are active
+                "war_goal": war_goal,
+                "status": "in_progress",  # All wars in the war section are active
             }
 
-            result['wars'].append(war_info)
+            result["wars"].append(war_info)
 
-        result['active_war_count'] = len(result['wars'])
-        result['count'] = len(result['wars'])  # Backward compatibility
-        result['player_at_war'] = len(result['wars']) > 0
+        result["active_war_count"] = len(result["wars"])
+        result["count"] = len(result["wars"])  # Backward compatibility
+        result["player_at_war"] = len(result["wars"]) > 0
 
         return result
 
@@ -246,25 +272,25 @@ class MilitaryMixin:
         """Get war information using regex (fallback method)."""
         from date_utils import days_between
 
-        result = {'wars': [], 'player_at_war': False, 'active_war_count': 0}
+        result = {"wars": [], "player_at_war": False, "active_war_count": 0}
 
         player_id = self.get_player_empire_id()
-        current_date = self.get_metadata().get('date', '')
+        current_date = self.get_metadata().get("date", "")
 
         # Build a country ID -> name mapping for lookups
         country_names = self._get_country_names_map()
 
         # Find war section
-        war_section_match = re.search(r'\nwar=\n\{', self.gamestate)
+        war_section_match = re.search(r"\nwar=\n\{", self.gamestate)
         if not war_section_match:
             return result
 
         war_start = war_section_match.start() + 1
-        war_chunk = self.gamestate[war_start:war_start + 5000000]  # Wars can be large
+        war_chunk = self.gamestate[war_start : war_start + 5000000]  # Wars can be large
 
         # Parse individual war blocks
         # Each war entry starts with a pattern like \n\t0=\n\t{
-        war_entry_pattern = r'\n\t(\d+)=\n\t\{'
+        war_entry_pattern = r"\n\t(\d+)=\n\t\{"
         war_entries = list(re.finditer(war_entry_pattern, war_chunk))
 
         for i, entry_match in enumerate(war_entries):
@@ -285,7 +311,7 @@ class MilitaryMixin:
                 war_name = simple_name_match.group(1)
             else:
                 # Try nested block format: name={...key="..."...}
-                name_block = self._extract_braced_block(war_block[:5000], 'name')
+                name_block = self._extract_braced_block(war_block[:5000], "name")
                 if name_block:
                     key_match = re.search(r'\bkey="([^"]+)"', name_block)
                     if key_match:
@@ -302,26 +328,40 @@ class MilitaryMixin:
             # The battles={} block contains per-battle exhaustion (usually 0 or small)
             # The war-level totals appear AFTER battles as top-level fields
             # Values are stored as 0-1 decimals, multiply by 100 for percentage
-            attacker_exhaustion_matches = re.findall(r'attacker_war_exhaustion\s*=\s*([\d.]+)', war_block)
-            defender_exhaustion_matches = re.findall(r'defender_war_exhaustion\s*=\s*([\d.]+)', war_block)
-            attacker_exhaustion = float(attacker_exhaustion_matches[-1]) * 100 if attacker_exhaustion_matches else 0.0
-            defender_exhaustion = float(defender_exhaustion_matches[-1]) * 100 if defender_exhaustion_matches else 0.0
+            attacker_exhaustion_matches = re.findall(
+                r"attacker_war_exhaustion\s*=\s*([\d.]+)", war_block
+            )
+            defender_exhaustion_matches = re.findall(
+                r"defender_war_exhaustion\s*=\s*([\d.]+)", war_block
+            )
+            attacker_exhaustion = (
+                float(attacker_exhaustion_matches[-1]) * 100
+                if attacker_exhaustion_matches
+                else 0.0
+            )
+            defender_exhaustion = (
+                float(defender_exhaustion_matches[-1]) * 100
+                if defender_exhaustion_matches
+                else 0.0
+            )
 
             # Extract war goal
-            war_goal_match = re.search(r'war_goal\s*=\s*\{[^}]*type\s*=\s*"?([^"\s}]+)"?', war_block, re.DOTALL)
+            war_goal_match = re.search(
+                r'war_goal\s*=\s*\{[^}]*type\s*=\s*"?([^"\s}]+)"?', war_block, re.DOTALL
+            )
             war_goal = war_goal_match.group(1) if war_goal_match else "unknown"
 
             # Extract attacker country IDs using proper brace matching
             attacker_ids = []
-            attackers_block = self._extract_braced_block(war_block, 'attackers')
+            attackers_block = self._extract_braced_block(war_block, "attackers")
             if attackers_block:
-                attacker_ids = re.findall(r'\bcountry\s*=\s*(\d+)', attackers_block)
+                attacker_ids = re.findall(r"\bcountry\s*=\s*(\d+)", attackers_block)
 
             # Extract defender country IDs using proper brace matching
             defender_ids = []
-            defenders_block = self._extract_braced_block(war_block, 'defenders')
+            defenders_block = self._extract_braced_block(war_block, "defenders")
             if defenders_block:
-                defender_ids = re.findall(r'\bcountry\s*=\s*(\d+)', defenders_block)
+                defender_ids = re.findall(r"\bcountry\s*=\s*(\d+)", defenders_block)
 
             # Check if player is involved and determine side
             player_id_str = str(player_id)
@@ -333,12 +373,20 @@ class MilitaryMixin:
 
             # Build war info
             our_side = "attacker" if player_is_attacker else "defender"
-            our_exhaustion = attacker_exhaustion if player_is_attacker else defender_exhaustion
-            their_exhaustion = defender_exhaustion if player_is_attacker else attacker_exhaustion
+            our_exhaustion = (
+                attacker_exhaustion if player_is_attacker else defender_exhaustion
+            )
+            their_exhaustion = (
+                defender_exhaustion if player_is_attacker else attacker_exhaustion
+            )
 
             # Resolve country names
-            attacker_names = [country_names.get(int(cid), f"Empire {cid}") for cid in attacker_ids]
-            defender_names = [country_names.get(int(cid), f"Empire {cid}") for cid in defender_ids]
+            attacker_names = [
+                country_names.get(int(cid), f"Empire {cid}") for cid in attacker_ids
+            ]
+            defender_names = [
+                country_names.get(int(cid), f"Empire {cid}") for cid in defender_ids
+            ]
 
             # Calculate duration
             duration_days = None
@@ -346,25 +394,25 @@ class MilitaryMixin:
                 duration_days = days_between(start_date, current_date)
 
             war_info = {
-                'name': war_name,
-                'start_date': start_date,
-                'duration_days': duration_days,
-                'our_side': our_side,
-                'our_exhaustion': round(our_exhaustion, 1),
-                'their_exhaustion': round(their_exhaustion, 1),
-                'participants': {
-                    'attackers': attacker_names,
-                    'defenders': defender_names
+                "name": war_name,
+                "start_date": start_date,
+                "duration_days": duration_days,
+                "our_side": our_side,
+                "our_exhaustion": round(our_exhaustion, 1),
+                "their_exhaustion": round(their_exhaustion, 1),
+                "participants": {
+                    "attackers": attacker_names,
+                    "defenders": defender_names,
                 },
-                'war_goal': war_goal,
-                'status': 'in_progress'  # All wars in the war section are active
+                "war_goal": war_goal,
+                "status": "in_progress",  # All wars in the war section are active
             }
 
-            result['wars'].append(war_info)
+            result["wars"].append(war_info)
 
-        result['active_war_count'] = len(result['wars'])
-        result['count'] = len(result['wars'])  # Backward compatibility
-        result['player_at_war'] = len(result['wars']) > 0
+        result["active_war_count"] = len(result["wars"])
+        result["count"] = len(result["wars"])  # Backward compatibility
+        result["player_at_war"] = len(result["wars"]) > 0
 
         return result
 
@@ -381,9 +429,13 @@ class MilitaryMixin:
             try:
                 return self._get_fleets_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for fleets: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for fleets: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         return self._get_fleets_regex()
@@ -391,13 +443,13 @@ class MilitaryMixin:
     def _get_fleets_rust(self) -> dict:
         """Get fleet information using Rust parser."""
         result = {
-            'fleets': [],
-            'count': 0,
-            'military_fleet_count': 0,
-            'starbase_count': 0,
-            'civilian_fleet_count': 0,
-            'military_ships': 0,
-            'total_military_power': 0.0,
+            "fleets": [],
+            "count": 0,
+            "military_fleet_count": 0,
+            "starbase_count": 0,
+            "civilian_fleet_count": 0,
+            "military_ships": 0,
+            "total_military_power": 0.0,
         }
 
         # Get the player's country block to find owned fleets
@@ -447,12 +499,14 @@ class MilitaryMixin:
                 name_block = fleet_data.get("name")
                 fleet_name = self._resolve_fleet_name(name_block, fleet_id)
 
-                military_fleets.append({
-                    'id': fleet_id,
-                    'name': fleet_name,
-                    'ships': ship_count,
-                    'military_power': round(mp, 0),
-                })
+                military_fleets.append(
+                    {
+                        "id": fleet_id,
+                        "name": fleet_name,
+                        "ships": ship_count,
+                        "military_power": round(mp, 0),
+                    }
+                )
                 total_military_power += mp
                 military_ships += ship_count
             else:
@@ -460,33 +514,33 @@ class MilitaryMixin:
 
         # Sort fleets by ID for consistent ordering (regex version uses file order)
         # Use same ordering as baseline: sort by ID numerically
-        military_fleets.sort(key=lambda f: int(f['id']))
+        military_fleets.sort(key=lambda f: int(f["id"]))
 
-        result['count'] = len(military_fleets)
-        result['military_fleet_count'] = len(military_fleets)
-        result['civilian_fleet_count'] = civilian_count
-        result['military_ships'] = military_ships
-        result['total_military_power'] = total_military_power
-        result['fleets'] = military_fleets
-        result['fleet_names'] = [f['name'] for f in military_fleets]
+        result["count"] = len(military_fleets)
+        result["military_fleet_count"] = len(military_fleets)
+        result["civilian_fleet_count"] = civilian_count
+        result["military_ships"] = military_ships
+        result["total_military_power"] = total_military_power
+        result["fleets"] = military_fleets
+        result["fleet_names"] = [f["name"] for f in military_fleets]
 
         # Get accurate starbase count from starbase_mgr
         starbase_info = self._count_player_starbases(owned_set)
-        result['starbase_count'] = starbase_info['total_upgraded']
-        result['starbases'] = starbase_info
+        result["starbase_count"] = starbase_info["total_upgraded"]
+        result["starbases"] = starbase_info
 
         return result
 
     def _get_fleets_regex(self) -> dict:
         """Get fleet information using regex (fallback method)."""
         result = {
-            'fleets': [],
-            'count': 0,
-            'military_fleet_count': 0,
-            'starbase_count': 0,
-            'civilian_fleet_count': 0,
-            'military_ships': 0,
-            'total_military_power': 0.0,
+            "fleets": [],
+            "count": 0,
+            "military_fleet_count": 0,
+            "starbase_count": 0,
+            "civilian_fleet_count": 0,
+            "military_ships": 0,
+            "total_military_power": 0.0,
         }
 
         # Get the player's country block using proper section detection
@@ -503,19 +557,19 @@ class MilitaryMixin:
         # Analyze the owned fleets
         analysis = self._analyze_player_fleets(owned_fleet_ids)
 
-        result['count'] = analysis['military_fleet_count']
-        result['military_fleet_count'] = analysis['military_fleet_count']
-        result['civilian_fleet_count'] = analysis['civilian_fleet_count']
-        result['military_ships'] = analysis['military_ships']
-        result['total_military_power'] = analysis['total_military_power']
-        result['fleets'] = analysis['military_fleets']
-        result['fleet_names'] = [f['name'] for f in analysis['military_fleets']]
+        result["count"] = analysis["military_fleet_count"]
+        result["military_fleet_count"] = analysis["military_fleet_count"]
+        result["civilian_fleet_count"] = analysis["civilian_fleet_count"]
+        result["military_ships"] = analysis["military_ships"]
+        result["total_military_power"] = analysis["total_military_power"]
+        result["fleets"] = analysis["military_fleets"]
+        result["fleet_names"] = [f["name"] for f in analysis["military_fleets"]]
 
         # Get accurate starbase count from starbase_mgr
         owned_set = set(owned_fleet_ids)
         starbase_info = self._count_player_starbases(owned_set)
-        result['starbase_count'] = starbase_info['total_upgraded']
-        result['starbases'] = starbase_info
+        result["starbase_count"] = starbase_info["total_upgraded"]
+        result["starbases"] = starbase_info
 
         return result
 
@@ -533,9 +587,13 @@ class MilitaryMixin:
             try:
                 return self._get_fleet_composition_rust(limit)
             except ParserError as e:
-                logger.warning(f"Rust parser failed for fleet_composition: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for fleet_composition: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         return self._get_fleet_composition_regex(limit)
@@ -561,7 +619,9 @@ class MilitaryMixin:
 
         # Build design_id -> ship_size mapping from ship_design section
         design_to_size: dict[str, str] = {}
-        for design_id, design_data in iter_section_entries(self.save_path, "ship_design"):
+        for design_id, design_data in iter_section_entries(
+            self.save_path, "ship_design"
+        ):
             if not isinstance(design_data, dict):
                 continue
             # ship_size can be directly on design or in growth_stages[0].ship_size
@@ -620,7 +680,9 @@ class MilitaryMixin:
             name_block = fleet_data.get("name")
             name_value = self._resolve_fleet_name(name_block, fleet_id)
             if name_value and name_value.startswith("shipclass_"):
-                name_value = name_value.replace("shipclass_", "").replace("_name", "").title()
+                name_value = (
+                    name_value.replace("shipclass_", "").replace("_name", "").title()
+                )
 
             # Process ships in this fleet
             ships = fleet_data.get("ships", [])
@@ -695,12 +757,15 @@ class MilitaryMixin:
         for m in ship_entry_re.finditer(self.gamestate, ships_start, ships_end):
             ship_id = m.group(1)
             snippet = self.gamestate[m.start() : min(m.start() + 3000, ships_end)]
-            impl_m = re.search(r'\bship_design_implementation\s*=\s*\{[^}]*\bdesign\s*=\s*(\d+)', snippet)
+            impl_m = re.search(
+                r"\bship_design_implementation\s*=\s*\{[^}]*\bdesign\s*=\s*(\d+)",
+                snippet,
+            )
             if impl_m:
                 ship_to_design[ship_id] = impl_m.group(1)
                 continue
 
-            design_m = re.search(r'\bship_design\s*=\s*(\d+)', snippet)
+            design_m = re.search(r"\bship_design\s*=\s*(\d+)", snippet)
             if design_m:
                 ship_to_design[ship_id] = design_m.group(1)
 
@@ -719,9 +784,9 @@ class MilitaryMixin:
             end = None
             for i in range(start, fleet_end):
                 char = self.gamestate[i]
-                if char == '{':
+                if char == "{":
                     brace_count += 1
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if brace_count == 0:
                         end = i + 1
@@ -737,7 +802,7 @@ class MilitaryMixin:
             if "civilian=yes" in header:
                 continue
 
-            mp_match = re.search(r'\bmilitary_power=([\d.]+)', header)
+            mp_match = re.search(r"\bmilitary_power=([\d.]+)", header)
             military_power = float(mp_match.group(1)) if mp_match else 0.0
             if military_power <= 100:
                 continue
@@ -754,7 +819,9 @@ class MilitaryMixin:
                     name_value = name_match.group(1)
 
             if name_value and name_value.startswith("shipclass_"):
-                name_value = name_value.replace("shipclass_", "").replace("_name", "").title()
+                name_value = (
+                    name_value.replace("shipclass_", "").replace("_name", "").title()
+                )
 
             ships_block = self._extract_braced_block(fleet_block, "ships")
             if not ships_block:
@@ -813,44 +880,51 @@ class MilitaryMixin:
             try:
                 return self._get_starbases_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for starbases: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for starbases: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         return self._get_starbases_regex()
 
     def _get_starbases_rust(self) -> dict:
         """Get starbase information using Rust parser."""
-        result = {
-            'starbases': [],
-            'count': 0,
-            'by_level': {},
-            'total_defense_score': 0
-        }
+        result = {"starbases": [], "count": 0, "by_level": {}, "total_defense_score": 0}
 
         player_id = self.get_player_empire_id()
         player_id_str = str(player_id)
 
         # Defense module types to track
-        DEFENSE_MODULES = {'gun_battery', 'hangar_bay', 'missile_battery'}
+        DEFENSE_MODULES = {"gun_battery", "hangar_bay", "missile_battery"}
         # Defense-enhancing building types
-        DEFENSE_BUILDINGS = {'target_uplink_computer', 'defense_grid', 'command_center',
-                             'communications_jammer', 'disruption_field', 'nebula_refinery'}
+        DEFENSE_BUILDINGS = {
+            "target_uplink_computer",
+            "defense_grid",
+            "command_center",
+            "communications_jammer",
+            "disruption_field",
+            "nebula_refinery",
+        }
         # Level bonus for defense score
         LEVEL_BONUS = {
-            'outpost': 0,
-            'starport': 100,
-            'starhold': 200,
-            'starfortress': 400,
-            'citadel': 800
+            "outpost": 0,
+            "starport": 100,
+            "starhold": 200,
+            "starfortress": 400,
+            "citadel": 800,
         }
 
         # Find player's starbases by scanning galactic_object section
         # Each system has starbases list and inhibitor_owners list
         player_starbase_ids = set()
 
-        for system_id, system_data in iter_section_entries(self.save_path, "galactic_object"):
+        for system_id, system_data in iter_section_entries(
+            self.save_path, "galactic_object"
+        ):
             if not isinstance(system_data, dict):
                 continue
 
@@ -869,7 +943,7 @@ class MilitaryMixin:
 
             for sb_id in starbases:
                 sb_id_str = str(sb_id)
-                if sb_id_str != '4294967295':  # Not null
+                if sb_id_str != "4294967295":  # Not null
                     player_starbase_ids.add(sb_id_str)
 
         # Now get starbase details from starbase_mgr
@@ -889,59 +963,66 @@ class MilitaryMixin:
                 continue
 
             level = sb_data.get("level", "")
-            clean_level = level.replace('starbase_level_', '') if level else 'unknown'
+            clean_level = level.replace("starbase_level_", "") if level else "unknown"
 
-            starbase_info = {
-                'id': sb_id,
-                'level': clean_level
-            }
+            starbase_info = {"id": sb_id, "level": clean_level}
 
             # Extract type if present
             sb_type = sb_data.get("type")
             if sb_type:
-                starbase_info['type'] = sb_type
+                starbase_info["type"] = sb_type
 
             # Extract modules
             modules_data = sb_data.get("modules", {})
-            modules = list(modules_data.values()) if isinstance(modules_data, dict) else []
+            modules = (
+                list(modules_data.values()) if isinstance(modules_data, dict) else []
+            )
             if modules:
-                starbase_info['modules'] = modules
+                starbase_info["modules"] = modules
 
             # Extract buildings
             buildings_data = sb_data.get("buildings", {})
-            buildings = list(buildings_data.values()) if isinstance(buildings_data, dict) else []
+            buildings = (
+                list(buildings_data.values())
+                if isinstance(buildings_data, dict)
+                else []
+            )
             if buildings:
-                starbase_info['buildings'] = buildings
+                starbase_info["buildings"] = buildings
 
             # Extract orbitals (defense platforms)
             orbitals_data = sb_data.get("orbitals", {})
-            orbital_ids = list(orbitals_data.values()) if isinstance(orbitals_data, dict) else []
+            orbital_ids = (
+                list(orbitals_data.values()) if isinstance(orbitals_data, dict) else []
+            )
             # Count non-null orbitals (4294967295 = empty slot)
-            defense_platform_count = sum(1 for oid in orbital_ids if str(oid) != '4294967295')
+            defense_platform_count = sum(
+                1 for oid in orbital_ids if str(oid) != "4294967295"
+            )
 
             # Calculate defense-specific fields
             defense_modules = [m for m in modules if m in DEFENSE_MODULES]
             defense_buildings = [b for b in buildings if b in DEFENSE_BUILDINGS]
 
             # Calculate defense score
-            gun_batteries = modules.count('gun_battery')
-            hangar_bays = modules.count('hangar_bay')
-            missile_batteries = modules.count('missile_battery')
+            gun_batteries = modules.count("gun_battery")
+            hangar_bays = modules.count("hangar_bay")
+            missile_batteries = modules.count("missile_battery")
             level_bonus = LEVEL_BONUS.get(clean_level, 0)
 
             defense_score = (
-                (gun_batteries * 100) +
-                (hangar_bays * 80) +
-                (missile_batteries * 90) +
-                (defense_platform_count * 50) +
-                level_bonus
+                (gun_batteries * 100)
+                + (hangar_bays * 80)
+                + (missile_batteries * 90)
+                + (defense_platform_count * 50)
+                + level_bonus
             )
 
             # Add defense fields to starbase info
-            starbase_info['defense_modules'] = defense_modules
-            starbase_info['defense_buildings'] = defense_buildings
-            starbase_info['defense_platform_count'] = defense_platform_count
-            starbase_info['defense_score'] = defense_score
+            starbase_info["defense_modules"] = defense_modules
+            starbase_info["defense_buildings"] = defense_buildings
+            starbase_info["defense_platform_count"] = defense_platform_count
+            starbase_info["defense_score"] = defense_score
 
             starbases_found.append(starbase_info)
             total_defense_score += defense_score
@@ -952,48 +1033,51 @@ class MilitaryMixin:
             level_counts[clean_level] += 1
 
         # Full list (no truncation); callers that need caps should slice.
-        result['starbases'] = starbases_found
-        result['count'] = len(starbases_found)
-        result['by_level'] = level_counts
-        result['starbase_ids'] = list(player_starbase_ids)
-        result['total_defense_score'] = total_defense_score
+        result["starbases"] = starbases_found
+        result["count"] = len(starbases_found)
+        result["by_level"] = level_counts
+        result["starbase_ids"] = list(player_starbase_ids)
+        result["total_defense_score"] = total_defense_score
 
         return result
 
     def _get_starbases_regex(self) -> dict:
         """Get starbase information using regex (fallback method)."""
-        result = {
-            'starbases': [],
-            'count': 0,
-            'by_level': {},
-            'total_defense_score': 0
-        }
+        result = {"starbases": [], "count": 0, "by_level": {}, "total_defense_score": 0}
 
         player_id = self.get_player_empire_id()
 
         # Defense module types to track
-        DEFENSE_MODULES = {'gun_battery', 'hangar_bay', 'missile_battery'}
+        DEFENSE_MODULES = {"gun_battery", "hangar_bay", "missile_battery"}
         # Defense-enhancing building types
-        DEFENSE_BUILDINGS = {'target_uplink_computer', 'defense_grid', 'command_center',
-                             'communications_jammer', 'disruption_field', 'nebula_refinery'}
+        DEFENSE_BUILDINGS = {
+            "target_uplink_computer",
+            "defense_grid",
+            "command_center",
+            "communications_jammer",
+            "disruption_field",
+            "nebula_refinery",
+        }
         # Level bonus for defense score
         LEVEL_BONUS = {
-            'outpost': 0,
-            'starport': 100,
-            'starhold': 200,
-            'starfortress': 400,
-            'citadel': 800
+            "outpost": 0,
+            "starport": 100,
+            "starhold": 200,
+            "starfortress": 400,
+            "citadel": 800,
         }
 
         # Find which starbases belong to player by looking at galactic_object section
         # Each system has a starbases={...} list and inhibitor_owners={...} containing owner IDs
-        galactic_match = re.search(r'^galactic_object=\s*\{', self.gamestate, re.MULTILINE)
+        galactic_match = re.search(
+            r"^galactic_object=\s*\{", self.gamestate, re.MULTILINE
+        )
         if not galactic_match:
-            result['error'] = "Could not find galactic_object section"
+            result["error"] = "Could not find galactic_object section"
             return result
 
         go_start = galactic_match.start()
-        go_chunk = self.gamestate[go_start:go_start + 5000000]  # 5MB for systems
+        go_chunk = self.gamestate[go_start : go_start + 5000000]  # 5MB for systems
 
         # Find systems where inhibitor_owners contains player_id
         # Pattern: starbases={ ID } ... inhibitor_owners={ player_id }
@@ -1001,20 +1085,20 @@ class MilitaryMixin:
 
         # Match system blocks that have starbases and are owned by player
         # Use player_id instead of hardcoded 0
-        system_pattern = rf'starbases=\s*\{{\s*(\d+)\s*\}}[^}}]*?inhibitor_owners=\s*\{{[^}}]*\b{player_id}\b'
+        system_pattern = rf"starbases=\s*\{{\s*(\d+)\s*\}}[^}}]*?inhibitor_owners=\s*\{{[^}}]*\b{player_id}\b"
         for match in re.finditer(system_pattern, go_chunk):
             sb_id = match.group(1)
-            if sb_id != '4294967295':  # Not null
+            if sb_id != "4294967295":  # Not null
                 player_starbase_ids.append(sb_id)
 
         # Now find the starbase_mgr section and get details for player starbases
-        starbase_match = re.search(r'^starbase_mgr=\s*\{', self.gamestate, re.MULTILINE)
+        starbase_match = re.search(r"^starbase_mgr=\s*\{", self.gamestate, re.MULTILINE)
         if not starbase_match:
-            result['error'] = "Could not find starbase_mgr section"
+            result["error"] = "Could not find starbase_mgr section"
             return result
 
         sb_start = starbase_match.start()
-        starbase_chunk = self.gamestate[sb_start:sb_start + 2000000]
+        starbase_chunk = self.gamestate[sb_start : sb_start + 2000000]
 
         # Parse individual starbases from starbase_mgr
         starbase_pattern = r'\n\t\t(\d+)=\s*\{\s*\n\t\t\tlevel="([^"]+)"'
@@ -1037,11 +1121,13 @@ class MilitaryMixin:
             brace_count = 0
             block_end = block_start
             started = False
-            for i, char in enumerate(starbase_chunk[block_start:block_start + 3000], block_start):
-                if char == '{':
+            for i, char in enumerate(
+                starbase_chunk[block_start : block_start + 3000], block_start
+            ):
+                if char == "{":
                     brace_count += 1
                     started = True
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if started and brace_count == 0:
                         block_end = i + 1
@@ -1049,62 +1135,61 @@ class MilitaryMixin:
 
             sb_block = starbase_chunk[block_start:block_end]
 
-            clean_level = level.replace('starbase_level_', '')
-            starbase_info = {
-                'id': sb_id,
-                'level': clean_level
-            }
+            clean_level = level.replace("starbase_level_", "")
+            starbase_info = {"id": sb_id, "level": clean_level}
 
             # Extract type if present
             type_match = re.search(r'type="([^"]+)"', sb_block)
             if type_match:
-                starbase_info['type'] = type_match.group(1)
+                starbase_info["type"] = type_match.group(1)
 
             # Extract modules
             modules = []
-            modules_match = re.search(r'modules=\s*\{([^}]+)\}', sb_block)
+            modules_match = re.search(r"modules=\s*\{([^}]+)\}", sb_block)
             if modules_match:
-                modules = re.findall(r'\d+=(\w+)', modules_match.group(1))
-                starbase_info['modules'] = modules
+                modules = re.findall(r"\d+=(\w+)", modules_match.group(1))
+                starbase_info["modules"] = modules
 
             # Extract buildings
             buildings = []
-            buildings_match = re.search(r'buildings=\s*\{([^}]+)\}', sb_block)
+            buildings_match = re.search(r"buildings=\s*\{([^}]+)\}", sb_block)
             if buildings_match:
-                buildings = re.findall(r'\d+=(\w+)', buildings_match.group(1))
-                starbase_info['buildings'] = buildings
+                buildings = re.findall(r"\d+=(\w+)", buildings_match.group(1))
+                starbase_info["buildings"] = buildings
 
             # Extract orbitals (defense platforms)
             defense_platform_count = 0
-            orbitals_match = re.search(r'orbitals=\s*\{([^}]+)\}', sb_block)
+            orbitals_match = re.search(r"orbitals=\s*\{([^}]+)\}", sb_block)
             if orbitals_match:
-                orbital_ids = re.findall(r'\d+=(\d+)', orbitals_match.group(1))
+                orbital_ids = re.findall(r"\d+=(\d+)", orbitals_match.group(1))
                 # Count non-null orbitals (4294967295 = empty slot)
-                defense_platform_count = sum(1 for oid in orbital_ids if oid != '4294967295')
+                defense_platform_count = sum(
+                    1 for oid in orbital_ids if oid != "4294967295"
+                )
 
             # Calculate defense-specific fields
             defense_modules = [m for m in modules if m in DEFENSE_MODULES]
             defense_buildings = [b for b in buildings if b in DEFENSE_BUILDINGS]
 
             # Calculate defense score
-            gun_batteries = modules.count('gun_battery')
-            hangar_bays = modules.count('hangar_bay')
-            missile_batteries = modules.count('missile_battery')
+            gun_batteries = modules.count("gun_battery")
+            hangar_bays = modules.count("hangar_bay")
+            missile_batteries = modules.count("missile_battery")
             level_bonus = LEVEL_BONUS.get(clean_level, 0)
 
             defense_score = (
-                (gun_batteries * 100) +
-                (hangar_bays * 80) +
-                (missile_batteries * 90) +
-                (defense_platform_count * 50) +
-                level_bonus
+                (gun_batteries * 100)
+                + (hangar_bays * 80)
+                + (missile_batteries * 90)
+                + (defense_platform_count * 50)
+                + level_bonus
             )
 
             # Add defense fields to starbase info
-            starbase_info['defense_modules'] = defense_modules
-            starbase_info['defense_buildings'] = defense_buildings
-            starbase_info['defense_platform_count'] = defense_platform_count
-            starbase_info['defense_score'] = defense_score
+            starbase_info["defense_modules"] = defense_modules
+            starbase_info["defense_buildings"] = defense_buildings
+            starbase_info["defense_platform_count"] = defense_platform_count
+            starbase_info["defense_score"] = defense_score
 
             starbases_found.append(starbase_info)
             total_defense_score += defense_score
@@ -1115,11 +1200,11 @@ class MilitaryMixin:
             level_counts[clean_level] += 1
 
         # Full list (no truncation); callers that need caps should slice.
-        result['starbases'] = starbases_found
-        result['count'] = len(starbases_found)
-        result['by_level'] = level_counts
-        result['starbase_ids'] = player_starbase_ids
-        result['total_defense_score'] = total_defense_score
+        result["starbases"] = starbases_found
+        result["count"] = len(starbases_found)
+        result["by_level"] = level_counts
+        result["starbase_ids"] = player_starbase_ids
+        result["total_defense_score"] = total_defense_score
 
         return result
 
@@ -1152,10 +1237,10 @@ class MilitaryMixin:
             return self._get_megastructures_regex()
 
         result = {
-            'megastructures': [],
-            'count': 0,
-            'by_type': {},
-            'ruined_available': [],
+            "megastructures": [],
+            "count": 0,
+            "by_type": {},
+            "ruined_available": [],
         }
 
         player_id = self.get_player_empire_id()
@@ -1164,18 +1249,18 @@ class MilitaryMixin:
         ruined_megas = []
         by_type: dict[str, int] = {}
 
-        for mega_id, entry in session.iter_section('megastructures'):
+        for mega_id, entry in session.iter_section("megastructures"):
             # P010: entry might be string "none" for deleted entries
             if not isinstance(entry, dict):
                 continue
 
             # P011: Use .get() with defaults
-            mega_type = entry.get('type')
+            mega_type = entry.get("type")
             if not mega_type:
                 continue
 
             # Owner can be a string number or int
-            owner_val = entry.get('owner')
+            owner_val = entry.get("owner")
             owner = None
             if owner_val is not None:
                 try:
@@ -1184,23 +1269,23 @@ class MilitaryMixin:
                     pass
 
             # Planet ID (4294967295 means null)
-            planet_val = entry.get('planet')
+            planet_val = entry.get("planet")
             planet_id = None
-            if planet_val is not None and str(planet_val) != '4294967295':
+            if planet_val is not None and str(planet_val) != "4294967295":
                 planet_id = str(planet_val)
 
             # Check if this is a ruined megastructure (could be repaired)
-            is_ruined = 'ruined' in mega_type
+            is_ruined = "ruined" in mega_type
 
             # Track ruined megastructures that could potentially be repaired
             if is_ruined:
                 ruined_info = {
-                    'id': mega_id,
-                    'type': mega_type,
-                    'owner': owner,
+                    "id": mega_id,
+                    "type": mega_type,
+                    "owner": owner,
                 }
                 if planet_id:
-                    ruined_info['planet_id'] = planet_id
+                    ruined_info["planet_id"] = planet_id
                 ruined_megas.append(ruined_info)
 
             # Only count megastructures owned by player
@@ -1208,66 +1293,76 @@ class MilitaryMixin:
                 continue
 
             # Determine status from type name
-            status = 'complete'
+            status = "complete"
             if is_ruined:
-                status = 'ruined'
-            elif '_restored' in mega_type:
-                status = 'restored'
-            elif any(x in mega_type for x in ['_0', '_1', '_2', '_3', '_4', '_site']):
-                status = 'under_construction'
+                status = "ruined"
+            elif "_restored" in mega_type:
+                status = "restored"
+            elif any(x in mega_type for x in ["_0", "_1", "_2", "_3", "_4", "_site"]):
+                status = "under_construction"
 
             # Clean up type name for display
             display_type = mega_type
             # Remove stage suffixes for cleaner grouping
-            for suffix in ['_ruined', '_restored', '_0', '_1', '_2', '_3', '_4', '_5', '_site']:
+            for suffix in [
+                "_ruined",
+                "_restored",
+                "_0",
+                "_1",
+                "_2",
+                "_3",
+                "_4",
+                "_5",
+                "_site",
+            ]:
                 if display_type.endswith(suffix):
-                    display_type = display_type[:-len(suffix)]
+                    display_type = display_type[: -len(suffix)]
                     break
 
             mega_info = {
-                'id': mega_id,
-                'type': mega_type,
-                'display_type': display_type,
-                'status': status,
+                "id": mega_id,
+                "type": mega_type,
+                "display_type": display_type,
+                "status": status,
             }
 
             if planet_id:
-                mega_info['planet_id'] = planet_id
+                mega_info["planet_id"] = planet_id
 
             player_megas.append(mega_info)
 
             # Count by display type
             by_type[display_type] = by_type.get(display_type, 0) + 1
 
-        result['megastructures'] = player_megas
-        result['count'] = len(player_megas)
-        result['by_type'] = by_type
+        result["megastructures"] = player_megas
+        result["count"] = len(player_megas)
+        result["by_type"] = by_type
         # Return all ruined megastructures - late-game galaxies can have many
-        result['ruined_available'] = ruined_megas
+        result["ruined_available"] = ruined_megas
 
         return result
 
     def _get_megastructures_regex(self) -> dict:
         """Original regex-based megastructure extraction - fallback."""
         result = {
-            'megastructures': [],
-            'count': 0,
-            'by_type': {},
-            'ruined_available': [],
+            "megastructures": [],
+            "count": 0,
+            "by_type": {},
+            "ruined_available": [],
         }
 
         player_id = self.get_player_empire_id()
 
         # Find megastructures section
-        mega_start = self.gamestate.find('\nmegastructures=')
+        mega_start = self.gamestate.find("\nmegastructures=")
         if mega_start == -1:
             return result
 
         # Get a large chunk for megastructures
-        mega_section = self.gamestate[mega_start:mega_start + 3000000]
+        mega_section = self.gamestate[mega_start : mega_start + 3000000]
 
         # Find all megastructure entries
-        entry_pattern = r'\n\t(\d+)=\s*\{'
+        entry_pattern = r"\n\t(\d+)=\s*\{"
         entries = list(re.finditer(entry_pattern, mega_section))
 
         player_megas = []
@@ -1283,18 +1378,18 @@ class MilitaryMixin:
             pos = start_pos
             max_pos = min(start_pos + 2000, len(mega_section))
             while brace_count > 0 and pos < max_pos:
-                if mega_section[pos] == '{':
+                if mega_section[pos] == "{":
                     brace_count += 1
-                elif mega_section[pos] == '}':
+                elif mega_section[pos] == "}":
                     brace_count -= 1
                 pos += 1
 
             block = mega_section[start_pos:pos]
 
             # Extract fields
-            owner_match = re.search(r'\n\s*owner=(\d+)', block)
+            owner_match = re.search(r"\n\s*owner=(\d+)", block)
             type_match = re.search(r'\n\s*type="([^"]+)"', block)
-            planet_match = re.search(r'\n\s*planet=(\d+)', block)
+            planet_match = re.search(r"\n\s*planet=(\d+)", block)
 
             if not type_match:
                 continue
@@ -1303,18 +1398,18 @@ class MilitaryMixin:
             owner = int(owner_match.group(1)) if owner_match else None
 
             # Check if this is a ruined megastructure (could be repaired)
-            is_ruined = 'ruined' in mega_type
+            is_ruined = "ruined" in mega_type
 
             # Track ruined megastructures that could potentially be repaired
             if is_ruined:
                 # These could be anywhere in the galaxy
                 ruined_info = {
-                    'id': mega_id,
-                    'type': mega_type,
-                    'owner': owner,
+                    "id": mega_id,
+                    "type": mega_type,
+                    "owner": owner,
                 }
-                if planet_match and planet_match.group(1) != '4294967295':
-                    ruined_info['planet_id'] = planet_match.group(1)
+                if planet_match and planet_match.group(1) != "4294967295":
+                    ruined_info["planet_id"] = planet_match.group(1)
                 ruined_megas.append(ruined_info)
 
             # Only count megastructures owned by player
@@ -1322,41 +1417,51 @@ class MilitaryMixin:
                 continue
 
             # Determine status from type name
-            status = 'complete'
+            status = "complete"
             if is_ruined:
-                status = 'ruined'
-            elif '_restored' in mega_type:
-                status = 'restored'
-            elif any(x in mega_type for x in ['_0', '_1', '_2', '_3', '_4', '_site']):
-                status = 'under_construction'
+                status = "ruined"
+            elif "_restored" in mega_type:
+                status = "restored"
+            elif any(x in mega_type for x in ["_0", "_1", "_2", "_3", "_4", "_site"]):
+                status = "under_construction"
 
             # Clean up type name for display
             display_type = mega_type
             # Remove stage suffixes for cleaner grouping
-            for suffix in ['_ruined', '_restored', '_0', '_1', '_2', '_3', '_4', '_5', '_site']:
+            for suffix in [
+                "_ruined",
+                "_restored",
+                "_0",
+                "_1",
+                "_2",
+                "_3",
+                "_4",
+                "_5",
+                "_site",
+            ]:
                 if display_type.endswith(suffix):
-                    display_type = display_type[:-len(suffix)]
+                    display_type = display_type[: -len(suffix)]
                     break
 
             mega_info = {
-                'id': mega_id,
-                'type': mega_type,
-                'display_type': display_type,
-                'status': status,
+                "id": mega_id,
+                "type": mega_type,
+                "display_type": display_type,
+                "status": status,
             }
 
-            if planet_match and planet_match.group(1) != '4294967295':
-                mega_info['planet_id'] = planet_match.group(1)
+            if planet_match and planet_match.group(1) != "4294967295":
+                mega_info["planet_id"] = planet_match.group(1)
 
             player_megas.append(mega_info)
 
             # Count by display type
             by_type[display_type] = by_type.get(display_type, 0) + 1
 
-        result['megastructures'] = player_megas
-        result['count'] = len(player_megas)
-        result['by_type'] = by_type
+        result["megastructures"] = player_megas
+        result["count"] = len(player_megas)
+        result["by_type"] = by_type
         # Return all ruined megastructures - late-game galaxies can have many
-        result['ruined_available'] = ruined_megas
+        result["ruined_available"] = ruined_megas
 
         return result

@@ -14,6 +14,7 @@ from typing import Any
 @dataclass
 class ValidationResult:
     """Result of a validation check."""
+
     valid: bool
     issues: list[dict] = field(default_factory=list)
     warnings: list[dict] = field(default_factory=list)
@@ -21,7 +22,13 @@ class ValidationResult:
     checks_failed: int = 0
     checks_warned: int = 0
 
-    def add_issue(self, check: str, message: str, details: dict | None = None, fix_suggestion: str | None = None):
+    def add_issue(
+        self,
+        check: str,
+        message: str,
+        details: dict | None = None,
+        fix_suggestion: str | None = None,
+    ):
         """Add a validation issue (failure)."""
         issue = {"check": check, "message": message}
         if details:
@@ -44,7 +51,7 @@ class ValidationResult:
         """Record a passed check."""
         self.checks_passed += 1
 
-    def merge(self, other: 'ValidationResult'):
+    def merge(self, other: "ValidationResult"):
         """Merge another result into this one."""
         self.issues.extend(other.issues)
         self.warnings.extend(other.warnings)
@@ -65,7 +72,7 @@ class ValidationResult:
                 "checks_failed": self.checks_failed,
                 "checks_warned": self.checks_warned,
                 "total_checks": self.checks_passed + self.checks_failed,
-            }
+            },
         }
 
 
@@ -87,6 +94,7 @@ class ExtractionValidator:
             save_path: Path to the Stellaris save file (.sav)
         """
         from .extractor import SaveExtractor
+
         self.extractor = SaveExtractor(save_path)
         self.raw = self.extractor.gamestate
         self._country_names_cache = None
@@ -99,52 +107,54 @@ class ExtractionValidator:
 
     def _find_raw_war_section(self) -> str | None:
         """Extract the raw war section from gamestate."""
-        match = re.search(r'\nwar=\n\{', self.raw)
+        match = re.search(r"\nwar=\n\{", self.raw)
         if not match:
             return None
         start = match.start() + 1
-        chunk = self.raw[start:start + 5000000]
+        chunk = self.raw[start : start + 5000000]
         return chunk
 
     def _find_raw_fleet_section(self) -> str | None:
         """Extract the raw fleet section from gamestate."""
-        match = re.search(r'\nfleet=\n\{', self.raw)
+        match = re.search(r"\nfleet=\n\{", self.raw)
         if not match:
             return None
         start = match.start() + 1
         # Fleet section can be very large
-        chunk = self.raw[start:start + 50000000]
+        chunk = self.raw[start : start + 50000000]
         return chunk
 
     def _find_raw_country_section(self) -> str | None:
         """Extract the raw country section from gamestate."""
-        match = re.search(r'\ncountry=\n\{', self.raw)
+        match = re.search(r"\ncountry=\n\{", self.raw)
         if not match:
             return None
         start = match.start() + 1
         # Country section is huge
-        chunk = self.raw[start:start + 50000000]
+        chunk = self.raw[start : start + 50000000]
         return chunk
 
     def _extract_war_ids_from_raw(self, war_section: str) -> list[int]:
         """Extract all active war IDs from raw section."""
         war_ids = []
         # Match war entries: \n\tID=\n\t{ (active) vs \n\tID=none (ended)
-        for match in re.finditer(r'\n\t(\d+)=\n\t\{', war_section):
+        for match in re.finditer(r"\n\t(\d+)=\n\t\{", war_section):
             war_ids.append(int(match.group(1)))
         return war_ids
 
     def _extract_fleet_ids_from_raw(self, fleet_section: str) -> list[int]:
         """Extract all fleet IDs from raw section."""
         fleet_ids = []
-        for match in re.finditer(r'\n\t(\d+)=\n\t\{', fleet_section):
+        for match in re.finditer(r"\n\t(\d+)=\n\t\{", fleet_section):
             fleet_ids.append(int(match.group(1)))
         return fleet_ids
 
-    def _get_raw_war_participants(self, war_section: str, war_id: int) -> tuple[list[int], list[int]]:
+    def _get_raw_war_participants(
+        self, war_section: str, war_id: int
+    ) -> tuple[list[int], list[int]]:
         """Extract attacker and defender IDs from raw war block."""
         # Find this war's block
-        pattern = rf'\n\t{war_id}=\n\t\{{'
+        pattern = rf"\n\t{war_id}=\n\t\{{"
         match = re.search(pattern, war_section)
         if not match:
             return [], []
@@ -156,47 +166,53 @@ class ExtractionValidator:
 
         # Extract attackers
         attackers = []
-        attackers_match = re.search(r'attackers=\s*\{', block)
+        attackers_match = re.search(r"attackers=\s*\{", block)
         if attackers_match:
             att_start = attackers_match.end()
-            att_end = block.find('}', att_start)
+            att_end = block.find("}", att_start)
             if att_end > att_start:
                 # Find inner blocks and extract country IDs
-                att_block = block[attackers_match.start():att_end + 100]
-                attackers = [int(m.group(1)) for m in re.finditer(r'\bcountry=(\d+)', att_block)]
+                att_block = block[attackers_match.start() : att_end + 100]
+                attackers = [
+                    int(m.group(1)) for m in re.finditer(r"\bcountry=(\d+)", att_block)
+                ]
 
         # Extract defenders
         defenders = []
-        defenders_match = re.search(r'defenders=\s*\{', block)
+        defenders_match = re.search(r"defenders=\s*\{", block)
         if defenders_match:
             def_start = defenders_match.end()
-            def_end = block.find('}', def_start)
+            def_end = block.find("}", def_start)
             if def_end > def_start:
-                def_block = block[defenders_match.start():def_end + 100]
-                defenders = [int(m.group(1)) for m in re.finditer(r'\bcountry=(\d+)', def_block)]
+                def_block = block[defenders_match.start() : def_end + 100]
+                defenders = [
+                    int(m.group(1)) for m in re.finditer(r"\bcountry=(\d+)", def_block)
+                ]
 
         return attackers, defenders
 
-    def _get_raw_war_exhaustion(self, war_section: str, war_id: int) -> tuple[float | None, float | None]:
+    def _get_raw_war_exhaustion(
+        self, war_section: str, war_id: int
+    ) -> tuple[float | None, float | None]:
         """Extract war exhaustion values from raw war block."""
-        pattern = rf'\n\t{war_id}=\n\t\{{'
+        pattern = rf"\n\t{war_id}=\n\t\{{"
         match = re.search(pattern, war_section)
         if not match:
             return None, None
 
         start = match.start()
-        block = war_section[start:start + 5000]
+        block = war_section[start : start + 5000]
 
         attacker_ex = None
         defender_ex = None
 
         # Use findall and take LAST match - battles block has per-battle values,
         # war-level totals appear after battles. Multiply by 100 for percentage.
-        att_matches = re.findall(r'attacker_war_exhaustion=([\d.]+)', block)
+        att_matches = re.findall(r"attacker_war_exhaustion=([\d.]+)", block)
         if att_matches:
             attacker_ex = float(att_matches[-1]) * 100
 
-        def_matches = re.findall(r'defender_war_exhaustion=([\d.]+)', block)
+        def_matches = re.findall(r"defender_war_exhaustion=([\d.]+)", block)
         if def_matches:
             defender_ex = float(def_matches[-1]) * 100
 
@@ -224,11 +240,11 @@ class ExtractionValidator:
             result.add_issue(
                 "extraction_error",
                 f"Failed to extract wars: {e}",
-                fix_suggestion="Check if save file is valid and properly formatted"
+                fix_suggestion="Check if save file is valid and properly formatted",
             )
             return result
 
-        wars = extracted.get('wars', [])
+        wars = extracted.get("wars", [])
         player_id = self.extractor.get_player_empire_id()
 
         # Get raw war section
@@ -239,7 +255,7 @@ class ExtractionValidator:
                 result.add_issue(
                     "section_missing",
                     "Extracted wars but no war section found in raw save",
-                    details={"extracted_count": len(wars)}
+                    details={"extracted_count": len(wars)},
                 )
             else:
                 result.add_pass()  # Correctly found no wars
@@ -251,7 +267,7 @@ class ExtractionValidator:
 
         # Check 1: Verify extracted wars exist in raw
         for war in wars:
-            war_name = war.get('name', 'Unknown')
+            war_name = war.get("name", "Unknown")
             # We don't have IDs in extraction, so check by matching participants
             result.add_pass()
 
@@ -272,25 +288,25 @@ class ExtractionValidator:
                 details={
                     "extracted_count": extracted_count,
                     "raw_player_wars": raw_count,
-                    "raw_war_ids": player_involved_raw
+                    "raw_war_ids": player_involved_raw,
                 },
-                fix_suggestion="Check war parsing logic - may be missing wars or filtering incorrectly"
+                fix_suggestion="Check war parsing logic - may be missing wars or filtering incorrectly",
             )
         else:
             result.add_pass()
 
         # Check 3: Exhaustion invariants (0-100)
         for war in wars:
-            our_ex = war.get('our_exhaustion', 0)
-            their_ex = war.get('their_exhaustion', 0)
-            war_name = war.get('name', 'Unknown')
+            our_ex = war.get("our_exhaustion", 0)
+            their_ex = war.get("their_exhaustion", 0)
+            war_name = war.get("name", "Unknown")
 
             if not (0 <= our_ex <= 100):
                 result.add_issue(
                     "exhaustion_invariant",
                     f"Our exhaustion {our_ex} outside [0, 100] in '{war_name}'",
                     details={"war": war_name, "our_exhaustion": our_ex},
-                    fix_suggestion="Clamp exhaustion values to [0, 100] range"
+                    fix_suggestion="Clamp exhaustion values to [0, 100] range",
                 )
             else:
                 result.add_pass()
@@ -300,24 +316,24 @@ class ExtractionValidator:
                     "exhaustion_invariant",
                     f"Their exhaustion {their_ex} outside [0, 100] in '{war_name}'",
                     details={"war": war_name, "their_exhaustion": their_ex},
-                    fix_suggestion="Clamp exhaustion values to [0, 100] range"
+                    fix_suggestion="Clamp exhaustion values to [0, 100] range",
                 )
             else:
                 result.add_pass()
 
         # Check 4: Participant consistency - both sides must have participants
         for war in wars:
-            participants = war.get('participants', {})
-            attackers = participants.get('attackers', [])
-            defenders = participants.get('defenders', [])
-            war_name = war.get('name', 'Unknown')
+            participants = war.get("participants", {})
+            attackers = participants.get("attackers", [])
+            defenders = participants.get("defenders", [])
+            war_name = war.get("name", "Unknown")
 
             if not attackers:
                 result.add_issue(
                     "participant_invariant",
                     f"War '{war_name}' has no attackers",
                     details={"war": war_name},
-                    fix_suggestion="Check attacker extraction logic"
+                    fix_suggestion="Check attacker extraction logic",
                 )
             else:
                 result.add_pass()
@@ -327,22 +343,22 @@ class ExtractionValidator:
                     "participant_invariant",
                     f"War '{war_name}' has no defenders",
                     details={"war": war_name},
-                    fix_suggestion="Check defender extraction logic"
+                    fix_suggestion="Check defender extraction logic",
                 )
             else:
                 result.add_pass()
 
         # Check 5: Validate start_date format
         for war in wars:
-            start_date = war.get('start_date')
-            war_name = war.get('name', 'Unknown')
+            start_date = war.get("start_date")
+            war_name = war.get("name", "Unknown")
 
             if start_date:
-                if not re.match(r'^\d+\.\d+\.\d+$', start_date):
+                if not re.match(r"^\d+\.\d+\.\d+$", start_date):
                     result.add_warning(
                         "date_format",
                         f"War '{war_name}' has unusual date format: {start_date}",
-                        details={"war": war_name, "date": start_date}
+                        details={"war": war_name, "date": start_date},
                     )
                 else:
                     result.add_pass()
@@ -350,8 +366,8 @@ class ExtractionValidator:
         # Check 6: Country ID validity for participants
         valid_country_ids = set(country_names.keys())
         for war in wars:
-            participants = war.get('participants', {})
-            war_name = war.get('name', 'Unknown')
+            participants = war.get("participants", {})
+            war_name = war.get("name", "Unknown")
 
             # We have names not IDs in extraction, so this is a softer check
             for side, names in participants.items():
@@ -361,7 +377,11 @@ class ExtractionValidator:
                         result.add_warning(
                             "unresolved_participant",
                             f"Unresolved participant '{name}' in war '{war_name}'",
-                            details={"war": war_name, "side": side, "participant": name}
+                            details={
+                                "war": war_name,
+                                "side": side,
+                                "participant": name,
+                            },
                         )
 
         return result
@@ -388,7 +408,7 @@ class ExtractionValidator:
             result.add_issue(
                 "extraction_error",
                 f"Failed to extract fleets: {e}",
-                fix_suggestion="Check if save file is valid"
+                fix_suggestion="Check if save file is valid",
             )
             return result
 
@@ -399,7 +419,7 @@ class ExtractionValidator:
         if not country_content:
             result.add_warning(
                 "country_missing",
-                "Could not find player country content for fleet validation"
+                "Could not find player country content for fleet validation",
             )
             return result
 
@@ -409,28 +429,28 @@ class ExtractionValidator:
         # Get raw fleet section
         fleet_section = self._find_raw_fleet_section()
         if fleet_section is None:
-            if extracted.get('military_fleet_count', 0) > 0:
+            if extracted.get("military_fleet_count", 0) > 0:
                 result.add_issue(
                     "section_missing",
-                    "Extracted fleets but no fleet section found in raw save"
+                    "Extracted fleets but no fleet section found in raw save",
                 )
             return result
 
         # Check 1: Triangulation - owned_fleets count vs extraction
         total_owned = len(owned_fleet_ids)
-        extracted_military = extracted.get('military_fleet_count', 0)
-        extracted_civilian = extracted.get('civilian_fleet_count', 0)
-        extracted_starbases = extracted.get('starbases', {}).get('total', 0)
+        extracted_military = extracted.get("military_fleet_count", 0)
+        extracted_civilian = extracted.get("civilian_fleet_count", 0)
+        extracted_starbases = extracted.get("starbases", {}).get("total", 0)
 
         # The sum should roughly match (some fleets may be uncategorized)
         if total_owned > 0:
             result.add_pass()
 
         # Check 2: Verify each extracted military fleet has valid data
-        military_fleets = extracted.get('fleets', [])
+        military_fleets = extracted.get("fleets", [])
         for fleet in military_fleets:
-            fleet_id = fleet.get('id', 'unknown')
-            mp = fleet.get('military_power', 0)
+            fleet_id = fleet.get("id", "unknown")
+            mp = fleet.get("military_power", 0)
 
             # Check fleet exists in owned set
             if fleet_id not in owned_set:
@@ -438,7 +458,7 @@ class ExtractionValidator:
                     "existence",
                     f"Extracted fleet {fleet_id} not in owned_fleets",
                     details={"fleet_id": fleet_id},
-                    fix_suggestion="Check fleet ID extraction logic"
+                    fix_suggestion="Check fleet ID extraction logic",
                 )
             else:
                 result.add_pass()
@@ -448,50 +468,50 @@ class ExtractionValidator:
                 result.add_warning(
                     "military_power_invariant",
                     f"Military fleet {fleet_id} has military_power <= 0",
-                    details={"fleet_id": fleet_id, "military_power": mp}
+                    details={"fleet_id": fleet_id, "military_power": mp},
                 )
             else:
                 result.add_pass()
 
         # Check 3: Accuracy - verify each extracted military fleet is correctly categorized
         # by checking against raw save data (no sampling)
-        extracted_fleet_ids = set(f.get('id', 'unknown') for f in military_fleets)
+        extracted_fleet_ids = set(f.get("id", "unknown") for f in military_fleets)
 
         for fleet in military_fleets:
-            fleet_id = fleet.get('id', 'unknown')
+            fleet_id = fleet.get("id", "unknown")
 
             # Find this fleet in raw save
-            pattern = rf'\n\t{fleet_id}=\n\t\{{'
+            pattern = rf"\n\t{fleet_id}=\n\t\{{"
             match = re.search(pattern, fleet_section)
             if not match:
                 result.add_issue(
                     "existence",
                     f"Extracted military fleet {fleet_id} not found in raw fleet section",
                     details={"fleet_id": fleet_id},
-                    fix_suggestion="Check fleet ID extraction - fleet may not exist"
+                    fix_suggestion="Check fleet ID extraction - fleet may not exist",
                 )
                 continue
 
-            block = fleet_section[match.start():match.start() + 2500]
+            block = fleet_section[match.start() : match.start() + 2500]
 
             # Verify it's NOT a starbase
-            if 'station=yes' in block:
+            if "station=yes" in block:
                 result.add_issue(
                     "categorization",
                     f"Fleet {fleet_id} has station=yes but is in military_fleets",
                     details={"fleet_id": fleet_id},
-                    fix_suggestion="Check station=yes detection in _analyze_player_fleets"
+                    fix_suggestion="Check station=yes detection in _analyze_player_fleets",
                 )
             else:
                 result.add_pass()
 
             # Verify it's NOT civilian
-            if 'civilian=yes' in block:
+            if "civilian=yes" in block:
                 result.add_issue(
                     "categorization",
                     f"Fleet {fleet_id} has civilian=yes but is in military_fleets",
                     details={"fleet_id": fleet_id},
-                    fix_suggestion="Check civilian=yes detection in _analyze_player_fleets"
+                    fix_suggestion="Check civilian=yes detection in _analyze_player_fleets",
                 )
             else:
                 result.add_pass()
@@ -502,17 +522,17 @@ class ExtractionValidator:
         missed_military_fleets = []
 
         for fid in owned_fleet_ids:
-            pattern = rf'\n\t{fid}=\n\t\{{'
+            pattern = rf"\n\t{fid}=\n\t\{{"
             match = re.search(pattern, fleet_section)
             if not match:
                 continue
 
-            block = fleet_section[match.start():match.start() + 2500]
+            block = fleet_section[match.start() : match.start() + 2500]
 
-            is_station = 'station=yes' in block
-            is_civilian = 'civilian=yes' in block
+            is_station = "station=yes" in block
+            is_civilian = "civilian=yes" in block
 
-            mp_match = re.search(r'military_power=([\d.]+)', block)
+            mp_match = re.search(r"military_power=([\d.]+)", block)
             mp = float(mp_match.group(1)) if mp_match else 0.0
 
             # Same criteria as extraction: not station, not civilian, power > 100
@@ -520,10 +540,7 @@ class ExtractionValidator:
                 military_in_raw += 1
                 # Check if we captured this fleet
                 if fid not in extracted_fleet_ids:
-                    missed_military_fleets.append({
-                        'id': fid,
-                        'military_power': mp
-                    })
+                    missed_military_fleets.append({"id": fid, "military_power": mp})
 
         # Report any missed military fleets
         if missed_military_fleets:
@@ -534,9 +551,9 @@ class ExtractionValidator:
                     "missed_count": len(missed_military_fleets),
                     "missed_fleets": missed_military_fleets[:10],  # Show first 10
                     "extracted_count": extracted_military,
-                    "raw_count": military_in_raw
+                    "raw_count": military_in_raw,
                 },
-                fix_suggestion="Check fleet filtering logic in _analyze_player_fleets"
+                fix_suggestion="Check fleet filtering logic in _analyze_player_fleets",
             )
         else:
             result.add_pass()
@@ -548,22 +565,22 @@ class ExtractionValidator:
                 f"Military fleet count differs: extracted {extracted_military}, raw {military_in_raw}",
                 details={
                     "extracted_military": extracted_military,
-                    "raw_military": military_in_raw
-                }
+                    "raw_military": military_in_raw,
+                },
             )
         else:
             result.add_pass()
 
         # Check 5: Name-based sanity check - fleet names shouldn't suggest starbases
         for fleet in military_fleets:
-            fleet_id = fleet.get('id', 'unknown')
-            name = fleet.get('name', '')
+            fleet_id = fleet.get("id", "unknown")
+            name = fleet.get("name", "")
 
-            if 'starbase' in name.lower() or 'station' in name.lower():
+            if "starbase" in name.lower() or "station" in name.lower():
                 result.add_warning(
                     "suspicious_name",
                     f"Fleet '{name}' (ID: {fleet_id}) has starbase-like name but passed categorization",
-                    details={"fleet_id": fleet_id, "name": name}
+                    details={"fleet_id": fleet_id, "name": name},
                 )
             else:
                 result.add_pass()
@@ -592,23 +609,23 @@ class ExtractionValidator:
             result.add_issue(
                 "extraction_error",
                 f"Failed to extract diplomacy: {e}",
-                fix_suggestion="Check if save file is valid"
+                fix_suggestion="Check if save file is valid",
             )
             return result
 
-        relations = extracted.get('relations', [])
+        relations = extracted.get("relations", [])
         player_id = self.extractor.get_player_empire_id()
         country_names = self._get_country_names()
         valid_country_ids = set(country_names.keys())
 
         # Check 1: All country IDs in relations are valid
         for rel in relations:
-            country_id = rel.get('country_id')
+            country_id = rel.get("country_id")
             if country_id is None:
                 result.add_issue(
                     "missing_country_id",
                     "Relation entry missing country_id",
-                    details={"relation": rel}
+                    details={"relation": rel},
                 )
                 continue
 
@@ -617,16 +634,16 @@ class ExtractionValidator:
                 result.add_warning(
                     "unknown_country",
                     f"Country ID {country_id} not found in country section",
-                    details={"country_id": country_id}
+                    details={"country_id": country_id},
                 )
             else:
                 result.add_pass()
 
         # Check 2: Opinion value invariants
         for rel in relations:
-            country_id = rel.get('country_id', 'unknown')
-            opinion = rel.get('opinion')
-            trust = rel.get('trust')
+            country_id = rel.get("country_id", "unknown")
+            opinion = rel.get("opinion")
+            trust = rel.get("trust")
 
             if opinion is not None:
                 # Opinion typically ranges -1000 to +1000
@@ -634,7 +651,7 @@ class ExtractionValidator:
                     result.add_warning(
                         "opinion_range",
                         f"Opinion {opinion} with country {country_id} outside typical range [-1000, 1000]",
-                        details={"country_id": country_id, "opinion": opinion}
+                        details={"country_id": country_id, "opinion": opinion},
                     )
                 else:
                     result.add_pass()
@@ -646,17 +663,17 @@ class ExtractionValidator:
                         "trust_invariant",
                         f"Negative trust {trust} with country {country_id}",
                         details={"country_id": country_id, "trust": trust},
-                        fix_suggestion="Trust should not be negative"
+                        fix_suggestion="Trust should not be negative",
                     )
                 else:
                     result.add_pass()
 
         # Check 3: Federation membership cross-reference
-        federation_id = extracted.get('federation')
+        federation_id = extracted.get("federation")
         if federation_id is not None:
             try:
                 fed_details = self.extractor.get_federation_details()
-                fed_members = fed_details.get('members', [])
+                fed_members = fed_details.get("members", [])
 
                 if player_id not in fed_members:
                     result.add_issue(
@@ -665,53 +682,58 @@ class ExtractionValidator:
                         details={
                             "federation_id": federation_id,
                             "player_id": player_id,
-                            "members": fed_members
+                            "members": fed_members,
                         },
-                        fix_suggestion="Check federation membership extraction"
+                        fix_suggestion="Check federation membership extraction",
                     )
                 else:
                     result.add_pass()
             except Exception as e:
                 result.add_warning(
                     "federation_check_failed",
-                    f"Could not verify federation membership: {e}"
+                    f"Could not verify federation membership: {e}",
                 )
 
         # Check 4: Treaty symmetry (defensive pacts, non-aggression, etc.)
-        symmetric_treaties = ['defensive_pact', 'non_aggression_pact', 'commercial_pact', 'migration_treaty']
+        symmetric_treaties = [
+            "defensive_pact",
+            "non_aggression_pact",
+            "commercial_pact",
+            "migration_treaty",
+        ]
 
         for treaty_type in symmetric_treaties:
-            treaty_list = extracted.get(f'{treaty_type}s', [])
+            treaty_list = extracted.get(f"{treaty_type}s", [])
             for other_id in treaty_list:
                 # Note: We can't easily check symmetry without loading other country's relations
                 # This is a placeholder for future enhancement
                 result.add_pass()
 
         # Check 5: Count validation
-        relation_count = extracted.get('relation_count', 0)
+        relation_count = extracted.get("relation_count", 0)
         actual_count = len(relations)
 
         if relation_count != actual_count:
             result.add_issue(
                 "count_mismatch",
                 f"relation_count ({relation_count}) doesn't match relations list length ({actual_count})",
-                fix_suggestion="Update relation_count calculation"
+                fix_suggestion="Update relation_count calculation",
             )
         else:
             result.add_pass()
 
         # Check 6: Summary consistency
-        summary = extracted.get('summary', {})
-        positive = summary.get('positive', 0)
-        negative = summary.get('negative', 0)
-        neutral = summary.get('neutral', 0)
-        total_contacts = summary.get('total_contacts', 0)
+        summary = extracted.get("summary", {})
+        positive = summary.get("positive", 0)
+        negative = summary.get("negative", 0)
+        neutral = summary.get("neutral", 0)
+        total_contacts = summary.get("total_contacts", 0)
 
         if positive + negative + neutral != total_contacts:
             result.add_warning(
                 "summary_inconsistency",
                 f"Summary counts don't add up: {positive}+{negative}+{neutral} != {total_contacts}",
-                details=summary
+                details=summary,
             )
         else:
             result.add_pass()
@@ -740,14 +762,14 @@ class ExtractionValidator:
             result.add_issue(
                 "extraction_error",
                 f"Failed to extract resources: {e}",
-                fix_suggestion="Check if save file is valid"
+                fix_suggestion="Check if save file is valid",
             )
             return result
 
-        stockpiles = extracted.get('stockpiles', {})
-        monthly_income = extracted.get('monthly_income', {})
-        monthly_expenses = extracted.get('monthly_expenses', {})
-        net_monthly = extracted.get('net_monthly', {})
+        stockpiles = extracted.get("stockpiles", {})
+        monthly_income = extracted.get("monthly_income", {})
+        monthly_expenses = extracted.get("monthly_expenses", {})
+        net_monthly = extracted.get("net_monthly", {})
 
         # Check 1: Stockpiles are non-negative
         for resource, value in stockpiles.items():
@@ -756,7 +778,7 @@ class ExtractionValidator:
                     "stockpile_invariant",
                     f"Negative stockpile for {resource}: {value}",
                     details={"resource": resource, "value": value},
-                    fix_suggestion="Stockpiles should never be negative"
+                    fix_suggestion="Stockpiles should never be negative",
                 )
             else:
                 result.add_pass()
@@ -767,7 +789,7 @@ class ExtractionValidator:
                 result.add_warning(
                     "income_negative",
                     f"Negative income for {resource}: {value}",
-                    details={"resource": resource, "value": value}
+                    details={"resource": resource, "value": value},
                 )
             else:
                 result.add_pass()
@@ -778,13 +800,17 @@ class ExtractionValidator:
                 result.add_warning(
                     "expense_negative",
                     f"Negative expense for {resource}: {value}",
-                    details={"resource": resource, "value": value}
+                    details={"resource": resource, "value": value},
                 )
             else:
                 result.add_pass()
 
         # Check 4: Budget math validation (income - expense = net)
-        all_resources = set(monthly_income.keys()) | set(monthly_expenses.keys()) | set(net_monthly.keys())
+        all_resources = (
+            set(monthly_income.keys())
+            | set(monthly_expenses.keys())
+            | set(net_monthly.keys())
+        )
 
         for resource in all_resources:
             income = monthly_income.get(resource, 0)
@@ -803,33 +829,33 @@ class ExtractionValidator:
                         "income": income,
                         "expense": expense,
                         "expected_net": expected_net,
-                        "actual_net": net
+                        "actual_net": net,
                     },
-                    fix_suggestion="Review net calculation in get_resources()"
+                    fix_suggestion="Review net calculation in get_resources()",
                 )
             else:
                 result.add_pass()
 
         # Check 5: Essential resources are present
-        essential_resources = ['energy', 'minerals', 'food', 'alloys', 'consumer_goods']
+        essential_resources = ["energy", "minerals", "food", "alloys", "consumer_goods"]
 
         for resource in essential_resources:
             if resource not in stockpiles and resource not in net_monthly:
                 result.add_warning(
                     "missing_essential",
                     f"Essential resource '{resource}' not found in extraction",
-                    details={"resource": resource}
+                    details={"resource": resource},
                 )
             else:
                 result.add_pass()
 
         # Check 6: Reasonable value ranges
         REASONABLE_STOCKPILE_MAX = {
-            'influence': 1000,  # Hard cap in game
-            'unity': 10000000,  # Very high but possible late game
-            'sr_living_metal': 100000,
-            'sr_zro': 100000,
-            'sr_dark_matter': 100000,
+            "influence": 1000,  # Hard cap in game
+            "unity": 10000000,  # Very high but possible late game
+            "sr_living_metal": 100000,
+            "sr_zro": 100000,
+            "sr_dark_matter": 100000,
         }
 
         DEFAULT_MAX = 10000000  # 10 million for basic resources
@@ -843,8 +869,8 @@ class ExtractionValidator:
                     details={
                         "resource": resource,
                         "value": value,
-                        "expected_max": max_expected
-                    }
+                        "expected_max": max_expected,
+                    },
                 )
             else:
                 result.add_pass()
@@ -852,12 +878,12 @@ class ExtractionValidator:
         # Check 7: Verify budget breakdown consistency if available
         try:
             breakdown = self.extractor.get_budget_breakdown()
-            by_resource = breakdown.get('by_resource', {})
+            by_resource = breakdown.get("by_resource", {})
 
             for resource, data in by_resource.items():
-                breakdown_income = data.get('income_total', 0)
-                breakdown_expense = data.get('expenses_total', 0)
-                breakdown_net = data.get('net', 0)
+                breakdown_income = data.get("income_total", 0)
+                breakdown_expense = data.get("expenses_total", 0)
+                breakdown_net = data.get("net", 0)
 
                 # Check breakdown's internal consistency
                 expected_breakdown_net = round(breakdown_income - breakdown_expense, 2)
@@ -870,15 +896,14 @@ class ExtractionValidator:
                             "income_total": breakdown_income,
                             "expenses_total": breakdown_expense,
                             "expected_net": expected_breakdown_net,
-                            "actual_net": breakdown_net
-                        }
+                            "actual_net": breakdown_net,
+                        },
                     )
                 else:
                     result.add_pass()
         except Exception as e:
             result.add_warning(
-                "breakdown_check_skipped",
-                f"Could not validate budget breakdown: {e}"
+                "breakdown_check_skipped", f"Could not validate budget breakdown: {e}"
             )
 
         return result
@@ -896,10 +921,10 @@ class ExtractionValidator:
             - summary: Aggregated statistics
         """
         results = {
-            'wars': self.validate_wars(),
-            'fleets': self.validate_fleets(),
-            'diplomacy': self.validate_diplomacy(),
-            'resources': self.validate_resources(),
+            "wars": self.validate_wars(),
+            "fleets": self.validate_fleets(),
+            "diplomacy": self.validate_diplomacy(),
+            "resources": self.validate_resources(),
         }
 
         # Calculate overall validity and stats
@@ -910,17 +935,21 @@ class ExtractionValidator:
         total_failed = sum(r.checks_failed for r in results.values())
 
         return {
-            'overall_valid': overall_valid,
-            'wars': results['wars'].to_dict(),
-            'fleets': results['fleets'].to_dict(),
-            'diplomacy': results['diplomacy'].to_dict(),
-            'resources': results['resources'].to_dict(),
-            'summary': {
-                'total_issues': total_issues,
-                'total_warnings': total_warnings,
-                'total_checks_passed': total_passed,
-                'total_checks_failed': total_failed,
-                'total_checks': total_passed + total_failed,
-                'pass_rate': round(total_passed / (total_passed + total_failed) * 100, 1) if (total_passed + total_failed) > 0 else 100.0
-            }
+            "overall_valid": overall_valid,
+            "wars": results["wars"].to_dict(),
+            "fleets": results["fleets"].to_dict(),
+            "diplomacy": results["diplomacy"].to_dict(),
+            "resources": results["resources"].to_dict(),
+            "summary": {
+                "total_issues": total_issues,
+                "total_warnings": total_warnings,
+                "total_checks_passed": total_passed,
+                "total_checks_failed": total_failed,
+                "total_checks": total_passed + total_failed,
+                "pass_rate": (
+                    round(total_passed / (total_passed + total_failed) * 100, 1)
+                    if (total_passed + total_failed) > 0
+                    else 100.0
+                ),
+            },
         }

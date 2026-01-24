@@ -9,7 +9,13 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
+    from rust_bridge import (
+        extract_sections,
+        iter_section_entries,
+        ParserError,
+        _get_active_session,
+    )
+
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
@@ -41,6 +47,12 @@ class SaveExtractorBase:
         self._building_types = None  # Lazy-loaded building ID→type map
         self._country_names = None  # Lazy-loaded country ID→name map
         self._player_status_cache = None  # Cached player status (expensive to compute)
+        self._player_country_entry_cache = (
+            None  # Cached player country from Rust get_entry
+        )
+        self._player_country_content_cache = (
+            None  # Cached player country string content
+        )
 
     def close(self) -> None:
         """Release large in-memory state (best-effort)."""
@@ -54,6 +66,8 @@ class SaveExtractorBase:
         self._building_types = None
         self._country_names = None
         self._player_status_cache = None
+        self._player_country_entry_cache = None
+        self._player_country_content_cache = None
 
     def __enter__(self) -> SaveExtractorBase:
         return self
@@ -115,9 +129,13 @@ class SaveExtractorBase:
                 }
                 return self._building_types
             except ParserError as e:
-                logger.warning(f"Rust parser failed for buildings: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for buildings: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback: regex-based parsing
         return self._get_building_types_regex()
@@ -129,13 +147,15 @@ class SaveExtractorBase:
             Dict mapping building IDs (as strings) to building type names
         """
         # Find the top-level buildings section (near end of file)
-        match = re.search(r'^buildings=\s*\{', self.gamestate, re.MULTILINE)
+        match = re.search(r"^buildings=\s*\{", self.gamestate, re.MULTILINE)
         if not match:
             return self._building_types
 
         start = match.start()
         # Parse entries like: 50331648={ type="building_ministry_production" position=0 }
-        chunk = self.gamestate[start:start + 5000000]  # Buildings section can be large
+        chunk = self.gamestate[
+            start : start + 5000000
+        ]  # Buildings section can be large
 
         for m in re.finditer(r'(\d+)=\s*\{\s*type="([^"]+)"', chunk):
             building_id = m.group(1)
@@ -146,14 +166,14 @@ class SaveExtractorBase:
 
     def _load_meta(self) -> None:
         """Extract meta from the save file (cheap, used for Tier 0 status)."""
-        with zipfile.ZipFile(self.save_path, 'r') as z:
+        with zipfile.ZipFile(self.save_path, "r") as z:
             with z.open("meta") as raw:
                 with io.TextIOWrapper(raw, encoding="utf-8", errors="replace") as text:
                     self._meta = text.read()
 
     def _load_gamestate(self) -> None:
         """Extract the full gamestate from the save file (expensive)."""
-        with zipfile.ZipFile(self.save_path, 'r') as z:
+        with zipfile.ZipFile(self.save_path, "r") as z:
             with z.open("gamestate") as raw:
                 with io.TextIOWrapper(raw, encoding="utf-8", errors="replace") as text:
                     self._gamestate = text.read()
@@ -176,7 +196,7 @@ class SaveExtractorBase:
             Tuple of (start, end) positions, or None if not found
         """
         # Look for "section_name={" or "section_name ={" at start of line
-        pattern = rf'^{re.escape(section_name)}\s*=\s*\{{'
+        pattern = rf"^{re.escape(section_name)}\s*=\s*\{{"
         match = re.search(pattern, self.gamestate, re.MULTILINE)
 
         if not match:
@@ -189,10 +209,10 @@ class SaveExtractorBase:
         in_section = False
 
         for i, char in enumerate(self.gamestate[start:], start):
-            if char == '{':
+            if char == "{":
                 brace_count += 1
                 in_section = True
-            elif char == '}':
+            elif char == "}":
                 brace_count -= 1
                 if in_section and brace_count == 0:
                     return (start, i + 1)
@@ -243,24 +263,24 @@ class SaveExtractorBase:
         block_start = 0
 
         for i in range(pos, -1, -1):
-            if content[i] == '}':
+            if content[i] == "}":
                 brace_count += 1
-            elif content[i] == '{':
+            elif content[i] == "{":
                 if brace_count == 0:
                     # Find the key before this brace
-                    block_start = content.rfind('\n', 0, i) + 1
+                    block_start = content.rfind("\n", 0, i) + 1
                     break
                 brace_count -= 1
 
         # Now find the matching closing brace
         brace_count = 0
         for i in range(block_start, len(content)):
-            if content[i] == '{':
+            if content[i] == "{":
                 brace_count += 1
-            elif content[i] == '}':
+            elif content[i] == "}":
                 brace_count -= 1
                 if brace_count == 0:
-                    return content[block_start:i + 1]
+                    return content[block_start : i + 1]
 
         return None
 
@@ -282,12 +302,19 @@ class SaveExtractorBase:
     def _find_player_country_content(self, player_id: int = 0) -> str | None:
         """Get the content of the player's country block.
 
+        Results are cached since this is an expensive operation and the
+        player country content doesn't change within a single analysis.
+
         Args:
             player_id: The player's country ID (usually 0)
 
         Returns:
             String content of the country block, or None if not found
         """
+        # Return cached result if available
+        if self._player_country_content_cache is not None:
+            return self._player_country_content_cache
+
         bounds = self._get_section_bounds("country")
         if not bounds:
             return None
@@ -312,7 +339,37 @@ class SaveExtractorBase:
             elif ch == "}":
                 brace_count -= 1
                 if started and brace_count == 0:
-                    return self.gamestate[start : i + 1]
+                    result = self.gamestate[start : i + 1]
+                    self._player_country_content_cache = result
+                    return result
+
+        return None
+
+    def _get_player_country_entry(self, player_id: int = 0) -> dict | None:
+        """Get the player's country entry as a parsed dict using Rust get_entry.
+
+        This is much faster than _find_player_country_content (0.004s vs 0.45s)
+        when a Rust session is active. Results are cached.
+
+        Args:
+            player_id: The player's country ID (usually 0)
+
+        Returns:
+            Parsed country dict if found, None otherwise.
+            Note: Returns None if no active session (use _find_player_country_content instead).
+        """
+        # Return cached result if available
+        if self._player_country_entry_cache is not None:
+            return self._player_country_entry_cache
+
+        session = _get_active_session()
+        if not session:
+            return None
+
+        entry = session.get_entry("country", str(player_id))
+        if entry and isinstance(entry, dict):
+            self._player_country_entry_cache = entry
+            return entry
 
         return None
 
@@ -341,18 +398,18 @@ class SaveExtractorBase:
             List of fleet ID strings that the player owns
         """
         # Find owned_fleets section
-        owned_match = re.search(r'owned_fleets=\s*\{', country_content)
+        owned_match = re.search(r"owned_fleets=\s*\{", country_content)
         if not owned_match:
             return []
 
         # Get content after owned_fleets={
-        content = country_content[owned_match.end():]
+        content = country_content[owned_match.end() :]
 
         # Extract all fleet=N values until we hit a section at lower indent
         # The structure is: owned_fleets=\n\t\t\t{\n\t\t\t\t{\n\t\t\t\t\tfleet=0\n\t\t\t\t}\n...
         # Use 100KB window - late-game empires can have 200+ fleets, each entry ~50 bytes
         fleet_ids = []
-        for match in re.finditer(r'fleet=(\d+)', content[:100000]):
+        for match in re.finditer(r"fleet=(\d+)", content[:100000]):
             fleet_ids.append(match.group(1))
 
         return fleet_ids
@@ -370,9 +427,13 @@ class SaveExtractorBase:
             try:
                 return self._get_ship_to_fleet_mapping_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for ship mapping: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for ship mapping: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         return self._get_ship_to_fleet_mapping_regex()
@@ -405,14 +466,14 @@ class SaveExtractorBase:
 
         ship_to_fleet = {}
         ships_start, ships_end = bounds
-        entry_re = re.compile(r'(?m)^\t(\d+)\s*=\s*\{')
+        entry_re = re.compile(r"(?m)^\t(\d+)\s*=\s*\{")
 
         for entry in entry_re.finditer(self.gamestate, ships_start, ships_end):
             ship_id = entry.group(1)
             start = entry.start()
             snippet = self.gamestate[start : min(start + 3000, ships_end)]
 
-            fleet_m = re.search(r'\bfleet=(\d+)\b', snippet)
+            fleet_m = re.search(r"\bfleet=(\d+)\b", snippet)
             if fleet_m:
                 ship_to_fleet[ship_id] = fleet_m.group(1)
 
@@ -434,12 +495,14 @@ class SaveExtractorBase:
             return owned_fleet_ids
 
         # Find fleets_manager.owned_fleets
-        fleets_mgr_match = re.search(r'fleets_manager=\s*\{', player_content)
+        fleets_mgr_match = re.search(r"fleets_manager=\s*\{", player_content)
         if not fleets_mgr_match:
             return owned_fleet_ids
 
-        content = player_content[fleets_mgr_match.start():fleets_mgr_match.start() + 50000]
-        for m in re.finditer(r'fleet=(\d+)', content):
+        content = player_content[
+            fleets_mgr_match.start() : fleets_mgr_match.start() + 50000
+        ]
+        for m in re.finditer(r"fleet=(\d+)", content):
             owned_fleet_ids.add(m.group(1))
 
         return owned_fleet_ids
@@ -458,15 +521,15 @@ class SaveExtractorBase:
             Dict with starbase counts by level and totals
         """
         result = {
-            'citadels': 0,
-            'star_fortresses': 0,
-            'starholds': 0,
-            'starports': 0,
-            'outposts': 0,
-            'orbital_rings': 0,
-            'total_upgraded': 0,  # Non-outpost, non-orbital starbases (count against capacity)
-            'total_systems': 0,   # Systems owned (starbases excluding orbital rings)
-            'total': 0,           # All starbases including orbital rings
+            "citadels": 0,
+            "star_fortresses": 0,
+            "starholds": 0,
+            "starports": 0,
+            "outposts": 0,
+            "orbital_rings": 0,
+            "total_upgraded": 0,  # Non-outpost, non-orbital starbases (count against capacity)
+            "total_systems": 0,  # Systems owned (starbases excluding orbital rings)
+            "total": 0,  # All starbases including orbital rings
         }
 
         # Get player's owned fleet IDs
@@ -484,16 +547,26 @@ class SaveExtractorBase:
         # Try Rust bridge first
         if RUST_BRIDGE_AVAILABLE:
             try:
-                return self._count_player_starbases_rust(owned_fleet_ids, ship_to_fleet, result)
+                return self._count_player_starbases_rust(
+                    owned_fleet_ids, ship_to_fleet, result
+                )
             except ParserError as e:
-                logger.warning(f"Rust parser failed for starbases: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for starbases: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
-        return self._count_player_starbases_regex(owned_fleet_ids, ship_to_fleet, result)
+        return self._count_player_starbases_regex(
+            owned_fleet_ids, ship_to_fleet, result
+        )
 
-    def _count_player_starbases_rust(self, owned_fleet_ids: set[str], ship_to_fleet: dict, result: dict) -> dict:
+    def _count_player_starbases_rust(
+        self, owned_fleet_ids: set[str], ship_to_fleet: dict, result: dict
+    ) -> dict:
         """Count player starbases using Rust parser.
 
         Args:
@@ -525,34 +598,36 @@ class SaveExtractorBase:
                 continue
 
             # This starbase belongs to the player
-            result['total'] += 1
+            result["total"] += 1
 
-            if 'citadel' in level:
-                result['citadels'] += 1
-                result['total_upgraded'] += 1
-                result['total_systems'] += 1
-            elif 'starfortress' in level:
-                result['star_fortresses'] += 1
-                result['total_upgraded'] += 1
-                result['total_systems'] += 1
-            elif 'starhold' in level:
-                result['starholds'] += 1
-                result['total_upgraded'] += 1
-                result['total_systems'] += 1
-            elif 'starport' in level:
-                result['starports'] += 1
-                result['total_upgraded'] += 1
-                result['total_systems'] += 1
-            elif 'orbital_ring' in level:
-                result['orbital_rings'] += 1
+            if "citadel" in level:
+                result["citadels"] += 1
+                result["total_upgraded"] += 1
+                result["total_systems"] += 1
+            elif "starfortress" in level:
+                result["star_fortresses"] += 1
+                result["total_upgraded"] += 1
+                result["total_systems"] += 1
+            elif "starhold" in level:
+                result["starholds"] += 1
+                result["total_upgraded"] += 1
+                result["total_systems"] += 1
+            elif "starport" in level:
+                result["starports"] += 1
+                result["total_upgraded"] += 1
+                result["total_systems"] += 1
+            elif "orbital_ring" in level:
+                result["orbital_rings"] += 1
                 # Orbital rings don't count against starbase capacity or as systems
-            elif 'outpost' in level:
-                result['outposts'] += 1
-                result['total_systems'] += 1
+            elif "outpost" in level:
+                result["outposts"] += 1
+                result["total_systems"] += 1
 
         return result
 
-    def _count_player_starbases_regex(self, owned_fleet_ids: set[str], ship_to_fleet: dict, result: dict) -> dict:
+    def _count_player_starbases_regex(
+        self, owned_fleet_ids: set[str], ship_to_fleet: dict, result: dict
+    ) -> dict:
         """Count player starbases using regex (fallback method).
 
         Args:
@@ -564,26 +639,28 @@ class SaveExtractorBase:
             Dict with starbase counts
         """
         # Find starbase_mgr section
-        starbase_match = re.search(r'^starbase_mgr=\s*\{', self.gamestate, re.MULTILINE)
+        starbase_match = re.search(r"^starbase_mgr=\s*\{", self.gamestate, re.MULTILINE)
         if not starbase_match:
             return result
 
-        sb_chunk = self.gamestate[starbase_match.start():starbase_match.start() + 5000000]
+        sb_chunk = self.gamestate[
+            starbase_match.start() : starbase_match.start() + 5000000
+        ]
 
         # Parse each starbase entry
-        for m in re.finditer(r'\n\t\t(\d+)=\n\t\t\{', sb_chunk):
+        for m in re.finditer(r"\n\t\t(\d+)=\n\t\t\{", sb_chunk):
             sb_id = m.group(1)
-            content = sb_chunk[m.start():m.start() + 2000]
+            content = sb_chunk[m.start() : m.start() + 2000]
 
             # Get level and station (ship ID)
             level_m = re.search(r'level="([^"]+)"', content)
-            station_m = re.search(r'\n\t\t\tstation=(\d+)\n', content)
+            station_m = re.search(r"\n\t\t\tstation=(\d+)\n", content)
 
             if not station_m:
                 continue
 
             ship_id = station_m.group(1)
-            level = level_m.group(1) if level_m else 'unknown'
+            level = level_m.group(1) if level_m else "unknown"
 
             # Trace ownership: ship → fleet → player?
             fleet_id = ship_to_fleet.get(ship_id)
@@ -591,30 +668,30 @@ class SaveExtractorBase:
                 continue
 
             # This starbase belongs to the player
-            result['total'] += 1
+            result["total"] += 1
 
-            if 'citadel' in level:
-                result['citadels'] += 1
-                result['total_upgraded'] += 1
-                result['total_systems'] += 1
-            elif 'starfortress' in level:
-                result['star_fortresses'] += 1
-                result['total_upgraded'] += 1
-                result['total_systems'] += 1
-            elif 'starhold' in level:
-                result['starholds'] += 1
-                result['total_upgraded'] += 1
-                result['total_systems'] += 1
-            elif 'starport' in level:
-                result['starports'] += 1
-                result['total_upgraded'] += 1
-                result['total_systems'] += 1
-            elif 'orbital_ring' in level:
-                result['orbital_rings'] += 1
+            if "citadel" in level:
+                result["citadels"] += 1
+                result["total_upgraded"] += 1
+                result["total_systems"] += 1
+            elif "starfortress" in level:
+                result["star_fortresses"] += 1
+                result["total_upgraded"] += 1
+                result["total_systems"] += 1
+            elif "starhold" in level:
+                result["starholds"] += 1
+                result["total_upgraded"] += 1
+                result["total_systems"] += 1
+            elif "starport" in level:
+                result["starports"] += 1
+                result["total_upgraded"] += 1
+                result["total_systems"] += 1
+            elif "orbital_ring" in level:
+                result["orbital_rings"] += 1
                 # Orbital rings don't count against starbase capacity or as systems
-            elif 'outpost' in level:
-                result['outposts'] += 1
-                result['total_systems'] += 1
+            elif "outpost" in level:
+                result["outposts"] += 1
+                result["total_systems"] += 1
 
         return result
 
@@ -640,9 +717,13 @@ class SaveExtractorBase:
                 self._country_names = self._get_country_names_map_rust()
                 return self._country_names
             except ParserError as e:
-                logger.warning(f"Rust parser failed for country names: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for country names: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         self._country_names = self._get_country_names_map_regex()
@@ -656,7 +737,9 @@ class SaveExtractorBase:
         """
         country_names = {}
 
-        for country_id_str, country_data in iter_section_entries(self.save_path, "country"):
+        for country_id_str, country_data in iter_section_entries(
+            self.save_path, "country"
+        ):
             if not isinstance(country_data, dict):
                 continue
 
@@ -680,7 +763,9 @@ class SaveExtractorBase:
                     country_names[country_id] = readable
                 elif key:
                     # Localization key - convert to readable name
-                    country_names[country_id] = self._localization_key_to_readable_name(key)
+                    country_names[country_id] = self._localization_key_to_readable_name(
+                        key
+                    )
 
         return country_names
 
@@ -716,11 +801,11 @@ class SaveExtractorBase:
                     elif nested_key and not nested_key.startswith("%"):
                         # Found a concrete value - clean it up
                         clean = nested_key
-                        for prefix in ['SPEC_', 'ADJ_', 'NAME_', 'SUFFIX_']:
+                        for prefix in ["SPEC_", "ADJ_", "NAME_", "SUFFIX_"]:
                             if clean.startswith(prefix):
-                                clean = clean[len(prefix):]
+                                clean = clean[len(prefix) :]
                                 break
-                        clean = clean.replace('_', ' ').strip()
+                        clean = clean.replace("_", " ").strip()
                         if clean:
                             parts.append(clean)
                 elif isinstance(value, str) and not value.startswith("%"):
@@ -729,7 +814,7 @@ class SaveExtractorBase:
         extract_values(variables)
 
         if parts:
-            return ' '.join(parts)
+            return " ".join(parts)
 
         # Fallback to key processing
         key = name_block.get("key", "Unknown Empire")
@@ -749,7 +834,7 @@ class SaveExtractorBase:
         country_start, country_end = bounds
 
         # Find entries like: <tab>0={ ... name="United Nations of Earth" ... }
-        entry_re = re.compile(r'(?m)^\t(\d+)\s*=\s*\{')
+        entry_re = re.compile(r"(?m)^\t(\d+)\s*=\s*\{")
         entries = list(entry_re.finditer(self.gamestate, country_start, country_end))
 
         # Process all country entries - no artificial limit
@@ -778,12 +863,14 @@ class SaveExtractorBase:
                 country_names[country_id] = name_match.group(1)
             else:
                 # Try localization key format: name={ key="..." }
-                key_match = re.search(r'(?m)^\t\tname\s*=\s*\{\s*key\s*=\s*"([^"]+)"', block)
+                key_match = re.search(
+                    r'(?m)^\t\tname\s*=\s*\{\s*key\s*=\s*"([^"]+)"', block
+                )
                 if key_match:
                     key = key_match.group(1)
                     # Check if name block has variables (look specifically in name={...} block)
                     # Extract name block first to check for variables
-                    name_block_match = re.search(r'(?m)^\t\tname\s*=\s*\{', block)
+                    name_block_match = re.search(r"(?m)^\t\tname\s*=\s*\{", block)
                     has_name_vars = False
                     if name_block_match:
                         # Find extent of name block
@@ -791,11 +878,13 @@ class SaveExtractorBase:
                         bc = 1
                         ne = ns
                         while bc > 0 and ne < len(block):
-                            if block[ne] == '{': bc += 1
-                            elif block[ne] == '}': bc -= 1
+                            if block[ne] == "{":
+                                bc += 1
+                            elif block[ne] == "}":
+                                bc -= 1
                             ne += 1
-                        name_section = block[name_block_match.start():ne]
-                        has_name_vars = 'variables=' in name_section
+                        name_section = block[name_block_match.start() : ne]
+                        has_name_vars = "variables=" in name_section
 
                     if has_name_vars:
                         # Extract variable values to build readable name
@@ -823,50 +912,50 @@ class SaveExtractorBase:
         """
         # Handle AWAKENED_EMPIRE_* patterns (check before FALLEN to handle awakened first)
         # Examples: AWAKENED_EMPIRE_SPIRITUALIST, AWAKENED_EMPIRE_1
-        if key.startswith('AWAKENED_EMPIRE_'):
-            suffix = key[len('AWAKENED_EMPIRE_'):]
+        if key.startswith("AWAKENED_EMPIRE_"):
+            suffix = key[len("AWAKENED_EMPIRE_") :]
             if suffix.isdigit():
                 return f"Awakened Empire {suffix}"
             else:
                 # Convert suffix like SPIRITUALIST to (Spiritualist)
-                type_name = suffix.replace('_', ' ').title()
+                type_name = suffix.replace("_", " ").title()
                 return f"Awakened Empire ({type_name})"
 
         # Handle FALLEN_EMPIRE_* patterns
         # Examples: FALLEN_EMPIRE_1, FALLEN_EMPIRE_SPIRITUALIST, FALLEN_EMPIRE_MATERIALIST
-        if key.startswith('FALLEN_EMPIRE_'):
-            suffix = key[len('FALLEN_EMPIRE_'):]
+        if key.startswith("FALLEN_EMPIRE_"):
+            suffix = key[len("FALLEN_EMPIRE_") :]
             if suffix.isdigit():
                 return f"Fallen Empire {suffix}"
             else:
                 # Convert suffix like SPIRITUALIST to (Spiritualist)
-                type_name = suffix.replace('_', ' ').title()
+                type_name = suffix.replace("_", " ").title()
                 return f"Fallen Empire ({type_name})"
 
         # Handle NAME_* patterns (specific named entities)
         # Examples: NAME_Enigmatic_Observers, NAME_Keepers_of_Knowledge
-        if key.startswith('NAME_'):
-            name_part = key[len('NAME_'):]
+        if key.startswith("NAME_"):
+            name_part = key[len("NAME_") :]
             # Replace underscores with spaces, preserve existing capitalization
-            return name_part.replace('_', ' ')
+            return name_part.replace("_", " ")
 
         # Handle standard EMPIRE_DESIGN_* patterns
         # Examples: EMPIRE_DESIGN_humans1, EMPIRE_DESIGN_commonwealth
-        if key.startswith('EMPIRE_DESIGN_'):
-            name_part = key[len('EMPIRE_DESIGN_'):]
+        if key.startswith("EMPIRE_DESIGN_"):
+            name_part = key[len("EMPIRE_DESIGN_") :]
             # Insert space before trailing numbers (humans1 -> humans 1)
-            name_part = re.sub(r'(\D)(\d+)$', r'\1 \2', name_part)
-            return name_part.replace('_', ' ').title()
+            name_part = re.sub(r"(\D)(\d+)$", r"\1 \2", name_part)
+            return name_part.replace("_", " ").title()
 
         # Fallback: general cleanup for any other patterns
         # Remove common prefixes and clean up
         result = key
-        for prefix in ['EMPIRE_', 'COUNTRY_', 'CIV_']:
+        for prefix in ["EMPIRE_", "COUNTRY_", "CIV_"]:
             if result.startswith(prefix):
-                result = result[len(prefix):]
+                result = result[len(prefix) :]
                 break
 
-        return result.replace('_', ' ').title()
+        return result.replace("_", " ").title()
 
     def _resolve_template_name(self, block: str, template_key: str) -> str:
         """Resolve a template name like %ADJECTIVE% using its variables block.
@@ -889,26 +978,28 @@ class SaveExtractorBase:
             Resolved name or a cleaned-up fallback
         """
         # First, extract just the name={...} block to avoid matching adjective={...}
-        name_block_match = re.search(r'\n\t\tname\s*=\s*\{', block)
+        name_block_match = re.search(r"\n\t\tname\s*=\s*\{", block)
         if name_block_match:
             # Find matching closing brace for name block
             start = name_block_match.end()
             brace_count = 1
             end = start
             while brace_count > 0 and end < len(block):
-                if block[end] == '{':
+                if block[end] == "{":
                     brace_count += 1
-                elif block[end] == '}':
+                elif block[end] == "}":
                     brace_count -= 1
                 end += 1
-            name_block = block[name_block_match.start():end]
+            name_block = block[name_block_match.start() : end]
         else:
             name_block = block[:1000]  # Fallback to first part
 
         # Recursively extract all literal value keys from nested variables
         # This handles nested templates like %ADJ% containing more templates
         # Pattern: value={ key="SOMETHING" } where SOMETHING doesn't start with %
-        all_values = re.findall(r'value\s*=\s*\{\s*key\s*=\s*"([^"%][^"]*)"', name_block)
+        all_values = re.findall(
+            r'value\s*=\s*\{\s*key\s*=\s*"([^"%][^"]*)"', name_block
+        )
 
         if not all_values:
             # Try simpler value="string" format
@@ -920,22 +1011,24 @@ class SaveExtractorBase:
             for vk in all_values:
                 # Remove common prefixes like SPEC_, ADJ_, etc.
                 clean = vk
-                for prefix in ['SPEC_', 'ADJ_', 'NAME_', 'SUFFIX_']:
+                for prefix in ["SPEC_", "ADJ_", "NAME_", "SUFFIX_"]:
                     if clean.startswith(prefix):
-                        clean = clean[len(prefix):]
+                        clean = clean[len(prefix) :]
                         break
                 # Convert underscores to spaces
-                clean = clean.replace('_', ' ').strip()
+                clean = clean.replace("_", " ").strip()
                 if clean:
                     parts.append(clean)
 
             if parts:
-                return ' '.join(parts)
+                return " ".join(parts)
 
         # Fallback: return a generic label
         return "Unknown Empire"
 
-    def _analyze_player_fleets(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
+    def _analyze_player_fleets(
+        self, fleet_ids: list[str], max_to_analyze: int = 1500
+    ) -> dict:
         """Analyze player's fleet IDs to categorize them properly.
 
         This distinguishes between:
@@ -956,16 +1049,18 @@ class SaveExtractorBase:
             return self._analyze_player_fleets_rust(fleet_ids, max_to_analyze)
         return self._analyze_player_fleets_regex(fleet_ids, max_to_analyze)
 
-    def _analyze_player_fleets_original(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
+    def _analyze_player_fleets_original(
+        self, fleet_ids: list[str], max_to_analyze: int = 1500
+    ) -> dict:
         """Original implementation - kept for reference during migration."""
         result = {
-            'total_fleet_ids': len(fleet_ids),
-            'starbase_count': 0,
-            'military_fleet_count': 0,
-            'civilian_fleet_count': 0,
-            'military_ships': 0,
-            'total_military_power': 0.0,
-            'military_fleets': [],  # List of military fleet details
+            "total_fleet_ids": len(fleet_ids),
+            "starbase_count": 0,
+            "military_fleet_count": 0,
+            "civilian_fleet_count": 0,
+            "military_ships": 0,
+            "total_military_power": 0.0,
+            "military_fleets": [],  # List of military fleet details
         }
 
         # Find the fleet section using robust detection
@@ -981,15 +1076,21 @@ class SaveExtractorBase:
             if analyzed >= max_to_analyze:
                 # Estimate remaining based on ratios
                 ratio = len(fleet_ids) / max_to_analyze
-                result['starbase_count'] = int(result['starbase_count'] * ratio)
-                result['military_fleet_count'] = int(result['military_fleet_count'] * ratio)
-                result['civilian_fleet_count'] = int(result['civilian_fleet_count'] * ratio)
-                result['_note'] = f'Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs'
+                result["starbase_count"] = int(result["starbase_count"] * ratio)
+                result["military_fleet_count"] = int(
+                    result["military_fleet_count"] * ratio
+                )
+                result["civilian_fleet_count"] = int(
+                    result["civilian_fleet_count"] * ratio
+                )
+                result["_note"] = (
+                    f"Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs"
+                )
                 break
 
             # Pattern must match fleet ID at start of line with tab indent
             # This avoids matching ship IDs inside other fleet blocks
-            pattern = rf'\n\t{fid}=\n\t\{{'
+            pattern = rf"\n\t{fid}=\n\t\{{"
             match = re.search(pattern, fleet_section)
             if not match:
                 continue
@@ -1000,43 +1101,43 @@ class SaveExtractorBase:
 
             # Find next fleet entry: \n\t{digits}=\n\t{ pattern
             # Search within reasonable window (100KB handles extreme cases)
-            search_window = fleet_section[fleet_start + 10:fleet_start + 100000]
-            next_fleet = re.search(r'\n\t\d+=\n\t\{', search_window)
+            search_window = fleet_section[fleet_start + 10 : fleet_start + 100000]
+            next_fleet = re.search(r"\n\t\d+=\n\t\{", search_window)
             if next_fleet:
                 block_end = next_fleet.start() + 10  # +10 accounts for offset
             else:
                 block_end = 100000  # Last fleet in section
 
-            fleet_data = fleet_section[fleet_start:fleet_start + block_end]
+            fleet_data = fleet_section[fleet_start : fleet_start + block_end]
             analyzed += 1
 
             # Check for station/civilian at fleet's top level (two tabs indentation)
-            is_station = re.search(r'\n\t\tstation=yes', fleet_data) is not None
-            is_civilian = re.search(r'\n\t\tcivilian=yes', fleet_data) is not None
+            is_station = re.search(r"\n\t\tstation=yes", fleet_data) is not None
+            is_civilian = re.search(r"\n\t\tcivilian=yes", fleet_data) is not None
 
             # Count ships
-            ships_match = re.search(r'ships=\s*\{([^}]+)\}', fleet_data)
+            ships_match = re.search(r"ships=\s*\{([^}]+)\}", fleet_data)
             ship_count = len(ships_match.group(1).split()) if ships_match else 0
 
             # Get military power
-            mp_match = re.search(r'military_power=([\d.]+)', fleet_data)
+            mp_match = re.search(r"military_power=([\d.]+)", fleet_data)
             mp = float(mp_match.group(1)) if mp_match else 0.0
 
             if is_station:
-                result['starbase_count'] += 1
+                result["starbase_count"] += 1
             elif is_civilian:
-                result['civilian_fleet_count'] += 1
+                result["civilian_fleet_count"] += 1
             elif mp > 100:  # Threshold filters out space creatures with tiny mp
-                result['military_fleet_count'] += 1
-                result['military_ships'] += ship_count
-                result['total_military_power'] += mp
+                result["military_fleet_count"] += 1
+                result["military_ships"] += ship_count
+                result["total_military_power"] += mp
 
                 # Extract fleet name for military fleets
                 name_match = re.search(r'key="([^"]+)"', fleet_data)
                 fleet_name = name_match.group(1) if name_match else f"Fleet {fid}"
 
                 # Handle %SEQ% format strings - extract num variable for fleet number
-                if fleet_name == '%SEQ%':
+                if fleet_name == "%SEQ%":
                     num_match = re.search(r'key="num"[^}]*key="(\d+)"', fleet_data)
                     if num_match:
                         fleet_num = int(num_match.group(1))
@@ -1045,29 +1146,40 @@ class SaveExtractorBase:
                         fleet_name = f"Fleet {fid}"
 
                 # Clean up localization keys
-                if fleet_name.startswith('shipclass_'):
-                    fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
-                elif fleet_name.startswith('NAME_'):
-                    fleet_name = fleet_name.replace('NAME_', '').replace('_', ' ')
-                elif fleet_name.startswith('TRANS_'):
-                    fleet_name = 'Transport Fleet'
-                elif fleet_name.endswith('_FLEET'):
+                if fleet_name.startswith("shipclass_"):
+                    fleet_name = (
+                        fleet_name.replace("shipclass_", "")
+                        .replace("_name", "")
+                        .title()
+                    )
+                elif fleet_name.startswith("NAME_"):
+                    fleet_name = fleet_name.replace("NAME_", "").replace("_", " ")
+                elif fleet_name.startswith("TRANS_"):
+                    fleet_name = "Transport Fleet"
+                elif fleet_name.endswith("_FLEET"):
                     # e.g., HUMAN1_FLEET -> extract just the type
-                    fleet_name = fleet_name.replace('_FLEET', '').replace('_', ' ').title() + ' Fleet'
+                    fleet_name = (
+                        fleet_name.replace("_FLEET", "").replace("_", " ").title()
+                        + " Fleet"
+                    )
 
                 # Store all military fleets (no truncation - callers can slice if needed)
-                result['military_fleets'].append({
-                    'id': fid,
-                    'name': fleet_name,
-                    'ships': ship_count,
-                    'military_power': round(mp, 0),
-                })
+                result["military_fleets"].append(
+                    {
+                        "id": fid,
+                        "name": fleet_name,
+                        "ships": ship_count,
+                        "military_power": round(mp, 0),
+                    }
+                )
             else:
-                result['civilian_fleet_count'] += 1
+                result["civilian_fleet_count"] += 1
 
         return result
 
-    def _analyze_player_fleets_rust(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
+    def _analyze_player_fleets_rust(
+        self, fleet_ids: list[str], max_to_analyze: int = 1500
+    ) -> dict:
         """Rust-optimized fleet analysis using get_entries.
 
         Uses direct batch lookup instead of iterating all fleets. Benefits:
@@ -1081,34 +1193,34 @@ class SaveExtractorBase:
             return self._analyze_player_fleets_regex(fleet_ids, max_to_analyze)
 
         result = {
-            'total_fleet_ids': len(fleet_ids),
-            'starbase_count': 0,
-            'military_fleet_count': 0,
-            'civilian_fleet_count': 0,
-            'military_ships': 0,
-            'total_military_power': 0.0,
-            'military_fleets': [],
+            "total_fleet_ids": len(fleet_ids),
+            "starbase_count": 0,
+            "military_fleet_count": 0,
+            "civilian_fleet_count": 0,
+            "military_ships": 0,
+            "total_military_power": 0.0,
+            "military_fleets": [],
         }
 
         # Use get_entries to fetch only owned fleets directly (not all 10K+ fleets)
         # Limit to max_to_analyze for performance in huge saves
         ids_to_fetch = [str(fid) for fid in fleet_ids[:max_to_analyze]]
-        entries = session.get_entries('fleet', ids_to_fetch)
+        entries = session.get_entries("fleet", ids_to_fetch)
 
         for entry in entries:
-            fid = entry.get('_key', '')
-            fleet = entry.get('_value')
+            fid = entry.get("_key", "")
+            fleet = entry.get("_value")
 
             # P010: entry might be string "none" for deleted entries
             if not isinstance(fleet, dict):
                 continue
 
             # Direct dict access - no regex needed
-            is_station = fleet.get('station') == 'yes'
-            is_civilian = fleet.get('civilian') == 'yes'
+            is_station = fleet.get("station") == "yes"
+            is_civilian = fleet.get("civilian") == "yes"
 
             # Get ship count from ships list/dict
-            ships = fleet.get('ships', [])
+            ships = fleet.get("ships", [])
             if isinstance(ships, list):
                 ship_count = len(ships)
             elif isinstance(ships, dict):
@@ -1117,43 +1229,47 @@ class SaveExtractorBase:
                 ship_count = 0
 
             # Get military power
-            mp = fleet.get('military_power')
+            mp = fleet.get("military_power")
             mp = float(mp) if mp is not None else 0.0
 
             if is_station:
-                result['starbase_count'] += 1
+                result["starbase_count"] += 1
             elif is_civilian:
-                result['civilian_fleet_count'] += 1
+                result["civilian_fleet_count"] += 1
             elif mp > 100:  # Threshold filters out space creatures with tiny mp
-                result['military_fleet_count'] += 1
-                result['military_ships'] += ship_count
-                result['total_military_power'] += mp
+                result["military_fleet_count"] += 1
+                result["military_ships"] += ship_count
+                result["total_military_power"] += mp
 
                 # Extract fleet name
                 fleet_name = self._extract_fleet_name_from_data(fleet, fid)
 
-                result['military_fleets'].append({
-                    'id': fid,
-                    'name': fleet_name,
-                    'ships': ship_count,
-                    'military_power': round(mp, 0),
-                })
+                result["military_fleets"].append(
+                    {
+                        "id": fid,
+                        "name": fleet_name,
+                        "ships": ship_count,
+                        "military_power": round(mp, 0),
+                    }
+                )
             else:
-                result['civilian_fleet_count'] += 1
+                result["civilian_fleet_count"] += 1
 
         # Add estimation note if we limited the analysis
         if len(fleet_ids) > max_to_analyze:
             ratio = len(fleet_ids) / max_to_analyze
-            result['starbase_count'] = int(result['starbase_count'] * ratio)
-            result['military_fleet_count'] = int(result['military_fleet_count'] * ratio)
-            result['civilian_fleet_count'] = int(result['civilian_fleet_count'] * ratio)
-            result['_note'] = f'Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs'
+            result["starbase_count"] = int(result["starbase_count"] * ratio)
+            result["military_fleet_count"] = int(result["military_fleet_count"] * ratio)
+            result["civilian_fleet_count"] = int(result["civilian_fleet_count"] * ratio)
+            result["_note"] = (
+                f"Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs"
+            )
 
         return result
 
     def _extract_fleet_name_from_data(self, fleet: dict, fid: str) -> str:
         """Extract fleet name from parsed fleet data structure."""
-        name_data = fleet.get('name')
+        name_data = fleet.get("name")
 
         if not name_data:
             return f"Fleet {fid}"
@@ -1162,16 +1278,16 @@ class SaveExtractorBase:
         if isinstance(name_data, str):
             fleet_name = name_data
         elif isinstance(name_data, dict):
-            fleet_name = name_data.get('key', f"Fleet {fid}")
+            fleet_name = name_data.get("key", f"Fleet {fid}")
 
             # Handle %SEQ% format - look for num variable
-            if fleet_name == '%SEQ%':
-                variables = name_data.get('variables', [])
+            if fleet_name == "%SEQ%":
+                variables = name_data.get("variables", [])
                 for var in variables:
-                    if isinstance(var, dict) and var.get('key') == 'num':
-                        value = var.get('value', {})
+                    if isinstance(var, dict) and var.get("key") == "num":
+                        value = var.get("value", {})
                         if isinstance(value, dict):
-                            num = value.get('key')
+                            num = value.get("key")
                             if num:
                                 return f"Fleet #{num}"
                 return f"Fleet {fid}"
@@ -1179,27 +1295,33 @@ class SaveExtractorBase:
             return f"Fleet {fid}"
 
         # Clean up localization keys
-        if fleet_name.startswith('shipclass_'):
-            fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
-        elif fleet_name.startswith('NAME_'):
-            fleet_name = fleet_name.replace('NAME_', '').replace('_', ' ')
-        elif fleet_name.startswith('TRANS_'):
-            fleet_name = 'Transport Fleet'
-        elif fleet_name.endswith('_FLEET'):
-            fleet_name = fleet_name.replace('_FLEET', '').replace('_', ' ').title() + ' Fleet'
+        if fleet_name.startswith("shipclass_"):
+            fleet_name = (
+                fleet_name.replace("shipclass_", "").replace("_name", "").title()
+            )
+        elif fleet_name.startswith("NAME_"):
+            fleet_name = fleet_name.replace("NAME_", "").replace("_", " ")
+        elif fleet_name.startswith("TRANS_"):
+            fleet_name = "Transport Fleet"
+        elif fleet_name.endswith("_FLEET"):
+            fleet_name = (
+                fleet_name.replace("_FLEET", "").replace("_", " ").title() + " Fleet"
+            )
 
         return fleet_name
 
-    def _analyze_player_fleets_regex(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
+    def _analyze_player_fleets_regex(
+        self, fleet_ids: list[str], max_to_analyze: int = 1500
+    ) -> dict:
         """Original regex-based implementation - used as fallback."""
         result = {
-            'total_fleet_ids': len(fleet_ids),
-            'starbase_count': 0,
-            'military_fleet_count': 0,
-            'civilian_fleet_count': 0,
-            'military_ships': 0,
-            'total_military_power': 0.0,
-            'military_fleets': [],
+            "total_fleet_ids": len(fleet_ids),
+            "starbase_count": 0,
+            "military_fleet_count": 0,
+            "civilian_fleet_count": 0,
+            "military_ships": 0,
+            "total_military_power": 0.0,
+            "military_fleets": [],
         }
 
         fleet_section_start = self._find_fleet_section_start()
@@ -1212,50 +1334,56 @@ class SaveExtractorBase:
         for fid in fleet_ids:
             if analyzed >= max_to_analyze:
                 ratio = len(fleet_ids) / max_to_analyze
-                result['starbase_count'] = int(result['starbase_count'] * ratio)
-                result['military_fleet_count'] = int(result['military_fleet_count'] * ratio)
-                result['civilian_fleet_count'] = int(result['civilian_fleet_count'] * ratio)
-                result['_note'] = f'Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs'
+                result["starbase_count"] = int(result["starbase_count"] * ratio)
+                result["military_fleet_count"] = int(
+                    result["military_fleet_count"] * ratio
+                )
+                result["civilian_fleet_count"] = int(
+                    result["civilian_fleet_count"] * ratio
+                )
+                result["_note"] = (
+                    f"Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs"
+                )
                 break
 
-            pattern = rf'\n\t{fid}=\n\t\{{'
+            pattern = rf"\n\t{fid}=\n\t\{{"
             match = re.search(pattern, fleet_section)
             if not match:
                 continue
 
             fleet_start = match.start()
-            search_window = fleet_section[fleet_start + 10:fleet_start + 100000]
-            next_fleet = re.search(r'\n\t\d+=\n\t\{', search_window)
+            search_window = fleet_section[fleet_start + 10 : fleet_start + 100000]
+            next_fleet = re.search(r"\n\t\d+=\n\t\{", search_window)
             if next_fleet:
                 block_end = next_fleet.start() + 10
             else:
                 block_end = 100000
 
-            fleet_data = fleet_section[fleet_start:fleet_start + block_end]
+            fleet_data = fleet_section[fleet_start : fleet_start + block_end]
             analyzed += 1
 
-            is_station = re.search(r'\n\t\tstation=yes', fleet_data) is not None
-            is_civilian = re.search(r'\n\t\tcivilian=yes', fleet_data) is not None
+            is_station = re.search(r"\n\t\tstation=yes", fleet_data) is not None
+            is_civilian = re.search(r"\n\t\tcivilian=yes", fleet_data) is not None
 
-            ships_match = re.search(r'ships=\s*\{([^}]+)\}', fleet_data)
+            ships_match = re.search(r"ships=\s*\{([^}]+)\}", fleet_data)
             ship_count = len(ships_match.group(1).split()) if ships_match else 0
 
-            mp_match = re.search(r'military_power=([\d.]+)', fleet_data)
+            mp_match = re.search(r"military_power=([\d.]+)", fleet_data)
             mp = float(mp_match.group(1)) if mp_match else 0.0
 
             if is_station:
-                result['starbase_count'] += 1
+                result["starbase_count"] += 1
             elif is_civilian:
-                result['civilian_fleet_count'] += 1
+                result["civilian_fleet_count"] += 1
             elif mp > 100:
-                result['military_fleet_count'] += 1
-                result['military_ships'] += ship_count
-                result['total_military_power'] += mp
+                result["military_fleet_count"] += 1
+                result["military_ships"] += ship_count
+                result["total_military_power"] += mp
 
                 name_match = re.search(r'key="([^"]+)"', fleet_data)
                 fleet_name = name_match.group(1) if name_match else f"Fleet {fid}"
 
-                if fleet_name == '%SEQ%':
+                if fleet_name == "%SEQ%":
                     num_match = re.search(r'key="num"[^}]*key="(\d+)"', fleet_data)
                     if num_match:
                         fleet_num = int(num_match.group(1))
@@ -1263,23 +1391,32 @@ class SaveExtractorBase:
                     else:
                         fleet_name = f"Fleet {fid}"
 
-                if fleet_name.startswith('shipclass_'):
-                    fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
-                elif fleet_name.startswith('NAME_'):
-                    fleet_name = fleet_name.replace('NAME_', '').replace('_', ' ')
-                elif fleet_name.startswith('TRANS_'):
-                    fleet_name = 'Transport Fleet'
-                elif fleet_name.endswith('_FLEET'):
-                    fleet_name = fleet_name.replace('_FLEET', '').replace('_', ' ').title() + ' Fleet'
+                if fleet_name.startswith("shipclass_"):
+                    fleet_name = (
+                        fleet_name.replace("shipclass_", "")
+                        .replace("_name", "")
+                        .title()
+                    )
+                elif fleet_name.startswith("NAME_"):
+                    fleet_name = fleet_name.replace("NAME_", "").replace("_", " ")
+                elif fleet_name.startswith("TRANS_"):
+                    fleet_name = "Transport Fleet"
+                elif fleet_name.endswith("_FLEET"):
+                    fleet_name = (
+                        fleet_name.replace("_FLEET", "").replace("_", " ").title()
+                        + " Fleet"
+                    )
 
-                result['military_fleets'].append({
-                    'id': fid,
-                    'name': fleet_name,
-                    'ships': ship_count,
-                    'military_power': round(mp, 0),
-                })
+                result["military_fleets"].append(
+                    {
+                        "id": fid,
+                        "name": fleet_name,
+                        "ships": ship_count,
+                        "military_power": round(mp, 0),
+                    }
+                )
             else:
-                result['civilian_fleet_count'] += 1
+                result["civilian_fleet_count"] += 1
 
         return result
 
@@ -1310,9 +1447,13 @@ class SaveExtractorBase:
                             species_names[species_id] = data["class"]
                 return species_names
             except ParserError as e:
-                logger.warning(f"Rust parser failed for species_db: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for species_db: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback: regex-based parsing
         return self._get_species_names_regex()
@@ -1326,26 +1467,26 @@ class SaveExtractorBase:
         species_names = {}
 
         # Find the species_db section (near start of file)
-        species_match = re.search(r'^species_db=\s*\{', self.gamestate, re.MULTILINE)
+        species_match = re.search(r"^species_db=\s*\{", self.gamestate, re.MULTILINE)
         if not species_match:
             # Fallback: try older format
-            species_match = re.search(r'^species=\s*\{', self.gamestate, re.MULTILINE)
+            species_match = re.search(r"^species=\s*\{", self.gamestate, re.MULTILINE)
             if not species_match:
                 return species_names
 
         start = species_match.start()
         # Species section is usually within first 2MB
-        species_chunk = self.gamestate[start:start + 2000000]
+        species_chunk = self.gamestate[start : start + 2000000]
 
         # Parse species entries: ID={ ... name="Species Name" ... }
         # Format: \n\tID=\n\t{ ... name="Name" ...
-        species_pattern = r'\n\t(\d+)=\s*\{'
+        species_pattern = r"\n\t(\d+)=\s*\{"
         for match in re.finditer(species_pattern, species_chunk):
             species_id = match.group(1)
             block_start = match.start()
 
             # Get a chunk for this species entry (they're typically < 1000 chars)
-            block_chunk = species_chunk[block_start:block_start + 1500]
+            block_chunk = species_chunk[block_start : block_start + 1500]
 
             # Extract name
             name_match = re.search(r'name="([^"]+)"', block_chunk)
@@ -1372,9 +1513,13 @@ class SaveExtractorBase:
             try:
                 return self._get_player_planet_ids_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for player planets: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for player planets: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         return self._get_player_planet_ids_regex()
@@ -1411,24 +1556,26 @@ class SaveExtractorBase:
         planet_ids = []
 
         # Find the planets section
-        planets_match = re.search(r'^planets=\s*\{\s*planet=\s*\{', self.gamestate, re.MULTILINE)
+        planets_match = re.search(
+            r"^planets=\s*\{\s*planet=\s*\{", self.gamestate, re.MULTILINE
+        )
         if not planets_match:
             return planet_ids
 
         start = planets_match.start()
-        planets_chunk = self.gamestate[start:start + 20000000]  # 20MB for planets
+        planets_chunk = self.gamestate[start : start + 20000000]  # 20MB for planets
 
         # Find each planet and check ownership
-        planet_start_pattern = r'\n\t\t(\d+)=\s*\{'
+        planet_start_pattern = r"\n\t\t(\d+)=\s*\{"
         for match in re.finditer(planet_start_pattern, planets_chunk):
             planet_id = match.group(1)
             block_start = match.start() + 1
 
             # Get first 3000 chars to find owner (owner is near start of block)
-            block_chunk = planets_chunk[block_start:block_start + 3000]
+            block_chunk = planets_chunk[block_start : block_start + 3000]
 
             # Check if owned by player
-            owner_match = re.search(r'\n\s*owner=(\d+)', block_chunk)
+            owner_match = re.search(r"\n\s*owner=(\d+)", block_chunk)
             if owner_match and int(owner_match.group(1)) == player_id:
                 planet_ids.append(planet_id)
 
@@ -1450,9 +1597,13 @@ class SaveExtractorBase:
             try:
                 return self._get_pop_ids_for_planets_rust(planet_ids)
             except ParserError as e:
-                logger.warning(f"Rust parser failed for pop IDs: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for pop IDs: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         return self._get_pop_ids_for_planets_regex(planet_ids)
@@ -1496,17 +1647,19 @@ class SaveExtractorBase:
         pop_ids = []
 
         # Find the planets section
-        planets_match = re.search(r'^planets=\s*\{\s*planet=\s*\{', self.gamestate, re.MULTILINE)
+        planets_match = re.search(
+            r"^planets=\s*\{\s*planet=\s*\{", self.gamestate, re.MULTILINE
+        )
         if not planets_match:
             return pop_ids
 
         start = planets_match.start()
-        planets_chunk = self.gamestate[start:start + 20000000]
+        planets_chunk = self.gamestate[start : start + 20000000]
 
         planet_id_set = set(planet_ids)
 
         # Find each planet block and extract pop_jobs
-        planet_start_pattern = r'\n\t\t(\d+)=\s*\{'
+        planet_start_pattern = r"\n\t\t(\d+)=\s*\{"
         for match in re.finditer(planet_start_pattern, planets_chunk):
             planet_id = match.group(1)
             if planet_id not in planet_id_set:
@@ -1518,11 +1671,13 @@ class SaveExtractorBase:
             brace_count = 0
             block_end = block_start
             started = False
-            for i, char in enumerate(planets_chunk[block_start:block_start + 30000], block_start):
-                if char == '{':
+            for i, char in enumerate(
+                planets_chunk[block_start : block_start + 30000], block_start
+            ):
+                if char == "{":
                     brace_count += 1
                     started = True
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if started and brace_count == 0:
                         block_end = i + 1
@@ -1531,9 +1686,9 @@ class SaveExtractorBase:
             planet_block = planets_chunk[block_start:block_end]
 
             # Extract pop_jobs list
-            pop_jobs_match = re.search(r'pop_jobs=\s*\{([^}]+)\}', planet_block)
+            pop_jobs_match = re.search(r"pop_jobs=\s*\{([^}]+)\}", planet_block)
             if pop_jobs_match:
-                ids = re.findall(r'\d+', pop_jobs_match.group(1))
+                ids = re.findall(r"\d+", pop_jobs_match.group(1))
                 pop_ids.extend(ids)
 
         return pop_ids
@@ -1549,4 +1704,4 @@ class SaveExtractorBase:
         """
         if not isinstance(data, dict):
             return data
-        return {k: v for k, v in data.items() if 'preview' not in k.lower()}
+        return {k: v for k, v in data.items() if "preview" not in k.lower()}

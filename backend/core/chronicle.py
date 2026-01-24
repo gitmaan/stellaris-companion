@@ -70,7 +70,7 @@ def _repair_json_string(text: str) -> str:
             i += 1
             continue
 
-        if char == '\\':
+        if char == "\\":
             result.append(char)
             escape_next = True
             i += 1
@@ -82,37 +82,37 @@ def _repair_json_string(text: str) -> str:
             i += 1
             continue
 
-        if in_string and char == '\n':
+        if in_string and char == "\n":
             # Escape the newline
-            result.append('\\n')
+            result.append("\\n")
             i += 1
             continue
 
-        if in_string and char == '\r':
+        if in_string and char == "\r":
             # Skip carriage returns (will be part of \r\n -> \n)
             i += 1
             continue
 
-        if in_string and char == '\t':
+        if in_string and char == "\t":
             # Escape tabs
-            result.append('\\t')
+            result.append("\\t")
             i += 1
             continue
 
         result.append(char)
         i += 1
 
-    return ''.join(result)
+    return "".join(result)
 
 
 # Era-ending event types that trigger chapter finalization
 ERA_ENDING_EVENTS = {
-    'war_ended',
-    'crisis_defeated',
-    'fallen_empire_awakened',
-    'war_in_heaven_started',
-    'federation_joined',
-    'federation_left',
+    "war_ended",
+    "crisis_defeated",
+    "fallen_empire_awakened",
+    "war_in_heaven_started",
+    "federation_joined",
+    "federation_left",
 }
 
 # Years between chapters (if no era-ending event)
@@ -158,7 +158,7 @@ def parse_year(date_str: str | None) -> int | None:
     if not date_str or not isinstance(date_str, str):
         return None
     try:
-        return int(date_str.split('.')[0])
+        return int(date_str.split(".")[0])
     except (ValueError, IndexError):
         return None
 
@@ -207,7 +207,9 @@ class ChronicleGenerator:
 
         if not save_id:
             # Fallback to session-based chronicle (legacy)
-            return self._generate_legacy_chronicle(session_id, force_refresh=force_refresh)
+            return self._generate_legacy_chronicle(
+                session_id, force_refresh=force_refresh
+            )
 
         # Load existing chapters data
         cached = self.db.get_chronicle_by_save_id(save_id)
@@ -347,7 +349,11 @@ class ChronicleGenerator:
             ],
             "current_era": current_era,
             "pending_chapters": pending_chapters,
-            "message": f"{pending_chapters} more chapters pending. Refresh to continue." if pending_chapters > 0 else None,
+            "message": (
+                f"{pending_chapters} more chapters pending. Refresh to continue."
+                if pending_chapters > 0
+                else None
+            ),
             # Backward compatible
             "chronicle": full_text,
             "cached": response_cached,
@@ -384,7 +390,9 @@ class ChronicleGenerator:
         if len(deduped) <= max_events:
             return deduped, False
 
-        notable: list[dict] = [e for e in deduped if e.get("event_type") in NOTABLE_EVENT_TYPES]
+        notable: list[dict] = [
+            e for e in deduped if e.get("event_type") in NOTABLE_EVENT_TYPES
+        ]
 
         selected_keys: list[tuple[Any, Any, Any]]
         if len(notable) >= max_events:
@@ -480,7 +488,7 @@ class ChronicleGenerator:
         )
 
         # Get previous chapters for context
-        previous_chapters = chapters[:chapter_number - 1]
+        previous_chapters = chapters[: chapter_number - 1]
 
         # Regenerate the chapter
         new_content = self._generate_chapter_content(
@@ -675,11 +683,13 @@ class ChronicleGenerator:
             new_end_year = (last_year or 2200) + CHAPTER_TIME_THRESHOLD
             new_end_date = f"{new_end_year}.01.01"
 
-            temp_data["chapters"].append({
-                "number": len(chapters) + 1,
-                "end_date": new_end_date,
-                "end_snapshot_id": current_snapshot_id,
-            })
+            temp_data["chapters"].append(
+                {
+                    "number": len(chapters) + 1,
+                    "end_date": new_end_date,
+                    "end_snapshot_id": current_snapshot_id,
+                }
+            )
             count += 1
 
         return count
@@ -733,7 +743,8 @@ class ChronicleGenerator:
         # Filter events to chapter date range
         end_year = parse_year(end_date)
         chapter_events = [
-            e for e in chapter_events
+            e
+            for e in chapter_events
             if (parse_year(e.get("game_date")) or 0) <= (end_year or 9999)
         ]
 
@@ -748,21 +759,23 @@ class ChronicleGenerator:
         )
 
         # Add the new chapter
-        chapters_data["chapters"].append({
-            "number": chapter_number,
-            "title": content["title"],
-            "start_date": start_date,
-            "end_date": end_date,
-            "start_snapshot_id": start_snapshot_id,
-            "end_snapshot_id": end_snapshot_id,
-            "narrative": content["narrative"],
-            "summary": content["summary"],
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "is_finalized": True,
-            "context_stale": False,
-            "trigger": trigger,
-            "event_count": len(chapter_events),
-        })
+        chapters_data["chapters"].append(
+            {
+                "number": chapter_number,
+                "title": content["title"],
+                "start_date": start_date,
+                "end_date": end_date,
+                "start_snapshot_id": start_snapshot_id,
+                "end_snapshot_id": end_snapshot_id,
+                "narrative": content["narrative"],
+                "summary": content["summary"],
+                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "is_finalized": True,
+                "context_stale": False,
+                "trigger": trigger,
+                "event_count": len(chapter_events),
+            }
+        )
 
         # Update current era start
         chapters_data["current_era_start_date"] = end_date
@@ -790,7 +803,9 @@ class ChronicleGenerator:
                 f"- Chapter {ch['number']} \"{ch.get('title', 'Untitled')}\" "
                 f"({ch.get('start_date', '?')} - {ch.get('end_date', '?')}): {ch.get('summary', '')}"
             )
-        previous_context = "\n".join(context_lines) if context_lines else "This is the first chapter."
+        previous_context = (
+            "\n".join(context_lines) if context_lines else "This is the first chapter."
+        )
 
         selected_events, was_truncated = self._select_events_for_prompt(
             events, max_events=MAX_EVENTS_PER_CHAPTER_PROMPT
@@ -856,13 +871,17 @@ Do NOT fabricate events not in the event list.
             }
         except Exception as e:
             # Fallback for errors - try JSON repair as last resort
-            logger.warning("Structured output failed for chapter %d: %s", chapter_number, e)
+            logger.warning(
+                "Structured output failed for chapter %d: %s", chapter_number, e
+            )
             try:
                 # Attempt JSON repair if we got a response
-                if hasattr(e, '__context__') and hasattr(e.__context__, 'doc'):
+                if hasattr(e, "__context__") and hasattr(e.__context__, "doc"):
                     raw_text = e.__context__.doc
                 else:
-                    raw_text = getattr(response, 'text', '') if 'response' in dir() else ''
+                    raw_text = (
+                        getattr(response, "text", "") if "response" in dir() else ""
+                    )
 
                 if raw_text:
                     repaired = _repair_json_string(raw_text)
@@ -925,7 +944,9 @@ Do NOT fabricate events not in the event list.
             context_lines.append(
                 f"- Chapter {ch['number']} \"{ch.get('title', 'Untitled')}\": {ch.get('summary', '')}"
             )
-        previous_context = "\n".join(context_lines) if context_lines else "No previous chapters."
+        previous_context = (
+            "\n".join(context_lines) if context_lines else "No previous chapters."
+        )
 
         selected_events, was_truncated = self._select_events_for_prompt(
             events, max_events=MAX_EVENTS_CURRENT_ERA_PROMPT
@@ -995,8 +1016,12 @@ Do NOT give advice. You are a historian, not an advisor.
 
         chapters = chapters_data.get("chapters", [])
         for ch in chapters:
-            lines.append(f"### CHAPTER {ch['number']}: {ch.get('title', 'Untitled').upper()}")
-            lines.append(f"**{ch.get('start_date', '?')} – {ch.get('end_date', '?')}**\n")
+            lines.append(
+                f"### CHAPTER {ch['number']}: {ch.get('title', 'Untitled').upper()}"
+            )
+            lines.append(
+                f"**{ch.get('start_date', '?')} – {ch.get('end_date', '?')}**\n"
+            )
             lines.append(ch.get("narrative", ""))
             lines.append("")
 
@@ -1263,13 +1288,19 @@ Do NOT give advice. Write as a historian, not an advisor.
             lines.append(f"\n=== {year} ===")
 
             if len(year_events) > 15:
-                notable = [e for e in year_events if e.get("event_type") in NOTABLE_EVENT_TYPES]
+                notable = [
+                    e for e in year_events if e.get("event_type") in NOTABLE_EVENT_TYPES
+                ]
                 for e in notable:
-                    lines.append(f"  * {e.get('summary', e.get('event_type', 'Unknown event'))}")
+                    lines.append(
+                        f"  * {e.get('summary', e.get('event_type', 'Unknown event'))}"
+                    )
                 lines.append(f"  (+ {len(year_events) - len(notable)} other events)")
             else:
                 for e in year_events:
-                    lines.append(f"  * {e.get('summary', e.get('event_type', 'Unknown event'))}")
+                    lines.append(
+                        f"  * {e.get('summary', e.get('event_type', 'Unknown event'))}"
+                    )
 
         return "\n".join(lines)
 

@@ -12,7 +12,10 @@ import discord
 from discord import app_commands
 
 from backend.core.database import get_default_db
-from backend.core.history_context import build_history_context_for_companion, should_include_history
+from backend.core.history_context import (
+    build_history_context_for_companion,
+    should_include_history,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,17 +42,17 @@ def split_response(text: str, max_length: int = 1900) -> list[str]:
         break_at = max_length
 
         # Try paragraph break first
-        para_break = remaining.rfind('\n\n', 0, max_length)
+        para_break = remaining.rfind("\n\n", 0, max_length)
         if para_break > max_length * 0.3:
             break_at = para_break + 2
 
         # Try single newline
-        elif (line_break := remaining.rfind('\n', 0, max_length)) > max_length * 0.3:
+        elif (line_break := remaining.rfind("\n", 0, max_length)) > max_length * 0.3:
             break_at = line_break + 1
 
         # Try sentence break
         else:
-            for punct in ['. ', '! ', '? ']:
+            for punct in [". ", "! ", "? "]:
                 sent_break = remaining.rfind(punct, 0, max_length)
                 if sent_break > max_length * 0.3:
                     break_at = sent_break + 2
@@ -73,7 +76,7 @@ def setup(bot) -> None:
 
     @bot.tree.command(
         name="ask",
-        description="Ask your strategic advisor a question about your empire"
+        description="Ask your strategic advisor a question about your empire",
     )
     @app_commands.describe(
         question="Your question for the advisor (e.g., 'How is my economy?' or 'Should I declare war?')"
@@ -90,7 +93,7 @@ def setup(bot) -> None:
             await interaction.response.send_message(
                 "No save file is currently loaded. Please wait for a save to be detected "
                 "or restart the bot with a valid save file.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -108,7 +111,9 @@ def setup(bot) -> None:
                 if should_include_history(question):
                     try:
                         db = get_default_db()
-                        history_context = build_history_context_for_companion(db=db, companion=bot.companion)
+                        history_context = build_history_context_for_companion(
+                            db=db, companion=bot.companion
+                        )
                     except Exception:
                         history_context = None
                 return bot.companion.ask_precomputed(
@@ -135,7 +140,7 @@ def setup(bot) -> None:
             logger.error(f"Error in /ask command: {e}")
             await interaction.followup.send(
                 f"An error occurred while processing your question: {str(e)}",
-                ephemeral=True
+                ephemeral=True,
             )
 
     logger.info("/ask command registered")

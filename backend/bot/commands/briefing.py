@@ -25,8 +25,7 @@ def setup(bot) -> None:
     """
 
     @bot.tree.command(
-        name="briefing",
-        description="Get a full strategic briefing from your advisor"
+        name="briefing", description="Get a full strategic briefing from your advisor"
     )
     async def briefing_command(interaction: discord.Interaction) -> None:
         """Handle the /briefing command.
@@ -39,7 +38,7 @@ def setup(bot) -> None:
             await interaction.response.send_message(
                 "No save file is currently loaded. Please wait for a save to be detected "
                 "or restart the bot with a valid save file.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
@@ -62,7 +61,9 @@ def setup(bot) -> None:
                         await interaction.followup.send(chunk)
 
                 # Send timing as final message
-                await interaction.followup.send(f"*Briefing completed in {elapsed:.1f}s*")
+                await interaction.followup.send(
+                    f"*Briefing completed in {elapsed:.1f}s*"
+                )
 
             else:
                 # Truncate if necessary
@@ -72,7 +73,9 @@ def setup(bot) -> None:
                 footer = f"\n\n*Briefing generated in {elapsed:.1f}s*"
 
                 if len(response_text) + len(footer) > 2000:
-                    response_text = truncate_response(response_text, 2000 - len(footer) - 10)
+                    response_text = truncate_response(
+                        response_text, 2000 - len(footer) - 10
+                    )
 
                 await interaction.followup.send(response_text + footer)
 
@@ -80,7 +83,7 @@ def setup(bot) -> None:
             logger.error(f"Error in /briefing command: {e}")
             await interaction.followup.send(
                 f"An error occurred while generating the briefing: {str(e)}",
-                ephemeral=True
+                ephemeral=True,
             )
 
     logger.info("/briefing command registered")
@@ -109,17 +112,17 @@ def split_response(text: str, max_length: int = 1900) -> list[str]:
         break_at = max_length
 
         # Try paragraph break first
-        para_break = remaining.rfind('\n\n', 0, max_length)
+        para_break = remaining.rfind("\n\n", 0, max_length)
         if para_break > max_length * 0.3:
             break_at = para_break + 2  # Include the newlines
 
         # Try single newline
-        elif (line_break := remaining.rfind('\n', 0, max_length)) > max_length * 0.3:
+        elif (line_break := remaining.rfind("\n", 0, max_length)) > max_length * 0.3:
             break_at = line_break + 1
 
         # Try sentence break
         else:
-            for punct in ['. ', '! ', '? ']:
+            for punct in [". ", "! ", "? "]:
                 sent_break = remaining.rfind(punct, 0, max_length)
                 if sent_break > max_length * 0.3:
                     break_at = sent_break + 2

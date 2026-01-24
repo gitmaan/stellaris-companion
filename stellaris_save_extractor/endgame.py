@@ -6,6 +6,7 @@ import re
 # Rust bridge for fast Clausewitz parsing
 try:
     from rust_bridge import iter_section_entries, ParserError, _get_active_session
+
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
@@ -22,22 +23,22 @@ class EndgameMixin:
     # NOTE: 'swarm' alone is space fauna (Tiyanki, Amoebas, etc.)
     # Prethoryn uses 'swarm_species' and has names containing 'Prethoryn'
     CRISIS_TYPES = {
-        'swarm_species': 'prethoryn',           # Actual Prethoryn Scourge
-        'extradimensional': 'unbidden',
-        'extradimensional_2': 'aberrant',
-        'extradimensional_3': 'vehement',
-        'ai_empire_01': 'contingency',          # Contingency machine worlds
-        'contingency_machine_empire': 'contingency',
+        "swarm_species": "prethoryn",  # Actual Prethoryn Scourge
+        "extradimensional": "unbidden",
+        "extradimensional_2": "aberrant",
+        "extradimensional_3": "vehement",
+        "ai_empire_01": "contingency",  # Contingency machine worlds
+        "contingency_machine_empire": "contingency",
     }
 
     # Space fauna types to EXCLUDE (these are NOT crisis)
     SPACE_FAUNA_TYPES = {
-        'swarm',           # Generic space creatures (Tiyanki, Amoebas)
-        'amoeba',
-        'tiyanki',
-        'crystal',
-        'drone',
-        'cloud',
+        "swarm",  # Generic space creatures (Tiyanki, Amoebas)
+        "amoeba",
+        "tiyanki",
+        "crystal",
+        "drone",
+        "cloud",
     }
 
     def get_crisis_status(self) -> dict:
@@ -62,9 +63,13 @@ class EndgameMixin:
             try:
                 return self._get_crisis_status_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for crisis status: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for crisis status: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback: regex-based parsing
         return self._get_crisis_status_regex()
@@ -76,28 +81,24 @@ class EndgameMixin:
             Dict with crisis status details
         """
         result = {
-            'crisis_active': False,
-            'crisis_type': None,
-            'crisis_types_detected': [],
-            'crisis_countries': [],
-            'player_is_crisis_fighter': False,
-            'player_crisis_kills': 0,
-            'crisis_systems_count': 0,
+            "crisis_active": False,
+            "crisis_type": None,
+            "crisis_types_detected": [],
+            "crisis_countries": [],
+            "player_is_crisis_fighter": False,
+            "player_crisis_kills": 0,
+            "crisis_systems_count": 0,
         }
 
         # Detect crisis countries by iterating over country section
         crisis_countries = []
         crisis_types_found = set()
-        player_id = self.get_player_empire_id()
-        player_data = None
 
-        for country_id, country_data in iter_section_entries(self.gamestate_path, "country"):
+        for country_id, country_data in iter_section_entries(
+            self.gamestate_path, "country"
+        ):
             if not isinstance(country_data, dict):
                 continue
-
-            # Save player data for later
-            if str(country_id) == str(player_id):
-                player_data = country_data
 
             # Check country type
             ctype = country_data.get("country_type") or country_data.get("type")
@@ -111,10 +112,12 @@ class EndgameMixin:
             # Check for known crisis types
             if ctype in self.CRISIS_TYPES:
                 crisis_name = self.CRISIS_TYPES[ctype]
-                crisis_countries.append({
-                    'country_id': int(country_id),
-                    'type': crisis_name,
-                })
+                crisis_countries.append(
+                    {
+                        "country_id": int(country_id),
+                        "type": crisis_name,
+                    }
+                )
                 crisis_types_found.add(crisis_name)
                 continue
 
@@ -122,64 +125,68 @@ class EndgameMixin:
             name_data = country_data.get("name", {})
             if isinstance(name_data, dict):
                 name_key = name_data.get("key", "")
-                if name_key and 'prethoryn' in name_key.lower():
-                    crisis_countries.append({
-                        'country_id': int(country_id),
-                        'type': 'prethoryn',
-                    })
-                    crisis_types_found.add('prethoryn')
+                if name_key and "prethoryn" in name_key.lower():
+                    crisis_countries.append(
+                        {
+                            "country_id": int(country_id),
+                            "type": "prethoryn",
+                        }
+                    )
+                    crisis_types_found.add("prethoryn")
 
-        result['crisis_countries'] = crisis_countries
-        result['crisis_types_detected'] = list(crisis_types_found)
-        result['crisis_active'] = len(crisis_types_found) > 0
+        result["crisis_countries"] = crisis_countries
+        result["crisis_types_detected"] = list(crisis_types_found)
+        result["crisis_active"] = len(crisis_types_found) > 0
         if crisis_types_found:
             # Primary crisis type (prioritize main ones)
-            for primary in ['prethoryn', 'contingency', 'unbidden']:
+            for primary in ["prethoryn", "contingency", "unbidden"]:
                 if primary in crisis_types_found:
-                    result['crisis_type'] = primary
+                    result["crisis_type"] = primary
                     break
-            if not result['crisis_type']:
-                result['crisis_type'] = list(crisis_types_found)[0]
+            if not result["crisis_type"]:
+                result["crisis_type"] = list(crisis_types_found)[0]
 
-        # Check player's crisis involvement from parsed country data
-        if player_data:
+        # Check player's crisis involvement from cached player country entry
+        player_id = self.get_player_empire_id()
+        player_data = self._get_player_country_entry(player_id)
+        if player_data and isinstance(player_data, dict):
             # Check for crisis_fighter flag
             flags = player_data.get("flags", {})
             if isinstance(flags, dict) and "crisis_fighter" in flags:
-                result['player_is_crisis_fighter'] = True
+                result["player_is_crisis_fighter"] = True
 
             # Check for crisis_kills count
             crisis_kills = player_data.get("crisis_kills")
             if crisis_kills is not None:
                 try:
-                    result['player_crisis_kills'] = int(crisis_kills)
+                    result["player_crisis_kills"] = int(crisis_kills)
                 except (ValueError, TypeError):
                     pass
 
         # Count crisis-controlled systems via count_keys (tree traversal)
         # This is faster than regex since we traverse the already-parsed JSON tree
         crisis_system_flags = [
-            'prethoryn_system',           # Prethoryn infested systems
-            'prethoryn_invasion_system',  # Prethoryn invasion target
-            'contingency_system',         # Contingency sterilization hubs
-            'contingency_world',          # Contingency machine world
-            'unbidden_portal_system',     # Unbidden dimensional anchor
-            'extradimensional_system',    # Generic extradimensional flag
+            "prethoryn_system",  # Prethoryn infested systems
+            "prethoryn_invasion_system",  # Prethoryn invasion target
+            "contingency_system",  # Contingency sterilization hubs
+            "contingency_world",  # Contingency machine world
+            "unbidden_portal_system",  # Unbidden dimensional anchor
+            "extradimensional_system",  # Generic extradimensional flag
         ]
 
         # Use count_keys operation if session is active
         sess = _get_active_session()
         if sess is not None:
             counts_result = sess.count_keys(crisis_system_flags)
-            counts = counts_result.get('counts', {})
+            counts = counts_result.get("counts", {})
             total_crisis_systems = sum(counts.values())
         else:
             # Fallback to regex if no active session
             total_crisis_systems = 0
             for flag in crisis_system_flags:
-                total_crisis_systems += len(re.findall(rf'\b{flag}=', self.gamestate))
+                total_crisis_systems += len(re.findall(rf"\b{flag}=", self.gamestate))
 
-        result['crisis_systems_count'] = total_crisis_systems
+        result["crisis_systems_count"] = total_crisis_systems
 
         return result
 
@@ -190,13 +197,13 @@ class EndgameMixin:
             Dict with crisis status details
         """
         result = {
-            'crisis_active': False,
-            'crisis_type': None,
-            'crisis_types_detected': [],
-            'crisis_countries': [],
-            'player_is_crisis_fighter': False,
-            'player_crisis_kills': 0,
-            'crisis_systems_count': 0,
+            "crisis_active": False,
+            "crisis_type": None,
+            "crisis_types_detected": [],
+            "crisis_countries": [],
+            "player_is_crisis_fighter": False,
+            "player_crisis_kills": 0,
+            "crisis_systems_count": 0,
         }
 
         # Detect crisis countries by country_type
@@ -206,10 +213,12 @@ class EndgameMixin:
         # Find crisis country IDs by scanning the country section
         country_section_start = self._find_country_section_start()
         if country_section_start != -1:
-            country_chunk = self.gamestate[country_section_start:country_section_start + 50000000]
+            country_chunk = self.gamestate[
+                country_section_start : country_section_start + 50000000
+            ]
 
             # Find countries with crisis types
-            for match in re.finditer(r'\n\t(\d+)=\n\t\{', country_chunk):
+            for match in re.finditer(r"\n\t(\d+)=\n\t\{", country_chunk):
                 country_id = int(match.group(1))
                 start = match.start()
 
@@ -230,63 +239,67 @@ class EndgameMixin:
                 # Check for known crisis types
                 if ctype and ctype in self.CRISIS_TYPES:
                     crisis_name = self.CRISIS_TYPES[ctype]
-                    crisis_countries.append({
-                        'country_id': country_id,
-                        'type': crisis_name,
-                    })
+                    crisis_countries.append(
+                        {
+                            "country_id": country_id,
+                            "type": crisis_name,
+                        }
+                    )
                     crisis_types_found.add(crisis_name)
                     continue
 
                 # Also check for Prethoryn by name (backup detection)
                 name_match = re.search(r'key="([^"]*[Pp]rethoryn[^"]*)"', block[:5000])
                 if name_match:
-                    crisis_countries.append({
-                        'country_id': country_id,
-                        'type': 'prethoryn',
-                    })
-                    crisis_types_found.add('prethoryn')
+                    crisis_countries.append(
+                        {
+                            "country_id": country_id,
+                            "type": "prethoryn",
+                        }
+                    )
+                    crisis_types_found.add("prethoryn")
 
-        result['crisis_countries'] = crisis_countries
-        result['crisis_types_detected'] = list(crisis_types_found)
-        result['crisis_active'] = len(crisis_types_found) > 0
+        result["crisis_countries"] = crisis_countries
+        result["crisis_types_detected"] = list(crisis_types_found)
+        result["crisis_active"] = len(crisis_types_found) > 0
         if crisis_types_found:
             # Primary crisis type (prioritize main ones)
-            for primary in ['prethoryn', 'contingency', 'unbidden']:
+            for primary in ["prethoryn", "contingency", "unbidden"]:
                 if primary in crisis_types_found:
-                    result['crisis_type'] = primary
+                    result["crisis_type"] = primary
                     break
-            if not result['crisis_type']:
-                result['crisis_type'] = list(crisis_types_found)[0]
+            if not result["crisis_type"]:
+                result["crisis_type"] = list(crisis_types_found)[0]
 
         # Check player's crisis involvement
         player_id = self.get_player_empire_id()
         player_chunk = self._find_player_country_content(player_id)
         if player_chunk:
             # Check for crisis_fighter flag
-            if 'crisis_fighter=yes' in player_chunk:
-                result['player_is_crisis_fighter'] = True
+            if "crisis_fighter=yes" in player_chunk:
+                result["player_is_crisis_fighter"] = True
 
             # Check for crisis_kills count
-            kills_match = re.search(r'\bcrisis_kills=(\d+)', player_chunk)
+            kills_match = re.search(r"\bcrisis_kills=(\d+)", player_chunk)
             if kills_match:
-                result['player_crisis_kills'] = int(kills_match.group(1))
+                result["player_crisis_kills"] = int(kills_match.group(1))
 
         # Count crisis-controlled systems via flags
         # NOTE: 'hostile_system' is for space creatures (amoebas, drones, etc.), NOT crisis
         # NOTE: 'lost_swarm_system' is for the Lost Swarm space creature event, NOT Prethoryn
         crisis_system_flags = [
-            'prethoryn_system',           # Prethoryn infested systems
-            'prethoryn_invasion_system',  # Prethoryn invasion target
-            'contingency_system',         # Contingency sterilization hubs
-            'contingency_world',          # Contingency machine world
-            'unbidden_portal_system',     # Unbidden dimensional anchor
-            'extradimensional_system',    # Generic extradimensional flag
+            "prethoryn_system",  # Prethoryn infested systems
+            "prethoryn_invasion_system",  # Prethoryn invasion target
+            "contingency_system",  # Contingency sterilization hubs
+            "contingency_world",  # Contingency machine world
+            "unbidden_portal_system",  # Unbidden dimensional anchor
+            "extradimensional_system",  # Generic extradimensional flag
         ]
         total_crisis_systems = 0
         for flag in crisis_system_flags:
-            total_crisis_systems += len(re.findall(rf'\b{flag}=', self.gamestate))
+            total_crisis_systems += len(re.findall(rf"\b{flag}=", self.gamestate))
 
-        result['crisis_systems_count'] = total_crisis_systems
+        result["crisis_systems_count"] = total_crisis_systems
 
         return result
 
@@ -310,9 +323,13 @@ class EndgameMixin:
             try:
                 return self._get_lgate_status_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for L-Gate status: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for L-Gate status: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback: regex-based parsing
         return self._get_lgate_status_regex()
@@ -324,59 +341,54 @@ class EndgameMixin:
             Dict with L-Gate status details
         """
         result = {
-            'lgate_enabled': False,
-            'insights_collected': 0,
-            'insights_required': 7,  # Standard requirement
-            'lgate_opened': False,
-            'player_activation_progress': 0,
+            "lgate_enabled": False,
+            "insights_collected": 0,
+            "insights_required": 7,  # Standard requirement
+            "lgate_opened": False,
+            "player_activation_progress": 0,
         }
 
         # Check if L-Gates are enabled - use regex since it's just a flag scan
-        if 'lgate_enabled=yes' in self.gamestate:
-            result['lgate_enabled'] = True
-        elif 'lgate_enabled=no' in self.gamestate:
-            result['lgate_enabled'] = False
+        if "lgate_enabled=yes" in self.gamestate:
+            result["lgate_enabled"] = True
+        elif "lgate_enabled=no" in self.gamestate:
+            result["lgate_enabled"] = False
             return result  # No point checking further
 
-        # Get player's L-Gate insights from parsed country data
+        # Get player's L-Gate insights from cached player country entry
         player_id = self.get_player_empire_id()
+        country_data = self._get_player_country_entry(player_id)
 
-        for country_id, country_data in iter_section_entries(self.gamestate_path, "country"):
-            if str(country_id) != str(player_id):
-                continue
-
-            if not isinstance(country_data, dict):
-                break
-
-            tech_status = country_data.get('tech_status', {})
+        if isinstance(country_data, dict):
+            tech_status = country_data.get("tech_status", {})
             if isinstance(tech_status, dict):
                 # Look for tech_repeatable_lcluster_clue in technology list
                 # Note: Due to duplicate key issues, we may need to check multiple formats
                 # Try the level field for repeatables
-                repeatables = tech_status.get('repeatables', {})
+                repeatables = tech_status.get("repeatables", {})
                 if isinstance(repeatables, dict):
-                    clue_level = repeatables.get('tech_repeatable_lcluster_clue')
+                    clue_level = repeatables.get("tech_repeatable_lcluster_clue")
                     if clue_level is not None:
                         try:
-                            result['insights_collected'] = int(clue_level)
+                            result["insights_collected"] = int(clue_level)
                         except (ValueError, TypeError):
                             pass
 
             # Check for activation tech progress in potential block
-            potential = country_data.get('potential', {})
+            potential = country_data.get("potential", {})
             if isinstance(potential, dict):
-                activation_progress = potential.get('tech_lgate_activation')
+                activation_progress = potential.get("tech_lgate_activation")
                 if activation_progress is not None:
                     try:
-                        result['player_activation_progress'] = int(activation_progress)
+                        result["player_activation_progress"] = int(activation_progress)
                     except (ValueError, TypeError):
                         pass
 
-            break  # Found player, no need to continue
-
         # Check if L-Gate has been opened - use regex for flag scan
-        if re.search(r'lcluster_|l_cluster_opened|gray_tempest_country', self.gamestate):
-            result['lgate_opened'] = True
+        if re.search(
+            r"lcluster_|l_cluster_opened|gray_tempest_country", self.gamestate
+        ):
+            result["lgate_opened"] = True
 
         return result
 
@@ -387,18 +399,18 @@ class EndgameMixin:
             Dict with L-Gate status details
         """
         result = {
-            'lgate_enabled': False,
-            'insights_collected': 0,
-            'insights_required': 7,  # Standard requirement
-            'lgate_opened': False,
-            'player_activation_progress': 0,
+            "lgate_enabled": False,
+            "insights_collected": 0,
+            "insights_required": 7,  # Standard requirement
+            "lgate_opened": False,
+            "player_activation_progress": 0,
         }
 
         # Check if L-Gates are enabled in galaxy settings
-        if 'lgate_enabled=yes' in self.gamestate:
-            result['lgate_enabled'] = True
-        elif 'lgate_enabled=no' in self.gamestate:
-            result['lgate_enabled'] = False
+        if "lgate_enabled=yes" in self.gamestate:
+            result["lgate_enabled"] = True
+        elif "lgate_enabled=no" in self.gamestate:
+            result["lgate_enabled"] = False
             return result  # No point checking further
 
         # Get player's L-Gate insights from tech_repeatable_lcluster_clue
@@ -407,40 +419,43 @@ class EndgameMixin:
 
         if player_chunk:
             # Look for tech_repeatable_lcluster_clue in technology section
-            tech_block = self._extract_braced_block(player_chunk, 'tech_status')
+            tech_block = self._extract_braced_block(player_chunk, "tech_status")
             if tech_block:
                 # Find the repeatable tech entry
                 clue_match = re.search(
                     r'technology="tech_repeatable_lcluster_clue"[^}]*level=(\d+)',
-                    tech_block
+                    tech_block,
                 )
                 if clue_match:
-                    result['insights_collected'] = int(clue_match.group(1))
+                    result["insights_collected"] = int(clue_match.group(1))
 
             # Check for activation tech progress
             # This appears in potential={} section as "tech_lgate_activation"="XX"
             potential_match = re.search(
-                r'"tech_lgate_activation"="(\d+)"',
-                player_chunk
+                r'"tech_lgate_activation"="(\d+)"', player_chunk
             )
             if potential_match:
-                result['player_activation_progress'] = int(potential_match.group(1))
+                result["player_activation_progress"] = int(potential_match.group(1))
 
         # Check if L-Gate has been opened (look for L-Cluster access)
         # When opened, there will be bypass connections to the L-Cluster
         # Or we can check for gray_tempest/lcluster related flags
-        if re.search(r'lcluster_|l_cluster_opened|gray_tempest_country', self.gamestate):
-            result['lgate_opened'] = True
+        if re.search(
+            r"lcluster_|l_cluster_opened|gray_tempest_country", self.gamestate
+        ):
+            result["lgate_opened"] = True
 
         # Also check if player has the activation tech completed
         if player_chunk:
-            if 'tech_lgate_activation' in player_chunk:
-                tech_section = self._extract_braced_block(player_chunk, 'technology')
+            if "tech_lgate_activation" in player_chunk:
+                tech_section = self._extract_braced_block(player_chunk, "technology")
                 if tech_section and '"tech_lgate_activation"' in tech_section:
                     # Check if it's in completed techs (not just potential)
-                    completed_block = self._extract_braced_block(tech_section, 'completed')
-                    if completed_block and 'tech_lgate_activation' in completed_block:
-                        result['lgate_opened'] = True
+                    completed_block = self._extract_braced_block(
+                        tech_section, "completed"
+                    )
+                    if completed_block and "tech_lgate_activation" in completed_block:
+                        result["lgate_opened"] = True
 
         return result
 
@@ -463,9 +478,13 @@ class EndgameMixin:
             try:
                 return self._get_menace_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for menace: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for menace: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback: regex-based parsing
         return self._get_menace_regex()
@@ -477,50 +496,45 @@ class EndgameMixin:
             Dict with menace status details
         """
         result = {
-            'has_crisis_perk': False,
-            'menace_level': 0,
-            'crisis_level': 0,
+            "has_crisis_perk": False,
+            "menace_level": 0,
+            "crisis_level": 0,
         }
 
         player_id = self.get_player_empire_id()
+        country_data = self._get_player_country_entry(player_id)
 
-        for country_id, country_data in iter_section_entries(self.gamestate_path, "country"):
-            if str(country_id) != str(player_id):
-                continue
+        if not isinstance(country_data, dict):
+            return result
 
-            if not isinstance(country_data, dict):
-                break
+        # Check for Become the Crisis ascension perk
+        # Note: ascension_perks may have duplicate keys, so use regex fallback for reliability
+        ascension_perks = country_data.get("ascension_perks", [])
+        if isinstance(ascension_perks, list):
+            if "ap_become_the_crisis" in ascension_perks:
+                result["has_crisis_perk"] = True
+        elif isinstance(ascension_perks, str):
+            # Single perk case
+            if ascension_perks == "ap_become_the_crisis":
+                result["has_crisis_perk"] = True
 
-            # Check for Become the Crisis ascension perk
-            # Note: ascension_perks may have duplicate keys, so use regex fallback for reliability
-            ascension_perks = country_data.get('ascension_perks', [])
-            if isinstance(ascension_perks, list):
-                if 'ap_become_the_crisis' in ascension_perks:
-                    result['has_crisis_perk'] = True
-            elif isinstance(ascension_perks, str):
-                # Single perk case
-                if ascension_perks == 'ap_become_the_crisis':
-                    result['has_crisis_perk'] = True
+        # If they have the perk, look for menace tracking
+        if result["has_crisis_perk"]:
+            # Menace is stored in the country block
+            menace = country_data.get("menace")
+            if menace is not None:
+                try:
+                    result["menace_level"] = int(menace)
+                except (ValueError, TypeError):
+                    pass
 
-            # If they have the perk, look for menace tracking
-            if result['has_crisis_perk']:
-                # Menace is stored in the country block
-                menace = country_data.get('menace')
-                if menace is not None:
-                    try:
-                        result['menace_level'] = int(menace)
-                    except (ValueError, TypeError):
-                        pass
-
-                # Crisis level/tier
-                crisis_level = country_data.get('crisis_level')
-                if crisis_level is not None:
-                    try:
-                        result['crisis_level'] = int(crisis_level)
-                    except (ValueError, TypeError):
-                        pass
-
-            break  # Found player, no need to continue
+            # Crisis level/tier
+            crisis_level = country_data.get("crisis_level")
+            if crisis_level is not None:
+                try:
+                    result["crisis_level"] = int(crisis_level)
+                except (ValueError, TypeError):
+                    pass
 
         return result
 
@@ -531,9 +545,9 @@ class EndgameMixin:
             Dict with menace status details
         """
         result = {
-            'has_crisis_perk': False,
-            'menace_level': 0,
-            'crisis_level': 0,
+            "has_crisis_perk": False,
+            "menace_level": 0,
+            "crisis_level": 0,
         }
 
         player_id = self.get_player_empire_id()
@@ -543,22 +557,22 @@ class EndgameMixin:
             return result
 
         # Check for Become the Crisis ascension perk
-        ascension_block = self._extract_braced_block(player_chunk, 'ascension_perks')
+        ascension_block = self._extract_braced_block(player_chunk, "ascension_perks")
         if ascension_block:
-            if 'ap_become_the_crisis' in ascension_block:
-                result['has_crisis_perk'] = True
+            if "ap_become_the_crisis" in ascension_block:
+                result["has_crisis_perk"] = True
 
         # If they have the perk, look for menace tracking
-        if result['has_crisis_perk']:
+        if result["has_crisis_perk"]:
             # Menace is stored in the country block
-            menace_match = re.search(r'\bmenace=(\d+)', player_chunk)
+            menace_match = re.search(r"\bmenace=(\d+)", player_chunk)
             if menace_match:
-                result['menace_level'] = int(menace_match.group(1))
+                result["menace_level"] = int(menace_match.group(1))
 
             # Crisis level/tier
-            crisis_level_match = re.search(r'\bcrisis_level=(\d+)', player_chunk)
+            crisis_level_match = re.search(r"\bcrisis_level=(\d+)", player_chunk)
             if crisis_level_match:
-                result['crisis_level'] = int(crisis_level_match.group(1))
+                result["crisis_level"] = int(crisis_level_match.group(1))
 
         return result
 
@@ -583,9 +597,13 @@ class EndgameMixin:
             try:
                 return self._get_great_khan_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for Great Khan: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for Great Khan: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback: regex-based parsing
         return self._get_great_khan_regex()
@@ -597,17 +615,19 @@ class EndgameMixin:
             Dict with Great Khan status details
         """
         result = {
-            'marauders_present': False,
-            'marauder_count': 0,
-            'khan_risen': False,
-            'khan_status': None,
-            'khan_country_id': None,
+            "marauders_present": False,
+            "marauder_count": 0,
+            "khan_risen": False,
+            "khan_status": None,
+            "khan_country_id": None,
         }
 
         marauder_count = 0
         khan_country_id = None
 
-        for country_id, country_data in iter_section_entries(self.gamestate_path, "country"):
+        for country_id, country_data in iter_section_entries(
+            self.gamestate_path, "country"
+        ):
             if not isinstance(country_data, dict):
                 continue
 
@@ -616,56 +636,56 @@ class EndgameMixin:
                 continue
 
             # Check for marauder types
-            if ctype in ('dormant_marauders', 'marauder', 'marauder_raiders'):
-                result['marauders_present'] = True
+            if ctype in ("dormant_marauders", "marauder", "marauder_raiders"):
+                result["marauders_present"] = True
                 marauder_count += 1
 
             # Check for awakened marauders (Great Khan)
-            if ctype in ('awakened_marauders', 'marauder_empire'):
-                result['khan_risen'] = True
-                result['khan_status'] = 'active'
+            if ctype in ("awakened_marauders", "marauder_empire"):
+                result["khan_risen"] = True
+                result["khan_status"] = "active"
                 khan_country_id = int(country_id)
 
             # Also check country name for marauder identification
             name_data = country_data.get("name", {})
             if isinstance(name_data, dict):
                 name_key = name_data.get("key", "")
-                if name_key and 'marauder' in name_key.lower():
-                    result['marauders_present'] = True
+                if name_key and "marauder" in name_key.lower():
+                    result["marauders_present"] = True
                     if not marauder_count:  # Don't double count
                         marauder_count += 1
 
         # Cap marauder count at realistic number
         if marauder_count > 0:
-            result['marauder_count'] = min(marauder_count, 3)
+            result["marauder_count"] = min(marauder_count, 3)
 
         if khan_country_id is not None:
-            result['khan_country_id'] = khan_country_id
+            result["khan_country_id"] = khan_country_id
 
         # Check for Khan defeated via flag search (more reliable)
         khan_defeated_patterns = [
-            r'great_khan_dead',
-            r'great_khan_defeated',
-            r'khan_successor',  # Khan died, successors fighting
+            r"great_khan_dead",
+            r"great_khan_defeated",
+            r"khan_successor",  # Khan died, successors fighting
         ]
 
         for pattern in khan_defeated_patterns:
             if re.search(pattern, self.gamestate):
-                result['khan_risen'] = True  # Was risen at some point
-                result['khan_status'] = 'defeated'
+                result["khan_risen"] = True  # Was risen at some point
+                result["khan_status"] = "defeated"
                 break
 
         # Check for Khan rising via flags if not detected by country type
-        if not result['khan_risen']:
+        if not result["khan_risen"]:
             khan_patterns = [
-                r'great_khan_risen',
-                r'great_khan=yes',
-                r'khan_country',
+                r"great_khan_risen",
+                r"great_khan=yes",
+                r"khan_country",
             ]
             for pattern in khan_patterns:
                 if re.search(pattern, self.gamestate):
-                    result['khan_risen'] = True
-                    result['khan_status'] = 'active'
+                    result["khan_risen"] = True
+                    result["khan_status"] = "active"
                     break
 
         return result
@@ -677,11 +697,11 @@ class EndgameMixin:
             Dict with Great Khan status details
         """
         result = {
-            'marauders_present': False,
-            'marauder_count': 0,
-            'khan_risen': False,
-            'khan_status': None,
-            'khan_country_id': None,
+            "marauders_present": False,
+            "marauder_count": 0,
+            "khan_risen": False,
+            "khan_status": None,
+            "khan_country_id": None,
         }
 
         # Check for marauder countries
@@ -697,57 +717,62 @@ class EndgameMixin:
         for pattern in marauder_patterns:
             matches = re.findall(pattern, self.gamestate)
             if matches:
-                result['marauders_present'] = True
+                result["marauders_present"] = True
                 marauder_count += len(matches)
 
         # Dedupe - NAME_Marauder appears multiple times per empire
         # Estimate actual marauder empires (usually 1-3)
         if marauder_count > 0:
-            result['marauder_count'] = min(marauder_count, 3)  # Cap at realistic number
+            result["marauder_count"] = min(marauder_count, 3)  # Cap at realistic number
 
         # Check for Great Khan rising
         # The Khan has specific country type and event flags
         khan_patterns = [
-            (r'type="awakened_marauders"', 'active'),
-            (r'type="marauder_empire"', 'active'),
-            (r'great_khan_risen', 'active'),
-            (r'great_khan=yes', 'active'),
-            (r'khan_country', 'active'),
+            (r'type="awakened_marauders"', "active"),
+            (r'type="marauder_empire"', "active"),
+            (r"great_khan_risen", "active"),
+            (r"great_khan=yes", "active"),
+            (r"khan_country", "active"),
         ]
 
         for pattern, status in khan_patterns:
             if re.search(pattern, self.gamestate):
-                result['khan_risen'] = True
-                result['khan_status'] = status
+                result["khan_risen"] = True
+                result["khan_status"] = status
                 break
 
         # Check for Khan defeated
         khan_defeated_patterns = [
-            r'great_khan_dead',
-            r'great_khan_defeated',
-            r'khan_successor',  # Khan died, successors fighting
+            r"great_khan_dead",
+            r"great_khan_defeated",
+            r"khan_successor",  # Khan died, successors fighting
         ]
 
         for pattern in khan_defeated_patterns:
             if re.search(pattern, self.gamestate):
-                result['khan_risen'] = True  # Was risen at some point
-                result['khan_status'] = 'defeated'
+                result["khan_risen"] = True  # Was risen at some point
+                result["khan_status"] = "defeated"
                 break
 
         # Try to find Khan's country ID if active
-        if result['khan_risen'] and result['khan_status'] == 'active':
+        if result["khan_risen"] and result["khan_status"] == "active":
             # Look for awakened_marauders country
             country_section_start = self._find_country_section_start()
             if country_section_start != -1:
-                country_chunk = self.gamestate[country_section_start:country_section_start + 10000000]
+                country_chunk = self.gamestate[
+                    country_section_start : country_section_start + 10000000
+                ]
 
-                for match in re.finditer(r'\n\t(\d+)=\n\t\{', country_chunk):
+                for match in re.finditer(r"\n\t(\d+)=\n\t\{", country_chunk):
                     country_id = int(match.group(1))
                     start = match.start()
-                    block = country_chunk[start:start + 5000]
+                    block = country_chunk[start : start + 5000]
 
-                    if 'type="awakened_marauders"' in block or 'type="marauder_empire"' in block:
-                        result['khan_country_id'] = country_id
+                    if (
+                        'type="awakened_marauders"' in block
+                        or 'type="marauder_empire"' in block
+                    ):
+                        result["khan_country_id"] = country_id
                         break
 
         return result

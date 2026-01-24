@@ -8,7 +8,13 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
+    from rust_bridge import (
+        extract_sections,
+        iter_section_entries,
+        ParserError,
+        _get_active_session,
+    )
+
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
@@ -112,11 +118,7 @@ class PlanetsMixin:
         if not session:
             return self._get_planets_regex()
 
-        result = {
-            'planets': [],
-            'count': 0,
-            'total_pops': 0
-        }
+        result = {"planets": [], "count": 0, "total_pops": 0}
 
         player_id = self.get_player_empire_id()
 
@@ -127,12 +129,20 @@ class PlanetsMixin:
         building_types = self._get_building_types()
 
         # Non-habitable planet types to skip
-        non_habitable = {'asteroid', 'barren', 'barren_cold', 'molten', 'toxic', 'frozen', 'gas_giant'}
+        non_habitable = {
+            "asteroid",
+            "barren",
+            "barren_cold",
+            "molten",
+            "toxic",
+            "frozen",
+            "gas_giant",
+        }
 
         # Use session extract_sections for planets (reuses parsed data, no spawn)
         # The planets section has nested structure: planets.planet.{id: {...}}
-        data = session.extract_sections(['planets'])
-        planets_data = data.get('planets', {}).get('planet', {})
+        data = session.extract_sections(["planets"])
+        planets_data = data.get("planets", {}).get("planet", {})
 
         planets_found = []
 
@@ -153,56 +163,58 @@ class PlanetsMixin:
             if ptype.endswith("_star") or ptype in non_habitable:
                 continue
 
-            planet_info = {'id': str(planet_id)}
+            planet_info = {"id": str(planet_id)}
 
             # Extract name
             name_data = planet.get("name")
             if name_data:
-                planet_info['name'] = self._extract_planet_name(name_data)
+                planet_info["name"] = self._extract_planet_name(name_data)
 
             # Extract type
             if ptype:
-                planet_info['type'] = ptype
+                planet_info["type"] = ptype
 
             # Extract planet size
             size = planet.get("planet_size")
             if size is not None:
-                planet_info['size'] = int(size)
+                planet_info["size"] = int(size)
 
             # Get population from pop_groups
             planet_id_int = int(planet_id)
-            planet_info['population'] = pop_by_planet.get(planet_id_int, 0)
-            result['total_pops'] += planet_info['population']
+            planet_info["population"] = pop_by_planet.get(planet_id_int, 0)
+            result["total_pops"] += planet_info["population"]
 
             # Extract stability
             stability = planet.get("stability")
             if stability is not None:
-                planet_info['stability'] = float(stability)
+                planet_info["stability"] = float(stability)
 
             # Extract amenities
             amenities = planet.get("amenities")
             if amenities is not None:
-                planet_info['amenities'] = float(amenities)
+                planet_info["amenities"] = float(amenities)
 
             # Extract free amenities (surplus/deficit)
             free_amenities = planet.get("free_amenities")
             if free_amenities is not None:
-                planet_info['free_amenities'] = float(free_amenities)
+                planet_info["free_amenities"] = float(free_amenities)
 
             # Extract crime
             crime = planet.get("crime")
             if crime is not None:
-                planet_info['crime'] = round(float(crime), 1)
+                planet_info["crime"] = round(float(crime), 1)
 
             # Extract permanent planet modifier
             pm = planet.get("planet_modifier")
             if pm:
-                planet_info['planet_modifier'] = pm.replace("pm_", "")
+                planet_info["planet_modifier"] = pm.replace("pm_", "")
 
             # Extract timed modifiers
-            timed_mods = self._extract_timed_modifiers_rust(planet.get("timed_modifier"))
+            timed_mods = self._extract_timed_modifiers_rust(
+                planet.get("timed_modifier")
+            )
             if timed_mods:
-                planet_info['modifiers'] = timed_mods
+                planet_info["modifiers"] = timed_mods
 
             # Extract buildings - resolve IDs to building type names
             # The baseline extracts from externally_owned_buildings (megacorp branch offices, etc.)
@@ -216,41 +228,43 @@ class PlanetsMixin:
                         for bid in building_ids:
                             bid_str = str(bid)
                             if bid_str in building_types:
-                                resolved_buildings.append(building_types[bid_str].replace('building_', ''))
+                                resolved_buildings.append(
+                                    building_types[bid_str].replace("building_", "")
+                                )
                 if resolved_buildings:
-                    planet_info['buildings'] = resolved_buildings
+                    planet_info["buildings"] = resolved_buildings
 
             # Extract districts count
             districts = planet.get("districts", [])
             if isinstance(districts, list):
-                planet_info['district_count'] = len(districts)
+                planet_info["district_count"] = len(districts)
 
             # Extract last building/district changed for context
             last_building = planet.get("last_building_changed")
             if last_building:
-                planet_info['last_building'] = last_building
+                planet_info["last_building"] = last_building
 
             last_district = planet.get("last_district_changed")
             if last_district:
-                planet_info['last_district'] = last_district
+                planet_info["last_district"] = last_district
 
             planets_found.append(planet_info)
 
         # Sort by planet ID for consistent ordering
-        planets_found.sort(key=lambda x: int(x['id']))
+        planets_found.sort(key=lambda x: int(x["id"]))
 
-        result['planets'] = planets_found
-        result['count'] = len(planets_found)
+        result["planets"] = planets_found
+        result["count"] = len(planets_found)
 
         # Summary by type
         type_counts = {}
         for planet in planets_found:
-            ptype = planet.get('type', 'unknown')
+            ptype = planet.get("type", "unknown")
             if ptype not in type_counts:
                 type_counts[ptype] = 0
             type_counts[ptype] += 1
 
-        result['by_type'] = type_counts
+        result["by_type"] = type_counts
 
         return result
 
@@ -287,14 +301,16 @@ class PlanetsMixin:
             except (ValueError, TypeError):
                 days = 0
 
-            display_name = mod_name.replace('_', ' ').title()
+            display_name = mod_name.replace("_", " ").title()
 
-            modifiers.append({
-                'name': mod_name,
-                'display_name': display_name,
-                'days': days,
-                'permanent': days < 0,
-            })
+            modifiers.append(
+                {
+                    "name": mod_name,
+                    "display_name": display_name,
+                    "days": days,
+                    "permanent": days < 0,
+                }
+            )
 
         return modifiers
 
@@ -330,12 +346,16 @@ class PlanetsMixin:
                     planet_id_int = int(planet_id)
                     pop_size = int(size)
                     if pop_size > 0:
-                        pop_by_planet[planet_id_int] = pop_by_planet.get(planet_id_int, 0) + pop_size
+                        pop_by_planet[planet_id_int] = (
+                            pop_by_planet.get(planet_id_int, 0) + pop_size
+                        )
                 except (ValueError, TypeError):
                     continue
 
         except ParserError as e:
-            logger.warning(f"Rust parser failed for pop_groups: {e}, using regex fallback")
+            logger.warning(
+                f"Rust parser failed for pop_groups: {e}, using regex fallback"
+            )
             return self._get_population_by_planet()
 
         return pop_by_planet
@@ -346,11 +366,7 @@ class PlanetsMixin:
         Returns:
             Dict with planet details including population and districts
         """
-        result = {
-            'planets': [],
-            'count': 0,
-            'total_pops': 0
-        }
+        result = {"planets": [], "count": 0, "total_pops": 0}
 
         player_id = self.get_player_empire_id()
 
@@ -359,20 +375,24 @@ class PlanetsMixin:
         pop_by_planet = self._get_population_by_planet()
 
         # Find the planets section
-        planets_match = re.search(r'^planets=\s*\{\s*planet=\s*\{', self.gamestate, re.MULTILINE)
+        planets_match = re.search(
+            r"^planets=\s*\{\s*planet=\s*\{", self.gamestate, re.MULTILINE
+        )
         if not planets_match:
-            result['error'] = "Could not find planets section"
+            result["error"] = "Could not find planets section"
             return result
 
         start = planets_match.start()
         # Get a large chunk for planets (they're spread out)
-        planets_chunk = self.gamestate[start:start + 20000000]  # 20MB - planets section is large
+        planets_chunk = self.gamestate[
+            start : start + 20000000
+        ]  # 20MB - planets section is large
 
         planets_found = []
 
         # Find each planet block by looking for the pattern: \n\t\tID=\n\t\t{
         # Then check if it has owner=player_id
-        planet_start_pattern = r'\n\t\t(\d+)=\s*\{'
+        planet_start_pattern = r"\n\t\t(\d+)=\s*\{"
 
         for match in re.finditer(planet_start_pattern, planets_chunk):
             planet_id = match.group(1)
@@ -383,11 +403,13 @@ class PlanetsMixin:
             block_end = block_start
             started = False
             # Planet blocks can be very large (10k+ chars) due to pop data
-            for i, char in enumerate(planets_chunk[block_start:block_start + 30000], block_start):
-                if char == '{':
+            for i, char in enumerate(
+                planets_chunk[block_start : block_start + 30000], block_start
+            ):
+                if char == "{":
                     brace_count += 1
                     started = True
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if started and brace_count == 0:
                         block_end = i + 1
@@ -397,7 +419,7 @@ class PlanetsMixin:
 
             # Check if this planet is owned by player
             # Look for owner=0 (but not original_owner=0)
-            owner_match = re.search(r'\n\s*owner=(\d+)', planet_block)
+            owner_match = re.search(r"\n\s*owner=(\d+)", planet_block)
             if not owner_match:
                 continue
 
@@ -405,109 +427,123 @@ class PlanetsMixin:
             if owner_id != player_id:
                 continue
 
-            planet_info = {'id': planet_id}
+            planet_info = {"id": planet_id}
 
             # Extract name
             name_match = re.search(r'name=\s*\{\s*key="([^"]+)"', planet_block)
             if name_match:
-                planet_info['name'] = name_match.group(1).replace('NAME_', '')
+                planet_info["name"] = name_match.group(1).replace("NAME_", "")
 
             # Extract planet class
             class_match = re.search(r'planet_class="([^"]+)"', planet_block)
             if class_match:
-                planet_info['type'] = class_match.group(1).replace('pc_', '')
+                planet_info["type"] = class_match.group(1).replace("pc_", "")
 
             # Skip stars and other non-habitable types
-            ptype = planet_info.get('type', '')
-            if ptype.endswith('_star') or ptype in ['asteroid', 'barren', 'barren_cold', 'molten', 'toxic', 'frozen', 'gas_giant']:
+            ptype = planet_info.get("type", "")
+            if ptype.endswith("_star") or ptype in [
+                "asteroid",
+                "barren",
+                "barren_cold",
+                "molten",
+                "toxic",
+                "frozen",
+                "gas_giant",
+            ]:
                 continue
 
             # Extract planet size
-            size_match = re.search(r'planet_size=(\d+)', planet_block)
+            size_match = re.search(r"planet_size=(\d+)", planet_block)
             if size_match:
-                planet_info['size'] = int(size_match.group(1))
+                planet_info["size"] = int(size_match.group(1))
 
             # Get population from pop_groups (accurate count via size field)
             planet_id_int = int(planet_id)
-            planet_info['population'] = pop_by_planet.get(planet_id_int, 0)
-            result['total_pops'] += planet_info['population']
+            planet_info["population"] = pop_by_planet.get(planet_id_int, 0)
+            result["total_pops"] += planet_info["population"]
 
             # Extract stability
-            stability_match = re.search(r'\n\s*stability=([\d.]+)', planet_block)
+            stability_match = re.search(r"\n\s*stability=([\d.]+)", planet_block)
             if stability_match:
-                planet_info['stability'] = float(stability_match.group(1))
+                planet_info["stability"] = float(stability_match.group(1))
 
             # Extract amenities
-            amenities_match = re.search(r'\n\s*amenities=([\d.]+)', planet_block)
+            amenities_match = re.search(r"\n\s*amenities=([\d.]+)", planet_block)
             if amenities_match:
-                planet_info['amenities'] = float(amenities_match.group(1))
+                planet_info["amenities"] = float(amenities_match.group(1))
 
             # Extract free amenities (surplus/deficit)
-            free_amenities_match = re.search(r'\n\s*free_amenities=([-\d.]+)', planet_block)
+            free_amenities_match = re.search(
+                r"\n\s*free_amenities=([-\d.]+)", planet_block
+            )
             if free_amenities_match:
-                planet_info['free_amenities'] = float(free_amenities_match.group(1))
+                planet_info["free_amenities"] = float(free_amenities_match.group(1))
 
             # Extract crime
-            crime_match = re.search(r'\n\s*crime=([\d.]+)', planet_block)
+            crime_match = re.search(r"\n\s*crime=([\d.]+)", planet_block)
             if crime_match:
-                planet_info['crime'] = round(float(crime_match.group(1)), 1)
+                planet_info["crime"] = round(float(crime_match.group(1)), 1)
 
             # Extract permanent planet modifier
             pm_match = re.search(r'planet_modifier="([^"]+)"', planet_block)
             if pm_match:
-                planet_info['planet_modifier'] = pm_match.group(1).replace('pm_', '')
+                planet_info["planet_modifier"] = pm_match.group(1).replace("pm_", "")
 
             # Extract timed modifiers (crime, events, buffs)
             timed_mods = self._extract_timed_modifiers(planet_block)
             if timed_mods:
-                planet_info['modifiers'] = timed_mods
+                planet_info["modifiers"] = timed_mods
 
             # Extract buildings - resolve IDs to building type names
             # Planet format: buildings={ { buildings={ ID1 ID2 ... } } }
             # These IDs reference the global buildings section
             building_types = self._get_building_types()
-            buildings_match = re.search(r'buildings=\s*\{[^}]*buildings=\s*\{([^}]+)\}', planet_block)
+            buildings_match = re.search(
+                r"buildings=\s*\{[^}]*buildings=\s*\{([^}]+)\}", planet_block
+            )
             if buildings_match:
-                building_ids = re.findall(r'\d+', buildings_match.group(1))
+                building_ids = re.findall(r"\d+", buildings_match.group(1))
                 resolved_buildings = []
                 for bid in building_ids:
                     if bid in building_types:
-                        resolved_buildings.append(building_types[bid].replace('building_', ''))
+                        resolved_buildings.append(
+                            building_types[bid].replace("building_", "")
+                        )
                 if resolved_buildings:
-                    planet_info['buildings'] = resolved_buildings
+                    planet_info["buildings"] = resolved_buildings
 
             # Extract districts info
             # Format: districts={ 0 59 60 61 } (numeric indices)
-            districts_match = re.search(r'districts=\s*\{([^}]+)\}', planet_block)
+            districts_match = re.search(r"districts=\s*\{([^}]+)\}", planet_block)
             if districts_match:
                 districts_block = districts_match.group(1)
-                district_ids = re.findall(r'\d+', districts_block)
-                planet_info['district_count'] = len(district_ids)
+                district_ids = re.findall(r"\d+", districts_block)
+                planet_info["district_count"] = len(district_ids)
 
             # Extract last building/district changed for context
             last_building = re.search(r'last_building_changed="([^"]+)"', planet_block)
             if last_building:
-                planet_info['last_building'] = last_building.group(1)
+                planet_info["last_building"] = last_building.group(1)
 
             last_district = re.search(r'last_district_changed="([^"]+)"', planet_block)
             if last_district:
-                planet_info['last_district'] = last_district.group(1)
+                planet_info["last_district"] = last_district.group(1)
 
             planets_found.append(planet_info)
 
         # Full list (no truncation); callers that need caps should slice.
-        result['planets'] = planets_found
-        result['count'] = len(planets_found)
+        result["planets"] = planets_found
+        result["count"] = len(planets_found)
 
         # Summary by type
         type_counts = {}
         for planet in planets_found:
-            ptype = planet.get('type', 'unknown')
+            ptype = planet.get("type", "unknown")
             if ptype not in type_counts:
                 type_counts[ptype] = 0
             type_counts[ptype] += 1
 
-        result['by_type'] = type_counts
+        result["by_type"] = type_counts
 
         return result
 
@@ -516,17 +552,17 @@ class PlanetsMixin:
         limit = max(1, min(int(limit or 25), 50))
 
         result = {
-            'sites': [],
-            'count': 0,
+            "sites": [],
+            "count": 0,
         }
 
-        section = self._extract_section('archaeological_sites')
+        section = self._extract_section("archaeological_sites")
         if not section:
-            result['error'] = 'Could not find archaeological_sites section'
+            result["error"] = "Could not find archaeological_sites section"
             return result
 
         # Extract sites={ ... } block.
-        sites_match = re.search(r'\bsites\s*=\s*\{', section)
+        sites_match = re.search(r"\bsites\s*=\s*\{", section)
         if not sites_match:
             return result
 
@@ -535,10 +571,10 @@ class PlanetsMixin:
         sites_end = None
         started = False
         for i, ch in enumerate(section[sites_start:], sites_start):
-            if ch == '{':
+            if ch == "{":
                 brace_count += 1
                 started = True
-            elif ch == '}':
+            elif ch == "}":
                 brace_count -= 1
                 if started and brace_count == 0:
                     sites_end = i + 1
@@ -548,21 +584,21 @@ class PlanetsMixin:
 
         sites_block = section[sites_start:sites_end]
 
-        site_pattern = r'\n\t\t(\d+)=\n\t\t\{'
+        site_pattern = r"\n\t\t(\d+)=\n\t\t\{"
         sites_found: list[dict] = []
 
         def extract_key_block(text: str, key: str) -> str | None:
-            m = re.search(rf'\b{re.escape(key)}\s*=\s*\{{', text)
+            m = re.search(rf"\b{re.escape(key)}\s*=\s*\{{", text)
             if not m:
                 return None
             start = m.start()
             brace_count = 0
             started = False
             for i, ch in enumerate(text[start:], start):
-                if ch == '{':
+                if ch == "{":
                     brace_count += 1
                     started = True
-                elif ch == '}':
+                elif ch == "}":
                     brace_count -= 1
                     if started and brace_count == 0:
                         return text[start : i + 1]
@@ -576,10 +612,10 @@ class PlanetsMixin:
             block_end = None
             started = False
             for i, ch in enumerate(sites_block[block_start:], block_start):
-                if ch == '{':
+                if ch == "{":
                     brace_count += 1
                     started = True
-                elif ch == '}':
+                elif ch == "}":
                     brace_count -= 1
                     if started and brace_count == 0:
                         block_end = i + 1
@@ -590,58 +626,74 @@ class PlanetsMixin:
             site_block = sites_block[block_start:block_end]
 
             entry = {
-                'site_id': site_id,
-                'type': None,
-                'location': None,
-                'index': None,
-                'clues': None,
-                'difficulty': None,
-                'days_left': None,
-                'locked': None,
-                'last_excavator_country': None,
-                'excavator_fleet': None,
-                'completed_count': 0,
-                'last_completed_date': None,
-                'events_count': 0,
-                'active_events_count': 0,
+                "site_id": site_id,
+                "type": None,
+                "location": None,
+                "index": None,
+                "clues": None,
+                "difficulty": None,
+                "days_left": None,
+                "locked": None,
+                "last_excavator_country": None,
+                "excavator_fleet": None,
+                "completed_count": 0,
+                "last_completed_date": None,
+                "events_count": 0,
+                "active_events_count": 0,
             }
 
             type_match = re.search(r'\btype="([^"]+)"', site_block)
             if type_match:
-                entry['type'] = type_match.group(1)
+                entry["type"] = type_match.group(1)
 
-            location_match = re.search(r'\blocation\s*=\s*\{\s*type=(\d+)\s*id=(\d+)\s*\}', site_block)
+            location_match = re.search(
+                r"\blocation\s*=\s*\{\s*type=(\d+)\s*id=(\d+)\s*\}", site_block
+            )
             if location_match:
-                entry['location'] = {'type': int(location_match.group(1)), 'id': int(location_match.group(2))}
+                entry["location"] = {
+                    "type": int(location_match.group(1)),
+                    "id": int(location_match.group(2)),
+                }
 
-            for key in ['index', 'clues', 'difficulty', 'days_left', 'last_excavator_country', 'excavator_fleet']:
-                m = re.search(rf'\b{key}=([-\d]+)', site_block)
+            for key in [
+                "index",
+                "clues",
+                "difficulty",
+                "days_left",
+                "last_excavator_country",
+                "excavator_fleet",
+            ]:
+                m = re.search(rf"\b{key}=([-\d]+)", site_block)
                 if m:
                     entry[key] = int(m.group(1))
 
-            locked_match = re.search(r'\blocked=(yes|no)\b', site_block)
+            locked_match = re.search(r"\blocked=(yes|no)\b", site_block)
             if locked_match:
-                entry['locked'] = locked_match.group(1) == 'yes'
+                entry["locked"] = locked_match.group(1) == "yes"
 
-            completed_block = extract_key_block(site_block, 'completed') or ''
+            completed_block = extract_key_block(site_block, "completed") or ""
             if completed_block:
-                entry['completed_count'] = len(re.findall(r'\bcountry=(\d+)', completed_block))
+                entry["completed_count"] = len(
+                    re.findall(r"\bcountry=(\d+)", completed_block)
+                )
                 dates = re.findall(r'\bdate=\s*"(\d+\.\d+\.\d+)"', completed_block)
                 if dates:
-                    entry['last_completed_date'] = dates[-1]
+                    entry["last_completed_date"] = dates[-1]
 
-            events_block = extract_key_block(site_block, 'events') or ''
+            events_block = extract_key_block(site_block, "events") or ""
             if events_block:
                 event_ids = re.findall(r'\bevent_id="([^"]+)"', events_block)
-                entry['events_count'] = len(event_ids)
-                entry['active_events_count'] = len(re.findall(r'\bexpired=no\b', events_block))
+                entry["events_count"] = len(event_ids)
+                entry["active_events_count"] = len(
+                    re.findall(r"\bexpired=no\b", events_block)
+                )
 
             sites_found.append(entry)
             if len(sites_found) >= limit:
                 break
 
-        result['sites'] = sites_found
-        result['count'] = len(sites_found)
+        result["sites"] = sites_found
+        result["count"] = len(sites_found)
         return result
 
     def _extract_timed_modifiers(self, planet_block: str) -> list[dict]:
@@ -655,7 +707,7 @@ class PlanetsMixin:
         modifiers = []
 
         # Find timed_modifier block
-        tm_match = re.search(r'timed_modifier\s*=\s*\{', planet_block)
+        tm_match = re.search(r"timed_modifier\s*=\s*\{", planet_block)
         if not tm_match:
             return modifiers
 
@@ -664,9 +716,9 @@ class PlanetsMixin:
         brace_count = 0
         end = None
         for i, char in enumerate(planet_block[start:], start):
-            if char == '{':
+            if char == "{":
                 brace_count += 1
-            elif char == '}':
+            elif char == "}":
                 brace_count -= 1
                 if brace_count == 0:
                     end = i + 1
@@ -678,25 +730,29 @@ class PlanetsMixin:
         tm_block = planet_block[start:end]
 
         # Find items block
-        items_match = re.search(r'items\s*=\s*\{', tm_block)
+        items_match = re.search(r"items\s*=\s*\{", tm_block)
         if not items_match:
             return modifiers
 
         # Extract individual modifier entries
         # Format: { modifier="name" days=N }
-        for match in re.finditer(r'\{\s*modifier="([^"]+)"\s*days=([-\d]+)\s*\}', tm_block):
+        for match in re.finditer(
+            r'\{\s*modifier="([^"]+)"\s*days=([-\d]+)\s*\}', tm_block
+        ):
             mod_name = match.group(1)
             days = int(match.group(2))
 
             # Clean up modifier name for display
-            display_name = mod_name.replace('_', ' ').title()
+            display_name = mod_name.replace("_", " ").title()
 
-            modifiers.append({
-                'name': mod_name,
-                'display_name': display_name,
-                'days': days,  # -1 means permanent
-                'permanent': days < 0,
-            })
+            modifiers.append(
+                {
+                    "name": mod_name,
+                    "display_name": display_name,
+                    "days": days,  # -1 means permanent
+                    "permanent": days < 0,
+                }
+            )
 
         return modifiers
 
@@ -707,47 +763,53 @@ class PlanetsMixin:
             Dict with lists of planets grouped by problem type
         """
         planets_data = self.get_planets()
-        planets = planets_data.get('planets', [])
+        planets = planets_data.get("planets", [])
 
         result = {
-            'high_crime': [],      # Crime > 25%
-            'low_stability': [],   # Stability < 50
-            'amenity_deficit': [], # Free amenities < 0
-            'problem_count': 0,
+            "high_crime": [],  # Crime > 25%
+            "low_stability": [],  # Stability < 50
+            "amenity_deficit": [],  # Free amenities < 0
+            "problem_count": 0,
         }
 
         for planet in planets:
             problems = []
 
-            crime = planet.get('crime', 0)
+            crime = planet.get("crime", 0)
             if crime > 25:
                 problems.append(f"crime {crime:.0f}%")
-                result['high_crime'].append({
-                    'name': planet.get('name', 'Unknown'),
-                    'crime': crime,
-                    'modifiers': planet.get('modifiers', []),
-                })
+                result["high_crime"].append(
+                    {
+                        "name": planet.get("name", "Unknown"),
+                        "crime": crime,
+                        "modifiers": planet.get("modifiers", []),
+                    }
+                )
 
-            stability = planet.get('stability', 100)
+            stability = planet.get("stability", 100)
             if stability < 50:
                 problems.append(f"stability {stability:.0f}")
-                result['low_stability'].append({
-                    'name': planet.get('name', 'Unknown'),
-                    'stability': stability,
-                })
+                result["low_stability"].append(
+                    {
+                        "name": planet.get("name", "Unknown"),
+                        "stability": stability,
+                    }
+                )
 
-            free_amenities = planet.get('free_amenities', 0)
+            free_amenities = planet.get("free_amenities", 0)
             if free_amenities < 0:
                 problems.append(f"amenities {free_amenities:.0f}")
-                result['amenity_deficit'].append({
-                    'name': planet.get('name', 'Unknown'),
-                    'deficit': free_amenities,
-                })
+                result["amenity_deficit"].append(
+                    {
+                        "name": planet.get("name", "Unknown"),
+                        "deficit": free_amenities,
+                    }
+                )
 
-        result['problem_count'] = (
-            len(result['high_crime']) +
-            len(result['low_stability']) +
-            len(result['amenity_deficit'])
+        result["problem_count"] = (
+            len(result["high_crime"])
+            + len(result["low_stability"])
+            + len(result["amenity_deficit"])
         )
 
         return result
@@ -766,19 +828,21 @@ class PlanetsMixin:
         pop_by_planet: dict[int, int] = {}
 
         # Find pop_groups section
-        pop_groups_match = re.search(r'\npop_groups=\n\{', self.gamestate)
+        pop_groups_match = re.search(r"\npop_groups=\n\{", self.gamestate)
         if not pop_groups_match:
             # Try alternate format
-            pop_groups_match = re.search(r'^pop_groups=\s*\{', self.gamestate, re.MULTILINE)
+            pop_groups_match = re.search(
+                r"^pop_groups=\s*\{", self.gamestate, re.MULTILINE
+            )
             if not pop_groups_match:
                 return pop_by_planet
 
         pg_start = pop_groups_match.start()
         # Pop groups section can be very large in late game
-        pg_chunk = self.gamestate[pg_start:pg_start + 100000000]  # Up to 100MB
+        pg_chunk = self.gamestate[pg_start : pg_start + 100000000]  # Up to 100MB
 
         # Parse each pop_group entry: \n\tID=\n\t{ ... planet=X size=N ... }
-        pop_pattern = r'\n\t(\d+)=\n\t\{'
+        pop_pattern = r"\n\t(\d+)=\n\t\{"
         groups_processed = 0
         max_groups = 100000  # Safety limit
 
@@ -790,17 +854,17 @@ class PlanetsMixin:
             block_start = match.start() + 1
 
             # Get pop group block content (they're relatively small)
-            chunk = pg_chunk[block_start:block_start + 2500]
+            chunk = pg_chunk[block_start : block_start + 2500]
 
             # Find end of this pop group's block
             brace_count = 0
             block_end = 0
             started = False
             for i, char in enumerate(chunk):
-                if char == '{':
+                if char == "{":
                     brace_count += 1
                     started = True
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if started and brace_count == 0:
                         block_end = i + 1
@@ -812,14 +876,14 @@ class PlanetsMixin:
             pop_block = chunk[:block_end]
 
             # Extract planet ID
-            planet_match = re.search(r'\n\s*planet=(\d+)', pop_block)
+            planet_match = re.search(r"\n\s*planet=(\d+)", pop_block)
             if not planet_match:
                 continue
 
             planet_id = int(planet_match.group(1))
 
             # Extract size (actual number of pops in this group)
-            size_match = re.search(r'\n\s*size=(\d+)', pop_block)
+            size_match = re.search(r"\n\s*size=(\d+)", pop_block)
             if not size_match:
                 continue
 

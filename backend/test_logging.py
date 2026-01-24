@@ -25,6 +25,7 @@ from core.companion import Companion
 
 def setup_logging():
     """Configure logging to show structured output."""
+
     # Create a custom formatter that shows the extra fields
     class StructuredFormatter(logging.Formatter):
         def format(self, record):
@@ -35,11 +36,29 @@ def setup_logging():
             extras = []
             for key, value in record.__dict__.items():
                 if key not in {
-                    'name', 'msg', 'args', 'created', 'filename', 'funcName',
-                    'levelname', 'levelno', 'lineno', 'module', 'msecs',
-                    'pathname', 'process', 'processName', 'relativeCreated',
-                    'stack_info', 'exc_info', 'exc_text', 'thread', 'threadName',
-                    'message', 'asctime', 'taskName'
+                    "name",
+                    "msg",
+                    "args",
+                    "created",
+                    "filename",
+                    "funcName",
+                    "levelname",
+                    "levelno",
+                    "lineno",
+                    "module",
+                    "msecs",
+                    "pathname",
+                    "process",
+                    "processName",
+                    "relativeCreated",
+                    "stack_info",
+                    "exc_info",
+                    "exc_text",
+                    "thread",
+                    "threadName",
+                    "message",
+                    "asctime",
+                    "taskName",
                 }:
                     extras.append(f"  {key}={value}")
 
@@ -52,9 +71,7 @@ def setup_logging():
     logger.setLevel(logging.DEBUG)
 
     handler = logging.StreamHandler()
-    handler.setFormatter(StructuredFormatter(
-        "%(asctime)s [%(levelname)s] %(message)s"
-    ))
+    handler.setFormatter(StructuredFormatter("%(asctime)s [%(levelname)s] %(message)s"))
     logger.addHandler(handler)
 
     return logger
@@ -67,16 +84,18 @@ def print_stats(stats: dict):
     print("=" * 50)
     print(f"  Total tool calls:  {stats['total_calls']}")
     print(f"  Tools used:        {', '.join(stats['tools_used']) or 'None'}")
-    print(f"  Wall time:         {stats['wall_time_ms']:.1f} ms ({stats['wall_time_ms']/1000:.2f} s)")
+    print(
+        f"  Wall time:         {stats['wall_time_ms']:.1f} ms ({stats['wall_time_ms']/1000:.2f} s)"
+    )
     print(f"  Response length:   {stats['response_length']} chars")
 
-    if stats.get('payload_sizes'):
+    if stats.get("payload_sizes"):
         print(f"  Payload sizes:")
-        for tool, size in stats['payload_sizes'].items():
+        for tool, size in stats["payload_sizes"].items():
             print(f"    - {tool}: {size:,} bytes")
         print(f"  Total payload:     {sum(stats['payload_sizes'].values()):,} bytes")
 
-    if stats.get('error'):
+    if stats.get("error"):
         print(f"  Error:             {stats['error']}")
 
     print("=" * 50)
@@ -92,7 +111,10 @@ def main():
         save_path = sys.argv[1]
     else:
         # Default test path - update this to your actual save file location
-        save_path = Path.home() / "Documents/Paradox Interactive/Stellaris/save games/test/test.sav"
+        save_path = (
+            Path.home()
+            / "Documents/Paradox Interactive/Stellaris/save games/test/test.sav"
+        )
         print(f"No save path provided. Using default: {save_path}")
         print("Usage: python test_logging.py <path_to_save_file>")
         print()
@@ -132,7 +154,7 @@ def main():
         print_stats(stats)
 
         # Evaluate against target
-        if stats['wall_time_ms'] < 8000:
+        if stats["wall_time_ms"] < 8000:
             print("PASS: Response time within target (< 8s)")
         else:
             print(f"WARNING: Response time exceeded target (> 8s)")
@@ -155,7 +177,7 @@ def main():
         print_stats(stats)
 
         # Evaluate against target
-        if stats['wall_time_ms'] < 12000:
+        if stats["wall_time_ms"] < 12000:
             print("PASS: Briefing time within target (< 12s)")
         else:
             print(f"WARNING: Briefing time exceeded target (> 12s)")
@@ -165,6 +187,7 @@ def main():
     except Exception as e:
         print(f"ERROR: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

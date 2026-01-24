@@ -33,7 +33,7 @@ def setup(bot) -> None:
 
     @bot.tree.command(
         name="end_session",
-        description="Manually end the current session (for end-of-session report/history boundaries)"
+        description="Manually end the current session (for end-of-session report/history boundaries)",
     )
     async def end_session_command(interaction: discord.Interaction) -> None:
         # Check if save is loaded
@@ -51,13 +51,24 @@ def setup(bot) -> None:
 
             # Ensure we have a latest snapshot recorded before ending the session.
             try:
-                briefing = getattr(bot.companion, "_current_snapshot", None) or bot.companion.get_snapshot()
+                briefing = (
+                    getattr(bot.companion, "_current_snapshot", None)
+                    or bot.companion.get_snapshot()
+                )
                 record_snapshot_from_companion(
                     db=db,
                     save_path=bot.companion.save_path,
                     save_hash=getattr(bot.companion, "_save_hash", None),
-                    gamestate=getattr(bot.companion.extractor, "gamestate", None) if bot.companion.extractor else None,
-                    player_id=bot.companion.extractor.get_player_empire_id() if bot.companion.extractor else None,
+                    gamestate=(
+                        getattr(bot.companion.extractor, "gamestate", None)
+                        if bot.companion.extractor
+                        else None
+                    ),
+                    player_id=(
+                        bot.companion.extractor.get_player_empire_id()
+                        if bot.companion.extractor
+                        else None
+                    ),
                     briefing=briefing,
                 )
             except Exception as e:
@@ -65,15 +76,31 @@ def setup(bot) -> None:
 
             # Compute save_id to find active session(s)
             briefing = getattr(bot.companion, "_current_snapshot", None) or {}
-            metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
+            metrics = (
+                extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
+            )
             campaign_id = None
-            if bot.companion.extractor and getattr(bot.companion.extractor, "gamestate", None):
-                campaign_id = extract_campaign_id_from_gamestate(bot.companion.extractor.gamestate)
+            if bot.companion.extractor and getattr(
+                bot.companion.extractor, "gamestate", None
+            ):
+                campaign_id = extract_campaign_id_from_gamestate(
+                    bot.companion.extractor.gamestate
+                )
             save_id = compute_save_id(
                 campaign_id=campaign_id,
-                player_id=bot.companion.extractor.get_player_empire_id() if bot.companion.extractor else None,
-                empire_name=metrics.get("empire_name") if isinstance(metrics, dict) else None,
-                save_path=bot.companion.save_path if isinstance(bot.companion.save_path, Path) else None,
+                player_id=(
+                    bot.companion.extractor.get_player_empire_id()
+                    if bot.companion.extractor
+                    else None
+                ),
+                empire_name=(
+                    metrics.get("empire_name") if isinstance(metrics, dict) else None
+                ),
+                save_path=(
+                    bot.companion.save_path
+                    if isinstance(bot.companion.save_path, Path)
+                    else None
+                ),
             )
 
             active_session_id = db.get_active_session_id(save_id)
@@ -104,7 +131,9 @@ def setup(bot) -> None:
 
             # Post deterministic session report (Phase 3 Milestone 4)
             try:
-                report = build_session_report_text(db=db, session_id=active_session_id, max_events=20)
+                report = build_session_report_text(
+                    db=db, session_id=active_session_id, max_events=20
+                )
                 if bot.notification_channel_id:
                     channel = bot.get_channel(bot.notification_channel_id)
                     if channel and isinstance(channel, discord.TextChannel):
@@ -115,7 +144,9 @@ def setup(bot) -> None:
                     for chunk in _split_chunks(report, max_len=1900):
                         await interaction.followup.send(chunk)
             except Exception as e:
-                logger.warning(f"/end_session: failed to build/post session report: {e}")
+                logger.warning(
+                    f"/end_session: failed to build/post session report: {e}"
+                )
 
         except Exception as e:
             logger.error(f"Error in /end_session command: {e}")

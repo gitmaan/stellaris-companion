@@ -8,16 +8,20 @@ from pathlib import Path
 # Rust bridge for fast Clausewitz parsing
 try:
     from rust_bridge import extract_sections, _get_active_session
+
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     extract_sections = None
     _get_active_session = lambda: None
 
+
 class BriefingMixin:
     """Domain methods extracted from the original SaveExtractor."""
 
-    def search(self, query: str, max_results: int = 5, context_chars: int = 500) -> dict:
+    def search(
+        self, query: str, max_results: int = 5, context_chars: int = 500
+    ) -> dict:
         """Search the full gamestate for specific text.
 
         Args:
@@ -33,20 +37,13 @@ class BriefingMixin:
         context_chars = min(context_chars, 500)
         MAX_TOTAL_OUTPUT = 4000  # Hard limit on total context returned
 
-        result = {
-            'query': query,
-            'matches': [],
-            'total_found': 0
-        }
+        result = {"query": query, "matches": [], "total_found": 0}
 
         # Sanitize query - remove any potential injection characters
         # Allow only alphanumeric, spaces, underscores, and common punctuation
-        sanitized_query = ''.join(
-            c for c in query
-            if c.isalnum() or c in ' _-.,\'"'
-        )
+        sanitized_query = "".join(c for c in query if c.isalnum() or c in " _-.,'\"")
         if not sanitized_query:
-            result['error'] = 'Query contains no valid search characters'
+            result["error"] = "Query contains no valid search characters"
             return result
 
         query_lower = sanitized_query.lower()
@@ -55,34 +52,33 @@ class BriefingMixin:
         total_context_size = 0
         start = 0
 
-        while len(result['matches']) < max_results:
+        while len(result["matches"]) < max_results:
             pos = gamestate_lower.find(query_lower, start)
             if pos == -1:
                 break
 
-            result['total_found'] += 1
+            result["total_found"] += 1
 
             # Get context
             context_start = max(0, pos - context_chars // 2)
-            context_end = min(len(self.gamestate), pos + len(query) + context_chars // 2)
+            context_end = min(
+                len(self.gamestate), pos + len(query) + context_chars // 2
+            )
 
             context = self.gamestate[context_start:context_end]
 
             # Sanitize context output - escape special characters that could
             # be interpreted as instructions
-            context = context.replace('{{', '{ {').replace('}}', '} }')
+            context = context.replace("{{", "{ {").replace("}}", "} }")
 
             # Check if adding this context would exceed our limit
             if total_context_size + len(context) > MAX_TOTAL_OUTPUT:
-                result['truncated'] = True
+                result["truncated"] = True
                 break
 
             total_context_size += len(context)
 
-            result['matches'].append({
-                'position': pos,
-                'context': context
-            })
+            result["matches"].append({"position": pos, "context": context})
 
             start = pos + 1
 
@@ -91,7 +87,7 @@ class BriefingMixin:
             pos = gamestate_lower.find(query_lower, start)
             if pos == -1:
                 break
-            result['total_found'] += 1
+            result["total_found"] += 1
             start = pos + 1
 
         return result
@@ -104,7 +100,7 @@ class BriefingMixin:
         """
         meta = self.get_metadata()
         player = self.get_player_status()
-        colonies = player.get('colonies', {})
+        colonies = player.get("colonies", {})
 
         summary = f"""Save File Summary:
 - Empire: {meta.get('name', 'Unknown')}
@@ -147,58 +143,68 @@ class BriefingMixin:
 
         # Build optimized briefing
         return {
-            'meta': {
-                'empire_name': player_clean.get('empire_name'),
-                'date': player_clean.get('date'),
-                'player_id': player_clean.get('player_id'),
+            "meta": {
+                "empire_name": player_clean.get("empire_name"),
+                "date": player_clean.get("date"),
+                "player_id": player_clean.get("player_id"),
             },
-            'military': {
-                'military_power': player_clean.get('military_power'),
-                'military_fleets': player_clean.get('military_fleet_count'),
-                'military_ships': player_clean.get('military_ships'),
-                'starbases': player_clean.get('starbase_count'),
+            "military": {
+                "military_power": player_clean.get("military_power"),
+                "military_fleets": player_clean.get("military_fleet_count"),
+                "military_ships": player_clean.get("military_ships"),
+                "starbases": player_clean.get("starbase_count"),
             },
-            'economy': {
-                'economy_power': player_clean.get('economy_power'),
-                'tech_power': player_clean.get('tech_power'),
+            "economy": {
+                "economy_power": player_clean.get("economy_power"),
+                "tech_power": player_clean.get("tech_power"),
                 # Use 'net_monthly' (correct key) and 'summary' for pre-computed values
-                'net_monthly': resources.get('net_monthly', {}),
-                'key_resources': {
+                "net_monthly": resources.get("net_monthly", {}),
+                "key_resources": {
                     # net_monthly uses bare keys like 'energy', not 'energy_net'
-                    'energy': resources.get('net_monthly', {}).get('energy'),
-                    'minerals': resources.get('net_monthly', {}).get('minerals'),
-                    'alloys': resources.get('net_monthly', {}).get('alloys'),
-                    'consumer_goods': resources.get('net_monthly', {}).get('consumer_goods'),
-                    'research_total': resources.get('summary', {}).get('research_total'),
+                    "energy": resources.get("net_monthly", {}).get("energy"),
+                    "minerals": resources.get("net_monthly", {}).get("minerals"),
+                    "alloys": resources.get("net_monthly", {}).get("alloys"),
+                    "consumer_goods": resources.get("net_monthly", {}).get(
+                        "consumer_goods"
+                    ),
+                    "research_total": resources.get("summary", {}).get(
+                        "research_total"
+                    ),
                 },
             },
-            'territory': {
-                'celestial_bodies_in_territory': player_clean.get('celestial_bodies_in_territory'),
-                'colonies': player_clean.get('colonies', {}),  # Breakdown by habitats vs planets
-                'planets_by_type': planets.get('by_type', {}),
-                'top_colonies': planets.get('planets', [])[:10],  # Top 10 colonies with details
+            "territory": {
+                "celestial_bodies_in_territory": player_clean.get(
+                    "celestial_bodies_in_territory"
+                ),
+                "colonies": player_clean.get(
+                    "colonies", {}
+                ),  # Breakdown by habitats vs planets
+                "planets_by_type": planets.get("by_type", {}),
+                "top_colonies": planets.get("planets", [])[
+                    :10
+                ],  # Top 10 colonies with details
             },
-            'diplomacy': {
-                'relation_count': diplomacy.get('relation_count'),
-                'allies': diplomacy.get('allies', []),
-                'rivals': diplomacy.get('rivals', []),
-                'federation': diplomacy.get('federation'),
-                'summary': diplomacy.get('summary', {}),
+            "diplomacy": {
+                "relation_count": diplomacy.get("relation_count"),
+                "allies": diplomacy.get("allies", []),
+                "rivals": diplomacy.get("rivals", []),
+                "federation": diplomacy.get("federation"),
+                "summary": diplomacy.get("summary", {}),
             },
-            'defense': {
-                'count': starbases.get('count'),
-                'by_level': starbases.get('by_level', {}),
-                'starbases': starbases.get('starbases', []),
+            "defense": {
+                "count": starbases.get("count"),
+                "by_level": starbases.get("by_level", {}),
+                "starbases": starbases.get("starbases", []),
             },
-            'leadership': {
-                'count': leaders.get('count'),
-                'by_class': leaders.get('by_class', {}),
-                'leaders': leaders.get('leaders', [])[:15],  # Top 15 leaders
+            "leadership": {
+                "count": leaders.get("count"),
+                "by_class": leaders.get("by_class", {}),
+                "leaders": leaders.get("leaders", [])[:15],  # Top 15 leaders
             },
-            'technology': {
-                'current_research': technology.get('current_research', {}),
-                'tech_count': technology.get('tech_count', 0),
-                'by_category': technology.get('by_category', {}),
+            "technology": {
+                "current_research": technology.get("current_research", {}),
+                "tech_count": technology.get("tech_count", 0),
+                "by_category": technology.get("by_category", {}),
             },
         }
 
@@ -219,10 +225,10 @@ class BriefingMixin:
             return self._extract_campaign_id_regex()
 
         try:
-            sections = session.extract_sections(['galaxy'])
-            galaxy = sections.get('galaxy', {})
+            sections = session.extract_sections(["galaxy"])
+            galaxy = sections.get("galaxy", {})
             if isinstance(galaxy, dict):
-                name = galaxy.get('name')
+                name = galaxy.get("name")
                 if isinstance(name, str) and name:
                     return name
             return None
@@ -280,7 +286,9 @@ class BriefingMixin:
         wars = self.get_wars()
 
         # Build situation inline from already-fetched data (saves ~1s vs calling get_situation)
-        situation = self._build_situation_from_data(meta, wars, diplomacy, resources, crisis, fallen)
+        situation = self._build_situation_from_data(
+            meta, wars, diplomacy, resources, crisis, fallen
+        )
 
         planets = self.get_planets()
         starbases = self.get_starbases()
@@ -333,12 +341,18 @@ class BriefingMixin:
                     "energy": resources.get("net_monthly", {}).get("energy"),
                     "minerals": resources.get("net_monthly", {}).get("minerals"),
                     "alloys": resources.get("net_monthly", {}).get("alloys"),
-                    "consumer_goods": resources.get("net_monthly", {}).get("consumer_goods"),
-                    "research_total": resources.get("summary", {}).get("research_total"),
+                    "consumer_goods": resources.get("net_monthly", {}).get(
+                        "consumer_goods"
+                    ),
+                    "research_total": resources.get("summary", {}).get(
+                        "research_total"
+                    ),
                 },
             },
             "territory": {
-                "celestial_bodies_in_territory": player_clean.get("celestial_bodies_in_territory"),
+                "celestial_bodies_in_territory": player_clean.get(
+                    "celestial_bodies_in_territory"
+                ),
                 "colonies": player_clean.get("colonies", {}),
                 "planets": planets,
                 "claims": claims,
@@ -386,72 +400,80 @@ class BriefingMixin:
         technology = self.get_technology()
 
         # Find capital planet (first planet, usually homeworld)
-        all_planets = planets.get('planets', [])
+        all_planets = planets.get("planets", [])
         capital = all_planets[0] if all_planets else {}
 
         # Find ruler (official class leader, or first leader)
-        all_leaders = leaders.get('leaders', [])
+        all_leaders = leaders.get("leaders", [])
         ruler = next(
-            (l for l in all_leaders if l.get('class') == 'official'),
-            all_leaders[0] if all_leaders else {}
+            (l for l in all_leaders if l.get("class") == "official"),
+            all_leaders[0] if all_leaders else {},
         )
 
         return {
-            'meta': {
-                'empire_name': player.get('empire_name'),
-                'date': player.get('date'),
+            "meta": {
+                "empire_name": player.get("empire_name"),
+                "date": player.get("date"),
             },
-            'military': {
-                'power': player.get('military_power'),
-                'military_fleets': player.get('military_fleet_count'),
-                'military_ships': player.get('military_ships'),
-                'starbases': player.get('starbase_count'),
+            "military": {
+                "power": player.get("military_power"),
+                "military_fleets": player.get("military_fleet_count"),
+                "military_ships": player.get("military_ships"),
+                "starbases": player.get("starbase_count"),
             },
-            'economy': {
-                'power': player.get('economy_power'),
-                'tech_power': player.get('tech_power'),
-                'net_monthly': resources.get('net_monthly', {}),
+            "economy": {
+                "power": player.get("economy_power"),
+                "tech_power": player.get("tech_power"),
+                "net_monthly": resources.get("net_monthly", {}),
             },
-            'territory': {
-                'total_colonies': player.get('colonies', {}).get('total_count', 0),
-                'habitats': player.get('colonies', {}).get('habitats', {}),
-                'by_type': planets.get('by_type', {}),
+            "territory": {
+                "total_colonies": player.get("colonies", {}).get("total_count", 0),
+                "habitats": player.get("colonies", {}).get("habitats", {}),
+                "by_type": planets.get("by_type", {}),
                 # HEADLINE: Capital only (not all planets)
-                'capital': {
-                    'name': capital.get('name'),
-                    'type': capital.get('type'),
-                    'population': capital.get('population'),
-                    'stability': capital.get('stability'),
-                } if capital else None,
+                "capital": (
+                    {
+                        "name": capital.get("name"),
+                        "type": capital.get("type"),
+                        "population": capital.get("population"),
+                        "stability": capital.get("stability"),
+                    }
+                    if capital
+                    else None
+                ),
             },
-            'leadership': {
-                'total_count': leaders.get('count'),
-                'by_class': leaders.get('by_class', {}),
+            "leadership": {
+                "total_count": leaders.get("count"),
+                "by_class": leaders.get("by_class", {}),
                 # HEADLINE: Ruler only (not all leaders)
-                'ruler': {
-                    'name': ruler.get('name'),
-                    'class': ruler.get('class'),
-                    'level': ruler.get('level'),
-                    'traits': ruler.get('traits', []),
-                } if ruler else None,
+                "ruler": (
+                    {
+                        "name": ruler.get("name"),
+                        "class": ruler.get("class"),
+                        "level": ruler.get("level"),
+                        "traits": ruler.get("traits", []),
+                    }
+                    if ruler
+                    else None
+                ),
                 # NO leaders list - forces tool use for details
             },
-            'diplomacy': {
-                'contact_count': diplomacy.get('relation_count'),
-                'ally_count': len(diplomacy.get('allies', [])),
-                'rival_count': len(diplomacy.get('rivals', [])),
-                'federation': diplomacy.get('federation'),
+            "diplomacy": {
+                "contact_count": diplomacy.get("relation_count"),
+                "ally_count": len(diplomacy.get("allies", [])),
+                "rival_count": len(diplomacy.get("rivals", [])),
+                "federation": diplomacy.get("federation"),
                 # NO relations list - forces tool use for details
             },
-            'defense': {
-                'starbase_count': starbases.get('count'),
-                'by_level': starbases.get('by_level', {}),
+            "defense": {
+                "starbase_count": starbases.get("count"),
+                "by_level": starbases.get("by_level", {}),
                 # NO starbases list - forces tool use for details
             },
-            'technology': {
-                'current_research': technology.get('current_research', {}),
-                'tech_count': technology.get('tech_count', 0),
-                'by_category': technology.get('by_category', {}),
+            "technology": {
+                "current_research": technology.get("current_research", {}),
+                "tech_count": technology.get("tech_count", 0),
+                "by_category": technology.get("by_category", {}),
             },
         }
 
@@ -482,8 +504,14 @@ class BriefingMixin:
             If any categories are invalid, an "errors" field is included.
         """
         valid_categories = {
-            "leaders", "planets", "starbases", "technology",
-            "wars", "fleets", "resources", "diplomacy",
+            "leaders",
+            "planets",
+            "starbases",
+            "technology",
+            "wars",
+            "fleets",
+            "resources",
+            "diplomacy",
         }
 
         if not isinstance(categories, list) or not categories:
@@ -497,50 +525,54 @@ class BriefingMixin:
 
         for category in categories:
             if category not in valid_categories:
-                errors[category] = f"Invalid category. Must be one of: {', '.join(sorted(valid_categories))}"
+                errors[category] = (
+                    f"Invalid category. Must be one of: {', '.join(sorted(valid_categories))}"
+                )
                 continue
 
             if category == "leaders":
                 data = self.get_leaders()
-                if 'leaders' in data:
-                    data['leaders'] = data['leaders'][:limit]
+                if "leaders" in data:
+                    data["leaders"] = data["leaders"][:limit]
                 results[category] = data
                 continue
 
             if category == "planets":
                 data = self.get_planets()
-                if 'planets' in data:
-                    data['planets'] = data['planets'][:limit]
+                if "planets" in data:
+                    data["planets"] = data["planets"][:limit]
                 results[category] = data
                 continue
 
             if category == "starbases":
                 data = self.get_starbases()
-                if 'starbases' in data:
-                    data['starbases'] = data['starbases'][:limit]
+                if "starbases" in data:
+                    data["starbases"] = data["starbases"][:limit]
                 results[category] = data
                 continue
 
             if category == "technology":
                 data = self.get_technology()
-                if 'sample_technologies' in data:
-                    data['sample_technologies'] = data['sample_technologies'][:limit]
-                if 'completed_technologies' in data:
-                    data['completed_technologies'] = data['completed_technologies'][:limit]
+                if "sample_technologies" in data:
+                    data["sample_technologies"] = data["sample_technologies"][:limit]
+                if "completed_technologies" in data:
+                    data["completed_technologies"] = data["completed_technologies"][
+                        :limit
+                    ]
                 results[category] = data
                 continue
 
             if category == "wars":
                 data = self.get_wars()
-                if 'wars' in data:
-                    data['wars'] = data['wars'][:limit]
+                if "wars" in data:
+                    data["wars"] = data["wars"][:limit]
                 results[category] = data
                 continue
 
             if category == "fleets":
                 data = self.get_fleets()
-                if 'fleet_names' in data:
-                    data['fleet_names'] = data['fleet_names'][:limit]
+                if "fleet_names" in data:
+                    data["fleet_names"] = data["fleet_names"][:limit]
                 results[category] = data
                 continue
 
@@ -550,8 +582,8 @@ class BriefingMixin:
 
             if category == "diplomacy":
                 data = self.get_diplomacy()
-                if 'relations' in data:
-                    data['relations'] = data['relations'][:limit]
+                if "relations" in data:
+                    data["relations"] = data["relations"][:limit]
                 results[category] = data
                 continue
 
@@ -560,103 +592,116 @@ class BriefingMixin:
             out["errors"] = errors
         return out
 
-    def _build_situation_from_data(self, meta: dict, wars: dict, diplomacy: dict,
-                                     resources: dict, crisis: dict, fallen: dict) -> dict:
+    def _build_situation_from_data(
+        self,
+        meta: dict,
+        wars: dict,
+        diplomacy: dict,
+        resources: dict,
+        crisis: dict,
+        fallen: dict,
+    ) -> dict:
         """Build situation dict from pre-fetched data (avoids redundant calls).
 
         This is an internal optimization for get_complete_briefing() which already
         has all the data needed to compute the situation.
         """
         result = {
-            'game_phase': 'early',
-            'year': 2200,
-            'at_war': False,
-            'war_count': 0,
-            'contacts_made': False,
-            'contact_count': 0,
-            'rivals': [],
-            'allies': [],
-            'crisis_active': False,
+            "game_phase": "early",
+            "year": 2200,
+            "at_war": False,
+            "war_count": 0,
+            "contacts_made": False,
+            "contact_count": 0,
+            "rivals": [],
+            "allies": [],
+            "crisis_active": False,
         }
 
         # Get game date and calculate year
-        date_str = meta.get('date', '2200.01.01')
+        date_str = meta.get("date", "2200.01.01")
         try:
-            year = int(date_str.split('.')[0])
-            result['year'] = year
+            year = int(date_str.split(".")[0])
+            result["year"] = year
 
             # Determine game phase
             if year < 2230:
-                result['game_phase'] = 'early'
+                result["game_phase"] = "early"
             elif year < 2300:
-                result['game_phase'] = 'mid_early'
+                result["game_phase"] = "mid_early"
             elif year < 2350:
-                result['game_phase'] = 'mid_late'
+                result["game_phase"] = "mid_late"
             elif year < 2400:
-                result['game_phase'] = 'late'
+                result["game_phase"] = "late"
             else:
-                result['game_phase'] = 'endgame'
+                result["game_phase"] = "endgame"
         except (ValueError, IndexError):
             pass
 
         # Check war status
-        result['war_count'] = wars.get('count', 0)
-        result['at_war'] = wars.get('player_at_war', False)
-        result['wars'] = wars.get('wars', [])
+        result["war_count"] = wars.get("count", 0)
+        result["at_war"] = wars.get("player_at_war", False)
+        result["wars"] = wars.get("wars", [])
 
         # Check diplomatic situation
-        result['contact_count'] = diplomacy.get('relation_count', 0)
-        result['contacts_made'] = result['contact_count'] > 0
-        result['allies'] = diplomacy.get('allies', [])
-        result['rivals'] = diplomacy.get('rivals', [])
+        result["contact_count"] = diplomacy.get("relation_count", 0)
+        result["contacts_made"] = result["contact_count"] > 0
+        result["allies"] = diplomacy.get("allies", [])
+        result["rivals"] = diplomacy.get("rivals", [])
 
         # Get economy data
-        net_monthly = resources.get('net_monthly', {})
-        result['economy'] = {
-            'energy_net': net_monthly.get('energy', 0),
-            'minerals_net': net_monthly.get('minerals', 0),
-            'alloys_net': net_monthly.get('alloys', 0),
-            'consumer_goods_net': net_monthly.get('consumer_goods', 0),
-            'research_net': (
-                net_monthly.get('physics_research', 0) +
-                net_monthly.get('society_research', 0) +
-                net_monthly.get('engineering_research', 0)
+        net_monthly = resources.get("net_monthly", {})
+        result["economy"] = {
+            "energy_net": net_monthly.get("energy", 0),
+            "minerals_net": net_monthly.get("minerals", 0),
+            "alloys_net": net_monthly.get("alloys", 0),
+            "consumer_goods_net": net_monthly.get("consumer_goods", 0),
+            "research_net": (
+                net_monthly.get("physics_research", 0)
+                + net_monthly.get("society_research", 0)
+                + net_monthly.get("engineering_research", 0)
             ),
-            '_note': 'Raw monthly net values - interpret based on empire size and game phase'
+            "_note": "Raw monthly net values - interpret based on empire size and game phase",
         }
 
         # Count negative resources
-        negative_resources = sum(1 for v in [
-            net_monthly.get('energy', 0),
-            net_monthly.get('minerals', 0),
-            net_monthly.get('food', 0),
-            net_monthly.get('consumer_goods', 0),
-            net_monthly.get('alloys', 0),
-        ] if v < 0)
-        result['economy']['resources_in_deficit'] = negative_resources
+        negative_resources = sum(
+            1
+            for v in [
+                net_monthly.get("energy", 0),
+                net_monthly.get("minerals", 0),
+                net_monthly.get("food", 0),
+                net_monthly.get("consumer_goods", 0),
+                net_monthly.get("alloys", 0),
+            ]
+            if v < 0
+        )
+        result["economy"]["resources_in_deficit"] = negative_resources
 
         # Check for crisis
-        result['crisis_active'] = crisis.get('crisis_active', False)
-        if result['crisis_active']:
-            result['crisis_type'] = crisis.get('crisis_type')
-            result['player_is_crisis_fighter'] = crisis.get('player_is_crisis_fighter', False)
+        result["crisis_active"] = crisis.get("crisis_active", False)
+        if result["crisis_active"]:
+            result["crisis_type"] = crisis.get("crisis_type")
+            result["player_is_crisis_fighter"] = crisis.get(
+                "player_is_crisis_fighter", False
+            )
 
         # Check for Fallen Empires
-        if fallen.get('total_count', 0) > 0:
-            result['fallen_empires'] = {
-                'total_count': fallen['total_count'],
-                'dormant_count': fallen['dormant_count'],
-                'awakened_count': fallen['awakened_count'],
-                'war_in_heaven': fallen['war_in_heaven'],
-                'empires': [
+        if fallen.get("total_count", 0) > 0:
+            result["fallen_empires"] = {
+                "total_count": fallen["total_count"],
+                "dormant_count": fallen["dormant_count"],
+                "awakened_count": fallen["awakened_count"],
+                "war_in_heaven": fallen["war_in_heaven"],
+                "empires": [
                     {
-                        'name': e['name'],
-                        'status': e['status'],
-                        'archetype': e['archetype'],
-                        'power_ratio': e['power_ratio'],
+                        "name": e["name"],
+                        "status": e["status"],
+                        "archetype": e["archetype"],
+                        "power_ratio": e["power_ratio"],
                     }
-                    for e in fallen.get('fallen_empires', [])
-                ]
+                    for e in fallen.get("fallen_empires", [])
+                ],
             }
 
         return result
@@ -671,105 +716,111 @@ class BriefingMixin:
             Dictionary with game phase, war status, economy state, and diplomatic situation
         """
         result = {
-            'game_phase': 'early',
-            'year': 2200,
-            'at_war': False,
-            'war_count': 0,
-            'contacts_made': False,
-            'contact_count': 0,
-            'rivals': [],
-            'allies': [],
-            'crisis_active': False,
+            "game_phase": "early",
+            "year": 2200,
+            "at_war": False,
+            "war_count": 0,
+            "contacts_made": False,
+            "contact_count": 0,
+            "rivals": [],
+            "allies": [],
+            "crisis_active": False,
         }
 
         # Get game date and calculate year
         meta = self.get_metadata()
-        date_str = meta.get('date', '2200.01.01')
+        date_str = meta.get("date", "2200.01.01")
         try:
-            year = int(date_str.split('.')[0])
-            result['year'] = year
+            year = int(date_str.split(".")[0])
+            result["year"] = year
 
             # Determine game phase
             if year < 2230:
-                result['game_phase'] = 'early'
+                result["game_phase"] = "early"
             elif year < 2300:
-                result['game_phase'] = 'mid_early'
+                result["game_phase"] = "mid_early"
             elif year < 2350:
-                result['game_phase'] = 'mid_late'
+                result["game_phase"] = "mid_late"
             elif year < 2400:
-                result['game_phase'] = 'late'
+                result["game_phase"] = "late"
             else:
-                result['game_phase'] = 'endgame'
+                result["game_phase"] = "endgame"
         except (ValueError, IndexError):
             pass
 
         # Check war status - use the improved player-specific war detection
         wars = self.get_wars()
-        result['war_count'] = wars.get('count', 0)
-        result['at_war'] = wars.get('player_at_war', False)
-        result['wars'] = wars.get('wars', [])
+        result["war_count"] = wars.get("count", 0)
+        result["at_war"] = wars.get("player_at_war", False)
+        result["wars"] = wars.get("wars", [])
 
         # Check diplomatic situation
         diplomacy = self.get_diplomacy()
-        result['contact_count'] = diplomacy.get('relation_count', 0)
-        result['contacts_made'] = result['contact_count'] > 0
-        result['allies'] = diplomacy.get('allies', [])
-        result['rivals'] = diplomacy.get('rivals', [])
+        result["contact_count"] = diplomacy.get("relation_count", 0)
+        result["contacts_made"] = result["contact_count"] > 0
+        result["allies"] = diplomacy.get("allies", [])
+        result["rivals"] = diplomacy.get("rivals", [])
 
         # Get economy data - provide raw values, let the model interpret
         # based on context (empire size, game phase, stockpiles)
         resources = self.get_resources()
-        net_monthly = resources.get('net_monthly', {})
+        net_monthly = resources.get("net_monthly", {})
 
         # Provide key resource net values for the model to interpret
-        result['economy'] = {
-            'energy_net': net_monthly.get('energy', 0),
-            'minerals_net': net_monthly.get('minerals', 0),
-            'alloys_net': net_monthly.get('alloys', 0),
-            'consumer_goods_net': net_monthly.get('consumer_goods', 0),
-            'research_net': (
-                net_monthly.get('physics_research', 0) +
-                net_monthly.get('society_research', 0) +
-                net_monthly.get('engineering_research', 0)
+        result["economy"] = {
+            "energy_net": net_monthly.get("energy", 0),
+            "minerals_net": net_monthly.get("minerals", 0),
+            "alloys_net": net_monthly.get("alloys", 0),
+            "consumer_goods_net": net_monthly.get("consumer_goods", 0),
+            "research_net": (
+                net_monthly.get("physics_research", 0)
+                + net_monthly.get("society_research", 0)
+                + net_monthly.get("engineering_research", 0)
             ),
-            '_note': 'Raw monthly net values - interpret based on empire size and game phase'
+            "_note": "Raw monthly net values - interpret based on empire size and game phase",
         }
 
         # Count negative resources as a simple indicator
-        negative_resources = sum(1 for v in [
-            net_monthly.get('energy', 0),
-            net_monthly.get('minerals', 0),
-            net_monthly.get('food', 0),
-            net_monthly.get('consumer_goods', 0),
-            net_monthly.get('alloys', 0),
-        ] if v < 0)
+        negative_resources = sum(
+            1
+            for v in [
+                net_monthly.get("energy", 0),
+                net_monthly.get("minerals", 0),
+                net_monthly.get("food", 0),
+                net_monthly.get("consumer_goods", 0),
+                net_monthly.get("alloys", 0),
+            ]
+            if v < 0
+        )
 
-        result['economy']['resources_in_deficit'] = negative_resources
+        result["economy"]["resources_in_deficit"] = negative_resources
 
         # Check for crisis using dedicated extractor
         crisis_status = self.get_crisis_status()
-        result['crisis_active'] = crisis_status.get('crisis_active', False)
-        if result['crisis_active']:
-            result['crisis_type'] = crisis_status.get('crisis_type')
-            result['player_is_crisis_fighter'] = crisis_status.get('player_is_crisis_fighter', False)
+        result["crisis_active"] = crisis_status.get("crisis_active", False)
+        if result["crisis_active"]:
+            result["crisis_type"] = crisis_status.get("crisis_type")
+            result["player_is_crisis_fighter"] = crisis_status.get(
+                "player_is_crisis_fighter", False
+            )
 
         # Check for Fallen Empires (both dormant and awakened)
         fallen = self.get_fallen_empires()
-        if fallen.get('total_count', 0) > 0:
-            result['fallen_empires'] = {
-                'total_count': fallen['total_count'],
-                'dormant_count': fallen['dormant_count'],
-                'awakened_count': fallen['awakened_count'],
-                'war_in_heaven': fallen['war_in_heaven'],
-                'empires': [
+        if fallen.get("total_count", 0) > 0:
+            result["fallen_empires"] = {
+                "total_count": fallen["total_count"],
+                "dormant_count": fallen["dormant_count"],
+                "awakened_count": fallen["awakened_count"],
+                "war_in_heaven": fallen["war_in_heaven"],
+                "empires": [
                     {
-                        'name': e['name'],
-                        'status': e['status'],
-                        'archetype': e['archetype'],
-                        'power_ratio': e['power_ratio'],
+                        "name": e["name"],
+                        "status": e["status"],
+                        "archetype": e["archetype"],
+                        "power_ratio": e["power_ratio"],
                     }
-                    for e in fallen['fallen_empires']
-                ]
+                    for e in fallen["fallen_empires"]
+                ],
             }
 
         return result

@@ -7,6 +7,7 @@ The design is intentionally simple: each turn re-injects the full briefing,
 and only recent chat history is retained for follow-up context. This avoids
 unbounded context growth while supporting conversational continuity.
 """
+
 from __future__ import annotations
 
 import threading
@@ -201,9 +202,10 @@ class ConversationManager:
             game_date: The in-game date when this turn occurred.
         """
         session = self._get_or_create(session_key)
-        session.history.append(Turn(question=question, answer=answer, game_date=game_date))
+        session.history.append(
+            Turn(question=question, answer=answer, game_date=game_date)
+        )
         session.last_game_date = game_date or session.last_game_date
         session.last_active = self._now()
         if len(session.history) > self.max_turns:
             session.history = session.history[-self.max_turns :]
-

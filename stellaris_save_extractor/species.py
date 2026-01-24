@@ -6,6 +6,7 @@ import re
 # Rust bridge for fast Clausewitz parsing
 try:
     from rust_bridge import extract_sections, iter_section_entries, ParserError
+
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
@@ -34,9 +35,13 @@ class SpeciesMixin:
             try:
                 return self._get_species_full_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for species: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for species: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         return self._get_species_full_regex()
@@ -53,19 +58,18 @@ class SpeciesMixin:
             Dict with species data
         """
         result = {
-            'species': [],
-            'count': 0,
-            'player_species_id': None,
+            "species": [],
+            "count": 0,
+            "player_species_id": None,
         }
 
-        # Find player's founder species using Rust parser
+        # Find player's founder species using cached player country entry
         player_id = self.get_player_empire_id()
-        for country_id, country_data in iter_section_entries(self.save_path, "country"):
-            if str(country_id) == str(player_id):
-                founder_ref = country_data.get('founder_species_ref')
-                if founder_ref is not None:
-                    result['player_species_id'] = str(founder_ref)
-                break
+        country_data = self._get_player_country_entry(player_id)
+        if country_data and isinstance(country_data, dict):
+            founder_ref = country_data.get("founder_species_ref")
+            if founder_ref is not None:
+                result["player_species_id"] = str(founder_ref)
 
         # Build a map of species_id -> traits using regex
         # (Rust parser only keeps last trait due to duplicate keys)
@@ -74,49 +78,51 @@ class SpeciesMixin:
         species_list = []
 
         # Iterate species using Rust parser
-        for species_id, species_data in iter_section_entries(self.save_path, "species_db"):
+        for species_id, species_data in iter_section_entries(
+            self.save_path, "species_db"
+        ):
             # Skip empty species entries
             if not species_data or len(species_data) < 2:
                 continue
 
             # Skip species without class (usually empty entries)
-            species_class = species_data.get('class')
+            species_class = species_data.get("class")
             if not species_class:
                 continue
 
             # Extract name from name block
             name = None
-            name_block = species_data.get('name')
+            name_block = species_data.get("name")
             if isinstance(name_block, dict):
-                name = name_block.get('key')
+                name = name_block.get("key")
             elif isinstance(name_block, str):
                 name = name_block
 
             # Get portrait
-            portrait = species_data.get('portrait')
+            portrait = species_data.get("portrait")
 
             # Get home planet
-            home_planet = species_data.get('home_planet')
+            home_planet = species_data.get("home_planet")
 
             # Get traits from regex extraction (more complete than Rust)
             traits = species_traits.get(str(species_id), [])
 
             species_info = {
-                'id': str(species_id),
-                'name': name,
-                'class': species_class,
-                'portrait': portrait,
-                'traits': traits,
-                'is_player_species': str(species_id) == result['player_species_id'],
+                "id": str(species_id),
+                "name": name,
+                "class": species_class,
+                "portrait": portrait,
+                "traits": traits,
+                "is_player_species": str(species_id) == result["player_species_id"],
             }
 
             if home_planet is not None:
-                species_info['home_planet_id'] = str(home_planet)
+                species_info["home_planet_id"] = str(home_planet)
 
             species_list.append(species_info)
 
-        result['species'] = species_list
-        result['count'] = len(species_list)
+        result["species"] = species_list
+        result["count"] = len(species_list)
 
         return result
 
@@ -127,9 +133,9 @@ class SpeciesMixin:
             The species_db section content, or empty string if not found
         """
         # Find species_db section
-        species_start = self.gamestate.find('\nspecies_db=')
+        species_start = self.gamestate.find("\nspecies_db=")
         if species_start == -1:
-            species_start = self.gamestate.find('species_db=')
+            species_start = self.gamestate.find("species_db=")
         if species_start == -1:
             return ""
 
@@ -139,16 +145,16 @@ class SpeciesMixin:
         started = False
         end_pos = 0
         for i, char in enumerate(chunk):
-            if char == '{':
+            if char == "{":
                 brace_count += 1
                 started = True
-            elif char == '}':
+            elif char == "}":
                 brace_count -= 1
                 if started and brace_count == 0:
                     end_pos = i + 1
                     break
 
-        return self.gamestate[species_start:species_start + end_pos]
+        return self.gamestate[species_start : species_start + end_pos]
 
     def _extract_species_traits_regex(self) -> dict:
         """Extract traits for all species using regex.
@@ -167,7 +173,7 @@ class SpeciesMixin:
             return species_traits
 
         # Parse individual species entries
-        entry_pattern = r'\n\t(\d+)=\s*\{'
+        entry_pattern = r"\n\t(\d+)=\s*\{"
         entries = list(re.finditer(entry_pattern, species_section))
 
         for i, match in enumerate(entries):
@@ -179,9 +185,9 @@ class SpeciesMixin:
             pos = start_pos
             max_pos = min(start_pos + 5000, len(species_section))
             while brace_count > 0 and pos < max_pos:
-                if species_section[pos] == '{':
+                if species_section[pos] == "{":
                     brace_count += 1
-                elif species_section[pos] == '}':
+                elif species_section[pos] == "}":
                     brace_count -= 1
                 pos += 1
 
@@ -189,7 +195,7 @@ class SpeciesMixin:
 
             # Extract traits
             traits = []
-            traits_block = re.search(r'traits=\s*\{([^}]+)\}', block)
+            traits_block = re.search(r"traits=\s*\{([^}]+)\}", block)
             if traits_block:
                 trait_matches = re.findall(r'trait="([^"]+)"', traits_block.group(1))
                 traits = trait_matches
@@ -206,18 +212,18 @@ class SpeciesMixin:
             Dict with species data
         """
         result = {
-            'species': [],
-            'count': 0,
-            'player_species_id': None,
+            "species": [],
+            "count": 0,
+            "player_species_id": None,
         }
 
         # Find player's founder species
         player_id = self.get_player_empire_id()
         country_content = self._find_player_country_content(player_id)
         if country_content:
-            founder_match = re.search(r'founder_species_ref=(\d+)', country_content)
+            founder_match = re.search(r"founder_species_ref=(\d+)", country_content)
             if founder_match:
-                result['player_species_id'] = founder_match.group(1)
+                result["player_species_id"] = founder_match.group(1)
 
         # Get properly bounded species_db section
         species_section = self._find_species_db_section()
@@ -225,7 +231,7 @@ class SpeciesMixin:
             return result
 
         # Parse individual species entries
-        entry_pattern = r'\n\t(\d+)=\s*\{'
+        entry_pattern = r"\n\t(\d+)=\s*\{"
         entries = list(re.finditer(entry_pattern, species_section))
 
         species_list = []
@@ -240,9 +246,9 @@ class SpeciesMixin:
             pos = start_pos
             max_pos = min(start_pos + 5000, len(species_section))
             while brace_count > 0 and pos < max_pos:
-                if species_section[pos] == '{':
+                if species_section[pos] == "{":
                     brace_count += 1
-                elif species_section[pos] == '}':
+                elif species_section[pos] == "}":
                     brace_count -= 1
                 pos += 1
 
@@ -260,11 +266,11 @@ class SpeciesMixin:
 
             class_match = re.search(r'\bclass="([^"]+)"', block)
             portrait_match = re.search(r'\bportrait="([^"]+)"', block)
-            home_planet_match = re.search(r'\bhome_planet=(\d+)', block)
+            home_planet_match = re.search(r"\bhome_planet=(\d+)", block)
 
             # Extract traits
             traits = []
-            traits_block = re.search(r'traits=\s*\{([^}]+)\}', block)
+            traits_block = re.search(r"traits=\s*\{([^}]+)\}", block)
             if traits_block:
                 trait_matches = re.findall(r'trait="([^"]+)"', traits_block.group(1))
                 traits = trait_matches
@@ -274,21 +280,21 @@ class SpeciesMixin:
                 continue
 
             species_info = {
-                'id': species_id,
-                'name': name_match.group(1) if name_match else None,
-                'class': class_match.group(1) if class_match else None,
-                'portrait': portrait_match.group(1) if portrait_match else None,
-                'traits': traits,
-                'is_player_species': species_id == result['player_species_id'],
+                "id": species_id,
+                "name": name_match.group(1) if name_match else None,
+                "class": class_match.group(1) if class_match else None,
+                "portrait": portrait_match.group(1) if portrait_match else None,
+                "traits": traits,
+                "is_player_species": species_id == result["player_species_id"],
             }
 
             if home_planet_match:
-                species_info['home_planet_id'] = home_planet_match.group(1)
+                species_info["home_planet_id"] = home_planet_match.group(1)
 
             species_list.append(species_info)
 
-        result['species'] = species_list
-        result['count'] = len(species_list)
+        result["species"] = species_list
+        result["count"] = len(species_list)
 
         return result
 
@@ -301,8 +307,8 @@ class SpeciesMixin:
               - count: Number of species with custom rights
         """
         result = {
-            'rights': [],
-            'count': 0,
+            "rights": [],
+            "count": 0,
         }
 
         player_id = self.get_player_empire_id()
@@ -311,24 +317,24 @@ class SpeciesMixin:
             return result
 
         # Find species_rights block
-        rights_start = country_content.find('species_rights=')
+        rights_start = country_content.find("species_rights=")
         if rights_start == -1:
             return result
 
         # Get a chunk around species_rights
-        rights_chunk = country_content[rights_start:rights_start + 50000]
+        rights_chunk = country_content[rights_start : rights_start + 50000]
 
         # Find the species_rights block
-        brace_pos = rights_chunk.find('{')
+        brace_pos = rights_chunk.find("{")
         if brace_pos == -1:
             return result
 
         brace_count = 1
         pos = brace_pos + 1
         while brace_count > 0 and pos < len(rights_chunk):
-            if rights_chunk[pos] == '{':
+            if rights_chunk[pos] == "{":
                 brace_count += 1
-            elif rights_chunk[pos] == '}':
+            elif rights_chunk[pos] == "}":
                 brace_count -= 1
             pos += 1
 
@@ -336,7 +342,7 @@ class SpeciesMixin:
 
         # Parse individual species rights entries
         # Each entry is: { species_index=X citizenship="Y" ... }
-        entry_pattern = r'\{\s*species_index=(\d+)'
+        entry_pattern = r"\{\s*species_index=(\d+)"
         entries = list(re.finditer(entry_pattern, rights_block))
 
         rights_list = []
@@ -350,9 +356,9 @@ class SpeciesMixin:
             entry_brace_count = 1
             epos = match.end()
             while entry_brace_count > 0 and epos < len(rights_block):
-                if rights_block[epos] == '{':
+                if rights_block[epos] == "{":
                     entry_brace_count += 1
-                elif rights_block[epos] == '}':
+                elif rights_block[epos] == "}":
                     entry_brace_count -= 1
                 epos += 1
 
@@ -360,14 +366,19 @@ class SpeciesMixin:
 
             # Extract rights settings
             rights_info = {
-                'species_index': species_index,
+                "species_index": species_index,
             }
 
             # Common rights fields
             rights_fields = [
-                'citizenship', 'living_standard', 'military_service',
-                'slavery', 'purge', 'population_control',
-                'colonization_control', 'migration_control'
+                "citizenship",
+                "living_standard",
+                "military_service",
+                "slavery",
+                "purge",
+                "population_control",
+                "colonization_control",
+                "migration_control",
             ]
 
             for field in rights_fields:
@@ -377,7 +388,7 @@ class SpeciesMixin:
 
             rights_list.append(rights_info)
 
-        result['rights'] = rights_list
-        result['count'] = len(rights_list)
+        result["rights"] = rights_list
+        result["count"] = len(rights_list)
 
         return result

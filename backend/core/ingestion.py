@@ -85,7 +85,9 @@ class IngestionManager:
 
         self._lock = threading.RLock()
         self._wakeup = threading.Event()
-        self._thread = threading.Thread(target=self._run, daemon=True, name="ingestion-manager")
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name="ingestion-manager"
+        )
         self._started = False
 
         self._request_id = 0
@@ -112,15 +114,24 @@ class IngestionManager:
         if db is not None:
             try:
                 payload["db"] = db.get_db_stats()
-                payload["db"]["keep_full_briefings_recent"] = DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
+                payload["db"][
+                    "keep_full_briefings_recent"
+                ] = DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
                 payload["db"]["keep_full_briefings_first"] = True
             except Exception:
-                payload["db"] = {"keep_full_briefings_recent": DEFAULT_KEEP_FULL_BRIEFINGS_RECENT, "keep_full_briefings_first": True}
+                payload["db"] = {
+                    "keep_full_briefings_recent": DEFAULT_KEEP_FULL_BRIEFINGS_RECENT,
+                    "keep_full_briefings_first": True,
+                }
         return payload
 
     def get_health_payload(self) -> dict[str, Any]:
         with self._lock:
-            meta = dict(self._status.t2_meta or {}) if self._status.t2_ready else dict(self._status.t0_meta or {})
+            meta = (
+                dict(self._status.t2_meta or {})
+                if self._status.t2_ready
+                else dict(self._status.t0_meta or {})
+            )
             empire_name = meta.get("empire_name") or meta.get("name")
             game_date = meta.get("date") or self._status.t2_game_date
             payload = {
@@ -167,7 +178,11 @@ class IngestionManager:
 
     def get_latest_t1_status(self) -> dict[str, Any] | None:
         with self._lock:
-            return dict(self._status.t1_status) if isinstance(self._status.t1_status, dict) else None
+            return (
+                dict(self._status.t1_status)
+                if isinstance(self._status.t1_status, dict)
+                else None
+            )
 
     def notify_save(self, save_path: Path) -> None:
         path = Path(save_path)
@@ -199,7 +214,9 @@ class IngestionManager:
 
     # --- internals ---
 
-    def _set_stage_locked(self, stage: IngestionStage, detail: str | None = None) -> None:
+    def _set_stage_locked(
+        self, stage: IngestionStage, detail: str | None = None
+    ) -> None:
         self._status.stage = stage
         self._status.stage_detail = detail
         self._status.updated_at = time.time()
@@ -217,7 +234,9 @@ class IngestionManager:
         parsed: dict[str, Any] = {
             "file_path": str(save_path),
             "file_size_mb": save_path.stat().st_size / (1024 * 1024),
-            "modified": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(save_path.stat().st_mtime)),
+            "modified": time.strftime(
+                "%Y-%m-%dT%H:%M:%S", time.localtime(save_path.stat().st_mtime)
+            ),
         }
         for line in meta_text.split("\n"):
             if "=" in line and "flag" not in line.lower():
@@ -297,12 +316,17 @@ class IngestionManager:
             save_path = Path(pending)
 
             with self._lock:
-                self._set_stage_locked("waiting_for_stable_save", "waiting for file stability")
+                self._set_stage_locked(
+                    "waiting_for_stable_save", "waiting for file stability"
+                )
 
             stable_start = time.time()
             if not self._wait_for_stable_save(save_path, request_id=request_id):
                 continue
-            logger.info("[TIMING] Save stability wait: %.1fms", (time.time() - stable_start) * 1000)
+            logger.info(
+                "[TIMING] Save stability wait: %.1fms",
+                (time.time() - stable_start) * 1000,
+            )
 
             with self._lock:
                 if request_id != self._request_id:
@@ -337,7 +361,9 @@ class IngestionManager:
             t1 = self._run_worker_tier("t1", save_path=save_path, request_id=request_id)
             if t1 is None:
                 continue
-            logger.info("[TIMING] T1 worker complete: %.1fms", (time.time() - t1_start) * 1000)
+            logger.info(
+                "[TIMING] T1 worker complete: %.1fms", (time.time() - t1_start) * 1000
+            )
 
             with self._lock:
                 if request_id != self._request_id:
@@ -358,7 +384,9 @@ class IngestionManager:
             t2 = self._run_worker_tier("t2", save_path=save_path, request_id=request_id)
             if t2 is None:
                 continue
-            logger.info("[TIMING] T2 worker complete: %.1fms", (time.time() - t2_start) * 1000)
+            logger.info(
+                "[TIMING] T2 worker complete: %.1fms", (time.time() - t2_start) * 1000
+            )
 
             briefing_json = t2.get("briefing_json")
             t2_meta = t2.get("meta")
@@ -377,7 +405,9 @@ class IngestionManager:
             with self._lock:
                 if request_id != self._request_id:
                     continue
-                self._set_stage_locked("persisting", "saving snapshot and activating cache")
+                self._set_stage_locked(
+                    "persisting", "saving snapshot and activating cache"
+                )
 
             # Persist + activate cache (main process only).
             persist_start = time.time()
@@ -393,7 +423,9 @@ class IngestionManager:
                     )
             except Exception as e:
                 logger.warning("snapshot_persist_failed error=%s", e)
-            logger.info("[TIMING] DB persist: %.1fms", (time.time() - persist_start) * 1000)
+            logger.info(
+                "[TIMING] DB persist: %.1fms", (time.time() - persist_start) * 1000
+            )
 
             activate_start = time.time()
             try:
@@ -410,22 +442,35 @@ class IngestionManager:
                     self._status.last_error = f"Failed to activate cache: {e}"
                     self._set_stage_locked("error", "activation failed")
                 continue
-            logger.info("[TIMING] Cache activation: %.1fms", (time.time() - activate_start) * 1000)
+            logger.info(
+                "[TIMING] Cache activation: %.1fms",
+                (time.time() - activate_start) * 1000,
+            )
 
             with self._lock:
                 if request_id != self._request_id:
                     continue
                 self._status.t2_ready = True
-                self._status.t2_meta = dict(t2_meta) if isinstance(t2_meta, dict) else {}
-                self._status.t2_game_date = str(game_date) if game_date is not None else None
+                self._status.t2_meta = (
+                    dict(t2_meta) if isinstance(t2_meta, dict) else {}
+                )
+                self._status.t2_game_date = (
+                    str(game_date) if game_date is not None else None
+                )
                 self._status.t2_updated_at = time.time()
-                self._status.t2_last_duration_ms = float(duration_ms) if duration_ms is not None else None
-                self._status.t2_last_save_hash = save_hash if isinstance(save_hash, str) else None
+                self._status.t2_last_duration_ms = (
+                    float(duration_ms) if duration_ms is not None else None
+                )
+                self._status.t2_last_save_hash = (
+                    save_hash if isinstance(save_hash, str) else None
+                )
                 self._status.last_error = None
                 self._set_stage_locked("ready", "complete briefing ready")
                 logger.info("[TIMING] T2 complete - status now 'ready'")
 
-    def _run_worker_tier(self, tier: Literal["t1", "t2"], *, save_path: Path, request_id: int) -> dict[str, Any] | None:
+    def _run_worker_tier(
+        self, tier: Literal["t1", "t2"], *, save_path: Path, request_id: int
+    ) -> dict[str, Any] | None:
         cancel_event = threading.Event()
         job: WorkerJob = {
             "tier": tier,
@@ -468,5 +513,7 @@ class IngestionManager:
                 self._status.worker_pid = int(result["worker_pid"])
                 self._status.worker_tier = tier
 
-        payload = result.get("payload") if isinstance(result.get("payload"), dict) else None
+        payload = (
+            result.get("payload") if isinstance(result.get("payload"), dict) else None
+        )
         return payload or {}

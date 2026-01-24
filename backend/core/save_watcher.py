@@ -82,8 +82,7 @@ class SaveFileHandler(FileSystemEventHandler):
         if self.on_save_detected_async and self.loop:
             try:
                 asyncio.run_coroutine_threadsafe(
-                    self.on_save_detected_async(path),
-                    self.loop
+                    self.on_save_detected_async(path), self.loop
                 )
             except Exception as e:
                 logger.error(f"Error scheduling async callback: {e}")
@@ -94,7 +93,7 @@ class SaveFileHandler(FileSystemEventHandler):
             return
 
         path = Path(event.src_path)
-        if path.suffix.lower() == '.sav':
+        if path.suffix.lower() == ".sav":
             self._handle_save_event(path)
 
     def on_modified(self, event: FileSystemEvent) -> None:
@@ -103,7 +102,7 @@ class SaveFileHandler(FileSystemEventHandler):
             return
 
         path = Path(event.src_path)
-        if path.suffix.lower() == '.sav':
+        if path.suffix.lower() == ".sav":
             self._handle_save_event(path)
 
 

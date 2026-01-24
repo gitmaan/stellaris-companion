@@ -36,6 +36,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
+
     load_dotenv(PROJECT_ROOT / ".env")
 except ImportError:
     pass  # dotenv not installed, rely on environment variables
@@ -198,7 +199,9 @@ def main() -> None:
     # Initialize companion (Electron ingestion manager owns save loading + precompute).
     try:
         companion = Companion(save_path=None, auto_precompute=False)
-        logger.info("Companion initialized (precompute managed by ingestion coordinator)")
+        logger.info(
+            "Companion initialized (precompute managed by ingestion coordinator)"
+        )
     except Exception as e:
         logger.error(f"Failed to initialize companion: {e}")
         sys.exit(1)

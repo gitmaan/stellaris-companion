@@ -9,4 +9,3 @@ via the top-level `save_extractor.py` module.
 from .extractor import SaveExtractor
 
 __all__ = ["SaveExtractor"]
-

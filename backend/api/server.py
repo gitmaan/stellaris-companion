@@ -289,8 +289,16 @@ def create_app() -> FastAPI:
                 "tech_power": status_data.get("tech_power", 0),
                 "economy_power": status_data.get("economy_power", 0),
             },
-            "colonies": colonies_data.get("total_count", 0) if isinstance(colonies_data, dict) else 0,
-            "pops": colonies_data.get("total_population", 0) if isinstance(colonies_data, dict) else 0,
+            "colonies": (
+                colonies_data.get("total_count", 0)
+                if isinstance(colonies_data, dict)
+                else 0
+            ),
+            "pops": (
+                colonies_data.get("total_population", 0)
+                if isinstance(colonies_data, dict)
+                else 0
+            ),
             "active_wars": [
                 {
                     "name": war.get("name"),
@@ -320,17 +328,20 @@ def create_app() -> FastAPI:
         # Format response according to API spec
         sessions = []
         for session in sessions_data:
-            sessions.append({
-                "id": session["id"],
-                "save_id": session["save_id"],
-                "empire_name": session["empire_name"],
-                "started_at": session["started_at"],
-                "ended_at": session["ended_at"],
-                "first_game_date": session["first_game_date"],
-                "last_game_date": session["last_game_date_computed"] or session["last_game_date"],
-                "snapshot_count": session["snapshot_count"],
-                "is_active": session["ended_at"] is None,
-            })
+            sessions.append(
+                {
+                    "id": session["id"],
+                    "save_id": session["save_id"],
+                    "empire_name": session["empire_name"],
+                    "started_at": session["started_at"],
+                    "ended_at": session["ended_at"],
+                    "first_game_date": session["first_game_date"],
+                    "last_game_date": session["last_game_date_computed"]
+                    or session["last_game_date"],
+                    "snapshot_count": session["snapshot_count"],
+                    "is_active": session["ended_at"] is None,
+                }
+            )
 
         return {"sessions": sessions}
 
@@ -362,6 +373,7 @@ def create_app() -> FastAPI:
 
         # Get events for the session
         import json as json_module
+
         events_data = db.get_recent_events(session_id=session_id, limit=limit)
 
         # Format response according to API spec
@@ -375,13 +387,15 @@ def create_app() -> FastAPI:
                 except Exception:
                     pass
 
-            events.append({
-                "id": event["id"],
-                "game_date": event["game_date"],
-                "event_type": event["event_type"],
-                "summary": event["summary"],
-                "data": data,
-            })
+            events.append(
+                {
+                    "id": event["id"],
+                    "game_date": event["game_date"],
+                    "event_type": event["event_type"],
+                    "summary": event["summary"],
+                    "data": data,
+                }
+            )
 
         return {"events": events}
 
@@ -418,7 +432,9 @@ def create_app() -> FastAPI:
                     status_code=400,
                     detail={"error": "No active session - briefing not ready yet"},
                 )
-            t2_meta = status.get("t2_meta") if isinstance(status.get("t2_meta"), dict) else {}
+            t2_meta = (
+                status.get("t2_meta") if isinstance(status.get("t2_meta"), dict) else {}
+            )
             campaign_id = t2_meta.get("campaign_id")
             player_id = t2_meta.get("player_id")
             empire_name = t2_meta.get("empire_name")
@@ -553,10 +569,17 @@ def create_app() -> FastAPI:
 
         # Prevent request storms from spawning concurrent LLM calls.
         # Chronicle generation can be network-intensive; serialize per-save.
-        save_id = db.get_save_id_for_session(body.session_id) or session.get("save_id") or body.session_id
+        save_id = (
+            db.get_save_id_for_session(body.session_id)
+            or session.get("save_id")
+            or body.session_id
+        )
         with _chronicle_in_flight_lock:
             if save_id in _chronicle_in_flight:
-                return {"error": "Chronicle generation already in progress", "retry_after_ms": 2000}
+                return {
+                    "error": "Chronicle generation already in progress",
+                    "retry_after_ms": 2000,
+                }
             _chronicle_in_flight.add(save_id)
 
         from backend.core.chronicle import ChronicleGenerator

@@ -33,6 +33,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
+
     load_dotenv(PROJECT_ROOT / ".env")
 except ImportError:
     pass  # dotenv not installed, rely on environment variables
@@ -165,7 +166,9 @@ def main():
     # Get notification channel
     notification_channel = get_notification_channel()
     if notification_channel:
-        logger.info(f"Save notifications will be sent to channel: {notification_channel}")
+        logger.info(
+            f"Save notifications will be sent to channel: {notification_channel}"
+        )
 
     # Initialize history database (Phase 3 foundation)
     try:
@@ -179,7 +182,9 @@ def main():
     try:
         companion = Companion(save_path=save_path)
         if companion.is_loaded:
-            logger.info(f"Companion loaded: {companion.metadata.get('name', 'Unknown')}")
+            logger.info(
+                f"Companion loaded: {companion.metadata.get('name', 'Unknown')}"
+            )
             logger.info(f"Personality: {companion.personality_summary}")
     except Exception as e:
         logger.error(f"Failed to initialize companion: {e}")

@@ -35,6 +35,7 @@ _diagnostics_tls = threading.local()
 @dataclass
 class ExtractorTiming:
     """Timing information for a single extractor call."""
+
     name: str
     duration_ms: float
     used_rust: bool
@@ -48,6 +49,7 @@ class DiagnosticsCollector:
     Thread-local singleton that tracks fallbacks, errors, and timing
     for diagnostic reporting.
     """
+
     # Version information
     python_version: str = field(default_factory=lambda: sys.version)
     platform_info: str = field(default_factory=lambda: platform.platform())
@@ -86,6 +88,7 @@ class DiagnosticsCollector:
         """Detect available capabilities (Rust bridge, orjson, etc.)."""
         try:
             from rust_bridge import PARSER_BINARY, _ORJSON_AVAILABLE
+
             self.rust_bridge_available = PARSER_BINARY.exists()
             self.orjson_available = _ORJSON_AVAILABLE
         except ImportError:
@@ -107,13 +110,15 @@ class DiagnosticsCollector:
             error_type: Type of error if applicable
             error_message: Error message if applicable
         """
-        self.fallbacks.append({
-            "extractor": extractor_name,
-            "reason": reason,
-            "error_type": error_type,
-            "error_message": error_message,
-            "timestamp": time.time(),
-        })
+        self.fallbacks.append(
+            {
+                "extractor": extractor_name,
+                "reason": reason,
+                "error_type": error_type,
+                "error_message": error_message,
+                "timestamp": time.time(),
+            }
+        )
 
     def record_error(
         self,
@@ -130,13 +135,15 @@ class DiagnosticsCollector:
             message: Error message
             details: Additional details (no save data!)
         """
-        self.errors.append({
-            "context": context,
-            "error_type": error_type,
-            "message": message,
-            "details": details or {},
-            "timestamp": time.time(),
-        })
+        self.errors.append(
+            {
+                "context": context,
+                "error_type": error_type,
+                "message": message,
+                "details": details or {},
+                "timestamp": time.time(),
+            }
+        )
 
     def record_warning(
         self,
@@ -151,12 +158,14 @@ class DiagnosticsCollector:
             message: Warning message
             details: Additional details (no save data!)
         """
-        self.warnings.append({
-            "context": context,
-            "message": message,
-            "details": details or {},
-            "timestamp": time.time(),
-        })
+        self.warnings.append(
+            {
+                "context": context,
+                "message": message,
+                "details": details or {},
+                "timestamp": time.time(),
+            }
+        )
 
     def record_timing(
         self,
@@ -173,12 +182,14 @@ class DiagnosticsCollector:
             used_rust: Whether Rust path was used
             fallback_reason: If not using Rust, why
         """
-        self.timings.append(ExtractorTiming(
-            name=name,
-            duration_ms=duration_ms,
-            used_rust=used_rust,
-            fallback_reason=fallback_reason,
-        ))
+        self.timings.append(
+            ExtractorTiming(
+                name=name,
+                duration_ms=duration_ms,
+                used_rust=used_rust,
+                fallback_reason=fallback_reason,
+            )
+        )
 
     def set_rust_version(self, version: str, schema_version: int) -> None:
         """Set the Rust parser version info (from extract_sections response).
@@ -253,7 +264,9 @@ def get_diagnostics() -> dict[str, Any]:
             "total_regex_ms": total_regex_ms,
             "extractor_count": len(collector.timings),
             "rust_extractor_count": sum(1 for t in collector.timings if t.used_rust),
-            "regex_extractor_count": sum(1 for t in collector.timings if not t.used_rust),
+            "regex_extractor_count": sum(
+                1 for t in collector.timings if not t.used_rust
+            ),
             "breakdown": [
                 {
                     "name": t.name,
@@ -306,6 +319,7 @@ def export_diagnostics(filepath: str | None = None) -> str:
 
 # Convenience decorators for instrumenting extractors
 
+
 class timed_extractor:
     """Decorator to time an extractor method and record diagnostics.
 
@@ -329,6 +343,7 @@ class timed_extractor:
                 # Check if session is active to determine if Rust path is used
                 try:
                     from rust_bridge import _get_active_session
+
                     if _get_active_session() is not None:
                         used_rust = True
                 except ImportError:
@@ -360,6 +375,7 @@ def record_fallback_on_exception(extractor_name: str):
         def _get_leaders_rust(self):
             ...
     """
+
     def decorator(func):
         def wrapper(*args, **kwargs):
             try:

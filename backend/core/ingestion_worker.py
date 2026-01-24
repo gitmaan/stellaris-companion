@@ -37,16 +37,26 @@ def _compute_save_hash_from_briefing(briefing: dict[str, Any]) -> str | None:
 
 def _build_t1_status(*, extractor: SaveExtractor) -> dict[str, Any]:
     status_data = {
-        "empire_name": extractor.get_metadata().get("name") or extractor.get_player_status().get("empire_name"),
-        "game_date": extractor.get_metadata().get("date") or extractor.get_player_status().get("date"),
+        "empire_name": extractor.get_metadata().get("name")
+        or extractor.get_player_status().get("empire_name"),
+        "game_date": extractor.get_metadata().get("date")
+        or extractor.get_player_status().get("date"),
     }
 
     player = extractor.get_player_status()
     resources = extractor.get_resources()
     wars_data = extractor.get_wars()
 
-    net = resources.get("net_monthly", {}) if isinstance(resources.get("net_monthly", {}), dict) else {}
-    colonies_data = player.get("colonies", {}) if isinstance(player.get("colonies", {}), dict) else {}
+    net = (
+        resources.get("net_monthly", {})
+        if isinstance(resources.get("net_monthly", {}), dict)
+        else {}
+    )
+    colonies_data = (
+        player.get("colonies", {})
+        if isinstance(player.get("colonies", {}), dict)
+        else {}
+    )
 
     status_data.update(
         {
@@ -68,7 +78,9 @@ def _build_t1_status(*, extractor: SaveExtractor) -> dict[str, Any]:
                     "attackers": war.get("attackers", []),
                     "defenders": war.get("defenders", []),
                 }
-                for war in (wars_data.get("wars", []) if isinstance(wars_data, dict) else [])
+                for war in (
+                    wars_data.get("wars", []) if isinstance(wars_data, dict) else []
+                )
             ],
         }
     )
@@ -92,6 +104,7 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
         # Use session mode to parse save once and reuse for all extractor calls
         t0 = time.time()
         from rust_bridge import session as rust_session
+
         timings["import_rust_bridge"] = time.time() - t0
 
         t0 = time.time()
@@ -139,7 +152,11 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
                 # Build history enrichment with precomputed signals
                 # Signals-backed fields (leaders/wars/diplomacy) use resolved names
                 # Remaining fields (galaxy/techs/policies/edicts/etc.) use gamestate if needed
-                player_id = briefing.get("meta", {}).get("player_id") if isinstance(briefing, dict) else None
+                player_id = (
+                    briefing.get("meta", {}).get("player_id")
+                    if isinstance(briefing, dict)
+                    else None
+                )
                 history = build_history_enrichment(
                     gamestate=None,  # Signals provide all critical data
                     player_id=player_id,
@@ -153,10 +170,16 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
                 log_timing("History enrichment (total)", timings["history_enrichment"])
             except Exception as e:
                 timings["history_enrichment"] = 0
-                print(f"[TIMING] History enrichment error: {e}", file=sys.stderr, flush=True)
+                print(
+                    f"[TIMING] History enrichment error: {e}",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
             t0 = time.time()
-            briefing_json = json.dumps(briefing, ensure_ascii=False, separators=(",", ":"), default=str)
+            briefing_json = json.dumps(
+                briefing, ensure_ascii=False, separators=(",", ":"), default=str
+            )
             timings["json_serialize"] = time.time() - t0
             log_timing("JSON serialize", timings["json_serialize"])
 
@@ -165,9 +188,17 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
             payload = {
                 "briefing_json": briefing_json,
                 "meta": meta if isinstance(meta, dict) else {},
-                "identity": briefing.get("identity") if isinstance(briefing, dict) else None,
-                "situation": briefing.get("situation") if isinstance(briefing, dict) else None,
-                "save_hash": _compute_save_hash_from_briefing(briefing) if isinstance(briefing, dict) else None,
+                "identity": (
+                    briefing.get("identity") if isinstance(briefing, dict) else None
+                ),
+                "situation": (
+                    briefing.get("situation") if isinstance(briefing, dict) else None
+                ),
+                "save_hash": (
+                    _compute_save_hash_from_briefing(briefing)
+                    if isinstance(briefing, dict)
+                    else None
+                ),
                 "game_date": meta.get("date") if isinstance(meta, dict) else None,
                 "duration_ms": (time.time() - started) * 1000,
                 "timings": timings,
@@ -189,10 +220,17 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
             ctx.__exit__(None, None, None)
             log_timing("Rust session close", time.time() - t0)
 
-        out_q.put({"ok": False, "error": f"Unknown tier: {tier}", "worker_pid": os.getpid()})
+        out_q.put(
+            {"ok": False, "error": f"Unknown tier: {tier}", "worker_pid": os.getpid()}
+        )
     except Exception as e:
         import traceback
-        print(f"[TIMING] Error: {e}\n{traceback.format_exc()}", file=sys.stderr, flush=True)
+
+        print(
+            f"[TIMING] Error: {e}\n{traceback.format_exc()}",
+            file=sys.stderr,
+            flush=True,
+        )
         out_q.put({"ok": False, "error": str(e), "worker_pid": os.getpid()})
 
 
@@ -210,7 +248,10 @@ def run_worker_job(*, job: WorkerJob, cancel_event: Any) -> WorkerResult:
 
     try:
         while True:
-            if cancel_event is not None and getattr(cancel_event, "is_set", lambda: False)():
+            if (
+                cancel_event is not None
+                and getattr(cancel_event, "is_set", lambda: False)()
+            ):
                 try:
                     if proc.is_alive():
                         proc.terminate()
@@ -223,7 +264,11 @@ def run_worker_job(*, job: WorkerJob, cancel_event: Any) -> WorkerResult:
                 except Exception:
                     pass
                 proc.join(timeout=0.5)
-                return {"ok": False, "error": "cancelled", "worker_pid": worker_pid or 0}
+                return {
+                    "ok": False,
+                    "error": "cancelled",
+                    "worker_pid": worker_pid or 0,
+                }
 
             try:
                 msg = q.get(timeout=0.1)
@@ -243,7 +288,11 @@ def run_worker_job(*, job: WorkerJob, cancel_event: Any) -> WorkerResult:
                         return msg  # type: ignore[return-value]
                 except Exception:
                     pass
-                return {"ok": False, "error": "worker exited without result", "worker_pid": worker_pid or 0}
+                return {
+                    "ok": False,
+                    "error": "worker exited without result",
+                    "worker_pid": worker_pid or 0,
+                }
     finally:
         try:
             if proc.is_alive():

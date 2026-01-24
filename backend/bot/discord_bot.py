@@ -47,13 +47,13 @@ def truncate_response(text: str, max_length: int = DISCORD_CHAR_LIMIT - 50) -> s
     truncate_at = max_length - 30  # Leave room for truncation notice
 
     # Try to find a paragraph break
-    para_break = text.rfind('\n\n', 0, truncate_at)
+    para_break = text.rfind("\n\n", 0, truncate_at)
     if para_break > truncate_at * 0.5:  # Only use if we keep at least half
         truncate_at = para_break
 
     # Or try a sentence break
     else:
-        for punct in ['. ', '! ', '? ']:
+        for punct in [". ", "! ", "? "]:
             sent_break = text.rfind(punct, 0, truncate_at)
             if sent_break > truncate_at * 0.5:
                 truncate_at = sent_break + 1
@@ -70,7 +70,7 @@ class StellarisBot(commands.Bot):
         companion: Companion,
         save_watcher: SaveWatcher | None = None,
         notification_channel_id: int | None = None,
-        **kwargs
+        **kwargs,
     ):
         """Initialize the bot.
 
@@ -87,7 +87,7 @@ class StellarisBot(commands.Bot):
         super().__init__(
             command_prefix="!",  # Fallback prefix (we use slash commands)
             intents=intents,
-            **kwargs
+            **kwargs,
         )
 
         self.companion = companion
@@ -145,7 +145,9 @@ class StellarisBot(commands.Bot):
 
         # Log status
         if self.companion.is_loaded:
-            logger.info(f"Loaded save: {self.companion.metadata.get('name', 'Unknown')}")
+            logger.info(
+                f"Loaded save: {self.companion.metadata.get('name', 'Unknown')}"
+            )
         else:
             logger.warning("No save file loaded")
 
@@ -159,7 +161,9 @@ class StellarisBot(commands.Bot):
 
         try:
             # Reload quickly, then start background precompute (handled inside Companion).
-            identity_changed = await asyncio.to_thread(self.companion.reload_save, new_path=save_path)
+            identity_changed = await asyncio.to_thread(
+                self.companion.reload_save, new_path=save_path
+            )
 
             message = f"Save file updated: **{save_path.name}**\n"
             message += f"Empire: {self.companion.metadata.get('name', 'Unknown')}\n"

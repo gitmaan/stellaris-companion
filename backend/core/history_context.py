@@ -13,7 +13,6 @@ from typing import Any
 from backend.core.database import GameDatabase
 from backend.core.history import compute_save_id, extract_snapshot_metrics
 
-
 _HISTORY_KEYWORDS = re.compile(
     r"\b("
     r"since|recent|recently|last\s+(save|autosave|session|turn)|"
@@ -72,7 +71,9 @@ def build_history_context(
     lines.append("HISTORY (current campaign/session):")
     lines.append(f"- session_id: {session_id}")
     if stats.get("first_game_date") and stats.get("last_game_date"):
-        lines.append(f"- date_range: {stats['first_game_date']} → {stats['last_game_date']}")
+        lines.append(
+            f"- date_range: {stats['first_game_date']} → {stats['last_game_date']}"
+        )
     lines.append(f"- snapshots: {stats.get('snapshot_count', 0)}")
 
     if events:
@@ -122,7 +123,11 @@ def build_history_context_for_companion(
     return build_history_context(
         db=db,
         campaign_id=campaign_id,
-        player_id=companion.extractor.get_player_empire_id() if getattr(companion, "extractor", None) else None,
+        player_id=(
+            companion.extractor.get_player_empire_id()
+            if getattr(companion, "extractor", None)
+            else None
+        ),
         empire_name=metrics.get("empire_name") if isinstance(metrics, dict) else None,
         save_path=getattr(companion, "save_path", None),
         max_events=max_events,

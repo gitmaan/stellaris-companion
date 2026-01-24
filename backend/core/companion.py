@@ -26,12 +26,13 @@ try:
     from google import genai
     from google.genai import types
 except ImportError:
-    raise ImportError("google-genai package not installed. Run: pip install google-genai")
+    raise ImportError(
+        "google-genai package not installed. Run: pip install google-genai"
+    )
 
 from save_extractor import SaveExtractor
 from personality import build_optimized_prompt, get_personality_summary
 from backend.core.conversation import ConversationManager
-
 
 # Configure dedicated logger for companion performance metrics
 logger = logging.getLogger("stellaris.companion")
@@ -102,7 +103,7 @@ class Companion:
 
         self.client = genai.Client(api_key=self.api_key)
         self._chat_session = None
-        self._thinking_level = 'dynamic'
+        self._thinking_level = "dynamic"
         self._auto_precompute = bool(auto_precompute)
 
         # Initialize save-related attributes
@@ -142,7 +143,9 @@ class Companion:
         self._precompute_generation = 0
 
         # Phase 4: sliding-window conversation memory (per session key)
-        self._conversations = ConversationManager(max_turns=5, timeout_minutes=15, max_answer_chars=500)
+        self._conversations = ConversationManager(
+            max_turns=5, timeout_minutes=15, max_answer_chars=500
+        )
 
         # Load save if provided
         if save_path:
@@ -241,7 +244,9 @@ class Companion:
             self.system_prompt = build_optimized_prompt(
                 self.identity, self.situation, game_context
             )
-            self.personality_summary = get_personality_summary(self.identity, self.situation)
+            self.personality_summary = get_personality_summary(
+                self.identity, self.situation
+            )
         except Exception as e:
             print(f"Warning: Failed to build personality ({e}), using fallback")
             self.system_prompt = FALLBACK_SYSTEM_PROMPT
@@ -256,21 +261,21 @@ class Companion:
         if not self.metadata:
             return None
 
-        version = self.metadata.get('version')
-        required_dlcs = self.metadata.get('required_dlcs', [])
+        version = self.metadata.get("version")
+        required_dlcs = self.metadata.get("required_dlcs", [])
 
         # Compute missing DLCs if extractor is available
         missing_dlcs = []
-        if self.extractor and hasattr(self.extractor, 'get_missing_dlcs'):
+        if self.extractor and hasattr(self.extractor, "get_missing_dlcs"):
             try:
                 missing_dlcs = self.extractor.get_missing_dlcs()
             except Exception:
                 pass  # Fall back to empty list
 
         return {
-            'version': version,
-            'required_dlcs': required_dlcs,
-            'missing_dlcs': missing_dlcs,
+            "version": version,
+            "required_dlcs": required_dlcs,
+            "missing_dlcs": missing_dlcs,
         }
 
     def _compute_save_hash(self) -> str:
@@ -335,9 +340,9 @@ class Companion:
 
         # Check if identity changed
         identity_changed = (
-            old_identity.get('ethics') != self.identity.get('ethics') or
-            old_identity.get('authority') != self.identity.get('authority') or
-            old_identity.get('civics') != self.identity.get('civics')
+            old_identity.get("ethics") != self.identity.get("ethics")
+            or old_identity.get("authority") != self.identity.get("authority")
+            or old_identity.get("civics") != self.identity.get("civics")
         )
 
         # Rebuild personality
@@ -355,7 +360,7 @@ class Companion:
                 "old_date": old_date,
                 "new_date": self._last_known_date,
                 "identity_changed": identity_changed,
-            }
+            },
         )
 
         # Kick off Phase 4 background precompute for the new save (unless disabled for Electron ingestion manager).
@@ -381,63 +386,79 @@ class Companion:
         curr = self._current_snapshot
 
         # Compare military power
-        prev_mil = prev.get('military', {}).get('power', 0)
-        curr_mil = curr.get('military', {}).get('power', 0)
+        prev_mil = prev.get("military", {}).get("power", 0)
+        curr_mil = curr.get("military", {}).get("power", 0)
         if prev_mil != curr_mil and prev_mil > 0:
             pct = ((curr_mil - prev_mil) / prev_mil) * 100
-            sign = '+' if pct > 0 else ''
-            changes.append(f"Military power: {prev_mil:,} -> {curr_mil:,} ({sign}{pct:.0f}%)")
+            sign = "+" if pct > 0 else ""
+            changes.append(
+                f"Military power: {prev_mil:,} -> {curr_mil:,} ({sign}{pct:.0f}%)"
+            )
 
         # Compare fleet count
-        prev_fleets = prev.get('military', {}).get('fleet_count', 0)
-        curr_fleets = curr.get('military', {}).get('fleet_count', 0)
+        prev_fleets = prev.get("military", {}).get("fleet_count", 0)
+        curr_fleets = curr.get("military", {}).get("fleet_count", 0)
         if prev_fleets != curr_fleets:
             diff = curr_fleets - prev_fleets
-            sign = '+' if diff > 0 else ''
+            sign = "+" if diff > 0 else ""
             changes.append(f"Fleets: {prev_fleets} -> {curr_fleets} ({sign}{diff})")
 
         # Compare tech power
-        prev_tech = prev.get('economy', {}).get('tech_power', 0)
-        curr_tech = curr.get('economy', {}).get('tech_power', 0)
+        prev_tech = prev.get("economy", {}).get("tech_power", 0)
+        curr_tech = curr.get("economy", {}).get("tech_power", 0)
         if prev_tech != curr_tech and prev_tech > 0:
             pct = ((curr_tech - prev_tech) / prev_tech) * 100
-            sign = '+' if pct > 0 else ''
-            changes.append(f"Tech power: {prev_tech:,} -> {curr_tech:,} ({sign}{pct:.0f}%)")
+            sign = "+" if pct > 0 else ""
+            changes.append(
+                f"Tech power: {prev_tech:,} -> {curr_tech:,} ({sign}{pct:.0f}%)"
+            )
 
         # Compare population
-        prev_pop = prev.get('territory', {}).get('total_population', 0)
-        curr_pop = curr.get('territory', {}).get('total_population', 0)
+        prev_pop = prev.get("territory", {}).get("total_population", 0)
+        curr_pop = curr.get("territory", {}).get("total_population", 0)
         if prev_pop != curr_pop:
             diff = curr_pop - prev_pop
-            sign = '+' if diff > 0 else ''
+            sign = "+" if diff > 0 else ""
             changes.append(f"Population: {prev_pop} -> {curr_pop} ({sign}{diff})")
 
         # Compare colony count
-        prev_colonies = prev.get('territory', {}).get('colony_count', 0)
-        curr_colonies = curr.get('territory', {}).get('colony_count', 0)
+        prev_colonies = prev.get("territory", {}).get("colony_count", 0)
+        curr_colonies = curr.get("territory", {}).get("colony_count", 0)
         if prev_colonies != curr_colonies:
             diff = curr_colonies - prev_colonies
-            sign = '+' if diff > 0 else ''
-            changes.append(f"Colonies: {prev_colonies} -> {curr_colonies} ({sign}{diff})")
+            sign = "+" if diff > 0 else ""
+            changes.append(
+                f"Colonies: {prev_colonies} -> {curr_colonies} ({sign}{diff})"
+            )
 
         # Check for new wars (compare war counts or detect new entries)
-        prev_wars = prev.get('military', {}).get('active_wars', [])
-        curr_wars = curr.get('military', {}).get('active_wars', [])
-        prev_war_names = {w.get('name', '') for w in prev_wars} if isinstance(prev_wars, list) else set()
-        curr_war_names = {w.get('name', '') for w in curr_wars} if isinstance(curr_wars, list) else set()
+        prev_wars = prev.get("military", {}).get("active_wars", [])
+        curr_wars = curr.get("military", {}).get("active_wars", [])
+        prev_war_names = (
+            {w.get("name", "") for w in prev_wars}
+            if isinstance(prev_wars, list)
+            else set()
+        )
+        curr_war_names = (
+            {w.get("name", "") for w in curr_wars}
+            if isinstance(curr_wars, list)
+            else set()
+        )
         new_wars = curr_war_names - prev_war_names
         for war_name in new_wars:
             if war_name:
                 changes.append(f"New war detected: {war_name}")
 
         # Compare key resources (net monthly)
-        for resource in ['energy', 'minerals', 'alloys', 'food']:
-            prev_net = prev.get('economy', {}).get('net_monthly', {}).get(resource, 0)
-            curr_net = curr.get('economy', {}).get('net_monthly', {}).get(resource, 0)
+        for resource in ["energy", "minerals", "alloys", "food"]:
+            prev_net = prev.get("economy", {}).get("net_monthly", {}).get(resource, 0)
+            curr_net = curr.get("economy", {}).get("net_monthly", {}).get(resource, 0)
             if prev_net != curr_net:
                 diff = curr_net - prev_net
-                sign = '+' if diff > 0 else ''
-                changes.append(f"{resource.capitalize()} income: {prev_net:+.0f} -> {curr_net:+.0f} ({sign}{diff:.0f})")
+                sign = "+" if diff > 0 else ""
+                changes.append(
+                    f"{resource.capitalize()} income: {prev_net:+.0f} -> {curr_net:+.0f} ({sign}{diff:.0f})"
+                )
 
         if not changes:
             return "No significant changes detected."
@@ -643,8 +664,8 @@ class Companion:
         elif mode == "full":
             # Full consolidated toolset - 4 tools instead of 12
             return [
-                self.get_snapshot,      # Primary data source (80% of questions)
-                self.get_details,       # Drill-down by category
+                self.get_snapshot,  # Primary data source (80% of questions)
+                self.get_details,  # Drill-down by category
                 self.search_save_file,  # Escape hatch for edge cases
                 self.get_empire_details,  # Look up other empires by name
             ]
@@ -659,15 +680,15 @@ class Companion:
         Args:
             level: One of 'dynamic', 'minimal', 'low', 'medium', 'high'
         """
-        valid_levels = ['dynamic', 'minimal', 'low', 'medium', 'high']
+        valid_levels = ["dynamic", "minimal", "low", "medium", "high"]
         if level not in valid_levels:
             raise ValueError(f"Invalid thinking level. Must be one of: {valid_levels}")
         self._thinking_level = level
         self._chat_session = None
 
-    def _extract_afc_stats(self, history_before: int = 0) -> tuple[
-        int, dict[str, int], dict[str, int], set[str], list[list[str]]
-    ]:
+    def _extract_afc_stats(
+        self, history_before: int = 0
+    ) -> tuple[int, dict[str, int], dict[str, int], set[str], list[list[str]]]:
         """Extract per-request automatic function calling statistics.
 
         Args:
@@ -689,13 +710,25 @@ class Companion:
         details_batches: list[list[str]] = []
 
         if self._chat_session is None:
-            return total_calls, call_counts, payload_sizes, details_categories_seen, details_batches
+            return (
+                total_calls,
+                call_counts,
+                payload_sizes,
+                details_categories_seen,
+                details_batches,
+            )
 
         try:
             history = self._chat_session.get_history()
         except Exception as e:
             logger.debug(f"Could not read chat history for AFC stats: {e}")
-            return total_calls, call_counts, payload_sizes, details_categories_seen, details_batches
+            return (
+                total_calls,
+                call_counts,
+                payload_sizes,
+                details_categories_seen,
+                details_batches,
+            )
 
         new_entries = history[history_before:] if isinstance(history, list) else []
 
@@ -730,7 +763,13 @@ class Companion:
                     except (TypeError, ValueError):
                         payload_sizes[func_name] = 0
 
-        return total_calls, call_counts, payload_sizes, details_categories_seen, details_batches
+        return (
+            total_calls,
+            call_counts,
+            payload_sizes,
+            details_categories_seen,
+            details_batches,
+        )
 
     def _response_has_pending_function_call(self, response: Any) -> bool:
         """Return True if the response contains a function_call part."""
@@ -792,7 +831,9 @@ class Companion:
             return "No save file loaded. Please load a save file first.", 0.0
 
         start_time = time.time()
-        truncated_question = user_message[:100] + "..." if len(user_message) > 100 else user_message
+        truncated_question = (
+            user_message[:100] + "..." if len(user_message) > 100 else user_message
+        )
 
         # Log request start
         logger.info(
@@ -802,7 +843,7 @@ class Companion:
                 "mode": "afc",
                 "question_preview": truncated_question,
                 "question_length": len(user_message),
-            }
+            },
         )
 
         try:
@@ -814,7 +855,7 @@ class Companion:
                 if current_hash != self._save_hash:
                     # Save state changed - prepend context update note
                     old_date = self._last_known_date
-                    new_date = self.metadata.get('date')
+                    new_date = self.metadata.get("date")
                     context_update_note = (
                         f"[SAVE UPDATE: The game state has changed since our last conversation. "
                         f"Previous: {old_date}, Current: {new_date}]\n\n"
@@ -827,7 +868,7 @@ class Companion:
                         extra={
                             "old_date": old_date,
                             "new_date": new_date,
-                        }
+                        },
                     )
 
             # Create chat session once (just for history management)
@@ -837,26 +878,32 @@ class Companion:
                 )
 
             # Prepare message with optional context update note
-            message_to_send = context_update_note + user_message if context_update_note else user_message
+            message_to_send = (
+                context_update_note + user_message
+                if context_update_note
+                else user_message
+            )
 
             # Build per-message config with tools (cookbook pattern)
             tools = self._get_tools_list(tool_mode)
             message_config = {
-                'system_instruction': self.system_prompt,
-                'tools': tools if tools else None,  # None if empty list (no tools mode)
-                'temperature': 1.0,  # Gemini 3 recommended default
-                'max_output_tokens': 4096,
+                "system_instruction": self.system_prompt,
+                "tools": tools if tools else None,  # None if empty list (no tools mode)
+                "temperature": 1.0,  # Gemini 3 recommended default
+                "max_output_tokens": 4096,
             }
 
             # Only add AFC config if we have tools
             if tools:
-                message_config['automatic_function_calling'] = types.AutomaticFunctionCallingConfig(
-                    maximum_remote_calls=8,
+                message_config["automatic_function_calling"] = (
+                    types.AutomaticFunctionCallingConfig(
+                        maximum_remote_calls=8,
+                    )
                 )
 
             # Add thinking config if not dynamic
-            if self._thinking_level != 'dynamic':
-                message_config['thinking_config'] = types.ThinkingConfig(
+            if self._thinking_level != "dynamic":
+                message_config["thinking_config"] = types.ThinkingConfig(
                     thinking_level=self._thinking_level
                 )
 
@@ -873,7 +920,9 @@ class Companion:
             )
 
             # Extract AFC statistics from history entries added by this request
-            total_calls, call_counts, payload_sizes, _, _ = self._extract_afc_stats(history_before)
+            total_calls, call_counts, payload_sizes, _, _ = self._extract_afc_stats(
+                history_before
+            )
             tools_used = list(call_counts.keys())
 
             # Extract text from response
@@ -884,7 +933,7 @@ class Companion:
                 has_pending_calls = False
                 if response.candidates and response.candidates[0].content:
                     for part in response.candidates[0].content.parts:
-                        if hasattr(part, 'function_call') and part.function_call:
+                        if hasattr(part, "function_call") and part.function_call:
                             has_pending_calls = True
                             break
 
@@ -919,7 +968,7 @@ class Companion:
                     "response_length": len(response_text),
                     "payload_sizes": payload_sizes,
                     "total_payload_bytes": sum(payload_sizes.values()),
-                }
+                },
             )
 
             return response_text, elapsed
@@ -945,7 +994,7 @@ class Companion:
                     "mode": "afc",
                     "wall_time_ms": wall_time_ms,
                     "error": str(e),
-                }
+                },
             )
 
             return f"Error: {str(e)}", elapsed
@@ -967,7 +1016,9 @@ class Companion:
         """Clear the conversation history by resetting the chat session."""
         self._chat_session = None
         # Also clear precomputed /ask conversation windows.
-        self._conversations = ConversationManager(max_turns=5, timeout_minutes=15, max_answer_chars=500)
+        self._conversations = ConversationManager(
+            max_turns=5, timeout_minutes=15, max_answer_chars=500
+        )
 
     def get_precompute_status(self) -> dict[str, Any]:
         """Get current Phase 4 precompute cache status (safe for UI display)."""
@@ -1043,8 +1094,16 @@ class Companion:
         """Compute a stable-ish hash for deduping snapshots."""
         if not isinstance(briefing, dict):
             return None
-        meta = briefing.get("meta", {}) if isinstance(briefing.get("meta", {}), dict) else {}
-        military = briefing.get("military", {}) if isinstance(briefing.get("military", {}), dict) else {}
+        meta = (
+            briefing.get("meta", {})
+            if isinstance(briefing.get("meta", {}), dict)
+            else {}
+        )
+        military = (
+            briefing.get("military", {})
+            if isinstance(briefing.get("military", {}), dict)
+            else {}
+        )
         date = meta.get("date")
         empire_name = meta.get("empire_name") or meta.get("name")
         mil = military.get("military_power")
@@ -1078,8 +1137,14 @@ class Companion:
             logger.error("precompute_failed")
             return
 
-        briefing_json = json.dumps(briefing, ensure_ascii=False, separators=(",", ":"), default=str)
-        meta = briefing.get("meta", {}) if isinstance(briefing.get("meta", {}), dict) else {}
+        briefing_json = json.dumps(
+            briefing, ensure_ascii=False, separators=(",", ":"), default=str
+        )
+        meta = (
+            briefing.get("meta", {})
+            if isinstance(briefing.get("meta", {}), dict)
+            else {}
+        )
         game_date = meta.get("date")
         save_hash = self._compute_save_hash_from_briefing(briefing)
 
@@ -1150,7 +1215,9 @@ class Companion:
             # Best-effort: target the current save/campaign if possible.
             if self.save_path:
                 # Avoid loading the full gamestate just to compute campaign_id; use save_path lookup.
-                session_id = db.get_active_or_latest_session_id_for_save_path(save_path=str(self.save_path))
+                session_id = db.get_active_or_latest_session_id_for_save_path(
+                    save_path=str(self.save_path)
+                )
                 if not session_id and self.extractor:
                     # Fallback: derive save_id without campaign_id (empire+root), which is cheap and stable.
                     save_id = compute_save_id(
@@ -1162,13 +1229,21 @@ class Companion:
                     session_id = db.get_active_or_latest_session_id(save_id=save_id)
 
                 if session_id:
-                    json_text = db.get_latest_session_briefing_json(session_id=session_id) or db.get_latest_snapshot_full_briefing_json(session_id=session_id)
+                    json_text = db.get_latest_session_briefing_json(
+                        session_id=session_id
+                    ) or db.get_latest_snapshot_full_briefing_json(
+                        session_id=session_id
+                    )
                     if json_text:
                         try:
                             parsed = json.loads(json_text)
                             gd = None
                             if isinstance(parsed, dict):
-                                meta = parsed.get("meta", {}) if isinstance(parsed.get("meta", {}), dict) else {}
+                                meta = (
+                                    parsed.get("meta", {})
+                                    if isinstance(parsed.get("meta", {}), dict)
+                                    else {}
+                                )
                                 gd = meta.get("date")
                             return json_text, (str(gd) if gd is not None else None)
                         except Exception:
@@ -1183,7 +1258,11 @@ class Companion:
                 parsed = json.loads(json_text)
                 gd = None
                 if isinstance(parsed, dict):
-                    meta = parsed.get("meta", {}) if isinstance(parsed.get("meta", {}), dict) else {}
+                    meta = (
+                        parsed.get("meta", {})
+                        if isinstance(parsed.get("meta", {}), dict)
+                        else {}
+                    )
                     gd = meta.get("date")
                 return json_text, (str(gd) if gd is not None else None)
             except Exception:
@@ -1204,7 +1283,11 @@ class Companion:
             if ready:
                 return cached_json, cached_date, None
             if cached_date:
-                return cached_json, cached_date, f"Using cached data from {cached_date}; new save processing…"
+                return (
+                    cached_json,
+                    cached_date,
+                    f"Using cached data from {cached_date}; new save processing…",
+                )
             return cached_json, cached_date, "Using cached data; new save processing…"
 
         # If we have a precompute running, wait briefly for it to finish (cold start).
@@ -1217,7 +1300,11 @@ class Companion:
         # Try SQLite fallback (persistence across restarts).
         db_json, db_date = self._load_latest_briefing_json_from_db()
         if db_json:
-            return db_json, db_date, "Loaded from history cache; live save processing may still be running…"
+            return (
+                db_json,
+                db_date,
+                "Loaded from history cache; live save processing may still be running…",
+            )
 
         return None, None, None
 
@@ -1232,7 +1319,10 @@ class Companion:
 
         briefing_json, game_date, data_note = self._get_best_briefing_json()
         if not briefing_json:
-            return "No precomputed game state is available yet. Please wait for a save to be processed.", 0.0
+            return (
+                "No precomputed game state is available yet. Please wait for a save to be processed.",
+                0.0,
+            )
 
         # Build prompt with sliding-window history (Phase 4)
         user_prompt = self._conversations.build_prompt(
@@ -1261,7 +1351,9 @@ class Companion:
                 max_output_tokens=4096,
             )
             if self._thinking_level != "dynamic":
-                cfg.thinking_config = types.ThinkingConfig(thinking_level=self._thinking_level)
+                cfg.thinking_config = types.ThinkingConfig(
+                    thinking_level=self._thinking_level
+                )
 
             response = self.client.models.generate_content(
                 model="gemini-3-flash-preview",
@@ -1356,7 +1448,7 @@ class Companion:
             extra={
                 "timestamp": time.time(),
                 "mode": "direct",
-            }
+            },
         )
 
         try:
@@ -1396,7 +1488,7 @@ Be concise but insightful."""
             )
 
             # Add thinking config if not dynamic
-            if self._thinking_level != 'dynamic':
+            if self._thinking_level != "dynamic":
                 message_config.thinking_config = types.ThinkingConfig(
                     thinking_level=self._thinking_level
                 )
@@ -1409,7 +1501,9 @@ Be concise but insightful."""
             )
 
             # Extract text from response
-            response_text = response.text if response.text else "Could not generate briefing."
+            response_text = (
+                response.text if response.text else "Could not generate briefing."
+            )
 
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
@@ -1431,7 +1525,7 @@ Be concise but insightful."""
                     "wall_time_ms": wall_time_ms,
                     "briefing_data_size": briefing_size,
                     "response_length": len(response_text),
-                }
+                },
             )
 
             return response_text, elapsed
@@ -1457,12 +1551,14 @@ Be concise but insightful."""
                     "mode": "direct",
                     "wall_time_ms": wall_time_ms,
                     "error": str(e),
-                }
+                },
             )
 
             return f"Error: {str(e)}", elapsed
 
-    def ask_simple(self, question: str, history_context: str | None = None) -> tuple[str, float]:
+    def ask_simple(
+        self, question: str, history_context: str | None = None
+    ) -> tuple[str, float]:
         """Ask a question using the 4 consolidated tools.
 
         Uses get_snapshot(), get_details(), search_save_file(), and get_empire_details().
@@ -1490,7 +1586,7 @@ Be concise but insightful."""
                 "mode": "afc",
                 "question_preview": truncated_question,
                 "question_length": len(question),
-            }
+            },
         )
 
         try:
@@ -1503,7 +1599,9 @@ Be concise but insightful."""
             # Use slim snapshot (summaries only, no truncated lists) to prevent hallucination.
             # Model must call get_details() for specific leader/planet/diplomacy info.
             snapshot_data = self.extractor.get_slim_briefing()
-            snapshot_json = json.dumps(snapshot_data, separators=(",", ":"), default=str)
+            snapshot_json = json.dumps(
+                snapshot_data, separators=(",", ":"), default=str
+            )
             snapshot_size = len(snapshot_json)
 
             user_prompt = (
@@ -1554,19 +1652,19 @@ Be concise but insightful."""
                 "- Maintain your full personality and colorful language - be an advisor, not a data dump!\n"
             )
             message_config = {
-                'system_instruction': ask_system_prompt,
-                'tools': tools,
-                'temperature': 1.0,  # Gemini 3 recommended default
-                'max_output_tokens': 4096,
+                "system_instruction": ask_system_prompt,
+                "tools": tools,
+                "temperature": 1.0,  # Gemini 3 recommended default
+                "max_output_tokens": 4096,
                 # Allow a couple drill-down calls without reintroducing long AFC chains.
-                'automatic_function_calling': types.AutomaticFunctionCallingConfig(
+                "automatic_function_calling": types.AutomaticFunctionCallingConfig(
                     maximum_remote_calls=6,
                 ),
             }
 
             # Add thinking config if not dynamic
-            if self._thinking_level != 'dynamic':
-                message_config['thinking_config'] = types.ThinkingConfig(
+            if self._thinking_level != "dynamic":
+                message_config["thinking_config"] = types.ThinkingConfig(
                     thinking_level=self._thinking_level
                 )
 
@@ -1577,7 +1675,13 @@ Be concise but insightful."""
             )
 
             # Extract per-request AFC statistics
-            total_calls, call_counts, payload_sizes, details_categories_seen, details_batches = self._extract_afc_stats(history_before)
+            (
+                total_calls,
+                call_counts,
+                payload_sizes,
+                details_categories_seen,
+                details_batches,
+            ) = self._extract_afc_stats(history_before)
             tools_used = list(call_counts.keys())
 
             # If the model hit the AFC cap and left a pending function_call, do a final
@@ -1591,7 +1695,9 @@ Be concise but insightful."""
                     sorted(details_categories_seen),
                 )
                 tool_payloads = self._extract_new_tool_payloads(history_before)
-                tool_payload_json = json.dumps(tool_payloads, separators=(",", ":"), default=str)
+                tool_payload_json = json.dumps(
+                    tool_payloads, separators=(",", ":"), default=str
+                )
                 # Keep the finalization prompt bounded
                 if len(tool_payload_json) > 12000:
                     tool_payload_json = tool_payload_json[:12000] + "...TRUNCATED"
@@ -1619,7 +1725,7 @@ Be concise but insightful."""
                     temperature=1.0,
                     max_output_tokens=4096,
                 )
-                if self._thinking_level != 'dynamic':
+                if self._thinking_level != "dynamic":
                     direct_config.thinking_config = types.ThinkingConfig(
                         thinking_level=self._thinking_level
                     )
@@ -1633,7 +1739,9 @@ Be concise but insightful."""
                 # Log finish reason for debugging truncation issues
                 finish_reason = None
                 if direct_response.candidates:
-                    finish_reason = getattr(direct_response.candidates[0], 'finish_reason', None)
+                    finish_reason = getattr(
+                        direct_response.candidates[0], "finish_reason", None
+                    )
                     if finish_reason and str(finish_reason) != "STOP":
                         logger.warning(
                             "ask_simple_finalize_finish_reason=%s (may indicate truncation)",
@@ -1647,8 +1755,10 @@ Be concise but insightful."""
 
                 # Warn if response seems truncated (ends mid-sentence)
                 if response_text and len(response_text) > 50:
-                    last_char = response_text.rstrip()[-1] if response_text.rstrip() else ''
-                    if last_char not in '.!?")\']':
+                    last_char = (
+                        response_text.rstrip()[-1] if response_text.rstrip() else ""
+                    )
+                    if last_char not in ".!?\")']":
                         logger.warning(
                             "ask_simple_possible_truncation finish_reason=%s last_char='%s' response_len=%d",
                             finish_reason,
@@ -1667,7 +1777,9 @@ Be concise but insightful."""
                 # Log finish reason for non-finalized responses too
                 finish_reason = None
                 if response.candidates:
-                    finish_reason = getattr(response.candidates[0], 'finish_reason', None)
+                    finish_reason = getattr(
+                        response.candidates[0], "finish_reason", None
+                    )
                     if finish_reason and str(finish_reason) != "STOP":
                         logger.warning(
                             "ask_simple_afc_finish_reason=%s (may indicate truncation)",
@@ -1678,8 +1790,10 @@ Be concise but insightful."""
 
                 # Warn if response seems truncated
                 if response_text and len(response_text) > 50:
-                    last_char = response_text.rstrip()[-1] if response_text.rstrip() else ''
-                    if last_char not in '.!?")\']':
+                    last_char = (
+                        response_text.rstrip()[-1] if response_text.rstrip() else ""
+                    )
+                    if last_char not in ".!?\")']":
                         logger.warning(
                             "ask_simple_possible_truncation finish_reason=%s last_char='%s' response_len=%d",
                             finish_reason,
@@ -1748,7 +1862,7 @@ Be concise but insightful."""
                     "mode": "afc",
                     "wall_time_ms": wall_time_ms,
                     "error": str(e),
-                }
+                },
             )
 
             return f"Error: {str(e)}", elapsed

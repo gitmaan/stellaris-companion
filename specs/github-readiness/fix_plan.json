@@ -112,12 +112,12 @@
       "id": "GHR-009",
       "title": "Run black formatter on Python files",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "pip3 show black > /dev/null 2>&1 || pip3 install black",
         "black --check backend/ stellaris_save_extractor/ personality.py save_extractor.py 2>&1 | grep -q 'would be reformatted' && exit 1 || exit 0"
       ],
-      "notes": "Normalize quote styles and formatting"
+      "notes": "Formatted 48 files with black 26.1.0. Used project venv (venv/) since system Python is externally managed."
     },
     {
       "id": "GHR-010",
@@ -192,6 +192,11 @@
       "id": "GHR-P007",
       "learned": "2026-01-25",
       "description": "ingestion_worker.py already has all print() calls using file=sys.stderr for timing diagnostics. The story was incorrectly marked as failing when the criteria were already satisfied."
+    },
+    {
+      "id": "GHR-P008",
+      "learned": "2026-01-25",
+      "description": "System Python on macOS is externally managed (PEP 668). Use project venv/ for installing tools like black: 'source venv/bin/activate && pip install black'"
     }
   ]
 }
