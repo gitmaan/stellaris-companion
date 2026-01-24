@@ -128,6 +128,11 @@
       "id": "P031",
       "learning": "Use session.iter_section() directly (not iter_section_entries()) in _rust methods to avoid the dual dispatch logic. The _rust method already knows it has a session.",
       "date": "2026-01-25"
+    },
+    {
+      "id": "P032",
+      "learning": "Fallback removal (MIG-040+) succeeded for get_resources. When removing regex fallbacks: (1) verify Rust version produces identical or better results first, (2) update get_X() to call _get_X_rust() directly, (3) delete _get_X_regex() method entirely. Session mode is now required.",
+      "date": "2026-01-25"
     }
   ],
   "stories": [
@@ -500,13 +505,13 @@
       "priority": 20,
       "description": "ESCAPE HATCH: First fallback removal. If this fails, add pattern and STOP further removals. Delete _regex methods, update dispatch to call Rust directly.",
       "files": ["stellaris_save_extractor/economy.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q 'def _get_resources_regex' stellaris_save_extractor/economy.py (regex method removed)",
         "RUN: grep -q 'def get_resources' stellaris_save_extractor/economy.py (main method exists)",
         "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_resources(); ctx.__exit__(None,None,None); assert 'stockpiles' in r or 'current' in r, 'FAILED'; print('ESCAPE HATCH PASSED')\" (works without fallback)"
       ],
-      "notes": "ESCAPE HATCH: If criterion 3 fails, add pattern 'Fallback removal failed: [reason]' and STOP. Do NOT proceed with MIG-041+."
+      "notes": "Completed 2026-01-25. ESCAPE HATCH PASSED. Removed _get_resources_regex() method (188 lines). Updated get_resources() to call _get_resources_rust() directly without fallback. Rust version produces identical results to regex version (both with empty stockpiles due to standard_economy_module parsing). All criteria pass - safe to proceed with MIG-041+."
     },
     {
       "id": "MIG-041",
