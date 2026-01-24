@@ -5,12 +5,13 @@ import re
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import iter_section_entries, ParserError
+    from rust_bridge import iter_section_entries, ParserError, _get_active_session
 
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -56,31 +57,27 @@ class ProjectsMixin:
               - notable_completed: Human-readable notable completions
               - precursor_progress: Dict of precursor chain status
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_special_projects_rust()
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for special projects: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback: regex-based parsing
+        # Dispatch to Rust version when session is active (P030)
+        session = _get_active_session()
+        if session:
+            return self._get_special_projects_rust()
         return self._get_special_projects_regex()
 
     def _get_special_projects_rust(self) -> dict:
         """Get special projects using Rust parser.
 
-        Uses Rust parser for country data and precursor flags, but regex for
-        completed_event_chain and special_project entries due to duplicate key issue.
+        Uses Rust session for country data, precursor flags, and completed_event_chain
+        (via get_duplicate_values). Still uses regex for active special projects
+        (nested block structure not easily extracted via Rust ops).
 
         Returns:
             Dict with special project details
         """
+        # P030: Check session at start and delegate if not available
+        session = _get_active_session()
+        if not session:
+            return self._get_special_projects_regex()
+
         result = {
             "active_projects": [],
             "active_count": 0,
@@ -92,18 +89,33 @@ class ProjectsMixin:
 
         player_id = self.get_player_empire_id()
 
-        # Use cached player country entry for fast lookup
-        player_data = self._get_player_country_entry(player_id)
+        # Use session.get_entry for O(1) lookup (P021)
+        player_data = session.get_entry("country", str(player_id))
 
         if not player_data or not isinstance(player_data, dict):
             return result
 
-        # For active projects and completed chains, we need regex due to duplicate keys
-        # The Rust parser collapses duplicate keys like completed_event_chain="x"
+        # Extract completed event chains using get_duplicate_values (P023)
+        # This handles the duplicate key issue where jomini collapses them
+        completed_chains = session.get_duplicate_values(
+            "country", str(player_id), "completed_event_chain"
+        )
+        result["completed_chains"] = completed_chains
+
+        # Identify notable completed chains
+        notable = []
+        for chain in completed_chains:
+            chain_lower = chain.lower()
+            for key, name in self.NOTABLE_CHAINS.items():
+                if key in chain_lower:
+                    notable.append(name)
+                    break
+        result["notable_completed"] = list(set(notable))
+
+        # For active projects, we still need regex due to nested block structure
+        # (special_project entries are complex blocks, not simple key=value)
         player_chunk = self._find_player_country_content(player_id)
-        completed_chains = []
         if player_chunk:
-            # Extract active special projects
             active_projects = self._extract_active_projects(player_chunk)
             result["active_projects"] = active_projects
             result["active_count"] = len(active_projects)
@@ -114,20 +126,6 @@ class ProjectsMixin:
                 ]
                 if days_list:
                     result["soonest_completion"] = min(days_list)
-
-            # Extract completed event chains (uses regex due to duplicate keys)
-            completed_chains = self._extract_completed_chains(player_chunk)
-            result["completed_chains"] = completed_chains
-
-            # Identify notable completed chains
-            notable = []
-            for chain in completed_chains:
-                chain_lower = chain.lower()
-                for key, name in self.NOTABLE_CHAINS.items():
-                    if key in chain_lower:
-                        notable.append(name)
-                        break
-            result["notable_completed"] = list(set(notable))
 
         # Extract precursor progress from flags (Rust handles this well)
         # Pass completed chains to check for completed precursor homeworlds
