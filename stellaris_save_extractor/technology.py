@@ -9,12 +9,13 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
 
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,8 @@ class TechnologyMixin:
     def get_technology(self) -> dict:
         """Get the player's technology research status.
 
-        Uses Rust parser for structured data (queues, alternatives, budget),
-        falls back to regex for researched techs due to duplicate key issue.
+        Uses Rust session for parsed dict access when available,
+        falls back to regex for non-session use.
 
         Returns:
             Dict with detailed technology tracking including:
@@ -36,33 +37,25 @@ class TechnologyMixin:
             - research_speed: Monthly research income by category
             - available_techs: Technologies available for research by category
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_technology_rust()
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for technology: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback: regex-based parsing
+        # Use Rust-optimized version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_technology_rust()
         return self._get_technology_regex()
 
     def _get_technology_rust(self) -> dict:
-        """Get technology using Rust parser.
+        """Get technology using Rust session.
 
-        Note: Uses hybrid approach - Rust for structured data (queues, alternatives,
-        budget), but regex for researched techs list because the Clausewitz format
-        has duplicate keys (technology="x" repeated) which the Rust parser doesn't
-        handle correctly (only keeps last value).
+        Uses get_duplicate_values for researched techs (handles duplicate keys)
+        and parsed dict access for queues, alternatives, and budget.
 
         Returns:
             Dict with technology status
         """
+        session = _get_active_session()
+        if not session:
+            return self._get_technology_regex()
+
         result = {
             "completed_count": 0,
             "researched_techs": [],
@@ -87,8 +80,8 @@ class TechnologyMixin:
             result["error"] = "Could not find tech_status section"
             return result
 
-        # Extract researched techs using regex (Rust only returns last tech due to duplicate keys)
-        technologies = self._extract_researched_techs_regex()
+        # Extract researched techs using get_duplicate_values (handles duplicate keys correctly)
+        technologies = session.get_duplicate_values("country", str(player_id), "technology")
         result["researched_techs"] = sorted(list(set(technologies)))
         result["completed_count"] = len(result["researched_techs"])
 
