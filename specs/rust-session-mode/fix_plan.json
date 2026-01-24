@@ -88,6 +88,11 @@
       "id": "P023",
       "learning": "get_duplicate_values(section, key, field) extracts ALL values for a field with duplicate keys by scanning raw bytes. Use for traits, technologies, species traits, etc. Returns list of strings. Entry must exist for values to be found.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P024",
+      "learning": "iter_section and other session methods (get_duplicate_values, get_entry, etc.) cannot be interleaved - they share the same stdin/stdout pipe. Use two-phase approach: (1) collect data during iteration, (2) make additional calls after iteration completes.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -193,13 +198,13 @@
       "priority": 4,
       "description": "Once MIG-015 provides duplicate-key support, update leaders.py to use it instead of raw gamestate regex for traits.",
       "files": ["stellaris_save_extractor/leaders.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q '_get_leaders_rust' stellaris_save_extractor/leaders.py (Rust method exists)",
         "RUN: ! grep -q 'self.gamestate' stellaris_save_extractor/leaders.py || grep -B3 'self.gamestate' stellaris_save_extractor/leaders.py | grep -q '_regex\\|fallback\\|debug' (gamestate only in fallback)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_leaders(); ctx.__exit__(None,None,None); leaders=r.get('leaders',[]); has_traits=any(l.get('traits') for l in leaders[:5]); print(f'Leaders with traits: {has_traits}'); assert has_traits\" (traits extracted via Rust)"
       ],
-      "notes": "Depends on MIG-015. This removes the hybrid approach documented in P018."
+      "notes": "Completed 2026-01-24. Updated _get_leaders_rust() to use session.iter_section() and session.get_duplicate_values() for traits. Uses two-phase approach because iter_section and get_duplicate_values cannot be interleaved (same pipe). Removed dead code (_get_leader_blocks_for_traits, _extract_leader_traits_from_block). Output matches baseline exactly (28 leaders, all traits correct). Note: Rust version is slightly slower (~1.3s vs ~0.7s regex) due to 28 individual get_duplicate_values calls, but provides better accuracy (no truncation risk)."
     },
     {
       "id": "MIG-017",

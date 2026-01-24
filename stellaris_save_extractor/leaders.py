@@ -8,11 +8,12 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -23,33 +24,33 @@ class LeadersMixin:
     def get_leaders(self) -> dict:
         """Get the player's leader information.
 
-        Uses Rust parser for fast extraction when available, falls back to regex.
+        Uses Rust session for fast extraction when available, falls back to regex.
 
         Returns:
             Dict with leader details including scientists, admirals, generals, governors
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_leaders_rust()
-            except ParserError as e:
-                logger.warning(f"Rust parser failed for leaders: {e}, falling back to regex")
-            except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
-
-        # Fallback: regex-based parsing
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_leaders_rust()
         return self._get_leaders_regex()
 
     def _get_leaders_rust(self) -> dict:
-        """Get leaders using Rust parser.
+        """Rust-optimized leader extraction using session methods.
 
-        Note: Uses hybrid approach - Rust for main iteration, but extracts traits
-        using regex because the Clausewitz format has duplicate keys for traits
-        which the JSON-style Rust parser doesn't handle correctly.
+        Uses iter_section for leader iteration and get_duplicate_values for traits.
+        No self.gamestate access needed - all data from Rust session.
+
+        Note: Uses two-phase approach because iter_section and get_duplicate_values
+        cannot be interleaved (both use the same stdin/stdout pipe).
 
         Returns:
             Dict with leader details
         """
+        session = _get_active_session()
+        if not session:
+            return self._get_leaders_regex()
+
         result = {
             'leaders': [],
             'count': 0,
@@ -57,15 +58,13 @@ class LeadersMixin:
         }
 
         player_id = self.get_player_empire_id()
-        leaders_found = []
         class_counts = {}
 
-        # Get leader blocks from gamestate for traits extraction (Rust parser
-        # only returns last trait because of duplicate keys)
-        leader_blocks = self._get_leader_blocks_for_traits()
-
-        # Iterate over leaders section using Rust parser
-        for leader_id, leader_data in iter_section_entries(self.gamestate_path, "leaders"):
+        # Phase 1: Iterate and collect player leader data
+        # (can't call get_duplicate_values during iter_section - same pipe)
+        player_leaders_data = []
+        for leader_id, leader_data in session.iter_section("leaders"):
+            # P010: entry might be string "none" for deleted entries
             if not isinstance(leader_data, dict):
                 continue
 
@@ -74,13 +73,19 @@ class LeadersMixin:
             if country_id is None or int(country_id) != player_id:
                 continue
 
-            # Extract class
+            # P011: Extract class using .get() with defaults
             leader_class = leader_data.get("class")
             if not leader_class:
                 continue
 
+            # Store leader data for phase 2
+            player_leaders_data.append((str(leader_id), leader_data, leader_class))
+
+        # Phase 2: Build leader info with traits (get_duplicate_values calls)
+        leaders_found = []
+        for leader_id, leader_data, leader_class in player_leaders_data:
             leader_info = {
-                'id': str(leader_id),
+                'id': leader_id,
                 'class': leader_class,
             }
 
@@ -89,7 +94,7 @@ class LeadersMixin:
             if name:
                 leader_info['name'] = name
 
-            # Extract level
+            # P012: Extract level, handle type variations
             level = leader_data.get("level")
             if level is not None:
                 leader_info['level'] = int(level)
@@ -99,8 +104,8 @@ class LeadersMixin:
             if age is not None:
                 leader_info['age'] = int(age)
 
-            # Extract traits using regex from raw blocks (Rust parser only keeps last value for duplicate keys)
-            traits = self._extract_leader_traits_from_block(leader_blocks.get(str(leader_id), ""))
+            # P023: Use get_duplicate_values for traits (handles duplicate keys)
+            traits = session.get_duplicate_values("leaders", leader_id, "traits")
             if traits:
                 leader_info['traits'] = traits
 
@@ -124,63 +129,6 @@ class LeadersMixin:
         result['by_class'] = class_counts
 
         return result
-
-    def _get_leader_blocks_for_traits(self) -> dict[str, str]:
-        """Extract raw leader blocks from gamestate for trait extraction.
-
-        The Rust parser can't handle duplicate keys (traits="x" repeated multiple times),
-        so we extract raw blocks and parse traits with regex.
-
-        Returns:
-            Dict mapping leader_id (str) to raw block text
-        """
-        blocks = {}
-
-        # Find the leaders section
-        leaders_match = re.search(r'^leaders=\s*\{', self.gamestate, re.MULTILINE)
-        if not leaders_match:
-            return blocks
-
-        start = leaders_match.start()
-        leaders_chunk = self.gamestate[start:start + 3000000]
-
-        # Find each leader block
-        leader_start_pattern = r'\n\t(\d+)=\s*\{(?:\s*\n|\s*$)'
-
-        for match in re.finditer(leader_start_pattern, leaders_chunk):
-            leader_id = match.group(1)
-            block_start = match.start() + 1
-
-            # Find the end of this block by counting braces
-            brace_count = 0
-            block_end = block_start
-            started = False
-            for i, char in enumerate(leaders_chunk[block_start:block_start + 5000], block_start):
-                if char == '{':
-                    brace_count += 1
-                    started = True
-                elif char == '}':
-                    brace_count -= 1
-                    if started and brace_count == 0:
-                        block_end = i + 1
-                        break
-
-            blocks[leader_id] = leaders_chunk[block_start:block_end]
-
-        return blocks
-
-    def _extract_leader_traits_from_block(self, block: str) -> list[str]:
-        """Extract all traits from a raw leader block using regex.
-
-        Args:
-            block: Raw text of leader block
-
-        Returns:
-            List of trait strings
-        """
-        if not block:
-            return []
-        return re.findall(r'traits="([^"]+)"', block)
 
     def _extract_leader_name_rust(self, leader_data: dict) -> str | None:
         """Extract leader name from Rust-parsed leader data.
