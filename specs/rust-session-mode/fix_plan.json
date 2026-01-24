@@ -93,6 +93,11 @@
       "id": "P024",
       "learning": "iter_section and other session methods (get_duplicate_values, get_entry, etc.) cannot be interleaved - they share the same stdin/stdout pipe. Use two-phase approach: (1) collect data during iteration, (2) make additional calls after iteration completes.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P025",
+      "learning": "batch_ops() sends multiple ops in one request: {op: 'multi', ops: [...]}. Returns list of results in same order. Use for many small queries (get_entry, count_keys) to avoid IPC round-trip latency. Does NOT support iter_section (streaming) or close.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -212,14 +217,14 @@
       "priority": 4,
       "description": "Reduce IPC overhead by allowing multiple operations in one request. One send → many results instead of 3590 round-trips.",
       "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'multi_op\\|batch_ops\\|MultiRequest' stellaris-parser/src/commands/serve.rs (multi-op support exists)",
         "RUN: grep -q 'multi_op\\|batch_ops\\|send_batch' rust_bridge.py (Python wrapper exists)",
         "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
         "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); print('Multi-op test'); s.close()\" (bridge works)"
       ],
-      "notes": "Request format: {op: 'multi', ops: [{op: 'get_entry', ...}, {op: 'count_keys', ...}]}. Response: {results: [...]}."
+      "notes": "Completed 2026-01-24. Added Multi request type to serve.rs with MultiOp enum supporting all non-streaming ops. Python wrapper batch_ops() sends {op: 'multi', ops: [...]} and returns results list. Enables N operations in one IPC round-trip."
     },
     {
       "id": "MIG-018",

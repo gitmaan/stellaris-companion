@@ -38,7 +38,33 @@ enum Request {
         key: String,
         field: String,
     },
+    /// Batch multiple operations in a single request to reduce IPC overhead
+    Multi { ops: Vec<MultiOp> },
     Close,
+}
+
+/// Operations that can be batched in a multi-op request.
+/// Note: IterSection and Close are excluded as they have special handling requirements.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case")]
+enum MultiOp {
+    ExtractSections { sections: Vec<String> },
+    GetEntry { section: String, key: String },
+    GetEntries {
+        section: String,
+        keys: Vec<String>,
+        #[serde(default)]
+        fields: Option<Vec<String>>,
+    },
+    CountKeys { keys: Vec<String> },
+    ContainsTokens { tokens: Vec<String> },
+    ContainsKv { pairs: Vec<(String, String)> },
+    GetCountrySummaries { fields: Vec<String> },
+    GetDuplicateValues {
+        section: String,
+        key: String,
+        field: String,
+    },
 }
 
 /// Default batch size for iter_section (100 entries per message)
@@ -102,6 +128,10 @@ enum ResponseData {
     DuplicateValues {
         values: Vec<String>,
         found: bool,
+    },
+    /// Results from a multi-op batch request
+    MultiResults {
+        results: Vec<Value>,
     },
 }
 
@@ -651,6 +681,268 @@ fn handle_get_duplicate_values(
     })
 }
 
+/// Handle multi-op batch request - execute multiple operations in one request
+/// to reduce IPC round-trip overhead.
+///
+/// Returns results in the same order as the input operations.
+fn handle_multi_op(parsed: &ParsedSave, ops: Vec<MultiOp>) -> io::Result<()> {
+    let mut results: Vec<Value> = Vec::with_capacity(ops.len());
+
+    for op in ops {
+        let result = match op {
+            MultiOp::ExtractSections { sections } => {
+                let data = parsed.extract_sections(&sections);
+                json!({ "data": data })
+            }
+            MultiOp::GetEntry { section, key } => {
+                if let Some(section_value) = parsed.gamestate.get(&section) {
+                    if let Value::Object(map) = section_value {
+                        if let Some(entry_value) = map.get(&key) {
+                            json!({ "entry": entry_value, "found": true })
+                        } else {
+                            json!({ "entry": Value::Null, "found": false })
+                        }
+                    } else {
+                        json!({ "entry": Value::Null, "found": false })
+                    }
+                } else {
+                    json!({ "entry": Value::Null, "found": false })
+                }
+            }
+            MultiOp::GetEntries { section, keys, fields } => {
+                let mut entries: Vec<Value> = Vec::new();
+                if let Some(section_value) = parsed.gamestate.get(&section) {
+                    if let Value::Object(map) = section_value {
+                        for key in &keys {
+                            if let Some(entry_value) = map.get(key) {
+                                let projected = if let Some(ref field_list) = fields {
+                                    if let Value::Object(entry_obj) = entry_value {
+                                        let mut projected_obj = Map::new();
+                                        projected_obj.insert("_key".to_string(), json!(key));
+                                        for field in field_list {
+                                            if let Some(field_value) = entry_obj.get(field) {
+                                                projected_obj.insert(field.clone(), field_value.clone());
+                                            }
+                                        }
+                                        Value::Object(projected_obj)
+                                    } else {
+                                        let mut obj = Map::new();
+                                        obj.insert("_key".to_string(), json!(key));
+                                        obj.insert("_value".to_string(), entry_value.clone());
+                                        Value::Object(obj)
+                                    }
+                                } else {
+                                    let mut obj = Map::new();
+                                    obj.insert("_key".to_string(), json!(key));
+                                    obj.insert("_value".to_string(), entry_value.clone());
+                                    Value::Object(obj)
+                                };
+                                entries.push(projected);
+                            }
+                        }
+                    }
+                }
+                json!({ "entries": entries })
+            }
+            MultiOp::CountKeys { keys } => {
+                use std::collections::HashSet;
+                let key_set: HashSet<&str> = keys.iter().map(|s| s.as_str()).collect();
+                let mut counts: HashMap<String, usize> = keys.iter().map(|k| (k.clone(), 0)).collect();
+
+                fn traverse(value: &Value, key_set: &HashSet<&str>, counts: &mut HashMap<String, usize>) {
+                    match value {
+                        Value::Object(map) => {
+                            for (k, v) in map {
+                                if key_set.contains(k.as_str()) {
+                                    *counts.get_mut(k.as_str()).unwrap() += 1;
+                                }
+                                traverse(v, key_set, counts);
+                            }
+                        }
+                        Value::Array(arr) => {
+                            for v in arr {
+                                traverse(v, key_set, counts);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                for section in parsed.gamestate.values() {
+                    traverse(section, &key_set, &mut counts);
+                }
+                json!({ "counts": counts })
+            }
+            MultiOp::ContainsTokens { tokens } => {
+                let mut matches: HashMap<String, bool> = tokens.iter().map(|t| (t.clone(), false)).collect();
+                if !tokens.is_empty() {
+                    let ac = AhoCorasick::new(&tokens).expect("Failed to build Aho-Corasick automaton");
+                    for mat in ac.find_iter(&parsed.gamestate_bytes) {
+                        let pattern_idx = mat.pattern().as_usize();
+                        if pattern_idx < tokens.len() {
+                            matches.insert(tokens[pattern_idx].clone(), true);
+                        }
+                    }
+                }
+                json!({ "matches": matches })
+            }
+            MultiOp::ContainsKv { pairs } => {
+                use std::collections::HashSet;
+                let mut key_to_values: HashMap<String, HashSet<String>> = HashMap::new();
+                for (key, value) in &pairs {
+                    key_to_values
+                        .entry(key.clone())
+                        .or_insert_with(HashSet::new)
+                        .insert(value.clone());
+                }
+                let mut matches: HashMap<String, bool> = pairs
+                    .iter()
+                    .map(|(k, v)| (format!("{}={}", k, v), false))
+                    .collect();
+
+                fn traverse_kv(
+                    value: &Value,
+                    key_to_values: &HashMap<String, HashSet<String>>,
+                    matches: &mut HashMap<String, bool>,
+                ) {
+                    match value {
+                        Value::Object(map) => {
+                            for (k, v) in map {
+                                if let Some(target_values) = key_to_values.get(k.as_str()) {
+                                    let value_str = match v {
+                                        Value::String(s) => Some(s.as_str()),
+                                        Value::Number(_) => None,
+                                        Value::Bool(b) => if *b { Some("yes") } else { Some("no") },
+                                        _ => None,
+                                    };
+                                    if let Some(vs) = value_str {
+                                        if target_values.contains(vs) {
+                                            matches.insert(format!("{}={}", k, vs), true);
+                                        }
+                                    }
+                                    if let Value::Number(n) = v {
+                                        let num_str = n.to_string();
+                                        if target_values.contains(&num_str) {
+                                            matches.insert(format!("{}={}", k, num_str), true);
+                                        }
+                                    }
+                                }
+                                traverse_kv(v, key_to_values, matches);
+                            }
+                        }
+                        Value::Array(arr) => {
+                            for v in arr {
+                                traverse_kv(v, key_to_values, matches);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                for section in parsed.gamestate.values() {
+                    traverse_kv(section, &key_to_values, &mut matches);
+                }
+                json!({ "matches": matches })
+            }
+            MultiOp::GetCountrySummaries { fields } => {
+                let mut countries: Vec<Value> = Vec::new();
+                if let Some(country_section) = parsed.gamestate.get("country") {
+                    if let Value::Object(country_map) = country_section {
+                        for (country_id, country_data) in country_map {
+                            let mut summary = Map::new();
+                            summary.insert("id".to_string(), json!(country_id));
+                            if let Value::Object(country_obj) = country_data {
+                                for field in &fields {
+                                    if let Some(value) = country_obj.get(field) {
+                                        summary.insert(field.clone(), value.clone());
+                                    }
+                                }
+                            }
+                            countries.push(Value::Object(summary));
+                        }
+                    }
+                }
+                json!({ "countries": countries })
+            }
+            MultiOp::GetDuplicateValues { section, key, field } => {
+                // Delegate to the raw bytes scanning logic
+                // Note: We inline a simplified version here to avoid io::Result handling
+                let mut values: Vec<String> = Vec::new();
+                let mut found = false;
+
+                let content = String::from_utf8_lossy(&parsed.gamestate_bytes);
+                let section_pattern = format!("\n{}=", section);
+                if let Some(section_start) = content.find(&section_pattern) {
+                    let section_content_start = match content[section_start..].find('{') {
+                        Some(pos) => section_start + pos + 1,
+                        None => {
+                            results.push(json!({ "values": values, "found": false }));
+                            continue;
+                        }
+                    };
+
+                    let entry_patterns = [
+                        format!("\n\t{}=\n\t{{", key),
+                        format!("\n\t{}={{", key),
+                        format!("\n\t{} =", key),
+                    ];
+
+                    let mut entry_start: Option<usize> = None;
+                    for pattern in &entry_patterns {
+                        if let Some(pos) = content[section_content_start..].find(pattern) {
+                            entry_start = Some(section_content_start + pos);
+                            break;
+                        }
+                    }
+
+                    if let Some(start) = entry_start {
+                        found = true;
+                        let entry_content = &content[start..];
+                        let mut brace_count = 0;
+                        let mut entry_end = entry_content.len();
+                        let mut in_entry = false;
+
+                        for (i, ch) in entry_content.chars().enumerate() {
+                            if ch == '{' {
+                                brace_count += 1;
+                                in_entry = true;
+                            } else if ch == '}' {
+                                brace_count -= 1;
+                                if in_entry && brace_count == 0 {
+                                    entry_end = i + 1;
+                                    break;
+                                }
+                            }
+                        }
+
+                        let entry_block = &entry_content[..entry_end];
+                        let field_pattern = format!("{}=\"", field);
+                        let mut search_pos = 0;
+
+                        while let Some(field_start) = entry_block[search_pos..].find(&field_pattern) {
+                            let value_start = search_pos + field_start + field_pattern.len();
+                            if let Some(value_end) = entry_block[value_start..].find('"') {
+                                let value = &entry_block[value_start..value_start + value_end];
+                                values.push(value.to_string());
+                                search_pos = value_start + value_end + 1;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+                json!({ "values": values, "found": found })
+            }
+        };
+        results.push(result);
+    }
+
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::MultiResults { results },
+    })
+}
+
 /// Main serve loop
 pub fn run(path: &str) -> Result<()> {
     // Log startup to stderr (stdout is reserved for protocol)
@@ -739,6 +1031,9 @@ pub fn run(path: &str) -> Result<()> {
             }
             Request::GetDuplicateValues { section, key, field } => {
                 handle_get_duplicate_values(&parsed.gamestate_bytes, section, key, field)
+            }
+            Request::Multi { ops } => {
+                handle_multi_op(&parsed, ops)
             }
             Request::Close => {
                 eprintln!("[serve] Received close request, shutting down");
@@ -917,6 +1212,53 @@ mod tests {
                 assert_eq!(section, "leaders");
                 assert_eq!(key, "123");
                 assert_eq!(field, "traits");
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_multi_op_request() {
+        let json = r#"{"op": "multi", "ops": [{"op": "get_entry", "section": "country", "key": "0"}, {"op": "count_keys", "keys": ["name"]}]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::Multi { ops } => {
+                assert_eq!(ops.len(), 2);
+                match &ops[0] {
+                    MultiOp::GetEntry { section, key } => {
+                        assert_eq!(section, "country");
+                        assert_eq!(key, "0");
+                    }
+                    _ => panic!("Wrong op type for first op"),
+                }
+                match &ops[1] {
+                    MultiOp::CountKeys { keys } => {
+                        assert_eq!(keys, &vec!["name"]);
+                    }
+                    _ => panic!("Wrong op type for second op"),
+                }
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_multi_op_all_types() {
+        // Test that all MultiOp variants can be parsed
+        let json = r#"{"op": "multi", "ops": [
+            {"op": "extract_sections", "sections": ["meta"]},
+            {"op": "get_entry", "section": "country", "key": "0"},
+            {"op": "get_entries", "section": "country", "keys": ["0", "1"]},
+            {"op": "count_keys", "keys": ["name"]},
+            {"op": "contains_tokens", "tokens": ["test"]},
+            {"op": "contains_kv", "pairs": [["key", "value"]]},
+            {"op": "get_country_summaries", "fields": ["name"]},
+            {"op": "get_duplicate_values", "section": "leaders", "key": "0", "field": "traits"}
+        ]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::Multi { ops } => {
+                assert_eq!(ops.len(), 8);
             }
             _ => panic!("Wrong request type"),
         }

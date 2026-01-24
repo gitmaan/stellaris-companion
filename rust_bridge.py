@@ -495,6 +495,53 @@ class RustSession:
         response = self._recv()
         return response.get("values", [])
 
+    def batch_ops(self, ops: list[dict]) -> list[dict]:
+        """Execute multiple operations in a single request to reduce IPC overhead.
+
+        This is useful when you need to make many small queries (e.g., get_entry,
+        count_keys) and want to avoid the round-trip latency for each one.
+
+        Args:
+            ops: List of operation dicts, each with an "op" key and operation-specific
+                 parameters. Supported operations:
+                 - {"op": "extract_sections", "sections": [...]}
+                 - {"op": "get_entry", "section": "...", "key": "..."}
+                 - {"op": "get_entries", "section": "...", "keys": [...], "fields": [...]}
+                 - {"op": "count_keys", "keys": [...]}
+                 - {"op": "contains_tokens", "tokens": [...]}
+                 - {"op": "contains_kv", "pairs": [[key, value], ...]}
+                 - {"op": "get_country_summaries", "fields": [...]}
+                 - {"op": "get_duplicate_values", "section": "...", "key": "...", "field": "..."}
+
+                 Note: iter_section and close are NOT supported in batch mode.
+
+        Returns:
+            List of result dicts, one per operation in the same order as input.
+            Each result contains the same data as the corresponding single operation
+            would return (e.g., {"entry": ..., "found": true} for get_entry).
+
+        Example:
+            >>> results = sess.batch_ops([
+            ...     {"op": "get_entry", "section": "country", "key": "0"},
+            ...     {"op": "get_entry", "section": "country", "key": "1"},
+            ...     {"op": "count_keys", "keys": ["name", "type"]}
+            ... ])
+            >>> country_0 = results[0]["entry"]
+            >>> country_1 = results[1]["entry"]
+            >>> name_count = results[2]["counts"]["name"]
+
+        Performance:
+            Sending N operations as a batch is significantly faster than N individual
+            calls, especially for small operations like get_entry. The speedup comes
+            from eliminating IPC round-trip latency (typically 1-5ms per call).
+        """
+        if not ops:
+            return []
+
+        self._send({"op": "multi", "ops": ops})
+        response = self._recv()
+        return response.get("results", [])
+
     def close(self):
         """Close the session and terminate the subprocess."""
         if self._closed:
