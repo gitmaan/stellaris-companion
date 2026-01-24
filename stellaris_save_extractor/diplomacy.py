@@ -2034,6 +2034,133 @@ class DiplomacyMixin:
               - player_claims_count: Number of systems player has claimed
               - claims_against_count: Number of claims against player
         """
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_claims_rust()
+        return self._get_claims_regex()
+
+    def _get_claims_rust(self) -> dict:
+        """Rust-optimized version using iter_section('galactic_object').
+
+        Uses direct parsed JSON access instead of regex on raw gamestate.
+        Benefits:
+        - No regex parsing on raw text
+        - No truncation limits (10MB chunk limit in regex version)
+        - Handles nested structures correctly
+        - Uses sectors data for accurate system ownership (vs missing starbase_owner)
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_claims_regex()
+
+        result = {
+            "player_claims": [],
+            "claims_against_player": [],
+            "player_claims_count": 0,
+            "claims_against_count": 0,
+        }
+
+        player_id = self.get_player_empire_id()
+
+        # Build system -> owner mapping from sectors
+        # This is more reliable than the regex starbase_owner approach
+        system_owners: dict[str, int] = {}
+        sectors_data = session.extract_sections(["sectors"])
+        sectors = sectors_data.get("sectors")
+        if sectors and isinstance(sectors, dict):
+            for sector_id, sector_data in sectors.items():
+                if not isinstance(sector_data, dict):
+                    continue
+                owner = sector_data.get("owner")
+                systems = sector_data.get("systems", [])
+                if owner is not None and isinstance(systems, list):
+                    try:
+                        owner_id = int(owner)
+                        for sys_id in systems:
+                            system_owners[str(sys_id)] = owner_id
+                    except (ValueError, TypeError):
+                        continue
+
+        player_claims: list[dict] = []
+        claims_against: list[dict] = []
+
+        # Iterate galactic_object to find all systems with claims
+        for sys_id, sys_data in session.iter_section("galactic_object"):
+            # P010: Entry might be string "none" (deleted)
+            if not isinstance(sys_data, dict):
+                continue
+
+            claims = sys_data.get("claims")
+            if not claims or not isinstance(claims, list):
+                continue
+
+            # Get system name
+            name_data = sys_data.get("name")
+            if isinstance(name_data, dict):
+                system_name = name_data.get("key", f"System {sys_id}")
+            elif isinstance(name_data, str):
+                system_name = name_data
+            else:
+                system_name = f"System {sys_id}"
+
+            # Get system owner from our sectors map
+            system_owner = system_owners.get(str(sys_id))
+
+            # Process each claim entry
+            for claim in claims:
+                if not isinstance(claim, dict):
+                    continue
+
+                claim_owner = claim.get("owner")
+                if claim_owner is None:
+                    continue
+
+                try:
+                    claim_owner_id = int(claim_owner)
+                except (ValueError, TypeError):
+                    continue
+
+                # Skip if owner is 4294967295 (none)
+                if claim_owner_id == 4294967295:
+                    continue
+
+                claim_date = claim.get("date")
+                claim_strength_raw = claim.get("claims")
+                try:
+                    strength = int(claim_strength_raw) if claim_strength_raw else 1
+                except (ValueError, TypeError):
+                    strength = 1
+
+                claim_info = {
+                    "system_id": str(sys_id),
+                    "system_name": system_name,
+                    "claimant_id": claim_owner_id,
+                    "date": claim_date if isinstance(claim_date, str) else None,
+                    "strength": strength,
+                }
+
+                # Is this player claiming someone else's system?
+                if claim_owner_id == player_id:
+                    claim_info["current_owner"] = system_owner
+                    player_claims.append(claim_info)
+                # Is this someone claiming a player-owned system?
+                elif system_owner == player_id:
+                    claims_against.append(claim_info)
+
+        # Sort by system name for readability
+        player_claims.sort(key=lambda x: x.get("system_name", ""))
+        claims_against.sort(key=lambda x: x.get("system_name", ""))
+
+        result["player_claims"] = player_claims
+        result["claims_against_player"] = claims_against
+        result["player_claims_count"] = len(player_claims)
+        result["claims_against_count"] = len(claims_against)
+
+        return result
+
+    def _get_claims_regex(self) -> dict:
+        """Original regex implementation - fallback for non-session use."""
         result = {
             "player_claims": [],
             "claims_against_player": [],
