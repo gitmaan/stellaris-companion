@@ -71,6 +71,9 @@ def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, An
     # Extract galaxy settings (static per game but needed for milestone events)
     signals["galaxy_settings"] = _extract_galaxy_settings_signals(extractor)
 
+    # Extract systems count (number of controlled systems via starbases)
+    signals["systems"] = _extract_systems_signals(extractor)
+
     return signals
 
 
@@ -855,3 +858,51 @@ def _extract_galaxy_settings_rust(session) -> dict[str, Any]:
     except Exception:
         # On any error, return empty dict (gamestate fallback in history.py)
         return {}
+
+
+def _extract_systems_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract systems count for the player empire.
+
+    Uses extractor.get_starbases() which is already Rust-backed.
+    Each starbase represents a controlled system, so the starbase count
+    gives us the player's system count.
+
+    Returns format compatible with events.py _extract_system_count():
+        Dict with:
+        - player_id: int | None
+        - count: int (number of controlled systems)
+        - by_level: dict mapping starbase level to count
+    """
+    # Get player ID
+    try:
+        player_id = extractor.get_player_empire_id()
+    except Exception:
+        player_id = None
+
+    # Get starbases data - each starbase represents a controlled system
+    raw = extractor.get_starbases()
+
+    if not isinstance(raw, dict):
+        return {
+            'player_id': player_id,
+            'count': 0,
+            'by_level': {},
+        }
+
+    # Get count from starbases data
+    count = raw.get('count', 0)
+    try:
+        count = int(count)
+    except (ValueError, TypeError):
+        count = 0
+
+    # Get breakdown by starbase level (useful for expansion milestones)
+    by_level = raw.get('by_level', {})
+    if not isinstance(by_level, dict):
+        by_level = {}
+
+    return {
+        'player_id': player_id,
+        'count': count,
+        'by_level': by_level,
+    }
