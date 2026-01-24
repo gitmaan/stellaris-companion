@@ -47,6 +47,9 @@ def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, An
     # Extract war signals
     signals["wars"] = _extract_war_signals(extractor)
 
+    # Extract diplomacy signals
+    signals["diplomacy"] = _extract_diplomacy_signals(extractor)
+
     return signals
 
 
@@ -162,4 +165,115 @@ def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         'player_at_war': player_at_war,
         'count': len(war_names),
         'wars': war_names,
+    }
+
+
+def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract normalized diplomacy data for history diffing.
+
+    Uses extractor.get_diplomacy() which provides comprehensive diplomatic data
+    including allies, rivals, and various treaty types.
+
+    Returns format compatible with events.py _extract_diplomacy_sets():
+        Dict with:
+        - player_id: int
+        - allies: list of country IDs (sorted)
+        - rivals: list of country IDs (sorted)
+        - treaties: dict mapping treaty type to list of country IDs
+    """
+    raw = extractor.get_diplomacy()
+
+    if not isinstance(raw, dict):
+        return {
+            'player_id': None,
+            'allies': [],
+            'rivals': [],
+            'treaties': {},
+        }
+
+    # Extract player ID from extractor
+    try:
+        player_id = extractor.get_player_empire_id()
+    except Exception:
+        player_id = None
+
+    # Helper to extract country IDs from list of {id, name} dicts
+    def extract_ids(items: Any) -> list[int]:
+        if not isinstance(items, list):
+            return []
+        ids: list[int] = []
+        for item in items:
+            if isinstance(item, dict):
+                cid = item.get('id')
+                if cid is not None:
+                    try:
+                        ids.append(int(cid))
+                    except (ValueError, TypeError):
+                        continue
+            elif isinstance(item, (int, str)):
+                try:
+                    ids.append(int(item))
+                except (ValueError, TypeError):
+                    continue
+        return sorted(ids)
+
+    # Extract allies and rivals as sorted ID lists
+    allies = extract_ids(raw.get('allies', []))
+    rivals = extract_ids(raw.get('rivals', []))
+
+    # Build treaties dict matching history.py format
+    # Maps treaty type to list of country IDs
+    treaties: dict[str, list[int]] = {}
+
+    # Map from get_diplomacy() keys to treaty type names used in events.py
+    treaty_mappings = [
+        ('defensive_pacts', 'defensive_pact'),
+        ('non_aggression_pacts', 'non_aggression_pact'),
+        ('commercial_pacts', 'commercial_pact'),
+        ('migration_treaties', 'migration_treaty'),
+        ('sensor_links', 'sensor_link'),
+    ]
+
+    for source_key, treaty_name in treaty_mappings:
+        ids = extract_ids(raw.get(source_key, []))
+        if ids:
+            treaties[treaty_name] = ids
+
+    # Also check treaties list for research_agreement and embassy
+    # which may not have their own top-level keys
+    raw_treaties = raw.get('treaties', [])
+    if isinstance(raw_treaties, list):
+        research_ids: list[int] = []
+        embassy_ids: list[int] = []
+        truce_ids: list[int] = []
+
+        for t in raw_treaties:
+            if not isinstance(t, dict):
+                continue
+            treaty_type = t.get('type')
+            cid = t.get('country_id')
+            if treaty_type and cid is not None:
+                try:
+                    cid_int = int(cid)
+                    if treaty_type == 'research_agreement':
+                        research_ids.append(cid_int)
+                    elif treaty_type == 'embassy':
+                        embassy_ids.append(cid_int)
+                    elif treaty_type == 'truce':
+                        truce_ids.append(cid_int)
+                except (ValueError, TypeError):
+                    continue
+
+        if research_ids:
+            treaties['research_agreement'] = sorted(set(research_ids))
+        if embassy_ids:
+            treaties['embassy'] = sorted(set(embassy_ids))
+        if truce_ids:
+            treaties['truce'] = sorted(set(truce_ids))
+
+    return {
+        'player_id': player_id,
+        'allies': allies,
+        'rivals': rivals,
+        'treaties': treaties,
     }

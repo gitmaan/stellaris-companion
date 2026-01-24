@@ -38,6 +38,11 @@
       "id": "UHE-P007",
       "learning": "Event name resolution: _get_leader_name() helper in events.py provides fallback chain (name → name_key with cleanup → #id). Cleanup matches _extract_leader_name_rust() patterns (_CHR_, NAME_ prefix). Event data should include both 'name' and 'name_key' for debugging.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P008",
+      "learning": "Diplomacy signals format: get_diplomacy() returns allies/rivals as lists of {id, name} dicts and treaty lists (defensive_pacts, commercial_pacts, etc.). Signals normalizes to sorted int lists matching history.py format for events.py compatibility.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -132,13 +137,13 @@
       "priority": 3,
       "description": "Extend build_snapshot_signals to include diplomacy using extractor.get_diplomacy(). Normalize allies/rivals/treaties to stable ID sets.",
       "files": ["backend/core/signals.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_diplomacy' backend/core/signals.py (uses extractor method)",
         "RUN: grep -q \"'diplomacy'\\|'allies'\\|'rivals'\" backend/core/signals.py (includes diplomacy fields)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); print(f'Diplomacy keys: {list(s.get(\\\"diplomacy\\\", {}).keys())}')\" (diplomacy extraction works)"
       ],
-      "notes": "Diplomacy includes allies (country IDs), rivals (country IDs), treaties by type. Uses stable IDs for reliable diffs."
+      "notes": "Diplomacy includes allies (country IDs), rivals (country IDs), treaties by type. Uses stable IDs for reliable diffs. Normalized format matches extract_player_diplomacy_from_gamestate output for events.py compatibility."
     },
     {
       "id": "UHE-008",
