@@ -7,31 +7,31 @@ import { useBackend, ChatResponse, isChatRetryResponse, EmpireType } from '../ho
 // Themed loading messages for different empire types
 const LOADING_MESSAGES = {
   universal: [
-    'Consulting the Curators...',
-    'Surveying the situation...',
-    'Analyzing sensor data...',
-    'Processing anomaly...',
-    'Compiling situation report...',
-    'Running simulations...',
-    'Accessing the archives...',
-    'Cross-referencing star charts...',
+    'Consulting the Curators',
+    'Surveying the situation',
+    'Analyzing sensor data',
+    'Processing anomaly',
+    'Compiling situation report',
+    'Running simulations',
+    'Accessing the archives',
+    'Cross-referencing star charts',
     // Easter eggs
-    'Waiting for end-game lag to clear...',
-    'Checking if the Fallen Empire noticed...',
-    'Consulting the Shroud...',
-    'What was, will be...',
+    'Waiting for end-game lag to clear',
+    'Checking if the Fallen Empire noticed',
+    'Consulting the Shroud',
+    'What was, will be',
   ],
   machine: [
-    'Processing directive...',
-    'The network ponders...',
-    'Calculating optimal outcome...',
-    'Querying subroutines...',
+    'Processing directive',
+    'The network ponders',
+    'Calculating optimal outcome',
+    'Querying subroutines',
   ],
   hive_mind: [
-    'The collective considers...',
-    'Syncing with the overmind...',
-    'Assimilating information...',
-    'Consensus forming...',
+    'The collective considers',
+    'Syncing with the overmind',
+    'Assimilating information',
+    'Consensus forming',
   ],
 }
 
@@ -78,7 +78,7 @@ function ChatPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [sessionKey] = useState(() => `chat-${Date.now()}`)
   const [empireType, setEmpireType] = useState<EmpireType | null>(null)
-  const [loadingMessage, setLoadingMessage] = useState<string>('Consulting the Curators...')
+  const [loadingMessage, setLoadingMessage] = useState<string>('Consulting the Curators')
 
   // Track mounted state to prevent state updates after unmount
   const isMountedRef = useRef(true)

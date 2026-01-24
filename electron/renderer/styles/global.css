@@ -121,6 +121,11 @@ body {
   min-height: 40px;
 }
 
+/* Mac: Add left padding to clear traffic lights */
+.platform-mac .status-bar {
+  padding-left: 80px;
+}
+
 .status-bar-left {
   display: flex;
   align-items: center;
@@ -433,6 +438,12 @@ body {
 
 .loading-text {
   font-style: italic;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 /* ============================================
