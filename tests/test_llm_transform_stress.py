@@ -67,7 +67,7 @@ TEST_CASES = [
         "name": "ecumenopolis_pop_growth",
         "question": "I want to maximize pop growth. Should I rush an Ecumenopolis?",
         "bad_patterns": [
-            r"no longer (provide|give|grant|boost)",
+            r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)",
             r"used to",
             r"was changed",
             r"\bpatch\b",
@@ -157,7 +157,7 @@ TEST_CASES = [
         "question": "What's the current meta for pop growth in the late game?",
         "bad_patterns": [
             r"was changed",
-            r"no longer (provide|give)",
+            r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)",
             r"used to",
             r"\bpatch\b",
         ],

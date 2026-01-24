@@ -151,7 +151,7 @@ Mechanics:
     # Check for violations
     violations = []
     bad_patterns = [
-        (r"no longer (provide|give|grant|boost|has)", "no longer [verb]"),
+        (r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)", "no longer [verb]"),
         (r"used to (provide|give|be)", "used to [verb]"),
         (r"was changed", "was changed"),
         (r"since (the )?(patch|update)", "since patch"),

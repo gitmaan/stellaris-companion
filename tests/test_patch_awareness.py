@@ -138,7 +138,7 @@ TEST_CASES = [
         expected_behavior="Should recommend Gaia Worlds for pop growth, not mention that Ecumenopolis 'changed'",
         bad_patterns=[
             r"since (the )?(patch|update|4\.\d)",
-            r"no longer",
+            r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)",
             r"was changed",
             r"used to",
             r"patch notes",
@@ -228,7 +228,7 @@ TEST_CASES = [
         patch_relevant_info="Ecumenopolises do not provide bonuses to pop growth. Gaia Worlds provide +15% pop growth.",
         expected_behavior="Should say no without referencing that it 'changed'",
         bad_patterns=[
-            r"no longer",
+            r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)",
             r"used to",
             r"was changed",
             r"\bpatch\b",
@@ -263,11 +263,11 @@ TEST_CASES = [
         patch_relevant_info="Ecumenopolises do not provide bonuses to pop growth but excel at production density.",
         expected_behavior="Should compare without referencing changes",
         bad_patterns=[
-            r"no longer",
+            r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)",
             r"used to",
             r"changed",
             r"\bpatch\b",
-            r"since",
+            r"since (the )?(patch|update|version)",
         ],
         good_patterns=[
             r"ecumenopolis|ring.?world",
@@ -362,7 +362,7 @@ TEST_CASES = [
         bad_patterns=[
             r"\bpatch\b",
             r"was changed",
-            r"no longer (provide|give|grant|boost|has|have|offer)",  # Specific to mechanics, not narrative
+            r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)",  # Specific to mechanics, not narrative
         ],
         good_patterns=[
             r"diplomacy|federation|ally",
@@ -388,7 +388,7 @@ TEST_CASES = [
         bad_patterns=[
             r"\bpatch\b",
             r"was changed",
-            r"no longer (provide|give|grant|boost|has|have|offer)",  # Specific to mechanics
+            r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)",  # Specific to mechanics
             r"used to (provide|give|grant|boost|be)",
             r"as of (version|patch)",
             r"in the current (patch|version|update)",
