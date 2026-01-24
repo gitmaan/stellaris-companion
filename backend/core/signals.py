@@ -59,6 +59,9 @@ def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, An
     # Extract crisis signals
     signals["crisis"] = _extract_crisis_signals(extractor)
 
+    # Extract fallen empires signals
+    signals["fallen_empires"] = _extract_fallen_empires_signals(extractor)
+
     return signals
 
 
@@ -552,3 +555,107 @@ def _extract_crisis_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         result['crisis_types_detected'] = crisis_types
 
     return result
+
+
+def _extract_fallen_empires_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract normalized fallen empires data for history diffing.
+
+    Uses extractor.get_fallen_empires() which provides comprehensive data
+    about dormant and awakened fallen empires in the galaxy.
+
+    Returns format compatible with events.py _extract_fallen_empires():
+        Dict with:
+        - fallen_empires: list of dicts with name, status, ethics, military_power, archetype
+        - dormant_count: int
+        - awakened_count: int
+        - war_in_heaven: bool
+    """
+    raw = extractor.get_fallen_empires()
+
+    if not isinstance(raw, dict):
+        return {
+            'fallen_empires': [],
+            'dormant_count': 0,
+            'awakened_count': 0,
+            'war_in_heaven': False,
+        }
+
+    # Extract fallen empires list
+    raw_fe_list = raw.get('fallen_empires', [])
+    if not isinstance(raw_fe_list, list):
+        raw_fe_list = []
+
+    # Normalize to format expected by events.py _extract_fallen_empires()
+    # events.py keys by name and checks: status, archetype, military_power, ethics
+    normalized: list[dict[str, Any]] = []
+
+    for fe in raw_fe_list:
+        if not isinstance(fe, dict):
+            continue
+
+        # Get name - required field for events.py keying
+        name = fe.get('name')
+        if not name:
+            continue
+
+        entry: dict[str, Any] = {
+            'name': name,
+            'status': fe.get('status', 'dormant'),
+            'archetype': fe.get('archetype', 'Unknown'),
+        }
+
+        # Include military power if available
+        mil_power = fe.get('military_power')
+        if mil_power is not None:
+            try:
+                entry['military_power'] = float(mil_power)
+            except (ValueError, TypeError):
+                pass
+
+        # Include ethics if available
+        ethics = fe.get('ethics')
+        if ethics is not None:
+            # May be a string or list depending on source
+            if isinstance(ethics, list):
+                entry['ethics'] = ethics
+            elif isinstance(ethics, str):
+                entry['ethics'] = [ethics]
+
+        # Include country_id for detailed tracking (useful for events/narrative)
+        cid = fe.get('country_id')
+        if cid is not None:
+            try:
+                entry['country_id'] = int(cid)
+            except (ValueError, TypeError):
+                pass
+
+        normalized.append(entry)
+
+    # Get counts from raw data or compute from normalized list
+    dormant_count = raw.get('dormant_count')
+    if dormant_count is None:
+        dormant_count = sum(1 for fe in normalized if fe.get('status') == 'dormant')
+    else:
+        try:
+            dormant_count = int(dormant_count)
+        except (ValueError, TypeError):
+            dormant_count = 0
+
+    awakened_count = raw.get('awakened_count')
+    if awakened_count is None:
+        awakened_count = sum(1 for fe in normalized if fe.get('status') == 'awakened')
+    else:
+        try:
+            awakened_count = int(awakened_count)
+        except (ValueError, TypeError):
+            awakened_count = 0
+
+    # War in Heaven detection
+    war_in_heaven = bool(raw.get('war_in_heaven', False))
+
+    return {
+        'fallen_empires': normalized,
+        'dormant_count': dormant_count,
+        'awakened_count': awakened_count,
+        'war_in_heaven': war_in_heaven,
+    }

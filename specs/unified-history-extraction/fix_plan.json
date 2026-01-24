@@ -324,7 +324,7 @@
       "files": [
         "backend/core/signals.py"
       ],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_fallen_empires' backend/core/signals.py (uses extractor method)",
         "RUN: grep -q \"'fallen_empires'\" backend/core/signals.py (includes fallen empires field)",
