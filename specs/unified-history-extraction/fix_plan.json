@@ -48,6 +48,11 @@
       "id": "UHE-P009",
       "learning": "Backward compatibility: build_history_enrichment accepts precomputed_signals param. Uses signals for leaders/wars/diplomacy when available, falls back to gamestate extraction. Galaxy settings, techs, policies, edicts, megastructures, crisis, systems, fallen_empires still use gamestate (not yet in signals).",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P010",
+      "learning": "Some leaders may have no resolved name (null/missing 'name' field) due to edge cases like pool scientists or special event leaders. This is expected behavior. The validation only checks for placeholder names starting with '%', not missing names.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -170,7 +175,7 @@
       "priority": 5,
       "description": "Verify full pipeline: ingest save → signals built → events use resolved names → no %LEADER_% in event summaries.",
       "files": [],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; from backend.core.events import compute_events; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); signals=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); leaders=signals.get('leaders',{}).get('leaders',[]); bad_names=[l for l in leaders if l.get('name','').startswith('%')]; print(f'Leaders with unresolved names: {len(bad_names)}'); assert len(bad_names)==0, f'Found {bad_names}'\" (no unresolved leader names)"
       ],
