@@ -617,10 +617,6 @@ class Companion:
         """
         return self.extractor.get_details(categories, limit)
 
-    def get_full_briefing(self) -> dict:
-        """DEPRECATED: Use get_snapshot() instead. Kept for backwards compatibility."""
-        return self.extractor.get_full_briefing()
-
     def _get_tools_list(self, mode: str = "full") -> list:
         """Get list of tool functions for the SDK.
 
@@ -668,19 +664,6 @@ class Companion:
             raise ValueError(f"Invalid thinking level. Must be one of: {valid_levels}")
         self._thinking_level = level
         self._chat_session = None
-
-    async def chat_async(self, user_message: str) -> tuple[str, float]:
-        """Send a message and get a response asynchronously.
-
-        Args:
-            user_message: The user's question or message
-
-        Returns:
-            Tuple of (response_text, elapsed_time_seconds)
-        """
-        # For now, just wrap the sync version
-        # In future, could use async SDK if available
-        return self.chat(user_message)
 
     def _extract_afc_stats(self, history_before: int = 0) -> tuple[
         int, dict[str, int], dict[str, int], set[str], list[list[str]]

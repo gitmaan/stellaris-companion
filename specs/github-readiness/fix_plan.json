@@ -67,13 +67,13 @@
       "id": "GHR-005",
       "title": "Delete deprecated companion.py methods",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "! grep -q 'def get_full_briefing(' backend/core/companion.py",
         "! grep -q 'def chat_async(' backend/core/companion.py",
-        "python3 -c \"from backend.core.companion import StrategicCompanion; print('OK')\""
+        "python3 -c \"from backend.core.companion import Companion; print('OK')\""
       ],
-      "notes": "Delete get_full_briefing (deprecated) and chat_async (never called)"
+      "notes": "Deleted get_full_briefing (deprecated wrapper, ~3 lines) and chat_async (never called, ~12 lines). Fixed criterion to use correct class name 'Companion' instead of 'StrategicCompanion'."
     },
     {
       "id": "GHR-006",
@@ -182,6 +182,11 @@
       "id": "GHR-P005",
       "learned": "2026-01-24",
       "description": "build_personality_prompt_v2 is kept in personality.py because it's used by experiments/test_optimized_vs_production.py for A/B comparison tests. The OR-criteria allow keeping it when the experiment file exists."
+    },
+    {
+      "id": "GHR-P006",
+      "learned": "2026-01-25",
+      "description": "Main companion class is named 'Companion', not 'StrategicCompanion'. Criteria in fix_plan.json should reference the correct class name."
     }
   ]
 }
