@@ -68,6 +68,9 @@ def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, An
     # Extract edicts signals
     signals["edicts"] = _extract_edicts_signals(extractor)
 
+    # Extract galaxy settings (static per game but needed for milestone events)
+    signals["galaxy_settings"] = _extract_galaxy_settings_signals(extractor)
+
     return signals
 
 
@@ -773,3 +776,82 @@ def _extract_edicts_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         'edicts': unique_edicts,
         'count': len(unique_edicts),
     }
+
+
+def _extract_galaxy_settings_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract galaxy settings for milestone events and game phase detection.
+
+    Uses Rust session extract_sections(['galaxy']) for fast parsed lookup.
+    These are static per game (set at galaxy generation) but needed for:
+    - Midgame/endgame milestone events
+    - Victory year detection
+    - Difficulty and ironman mode indicators
+
+    Returns format compatible with history.py extract_galaxy_settings_from_gamestate():
+        Dict with:
+        - galaxy_name: str | None (galaxy UUID used for campaign identification)
+        - mid_game_start: int | None (years after 2200 when midgame starts)
+        - end_game_start: int | None (years after 2200 when endgame starts)
+        - victory_year: int | None (year when victory is calculated)
+        - ironman: str | None ('yes' or None)
+        - difficulty: str | None (difficulty setting name)
+        - crisis_type: str | None (pre-selected crisis if any)
+    """
+    # Try to use Rust session for fast parsed lookup
+    try:
+        from rust_bridge import _get_active_session
+        session = _get_active_session()
+        if session:
+            return _extract_galaxy_settings_rust(session)
+    except ImportError:
+        pass
+
+    # No session available - return empty (gamestate fallback in history.py)
+    return {}
+
+
+def _extract_galaxy_settings_rust(session) -> dict[str, Any]:
+    """Extract galaxy settings using Rust session's extract_sections.
+
+    Args:
+        session: Active RustSession instance
+
+    Returns:
+        Galaxy settings dict
+    """
+    try:
+        sections = session.extract_sections(['galaxy'])
+        galaxy = sections.get('galaxy', {})
+
+        if not isinstance(galaxy, dict):
+            return {}
+
+        # Helper to safely get int value
+        def _safe_int(val: Any) -> int | None:
+            if val is None:
+                return None
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return None
+
+        # Helper to safely get str value
+        def _safe_str(val: Any) -> str | None:
+            if val is None:
+                return None
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+            return None
+
+        return {
+            'galaxy_name': _safe_str(galaxy.get('name')),
+            'mid_game_start': _safe_int(galaxy.get('mid_game_start')),
+            'end_game_start': _safe_int(galaxy.get('end_game_start')),
+            'victory_year': _safe_int(galaxy.get('victory_year')),
+            'ironman': _safe_str(galaxy.get('ironman')),
+            'difficulty': _safe_str(galaxy.get('difficulty')),
+            'crisis_type': _safe_str(galaxy.get('crisis_type')),
+        }
+    except Exception:
+        # On any error, return empty dict (gamestate fallback in history.py)
+        return {}
