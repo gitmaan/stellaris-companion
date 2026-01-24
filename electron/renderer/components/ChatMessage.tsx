@@ -1,4 +1,5 @@
 import { forwardRef } from 'react'
+import ReactMarkdown from 'react-markdown'
 
 interface ChatMessageProps {
   role: 'user' | 'assistant'
@@ -35,7 +36,13 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
           <span className="message-time">{formatTime(timestamp)}</span>
         )}
       </div>
-      <div className="message-content">{content}</div>
+      <div className="message-content">
+        {role === 'assistant' ? (
+          <ReactMarkdown>{content}</ReactMarkdown>
+        ) : (
+          content
+        )}
+      </div>
       {role === 'assistant' && !isError && (responseTimeMs !== undefined || toolsUsed?.length) && (
         <div className="message-meta">
           {responseTimeMs !== undefined && (
