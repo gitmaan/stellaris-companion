@@ -519,12 +519,12 @@
       "priority": 21,
       "description": "Delete _get_planets_regex, _get_population_by_planet_regex. Update dispatch to call Rust directly.",
       "files": ["stellaris_save_extractor/planets.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q 'def _get_planets_regex' stellaris_save_extractor/planets.py (removed)",
         "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_planets(); ctx.__exit__(None,None,None); print('OK')\" (works)"
       ],
-      "notes": "Only proceed if MIG-040 passed."
+      "notes": "Completed 2026-01-25. Removed _get_planets_regex (~186 lines), _get_population_by_planet (~78 lines), _extract_timed_modifiers (~59 lines). Updated get_planets() to call _get_planets_rust() directly. Updated _get_planets_rust and _get_population_by_planet_rust to raise ParserError if no session. Rust version produces identical results: 32 planets, 171724 pops, types match. MIG-040 escape hatch passed, safe to proceed."
     },
     {
       "id": "MIG-042",

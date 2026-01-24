@@ -30,16 +30,12 @@ class PlanetsMixin:
     def get_planets(self) -> dict:
         """Get the player's colonized planets.
 
-        Uses Rust session when active for fast extraction, falls back to regex.
+        Requires Rust session mode for extraction.
 
         Returns:
             Dict with planet details including population and districts
         """
-        # Dispatch to Rust version when session is active
-        session = _get_active_session()
-        if session:
-            return self._get_planets_rust()
-        return self._get_planets_regex()
+        return self._get_planets_rust()
 
     def _extract_planet_name(self, name_data) -> str:
         """Extract readable planet name from Rust-parsed name data.
@@ -113,10 +109,13 @@ class PlanetsMixin:
 
         Returns:
             Dict with planet details including population and districts
+
+        Raises:
+            ParserError: If no active Rust session
         """
         session = _get_active_session()
         if not session:
-            return self._get_planets_regex()
+            raise ParserError("Rust session required for get_planets")
 
         result = {"planets": [], "count": 0, "total_pops": 0}
 
@@ -318,234 +317,42 @@ class PlanetsMixin:
         """Build a mapping of planet_id -> total population using Rust session.
 
         Uses session iter_section for fast iteration without spawning.
-        Falls back to regex if no session is active.
 
         Returns:
             Dict mapping planet_id (int) to total population (int)
+
+        Raises:
+            ParserError: If no active Rust session or parser fails
         """
         session = _get_active_session()
         if not session:
-            return self._get_population_by_planet()
+            raise ParserError("Rust session required for population extraction")
 
         pop_by_planet: dict[int, int] = {}
 
-        try:
-            for key, pop_group in session.iter_section("pop_groups"):
-                # P010: entry might be string "none" for deleted entries
-                if not isinstance(pop_group, dict):
-                    continue
+        for key, pop_group in session.iter_section("pop_groups"):
+            # P010: entry might be string "none" for deleted entries
+            if not isinstance(pop_group, dict):
+                continue
 
-                # P011: use .get() with defaults
-                planet_id = pop_group.get("planet")
-                size = pop_group.get("size")
+            # P011: use .get() with defaults
+            planet_id = pop_group.get("planet")
+            size = pop_group.get("size")
 
-                if planet_id is None or size is None:
-                    continue
+            if planet_id is None or size is None:
+                continue
 
-                try:
-                    planet_id_int = int(planet_id)
-                    pop_size = int(size)
-                    if pop_size > 0:
-                        pop_by_planet[planet_id_int] = (
-                            pop_by_planet.get(planet_id_int, 0) + pop_size
-                        )
-                except (ValueError, TypeError):
-                    continue
-
-        except ParserError as e:
-            logger.warning(
-                f"Rust parser failed for pop_groups: {e}, using regex fallback"
-            )
-            return self._get_population_by_planet()
+            try:
+                planet_id_int = int(planet_id)
+                pop_size = int(size)
+                if pop_size > 0:
+                    pop_by_planet[planet_id_int] = (
+                        pop_by_planet.get(planet_id_int, 0) + pop_size
+                    )
+            except (ValueError, TypeError):
+                continue
 
         return pop_by_planet
-
-    def _get_planets_regex(self) -> dict:
-        """Get planets using regex parsing (fallback method).
-
-        Returns:
-            Dict with planet details including population and districts
-        """
-        result = {"planets": [], "count": 0, "total_pops": 0}
-
-        player_id = self.get_player_empire_id()
-
-        # Build population map from pop_groups section
-        # pop_groups aggregates pops by type with size=N showing actual count
-        pop_by_planet = self._get_population_by_planet()
-
-        # Find the planets section
-        planets_match = re.search(
-            r"^planets=\s*\{\s*planet=\s*\{", self.gamestate, re.MULTILINE
-        )
-        if not planets_match:
-            result["error"] = "Could not find planets section"
-            return result
-
-        start = planets_match.start()
-        # Get a large chunk for planets (they're spread out)
-        planets_chunk = self.gamestate[
-            start : start + 20000000
-        ]  # 20MB - planets section is large
-
-        planets_found = []
-
-        # Find each planet block by looking for the pattern: \n\t\tID=\n\t\t{
-        # Then check if it has owner=player_id
-        planet_start_pattern = r"\n\t\t(\d+)=\s*\{"
-
-        for match in re.finditer(planet_start_pattern, planets_chunk):
-            planet_id = match.group(1)
-            block_start = match.start() + 1  # Skip leading newline
-
-            # Find the end of this planet block by counting braces
-            brace_count = 0
-            block_end = block_start
-            started = False
-            # Planet blocks can be very large (10k+ chars) due to pop data
-            for i, char in enumerate(
-                planets_chunk[block_start : block_start + 30000], block_start
-            ):
-                if char == "{":
-                    brace_count += 1
-                    started = True
-                elif char == "}":
-                    brace_count -= 1
-                    if started and brace_count == 0:
-                        block_end = i + 1
-                        break
-
-            planet_block = planets_chunk[block_start:block_end]
-
-            # Check if this planet is owned by player
-            # Look for owner=0 (but not original_owner=0)
-            owner_match = re.search(r"\n\s*owner=(\d+)", planet_block)
-            if not owner_match:
-                continue
-
-            owner_id = int(owner_match.group(1))
-            if owner_id != player_id:
-                continue
-
-            planet_info = {"id": planet_id}
-
-            # Extract name
-            name_match = re.search(r'name=\s*\{\s*key="([^"]+)"', planet_block)
-            if name_match:
-                planet_info["name"] = name_match.group(1).replace("NAME_", "")
-
-            # Extract planet class
-            class_match = re.search(r'planet_class="([^"]+)"', planet_block)
-            if class_match:
-                planet_info["type"] = class_match.group(1).replace("pc_", "")
-
-            # Skip stars and other non-habitable types
-            ptype = planet_info.get("type", "")
-            if ptype.endswith("_star") or ptype in [
-                "asteroid",
-                "barren",
-                "barren_cold",
-                "molten",
-                "toxic",
-                "frozen",
-                "gas_giant",
-            ]:
-                continue
-
-            # Extract planet size
-            size_match = re.search(r"planet_size=(\d+)", planet_block)
-            if size_match:
-                planet_info["size"] = int(size_match.group(1))
-
-            # Get population from pop_groups (accurate count via size field)
-            planet_id_int = int(planet_id)
-            planet_info["population"] = pop_by_planet.get(planet_id_int, 0)
-            result["total_pops"] += planet_info["population"]
-
-            # Extract stability
-            stability_match = re.search(r"\n\s*stability=([\d.]+)", planet_block)
-            if stability_match:
-                planet_info["stability"] = float(stability_match.group(1))
-
-            # Extract amenities
-            amenities_match = re.search(r"\n\s*amenities=([\d.]+)", planet_block)
-            if amenities_match:
-                planet_info["amenities"] = float(amenities_match.group(1))
-
-            # Extract free amenities (surplus/deficit)
-            free_amenities_match = re.search(
-                r"\n\s*free_amenities=([-\d.]+)", planet_block
-            )
-            if free_amenities_match:
-                planet_info["free_amenities"] = float(free_amenities_match.group(1))
-
-            # Extract crime
-            crime_match = re.search(r"\n\s*crime=([\d.]+)", planet_block)
-            if crime_match:
-                planet_info["crime"] = round(float(crime_match.group(1)), 1)
-
-            # Extract permanent planet modifier
-            pm_match = re.search(r'planet_modifier="([^"]+)"', planet_block)
-            if pm_match:
-                planet_info["planet_modifier"] = pm_match.group(1).replace("pm_", "")
-
-            # Extract timed modifiers (crime, events, buffs)
-            timed_mods = self._extract_timed_modifiers(planet_block)
-            if timed_mods:
-                planet_info["modifiers"] = timed_mods
-
-            # Extract buildings - resolve IDs to building type names
-            # Planet format: buildings={ { buildings={ ID1 ID2 ... } } }
-            # These IDs reference the global buildings section
-            building_types = self._get_building_types()
-            buildings_match = re.search(
-                r"buildings=\s*\{[^}]*buildings=\s*\{([^}]+)\}", planet_block
-            )
-            if buildings_match:
-                building_ids = re.findall(r"\d+", buildings_match.group(1))
-                resolved_buildings = []
-                for bid in building_ids:
-                    if bid in building_types:
-                        resolved_buildings.append(
-                            building_types[bid].replace("building_", "")
-                        )
-                if resolved_buildings:
-                    planet_info["buildings"] = resolved_buildings
-
-            # Extract districts info
-            # Format: districts={ 0 59 60 61 } (numeric indices)
-            districts_match = re.search(r"districts=\s*\{([^}]+)\}", planet_block)
-            if districts_match:
-                districts_block = districts_match.group(1)
-                district_ids = re.findall(r"\d+", districts_block)
-                planet_info["district_count"] = len(district_ids)
-
-            # Extract last building/district changed for context
-            last_building = re.search(r'last_building_changed="([^"]+)"', planet_block)
-            if last_building:
-                planet_info["last_building"] = last_building.group(1)
-
-            last_district = re.search(r'last_district_changed="([^"]+)"', planet_block)
-            if last_district:
-                planet_info["last_district"] = last_district.group(1)
-
-            planets_found.append(planet_info)
-
-        # Full list (no truncation); callers that need caps should slice.
-        result["planets"] = planets_found
-        result["count"] = len(planets_found)
-
-        # Summary by type
-        type_counts = {}
-        for planet in planets_found:
-            ptype = planet.get("type", "unknown")
-            if ptype not in type_counts:
-                type_counts[ptype] = 0
-            type_counts[ptype] += 1
-
-        result["by_type"] = type_counts
-
-        return result
 
     def get_archaeology(self, limit: int = 25) -> dict:
         """Get archaeological dig sites and progress (summary-first, capped).
@@ -824,66 +631,6 @@ class PlanetsMixin:
         result["count"] = len(sites_found)
         return result
 
-    def _extract_timed_modifiers(self, planet_block: str) -> list[dict]:
-        """Extract timed modifiers from a planet block.
-
-        Timed modifiers include crime events, prosperity buffs, etc.
-
-        Returns:
-            List of modifiers with name and days remaining
-        """
-        modifiers = []
-
-        # Find timed_modifier block
-        tm_match = re.search(r"timed_modifier\s*=\s*\{", planet_block)
-        if not tm_match:
-            return modifiers
-
-        # Extract the timed_modifier block
-        start = tm_match.start()
-        brace_count = 0
-        end = None
-        for i, char in enumerate(planet_block[start:], start):
-            if char == "{":
-                brace_count += 1
-            elif char == "}":
-                brace_count -= 1
-                if brace_count == 0:
-                    end = i + 1
-                    break
-
-        if end is None:
-            return modifiers
-
-        tm_block = planet_block[start:end]
-
-        # Find items block
-        items_match = re.search(r"items\s*=\s*\{", tm_block)
-        if not items_match:
-            return modifiers
-
-        # Extract individual modifier entries
-        # Format: { modifier="name" days=N }
-        for match in re.finditer(
-            r'\{\s*modifier="([^"]+)"\s*days=([-\d]+)\s*\}', tm_block
-        ):
-            mod_name = match.group(1)
-            days = int(match.group(2))
-
-            # Clean up modifier name for display
-            display_name = mod_name.replace("_", " ").title()
-
-            modifiers.append(
-                {
-                    "name": mod_name,
-                    "display_name": display_name,
-                    "days": days,  # -1 means permanent
-                    "permanent": days < 0,
-                }
-            )
-
-        return modifiers
-
     def get_problem_planets(self) -> dict:
         """Get planets with issues (high crime, low stability, amenity deficit).
 
@@ -941,82 +688,3 @@ class PlanetsMixin:
         )
 
         return result
-
-    def _get_population_by_planet(self) -> dict[int, int]:
-        """Build a mapping of planet_id -> total population from pop_groups.
-
-        The pop_groups section aggregates pops by type (species, job category, ethics)
-        with a 'size' field showing the actual number of pops in each group.
-        This is the accurate way to count population, NOT pop_jobs which only
-        lists job assignment IDs.
-
-        Returns:
-            Dict mapping planet_id (int) to total population (int)
-        """
-        pop_by_planet: dict[int, int] = {}
-
-        # Find pop_groups section
-        pop_groups_match = re.search(r"\npop_groups=\n\{", self.gamestate)
-        if not pop_groups_match:
-            # Try alternate format
-            pop_groups_match = re.search(
-                r"^pop_groups=\s*\{", self.gamestate, re.MULTILINE
-            )
-            if not pop_groups_match:
-                return pop_by_planet
-
-        pg_start = pop_groups_match.start()
-        # Pop groups section can be very large in late game
-        pg_chunk = self.gamestate[pg_start : pg_start + 100000000]  # Up to 100MB
-
-        # Parse each pop_group entry: \n\tID=\n\t{ ... planet=X size=N ... }
-        pop_pattern = r"\n\t(\d+)=\n\t\{"
-        groups_processed = 0
-        max_groups = 100000  # Safety limit
-
-        for match in re.finditer(pop_pattern, pg_chunk):
-            if groups_processed >= max_groups:
-                break
-
-            groups_processed += 1
-            block_start = match.start() + 1
-
-            # Get pop group block content (they're relatively small)
-            chunk = pg_chunk[block_start : block_start + 2500]
-
-            # Find end of this pop group's block
-            brace_count = 0
-            block_end = 0
-            started = False
-            for i, char in enumerate(chunk):
-                if char == "{":
-                    brace_count += 1
-                    started = True
-                elif char == "}":
-                    brace_count -= 1
-                    if started and brace_count == 0:
-                        block_end = i + 1
-                        break
-
-            if block_end == 0:
-                continue
-
-            pop_block = chunk[:block_end]
-
-            # Extract planet ID
-            planet_match = re.search(r"\n\s*planet=(\d+)", pop_block)
-            if not planet_match:
-                continue
-
-            planet_id = int(planet_match.group(1))
-
-            # Extract size (actual number of pops in this group)
-            size_match = re.search(r"\n\s*size=(\d+)", pop_block)
-            if not size_match:
-                continue
-
-            pop_size = int(size_match.group(1))
-            if pop_size > 0:
-                pop_by_planet[planet_id] = pop_by_planet.get(planet_id, 0) + pop_size
-
-        return pop_by_planet
