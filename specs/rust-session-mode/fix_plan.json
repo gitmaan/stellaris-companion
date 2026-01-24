@@ -58,6 +58,11 @@
       "id": "P017",
       "learning": "_get_active_session() only returns a session when using session() context manager (which sets thread-local). RustSession() directly does NOT set thread-local, so dispatch methods won't see the session. Use 'with rust_session(path):' or 'ctx=session(path); ctx.__enter__()' for tests.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P018",
+      "learning": "Jomini parser collapses duplicate keys into single dict. For Stellaris sections with multiple same-named entries (e.g., relation={} in relations_manager), regex is still needed. Hybrid approach acceptable: use Rust for iteration/lookup, regex for duplicate-key blocks.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -127,13 +132,13 @@
       "priority": 4,
       "description": "Replace 80KB-limited regex with Rust session - accuracy critical for large empires",
       "files": ["stellaris_save_extractor/diplomacy.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q '_get_diplomacy_rust' stellaris_save_extractor/diplomacy.py (Rust method exists)",
         "RUN: grep -q '_get_diplomacy_regex' stellaris_save_extractor/diplomacy.py (fallback exists)",
-        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import RustSession; s=RustSession('test_save.sav'); e=SaveExtractor('test_save.sav'); r=e.get_diplomacy(); s.close(); print('relations' in str(r) or 'opinion' in str(r) or len(r) > 0)\" (get_diplomacy works with session)"
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session as rust_session; ctx=rust_session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_diplomacy(); ctx.__exit__(None,None,None); print('relations' in str(r) or 'opinion' in str(r) or len(r) > 0)\" (get_diplomacy works with session context)"
       ],
-      "notes": "Follow MIGRATION_PATTERN.md - baseline first, compare output"
+      "notes": "Implemented 2026-01-24. Hybrid approach: uses Rust iter_section for federation ID lookup, regex for relation entries due to jomini duplicate-key collapse. Criterion self-healed to use session() context manager per P017."
     },
     {
       "id": "MIG-006",
