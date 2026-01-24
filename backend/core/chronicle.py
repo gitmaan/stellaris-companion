@@ -15,6 +15,7 @@ See docs/CHRONICLE_INCREMENTAL.md for incremental chapter design.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
@@ -22,6 +23,8 @@ from typing import Any
 from google import genai
 
 from backend.core.database import GameDatabase
+
+logger = logging.getLogger(__name__)
 
 
 # Era-ending event types that trigger chapter finalization
@@ -42,6 +45,26 @@ MIN_YEARS_AFTER_EVENT = 5
 
 # Maximum chapters to finalize per request (prevent timeout)
 MAX_CHAPTERS_PER_REQUEST = 2
+
+# Hard caps to keep Gemini requests reasonably sized.
+# These limits are deliberately conservative to avoid saturating the user's network.
+MAX_EVENTS_PER_CHAPTER_PROMPT = 250
+MAX_EVENTS_CURRENT_ERA_PROMPT = 200
+
+NOTABLE_EVENT_TYPES = {
+    "war_started",
+    "war_ended",
+    "crisis_started",
+    "crisis_defeated",
+    "fallen_empire_awakened",
+    "war_in_heaven_started",
+    "federation_joined",
+    "federation_left",
+    "alliance_formed",
+    "alliance_ended",
+    "colony_count_change",
+    "military_power_change",
+}
 
 # Default chapters_json structure
 DEFAULT_CHAPTERS_DATA = {
@@ -155,13 +178,54 @@ class ChronicleGenerator:
             current_snapshot_id=current_snapshot_id,
         )
 
-        # Generate current era narrative
-        current_era = self._generate_current_era(
+        # Generate (or reuse cached) current era narrative.
+        era_start_date, era_start_snapshot_id = self._get_current_era_start(
             save_id=save_id,
             chapters_data=chapters_data,
-            briefing=briefing,
-            current_date=current_date,
+            snapshot_range=snapshot_range,
         )
+
+        used_cached_current_era = False
+        current_era_cache = chapters_data.get("current_era_cache")
+        if (
+            not force_refresh
+            and isinstance(current_era_cache, dict)
+            and current_snapshot_id is not None
+            and current_era_cache.get("start_snapshot_id") == era_start_snapshot_id
+            and current_era_cache.get("last_snapshot_id") == current_snapshot_id
+            and isinstance(current_era_cache.get("current_era"), dict)
+        ):
+            used_cached_current_era = True
+            current_era = current_era_cache["current_era"]
+            logger.debug(
+                "Chronicle current era cache hit (save_id=%s last_snapshot_id=%s)",
+                save_id,
+                current_snapshot_id,
+            )
+        else:
+            if current_era_cache and not used_cached_current_era:
+                chapters_data.pop("current_era_cache", None)
+
+            current_era = self._generate_current_era(
+                save_id=save_id,
+                chapters_data=chapters_data,
+                briefing=briefing,
+                current_date=current_date,
+            )
+
+            if current_era and current_snapshot_id is not None:
+                chapters_data["current_era_cache"] = {
+                    "start_date": era_start_date,
+                    "start_snapshot_id": era_start_snapshot_id,
+                    "last_snapshot_id": current_snapshot_id,
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "current_era": current_era,
+                }
+                logger.debug(
+                    "Chronicle current era generated (save_id=%s last_snapshot_id=%s)",
+                    save_id,
+                    current_snapshot_id,
+                )
 
         # Assemble full chronicle text for backward compatibility
         full_text = self._assemble_chronicle_text(chapters_data, current_era)
@@ -182,6 +246,11 @@ class ChronicleGenerator:
         )
 
         # Build response
+        response_cached = (
+            not force_refresh
+            and chapters_finalized == 0
+            and (used_cached_current_era or current_era is None)
+        )
         return {
             # New structured format
             "chapters": [
@@ -203,10 +272,90 @@ class ChronicleGenerator:
             "message": f"{pending_chapters} more chapters pending. Refresh to continue." if pending_chapters > 0 else None,
             # Backward compatible
             "chronicle": full_text,
-            "cached": chapters_finalized == 0 and current_era is None,
+            "cached": response_cached,
             "event_count": event_count,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
+
+    def _event_key(self, event: dict) -> tuple[Any, Any, Any]:
+        return (event.get("game_date"), event.get("event_type"), event.get("summary"))
+
+    def _select_events_for_prompt(
+        self, events: list[dict], *, max_events: int
+    ) -> tuple[list[dict], bool]:
+        """Select a bounded subset of events for prompt size safety.
+
+        Returns (selected_events, was_truncated).
+        """
+        if max_events <= 0:
+            return [], bool(events)
+
+        if len(events) <= max_events:
+            return events, False
+
+        # Deduplicate while preserving order.
+        seen: set[tuple[Any, Any, Any]] = set()
+        deduped: list[dict] = []
+        for event in events:
+            key = self._event_key(event)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(event)
+
+        if len(deduped) <= max_events:
+            return deduped, False
+
+        notable: list[dict] = [e for e in deduped if e.get("event_type") in NOTABLE_EVENT_TYPES]
+
+        selected_keys: list[tuple[Any, Any, Any]]
+        if len(notable) >= max_events:
+            selected_keys = [self._event_key(e) for e in notable[-max_events:]]
+        else:
+            selected_set = {self._event_key(e) for e in notable}
+            selected_keys = list(selected_set)
+            for event in reversed(deduped):
+                key = self._event_key(event)
+                if key in selected_set:
+                    continue
+                selected_set.add(key)
+                selected_keys.append(key)
+                if len(selected_set) >= max_events:
+                    break
+
+        selected_set = set(selected_keys)
+        selected: list[dict] = []
+        included: set[tuple[Any, Any, Any]] = set()
+        for event in deduped:
+            key = self._event_key(event)
+            if key in selected_set and key not in included:
+                included.add(key)
+                selected.append(event)
+
+        return selected, True
+
+    def _get_current_era_start(
+        self,
+        *,
+        save_id: str,
+        chapters_data: dict[str, Any],
+        snapshot_range: dict[str, Any],
+    ) -> tuple[str, int | None]:
+        chapters = chapters_data.get("chapters", [])
+
+        if chapters:
+            return (
+                chapters[-1].get("end_date"),
+                chapters[-1].get("end_snapshot_id"),
+            )
+
+        era_start_date = chapters_data.get("current_era_start_date")
+        era_start_snapshot_id = chapters_data.get("current_era_start_snapshot_id")
+        if not era_start_date:
+            era_start_date = snapshot_range.get("first_game_date", "2200.01.01")
+            era_start_snapshot_id = snapshot_range.get("first_snapshot_id")
+
+        return era_start_date, era_start_snapshot_id
 
     def regenerate_chapter(
         self,
@@ -565,7 +714,23 @@ class ChronicleGenerator:
             )
         previous_context = "\n".join(context_lines) if context_lines else "This is the first chapter."
 
-        events_text = self._format_events(events)
+        selected_events, was_truncated = self._select_events_for_prompt(
+            events, max_events=MAX_EVENTS_PER_CHAPTER_PROMPT
+        )
+        if was_truncated:
+            logger.debug(
+                "Chapter %s prompt events truncated (%s -> %s)",
+                chapter_number,
+                len(events),
+                len(selected_events),
+            )
+        events_text = self._format_events(selected_events)
+        truncation_note = ""
+        if was_truncated:
+            truncation_note = (
+                f"NOTE: Event list truncated to {len(selected_events)} events to fit context. "
+                "Focus on major arcs and turning points.\n"
+            )
 
         prompt = f"""You are the Royal Chronicler of {empire_name}.
 
@@ -576,6 +741,7 @@ class ChronicleGenerator:
 {previous_context}
 
 === EVENTS FOR THIS CHAPTER ({start_date} to {end_date}) ===
+{truncation_note}
 {events_text}
 
 === YOUR TASK ===
@@ -665,7 +831,23 @@ Respond in this exact JSON format:
             )
         previous_context = "\n".join(context_lines) if context_lines else "No previous chapters."
 
-        events_text = self._format_events(events)
+        selected_events, was_truncated = self._select_events_for_prompt(
+            events, max_events=MAX_EVENTS_CURRENT_ERA_PROMPT
+        )
+        if was_truncated:
+            logger.debug(
+                "Current era prompt events truncated (%s -> %s) (save_id=%s)",
+                len(events),
+                len(selected_events),
+                save_id,
+            )
+        events_text = self._format_events(selected_events)
+        truncation_note = ""
+        if was_truncated:
+            truncation_note = (
+                f"NOTE: Event list truncated to {len(selected_events)} events to fit context. "
+                "Focus on major arcs and the immediate stakes.\n"
+            )
 
         prompt = f"""You are the Royal Chronicler of {empire_name}.
 
@@ -676,6 +858,7 @@ Respond in this exact JSON format:
 {previous_context}
 
 === CURRENT ERA EVENTS ({era_start_date} to present) ===
+{truncation_note}
 {events_text}
 
 === YOUR TASK ===
@@ -984,20 +1167,7 @@ Do NOT give advice. Write as a historian, not an advisor.
             lines.append(f"\n=== {year} ===")
 
             if len(year_events) > 15:
-                notable_types = {
-                    "war_started",
-                    "war_ended",
-                    "crisis_started",
-                    "crisis_defeated",
-                    "fallen_empire_awakened",
-                    "war_in_heaven_started",
-                    "federation_joined",
-                    "alliance_formed",
-                    "alliance_ended",
-                    "colony_count_change",
-                    "military_power_change",
-                }
-                notable = [e for e in year_events if e.get("event_type") in notable_types]
+                notable = [e for e in year_events if e.get("event_type") in NOTABLE_EVENT_TYPES]
                 for e in notable:
                     lines.append(f"  * {e.get('summary', e.get('event_type', 'Unknown event'))}")
                 lines.append(f"  (+ {len(year_events) - len(notable)} other events)")

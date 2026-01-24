@@ -8,6 +8,7 @@ the Python backend. All endpoints require Bearer token authentication.
 from __future__ import annotations
 
 import os
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,9 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+
+_chronicle_in_flight: set[str] = set()
+_chronicle_in_flight_lock = threading.Lock()
 
 
 # Auth configuration
@@ -318,6 +322,7 @@ def create_app() -> FastAPI:
         for session in sessions_data:
             sessions.append({
                 "id": session["id"],
+                "save_id": session["save_id"],
                 "empire_name": session["empire_name"],
                 "started_at": session["started_at"],
                 "ended_at": session["ended_at"],
@@ -546,6 +551,14 @@ def create_app() -> FastAPI:
                 detail={"error": "Session not found"},
             )
 
+        # Prevent request storms from spawning concurrent LLM calls.
+        # Chronicle generation can be network-intensive; serialize per-save.
+        save_id = db.get_save_id_for_session(body.session_id) or session.get("save_id") or body.session_id
+        with _chronicle_in_flight_lock:
+            if save_id in _chronicle_in_flight:
+                return {"error": "Chronicle generation already in progress", "retry_after_ms": 2000}
+            _chronicle_in_flight.add(save_id)
+
         from backend.core.chronicle import ChronicleGenerator
 
         generator = ChronicleGenerator(db=db)
@@ -563,6 +576,9 @@ def create_app() -> FastAPI:
                 status_code=500,
                 detail={"error": f"Chronicle generation failed: {str(e)}"},
             )
+        finally:
+            with _chronicle_in_flight_lock:
+                _chronicle_in_flight.discard(save_id)
 
     @app.post("/api/chronicle/regenerate-chapter", dependencies=[Depends(verify_token)])
     def regenerate_chapter(

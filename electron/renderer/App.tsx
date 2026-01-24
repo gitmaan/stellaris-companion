@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import ChatPage from './pages/ChatPage'
-import RecapPage from './pages/RecapPage'
+import ChroniclePage from './pages/ChroniclePage'
 import SettingsPage from './pages/SettingsPage'
 import StatusBar from './components/StatusBar'
 
-type Tab = 'chat' | 'recap' | 'settings'
+type Tab = 'chat' | 'chronicle' | 'settings'
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('chat')
@@ -26,10 +26,10 @@ function App() {
           Chat
         </button>
         <button
-          className={activeTab === 'recap' ? 'active' : ''}
-          onClick={() => setActiveTab('recap')}
+          className={activeTab === 'chronicle' ? 'active' : ''}
+          onClick={() => setActiveTab('chronicle')}
         >
-          Recap
+          Chronicle
         </button>
         <button
           className={activeTab === 'settings' ? 'active' : ''}
@@ -40,7 +40,7 @@ function App() {
       </nav>
       <main className="main-content">
         {activeTab === 'chat' && <ChatPage />}
-        {activeTab === 'recap' && <RecapPage />}
+        {activeTab === 'chronicle' && <ChroniclePage />}
         {activeTab === 'settings' && <SettingsPage />}
       </main>
     </div>

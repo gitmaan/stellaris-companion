@@ -1,7 +1,7 @@
 // IPC wrapper for API calls - uses window.electronAPI.backend.* internally
 // Implements UI-006: useBackend hook with loading states and error handling
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 
 // ============================================
 // API Response Types (match backend/api/server.py)
@@ -73,6 +73,7 @@ export interface StatusResponse {
 
 export interface Session {
   id: string
+  save_id: string
   empire_name: string
   started_at: number
   ended_at: number | null
@@ -223,6 +224,8 @@ export interface UseBackendResult<T> {
 export function useBackend() {
   // Track loading states per-method
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({})
+  const loadingStatesRef = useRef<Record<string, boolean>>({})
+  loadingStatesRef.current = loadingStates
 
   // Set loading state, removing key when done to prevent object growth
   const setLoading = useCallback((key: string, loading: boolean) => {
@@ -283,6 +286,10 @@ export function useBackend() {
       setLoading(key, false)
     }
   }, [setLoading])
+
+  const isLoading = useCallback((key: string) => {
+    return loadingStatesRef.current[key] ?? false
+  }, [])
 
   // ============================================
   // API Methods
@@ -407,13 +414,15 @@ export function useBackend() {
     endSession,
 
     // Loading states (for UI components that need to track multiple calls)
-    isLoading: (key: string) => loadingStates[key] ?? false,
-    loadingStates,
+    isLoading,
+    get loadingStates() {
+      return loadingStatesRef.current
+    },
 
     // Type guards for consumers
     isErrorResponse,
     isChatRetryResponse,
-  }), [health, chat, status, sessions, sessionEvents, recap, chronicle, regenerateChapter, endSession, loadingStates])
+  }), [health, chat, status, sessions, sessionEvents, recap, chronicle, regenerateChapter, endSession, isLoading])
 }
 
 export default useBackend
