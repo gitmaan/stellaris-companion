@@ -8,11 +8,12 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -23,21 +24,15 @@ class PlanetsMixin:
     def get_planets(self) -> dict:
         """Get the player's colonized planets.
 
-        Uses Rust parser for fast extraction when available, falls back to regex.
+        Uses Rust session when active for fast extraction, falls back to regex.
 
         Returns:
             Dict with planet details including population and districts
         """
-        # Try Rust parser first for faster extraction
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_planets_rust()
-            except ParserError as e:
-                logger.warning(f"Rust parser failed for planets: {e}, falling back to regex")
-            except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
-
-        # Fallback: regex-based parsing
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_planets_rust()
         return self._get_planets_regex()
 
     def _extract_planet_name(self, name_data) -> str:
@@ -105,11 +100,18 @@ class PlanetsMixin:
         return key
 
     def _get_planets_rust(self) -> dict:
-        """Get planets using Rust parser.
+        """Rust-optimized planets extraction using session mode.
+
+        Uses iter_section for fast planet iteration without regex.
+        Fixes truncation bugs in regex version (20MB limit).
 
         Returns:
             Dict with planet details including population and districts
         """
+        session = _get_active_session()
+        if not session:
+            return self._get_planets_regex()
+
         result = {
             'planets': [],
             'count': 0,
@@ -118,7 +120,7 @@ class PlanetsMixin:
 
         player_id = self.get_player_empire_id()
 
-        # Build population map from pop_groups section
+        # Build population map from pop_groups section (using session)
         pop_by_planet = self._get_population_by_planet_rust()
 
         # Get building types mapping
@@ -127,9 +129,10 @@ class PlanetsMixin:
         # Non-habitable planet types to skip
         non_habitable = {'asteroid', 'barren', 'barren_cold', 'molten', 'toxic', 'frozen', 'gas_giant'}
 
-        # Extract planets section
-        data = extract_sections(self.save_path, ["planets"])
-        planets_data = data.get("planets", {}).get("planet", {})
+        # Use session extract_sections for planets (reuses parsed data, no spawn)
+        # The planets section has nested structure: planets.planet.{id: {...}}
+        data = session.extract_sections(['planets'])
+        planets_data = data.get('planets', {}).get('planet', {})
 
         planets_found = []
 
@@ -296,18 +299,27 @@ class PlanetsMixin:
         return modifiers
 
     def _get_population_by_planet_rust(self) -> dict[int, int]:
-        """Build a mapping of planet_id -> total population using Rust parser.
+        """Build a mapping of planet_id -> total population using Rust session.
+
+        Uses session iter_section for fast iteration without spawning.
+        Falls back to regex if no session is active.
 
         Returns:
             Dict mapping planet_id (int) to total population (int)
         """
+        session = _get_active_session()
+        if not session:
+            return self._get_population_by_planet()
+
         pop_by_planet: dict[int, int] = {}
 
         try:
-            for key, pop_group in iter_section_entries(self.save_path, "pop_groups"):
+            for key, pop_group in session.iter_section("pop_groups"):
+                # P010: entry might be string "none" for deleted entries
                 if not isinstance(pop_group, dict):
                     continue
 
+                # P011: use .get() with defaults
                 planet_id = pop_group.get("planet")
                 size = pop_group.get("size")
 
