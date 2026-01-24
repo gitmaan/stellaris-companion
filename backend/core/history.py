@@ -759,28 +759,80 @@ def build_event_state_from_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
     return event_state
 
 
-def build_history_enrichment(*, gamestate: str | None, player_id: int | None) -> dict[str, Any]:
+def build_history_enrichment(
+    *,
+    gamestate: str | None,
+    player_id: int | None,
+    precomputed_signals: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Build the optional `history` payload stored with a snapshot.
 
     This is intentionally best-effort and returns an empty dict when inputs are missing.
+
+    Args:
+        gamestate: Raw gamestate string for regex-based extraction (legacy path).
+        player_id: The player's empire ID.
+        precomputed_signals: Optional SnapshotSignals dict from build_snapshot_signals().
+            When provided, uses signals data for leaders/wars/diplomacy instead of
+            parsing gamestate. This provides resolved names and better performance.
+
+    Returns:
+        History enrichment dict for storage with snapshot.
     """
-    if not gamestate:
+    # Start with precomputed signals if available
+    signals = precomputed_signals if isinstance(precomputed_signals, dict) else {}
+
+    # If no gamestate and no signals, return empty
+    if not gamestate and not signals:
         return {}
 
     resolved_player_id = int(player_id) if isinstance(player_id, int) else None
 
-    wars = extract_player_wars_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
-    leaders = extract_player_leaders_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
-    diplomacy = extract_player_diplomacy_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
-    galaxy = extract_galaxy_settings_from_gamestate(gamestate)
+    # Use precomputed signals when available, fall back to gamestate extraction
+    # Leaders: prefer signals (has resolved names), fall back to gamestate
+    if signals.get("leaders"):
+        leaders = signals["leaders"]
+    elif gamestate:
+        leaders = extract_player_leaders_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    else:
+        leaders = None
 
-    techs = extract_player_techs_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
-    policies = extract_player_policies_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
-    edicts = extract_player_edicts_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
-    megastructures = extract_megastructures_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
-    crisis = extract_crisis_from_gamestate(gamestate)
-    systems = extract_system_count_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
-    fallen_empires = extract_fallen_empires_from_gamestate(gamestate)
+    # Wars: prefer signals, fall back to gamestate
+    if signals.get("wars"):
+        wars = signals["wars"]
+    elif gamestate:
+        wars = extract_player_wars_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    else:
+        wars = None
+
+    # Diplomacy: prefer signals, fall back to gamestate
+    if signals.get("diplomacy"):
+        diplomacy = signals["diplomacy"]
+    elif gamestate:
+        diplomacy = extract_player_diplomacy_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+    else:
+        diplomacy = None
+
+    # Galaxy settings: always from gamestate (static data, not in signals)
+    galaxy = extract_galaxy_settings_from_gamestate(gamestate) if gamestate else None
+
+    # Remaining extractions: always from gamestate (not yet in signals)
+    if gamestate:
+        techs = extract_player_techs_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+        policies = extract_player_policies_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+        edicts = extract_player_edicts_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+        megastructures = extract_megastructures_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+        crisis = extract_crisis_from_gamestate(gamestate)
+        systems = extract_system_count_from_gamestate(gamestate=gamestate, player_id=resolved_player_id)
+        fallen_empires = extract_fallen_empires_from_gamestate(gamestate)
+    else:
+        techs = None
+        policies = None
+        edicts = None
+        megastructures = None
+        crisis = None
+        systems = None
+        fallen_empires = None
 
     history: dict[str, Any] = {}
     if wars:

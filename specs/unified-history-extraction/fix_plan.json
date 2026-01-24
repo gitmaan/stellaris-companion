@@ -43,6 +43,11 @@
       "id": "UHE-P008",
       "learning": "Diplomacy signals format: get_diplomacy() returns allies/rivals as lists of {id, name} dicts and treaty lists (defensive_pacts, commercial_pacts, etc.). Signals normalizes to sorted int lists matching history.py format for events.py compatibility.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P009",
+      "learning": "Backward compatibility: build_history_enrichment accepts precomputed_signals param. Uses signals for leaders/wars/diplomacy when available, falls back to gamestate extraction. Galaxy settings, techs, policies, edicts, megastructures, crisis, systems, fallen_empires still use gamestate (not yet in signals).",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -151,13 +156,13 @@
       "priority": 4,
       "description": "Add compatibility layer: history functions can accept precomputed signals payload instead of parsing gamestate. Keep old functions for backward compat with existing snapshots.",
       "files": ["backend/core/history.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'signals\\|precomputed' backend/core/history.py (accepts signals parameter)",
         "RUN: grep -q 'extract_player_leaders_from_gamestate' backend/core/history.py (old function still exists for compat)",
         "RUN: python3 -c \"from backend.core.history import build_history_enrichment; print('Import OK')\" (importable)"
       ],
-      "notes": "Old snapshots only have name_key. New snapshots have full signals with resolved names. History module bridges both."
+      "notes": "Old snapshots only have name_key. New snapshots have full signals with resolved names. History module bridges both. build_history_enrichment now accepts precomputed_signals param - uses signals for leaders/wars/diplomacy when available, falls back to gamestate for everything else."
     },
     {
       "id": "UHE-009",
