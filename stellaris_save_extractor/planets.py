@@ -548,7 +548,135 @@ class PlanetsMixin:
         return result
 
     def get_archaeology(self, limit: int = 25) -> dict:
-        """Get archaeological dig sites and progress (summary-first, capped)."""
+        """Get archaeological dig sites and progress (summary-first, capped).
+
+        Uses Rust session when active for fast extraction, falls back to regex.
+        """
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_archaeology_rust(limit)
+        return self._get_archaeology_regex(limit)
+
+    def _get_archaeology_rust(self, limit: int = 25) -> dict:
+        """Rust-optimized archaeology extraction using session mode.
+
+        Uses extract_sections for fast parsed dict access without regex.
+
+        Args:
+            limit: Maximum number of sites to return (1-50)
+
+        Returns:
+            Dict with archaeological site details
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_archaeology_regex(limit)
+
+        limit = max(1, min(int(limit or 25), 50))
+
+        result = {
+            "sites": [],
+            "count": 0,
+        }
+
+        # Use session extract_sections for archaeological_sites
+        data = session.extract_sections(["archaeological_sites"])
+        arch_data = data.get("archaeological_sites", {})
+        sites_data = arch_data.get("sites", {})
+
+        if not isinstance(sites_data, dict):
+            return result
+
+        sites_found = []
+
+        for site_id, site in sites_data.items():
+            # P010: entry might be string "none" for deleted entries
+            if not isinstance(site, dict):
+                continue
+
+            entry = {
+                "site_id": site_id,
+                "type": None,
+                "location": None,
+                "index": None,
+                "clues": None,
+                "difficulty": None,
+                "days_left": None,
+                "locked": None,
+                "last_excavator_country": None,
+                "excavator_fleet": None,
+                "completed_count": 0,
+                "last_completed_date": None,
+                "events_count": 0,
+                "active_events_count": 0,
+            }
+
+            # P011: use .get() with defaults
+            site_type = site.get("type")
+            if site_type:
+                entry["type"] = site_type
+
+            # Extract location
+            location = site.get("location")
+            if isinstance(location, dict):
+                loc_type = location.get("type")
+                loc_id = location.get("id")
+                if loc_type is not None and loc_id is not None:
+                    entry["location"] = {
+                        "type": int(loc_type),
+                        "id": int(loc_id),
+                    }
+
+            # Extract numeric fields
+            for key in ["index", "clues", "difficulty", "days_left",
+                        "last_excavator_country", "excavator_fleet"]:
+                value = site.get(key)
+                if value is not None:
+                    try:
+                        entry[key] = int(value)
+                    except (ValueError, TypeError):
+                        pass
+
+            # Extract locked boolean
+            locked = site.get("locked")
+            if locked is not None:
+                entry["locked"] = locked == "yes"
+
+            # Extract completed info
+            completed = site.get("completed")
+            if isinstance(completed, list):
+                entry["completed_count"] = len(completed)
+                # Get last completed date
+                for comp in completed:
+                    if isinstance(comp, dict):
+                        date = comp.get("date")
+                        if date:
+                            entry["last_completed_date"] = date
+
+            # Extract events info
+            events = site.get("events")
+            if isinstance(events, list):
+                entry["events_count"] = len(events)
+                # Count active (non-expired) events
+                active_count = 0
+                for evt in events:
+                    if isinstance(evt, dict):
+                        expired = evt.get("expired")
+                        if expired == "no":
+                            active_count += 1
+                entry["active_events_count"] = active_count
+
+            sites_found.append(entry)
+            if len(sites_found) >= limit:
+                break
+
+        result["sites"] = sites_found
+        result["count"] = len(sites_found)
+        return result
+
+    def _get_archaeology_regex(self, limit: int = 25) -> dict:
+        """Get archaeological dig sites using regex (fallback method)."""
         limit = max(1, min(int(limit or 25), 50))
 
         result = {
