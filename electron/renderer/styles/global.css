@@ -275,19 +275,31 @@ body {
 .chat-suggestions .suggestions-label {
   font-size: 13px;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
-.chat-suggestions ul {
-  list-style: none;
-  padding: 0;
+.suggestion-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.chat-suggestions li {
+.suggestion-buttons button {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 14px;
   font-size: 14px;
-  color: var(--accent-primary);
-  padding: 6px 0;
-  cursor: default;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.suggestion-buttons button:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ============================================

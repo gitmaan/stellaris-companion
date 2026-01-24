@@ -45,6 +45,47 @@ function getLoadingMessage(empireType: EmpireType | null): string {
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
+// Suggestion pools for the welcome screen
+const SUGGESTIONS = {
+  strategic: [
+    'What should the empire focus on next?',
+    "What's our most pressing concern?",
+    'What opportunities have we overlooked?',
+    'Assess our economic situation',
+    "What's our biggest weakness right now?",
+  ],
+  tactical: [
+    'Who poses the greatest threat to us?',
+    'Can we actually win a war right now?',
+    'How do our neighbors view us?',
+    'Any planets that need attention?',
+    'Where should we expand next?',
+    'How are our factions feeling?',
+  ],
+  wildcards: [
+    'Roast my empire',
+    "Are we worthy of the Fallen Empires' attention?",
+    'What will history say about our reign?',
+    'Would our founders be proud?',
+    'What defines our empire?',
+  ],
+}
+
+// Pick random items from an array
+function pickRandom<T>(arr: T[], count: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, count)
+}
+
+// Generate a set of suggestions: 2 strategic, 2 tactical, 1 wildcard
+function generateSuggestions(): string[] {
+  return [
+    ...pickRandom(SUGGESTIONS.strategic, 2),
+    ...pickRandom(SUGGESTIONS.tactical, 2),
+    ...pickRandom(SUGGESTIONS.wildcards, 1),
+  ].sort(() => Math.random() - 0.5) // Shuffle the final order
+}
+
 interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -79,6 +120,7 @@ function ChatPage() {
   const [sessionKey] = useState(() => `chat-${Date.now()}`)
   const [empireType, setEmpireType] = useState<EmpireType | null>(null)
   const [loadingMessage, setLoadingMessage] = useState<string>('Consulting the Curators')
+  const [suggestions] = useState<string[]>(() => generateSuggestions())
 
   // Track mounted state to prevent state updates after unmount
   const isMountedRef = useRef(true)
@@ -226,12 +268,13 @@ function ChatPage() {
             <p>Your strategic advisor awaits.</p>
             <div className="chat-suggestions">
               <p className="suggestions-label">Try asking:</p>
-              <ul>
-                <li>"What is my empire status?"</li>
-                <li>"What should I focus on next?"</li>
-                <li>"Analyze my economy"</li>
-                <li>"What threats should I be aware of?"</li>
-              </ul>
+              <div className="suggestion-buttons">
+                {suggestions.map((suggestion) => (
+                  <button key={suggestion} onClick={() => handleSend(suggestion)}>
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
