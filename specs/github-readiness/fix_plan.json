@@ -56,12 +56,12 @@
       "id": "GHR-004",
       "title": "Delete or move build_personality_prompt_v2",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "! grep -q 'def build_personality_prompt_v2(' personality.py || test -f experiments/test_optimized_vs_production.py",
         "python3 -c \"from personality import build_optimized_prompt; print('OK')\""
       ],
-      "notes": "Either delete v2 or keep it if experiments/test_optimized_vs_production.py needs it"
+      "notes": "Kept build_personality_prompt_v2 in personality.py because experiments/test_optimized_vs_production.py imports and uses it for A/B comparison tests"
     },
     {
       "id": "GHR-005",
@@ -177,6 +177,11 @@
       "id": "GHR-P004",
       "learned": "2026-01-24",
       "description": "When moving files to experiments/, update sys.path.insert to use parent.parent and .env paths similarly"
+    },
+    {
+      "id": "GHR-P005",
+      "learned": "2026-01-24",
+      "description": "build_personality_prompt_v2 is kept in personality.py because it's used by experiments/test_optimized_vs_production.py for A/B comparison tests. The OR-criteria allow keeping it when the experiment file exists."
     }
   ]
 }
