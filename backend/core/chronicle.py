@@ -17,14 +17,92 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any
 
 from google import genai
+from pydantic import BaseModel, Field
 
 from backend.core.database import GameDatabase
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================
+# Pydantic models for structured LLM output
+# ============================================
+
+
+class ChapterOutput(BaseModel):
+    """Structured output schema for chapter generation."""
+
+    title: str = Field(
+        description="A dramatic, thematic name for this chapter/era (e.g., 'The Cradle's Awakening', 'The Great Expansion')"
+    )
+    narrative: str = Field(
+        description="3-5 paragraphs of dramatic prose describing the events of this era (500-800 words). Write as a historian chronicling history, not as an advisor."
+    )
+    summary: str = Field(
+        description="2-3 sentences summarizing the key events for context in future chapters."
+    )
+
+
+def _repair_json_string(text: str) -> str:
+    """Repair JSON with unescaped newlines in string values.
+
+    Gemini sometimes returns JSON with literal newlines inside strings,
+    which is invalid JSON. This function escapes them properly.
+    """
+    # Strategy: Find string values and escape newlines within them
+    # This regex finds content between quotes (handling escaped quotes)
+    result = []
+    in_string = False
+    escape_next = False
+    i = 0
+
+    while i < len(text):
+        char = text[i]
+
+        if escape_next:
+            result.append(char)
+            escape_next = False
+            i += 1
+            continue
+
+        if char == '\\':
+            result.append(char)
+            escape_next = True
+            i += 1
+            continue
+
+        if char == '"':
+            result.append(char)
+            in_string = not in_string
+            i += 1
+            continue
+
+        if in_string and char == '\n':
+            # Escape the newline
+            result.append('\\n')
+            i += 1
+            continue
+
+        if in_string and char == '\r':
+            # Skip carriage returns (will be part of \r\n -> \n)
+            i += 1
+            continue
+
+        if in_string and char == '\t':
+            # Escape tabs
+            result.append('\\t')
+            i += 1
+            continue
+
+        result.append(char)
+        i += 1
+
+    return ''.join(result)
 
 
 # Era-ending event types that trigger chapter finalization
@@ -755,9 +833,6 @@ Requirements:
 
 Do NOT give advice. You are a historian, not an advisor.
 Do NOT fabricate events not in the event list.
-
-Respond in this exact JSON format:
-{{"title": "Chapter Title", "narrative": "Full narrative text...", "summary": "Brief summary..."}}
 """
 
         try:
@@ -768,18 +843,39 @@ Respond in this exact JSON format:
                     "temperature": 1.0,
                     "max_output_tokens": 2048,
                     "response_mime_type": "application/json",
+                    "response_schema": ChapterOutput,
                 },
             )
 
-            # Parse JSON response
-            result = json.loads(response.text)
+            # Parse with Pydantic for validation
+            chapter = ChapterOutput.model_validate_json(response.text)
             return {
-                "title": result.get("title", f"Chapter {chapter_number}"),
-                "narrative": result.get("narrative", ""),
-                "summary": result.get("summary", ""),
+                "title": chapter.title,
+                "narrative": chapter.narrative,
+                "summary": chapter.summary,
             }
-        except (json.JSONDecodeError, Exception) as e:
-            # Fallback: try to extract from plain text
+        except Exception as e:
+            # Fallback for errors - try JSON repair as last resort
+            logger.warning("Structured output failed for chapter %d: %s", chapter_number, e)
+            try:
+                # Attempt JSON repair if we got a response
+                if hasattr(e, '__context__') and hasattr(e.__context__, 'doc'):
+                    raw_text = e.__context__.doc
+                else:
+                    raw_text = getattr(response, 'text', '') if 'response' in dir() else ''
+
+                if raw_text:
+                    repaired = _repair_json_string(raw_text)
+                    result = json.loads(repaired)
+                    logger.info("JSON repair succeeded for chapter %d", chapter_number)
+                    return {
+                        "title": result.get("title", f"Chapter {chapter_number}"),
+                        "narrative": result.get("narrative", ""),
+                        "summary": result.get("summary", ""),
+                    }
+            except Exception:
+                pass
+
             return {
                 "title": f"Chapter {chapter_number}",
                 "narrative": f"[Generation error: {e}]",
