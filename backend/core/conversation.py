@@ -1,3 +1,12 @@
+"""Conversation management for multi-turn chat sessions.
+
+Provides sliding-window conversation memory with per-session isolation,
+automatic timeout handling, and prompt building for the LLM advisor.
+
+The design is intentionally simple: each turn re-injects the full briefing,
+and only recent chat history is retained for follow-up context. This avoids
+unbounded context growth while supporting conversational continuity.
+"""
 from __future__ import annotations
 
 import threading
@@ -7,6 +16,15 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Turn:
+    """A single question-answer exchange in a conversation.
+
+    Attributes:
+        question: The user's question text.
+        answer: The advisor's response text.
+        game_date: The in-game date when this turn occurred (e.g., "2250.03.15").
+        created_at: Unix timestamp when this turn was recorded.
+    """
+
     question: str
     answer: str
     game_date: str | None
@@ -15,6 +33,14 @@ class Turn:
 
 @dataclass
 class Session:
+    """A conversation session containing turn history and metadata.
+
+    Attributes:
+        history: List of Turn objects in chronological order.
+        last_game_date: Most recent in-game date seen in this session.
+        last_active: Unix timestamp of last activity (for timeout detection).
+    """
+
     history: list[Turn] = field(default_factory=list)
     last_game_date: str | None = None
     last_active: float = field(default_factory=time.time)
@@ -25,6 +51,11 @@ class ConversationManager:
 
     This is intentionally simple: /ask re-injects the full briefing each turn,
     and we keep only a small amount of recent chat history to support follow-ups.
+
+    Attributes:
+        max_turns: Maximum number of turns to retain in history.
+        timeout_seconds: Seconds of inactivity before session expires.
+        max_answer_chars: Maximum characters to include from previous answers.
     """
 
     def __init__(
@@ -42,12 +73,22 @@ class ConversationManager:
         self._sessions: dict[str, Session] = {}
 
     def _now(self) -> float:
+        """Return current Unix timestamp."""
         return time.time()
 
     def _is_expired(self, session: Session) -> bool:
+        """Check if a session has exceeded the inactivity timeout."""
         return (self._now() - float(session.last_active or 0.0)) > self.timeout_seconds
 
     def _get_or_create(self, session_key: str) -> Session:
+        """Get existing session or create a new one, expiring stale sessions.
+
+        Args:
+            session_key: Unique identifier for the session (e.g., Discord user ID).
+
+        Returns:
+            The active Session object with updated last_active timestamp.
+        """
         with self._lock:
             session = self._sessions.get(session_key)
             if session and self._is_expired(session):
@@ -60,6 +101,11 @@ class ConversationManager:
             return session
 
     def clear(self, session_key: str) -> None:
+        """Remove a session and its history.
+
+        Args:
+            session_key: Unique identifier for the session to clear.
+        """
         with self._lock:
             self._sessions.pop(session_key, None)
 
@@ -73,6 +119,27 @@ class ConversationManager:
         data_note: str | None = None,
         history_context: str | None = None,
     ) -> str:
+        """Build the full prompt for the LLM including context and history.
+
+        Assembles a prompt containing:
+        - Optional data note (warnings about data quality)
+        - Game date change notification if date progressed
+        - Current empire state as JSON briefing
+        - Optional history context for trend questions
+        - Recent conversation turns (sliding window)
+        - The current user question
+
+        Args:
+            session_key: Unique identifier for the session.
+            briefing_json: JSON string of current empire state.
+            game_date: Current in-game date (e.g., "2250.03.15").
+            question: The user's current question.
+            data_note: Optional warning about data quality/freshness.
+            history_context: Optional historical data for trend analysis.
+
+        Returns:
+            The assembled prompt string ready for LLM input.
+        """
         session = self._get_or_create(session_key)
 
         lines: list[str] = []
@@ -122,6 +189,17 @@ class ConversationManager:
         answer: str,
         game_date: str | None,
     ) -> None:
+        """Record a completed question-answer exchange in the session history.
+
+        Appends the turn to history and trims to max_turns if needed.
+        Updates the session's last_game_date and last_active timestamp.
+
+        Args:
+            session_key: Unique identifier for the session.
+            question: The user's question text.
+            answer: The advisor's response text.
+            game_date: The in-game date when this turn occurred.
+        """
         session = self._get_or_create(session_key)
         session.history.append(Turn(question=question, answer=answer, game_date=game_date))
         session.last_game_date = game_date or session.last_game_date

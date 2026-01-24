@@ -79,12 +79,12 @@
       "id": "GHR-006",
       "title": "Add docstrings to conversation.py",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "grep -q '\"\"\"' backend/core/conversation.py",
         "python3 -c \"from backend.core.conversation import ConversationManager; print(ConversationManager.__doc__ or 'NO DOC')\" | grep -v 'NO DOC'"
       ],
-      "notes": "Currently 0% docstring coverage"
+      "notes": "Added module-level docstring, class docstrings for Turn/Session/ConversationManager, and method docstrings for all public and private methods."
     },
     {
       "id": "GHR-007",
