@@ -1,175 +1,164 @@
 {
-  "feature": "Rust Session Mode Optimization",
-  "description": "Optimize session mode performance by fixing IPC overhead and eliminating regex scans",
+  "feature": "Regex-to-Rust Migration",
+  "description": "Migrate regex-based extraction to Rust session operations for accuracy and performance",
   "spec_dir": "specs/rust-session-mode",
-  "branch": "ralph/session-optimization",
+  "branch": "ralph/regex-migration",
   "patterns": [
-    {
-      "id": "P001",
-      "learning": "Use python3, not bare python",
-      "date": "2026-01-22"
-    },
-    {
-      "id": "P002",
-      "learning": "Rust cargo is at ~/.cargo/bin/cargo",
-      "date": "2026-01-23"
-    },
-    {
-      "id": "P003",
-      "learning": "Session mode already implemented in rust_bridge.py and serve.rs",
-      "date": "2026-01-23"
-    },
-    {
-      "id": "P004",
-      "learning": "Profiling shows: 77s regex (54%), 14s IPC (10%), 51s Python processing (36%)",
-      "date": "2026-01-23"
-    },
-    {
-      "id": "P005",
-      "learning": "Use count_keys (tree traversal) not Aho-Corasick for structured key counting - avoids boundary issues",
-      "date": "2026-01-23"
-    },
     {
       "id": "P006",
       "learning": "Keep game logic in Python, Rust provides fast primitives only",
       "date": "2026-01-23"
     },
     {
-      "id": "P007",
-      "learning": "Criterion checks should target specific functions (use sed -n '/fn name/,/^fn /p') not whole files when checking for patterns like value.clone()",
-      "date": "2026-01-24"
-    },
-    {
       "id": "P008",
-      "learning": "Mixin files have both _rust and _regex methods - regex fallbacks are intentional. Criteria should check that count_keys/contains_tokens are USED, not that regex is completely eliminated from the file",
+      "learning": "Mixin files have both _rust and _regex methods - regex fallbacks are intentional. Criteria should check that Rust methods exist and are USED, not that regex is completely eliminated",
       "date": "2026-01-24"
     },
     {
       "id": "P009",
-      "learning": "session() returns a context manager. CRITICAL: Keep a reference to it! 'ctx=session(path); s=ctx.__enter__()' works, but 's=session(path).__enter__()' FAILS because losing the ctx reference triggers GC which runs finally block immediately. Use RustSession(path) directly for simplest one-liners.",
+      "learning": "session() returns a context manager. Keep a reference! 'ctx=session(path); s=ctx.__enter__()' works. Use RustSession(path) directly for simplest one-liners",
+      "date": "2026-01-24"
+    },
+    {
+      "id": "P010",
+      "learning": "Entry from iter_section might be string 'none' (deleted entry) - always check isinstance(entry, dict) before accessing",
+      "date": "2026-01-24"
+    },
+    {
+      "id": "P011",
+      "learning": "Use .get() with defaults, never direct [] access on parsed entries - fields may be missing",
+      "date": "2026-01-24"
+    },
+    {
+      "id": "P012",
+      "learning": "Fields can be str, int, float, dict, or list - handle type variations with isinstance checks",
+      "date": "2026-01-24"
+    },
+    {
+      "id": "P013",
+      "learning": "Entry IDs from iter_section are strings, convert to int if needed for comparison",
+      "date": "2026-01-24"
+    },
+    {
+      "id": "P014",
+      "learning": "Follow MIGRATION_PATTERN.md: 1.BASELINE 2.ANALYZE 3.IMPLEMENT 4.COMPARE 5.BENCHMARK 6.DISPATCH 7.FALLBACK",
       "date": "2026-01-24"
     }
   ],
   "stories": [
     {
-      "id": "OPT-001",
-      "title": "Remove value.clone() in serve.rs streaming",
+      "id": "MIG-001",
+      "title": "Add get_entry operation to serve.rs",
       "priority": 1,
-      "description": "Serialize entries directly without cloning the entire Value tree",
-      "files": ["stellaris-parser/src/commands/serve.rs"],
+      "description": "Fetch a single entry by section and key ID - avoids iterating entire section",
+      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
       "passes": true,
       "criteria": [
-        "RUN: sed -n '/fn handle_iter_section/,/^fn /p' stellaris-parser/src/commands/serve.rs | grep -c 'value.clone()' | grep -q '^0$' (no value.clone in streaming function)",
-        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
+        "RUN: grep -q 'get_entry' stellaris-parser/src/commands/serve.rs (operation exists)",
+        "RUN: grep -q 'def get_entry' rust_bridge.py (Python wrapper exists)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
         "RUN: cd stellaris-parser && ~/.cargo/bin/cargo test 2>&1 | grep -q 'test result: ok' (tests pass)",
-        "RUN: echo '{\"op\":\"iter_section\",\"section\":\"country\"}' | ./stellaris-parser/target/release/stellaris-parser serve --path test_save.sav 2>/dev/null | head -3 | grep -q 'ok.*true' (iter_section still works)"
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entry('country', '0'); s.close(); print(type(r)); assert isinstance(r, dict)\" (returns dict for valid ID)"
+      ],
+      "notes": "Implemented 2026-01-24. Returns entry dict if found, None if not found."
+    },
+    {
+      "id": "MIG-002",
+      "title": "Add get_entries operation to serve.rs",
+      "priority": 1,
+      "description": "Batch fetch multiple entries by IDs with optional field projection - key for owned fleet lookup",
+      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_entries' stellaris-parser/src/commands/serve.rs (operation exists)",
+        "RUN: grep -q 'def get_entries' rust_bridge.py (Python wrapper exists)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entries('country', ['0','1','2']); s.close(); print(len(r)); assert len(r) >= 1\" (returns multiple entries)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entries('country', ['0'], fields=['name','type']); s.close(); print(r); assert 'name' in str(r) or len(r) > 0\" (field projection works)"
       ],
       "notes": ""
     },
     {
-      "id": "OPT-002",
-      "title": "Add batched streaming to serve.rs",
+      "id": "MIG-003",
+      "title": "Add contains_kv operation to serve.rs",
       "priority": 2,
-      "description": "Batch entries (100 per message) to reduce IPC overhead from 104K to ~1K messages",
+      "description": "Whitespace-insensitive key=value check - fixes contains_tokens limitation for patterns like 'war_in_heaven=yes'",
       "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": true,
+      "passes": false,
       "criteria": [
-        "RUN: grep -q 'batch_size' stellaris-parser/src/commands/serve.rs (batch_size parameter exists)",
-        "RUN: grep -q 'entries' stellaris-parser/src/commands/serve.rs (batched entries field exists)",
-        "RUN: grep -q 'entries' rust_bridge.py (Python handles batched responses)",
-        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
-        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); c=sum(1 for _ in s.iter_section('country')); s.close(); print(f'Got {c} countries'); assert c > 0\" (batched iteration works)"
+        "RUN: grep -q 'contains_kv' stellaris-parser/src/commands/serve.rs (operation exists)",
+        "RUN: grep -q 'def contains_kv' rust_bridge.py (Python wrapper exists)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.contains_kv([('version', '3')]); s.close(); print(r); assert 'matches' in r\" (returns matches dict)"
       ],
-      "notes": ""
+      "notes": "Should handle both 'key=value' and 'key = value' formatting"
     },
     {
-      "id": "OPT-003",
-      "title": "Add count_keys operation to serve.rs",
+      "id": "MIG-004",
+      "title": "Optimize _analyze_player_fleets with get_entries",
       "priority": 3,
-      "description": "Tree traversal to count occurrences of specific keys - replaces regex findall patterns",
-      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": true,
+      "description": "Replace iter_section loop with get_entries for owned fleet IDs - avoid iterating 10K+ fleets",
+      "files": ["stellaris_save_extractor/base.py"],
+      "passes": false,
       "criteria": [
-        "RUN: grep -q 'count_keys' stellaris-parser/src/commands/serve.rs (operation implemented)",
-        "RUN: grep -q 'count_keys' rust_bridge.py (Python wrapper exists)",
-        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
-        "RUN: echo '{\"op\":\"count_keys\",\"keys\":[\"name\",\"type\",\"flag\"]}' | ./stellaris-parser/target/release/stellaris-parser serve --path test_save.sav 2>/dev/null | grep -q 'counts' (returns counts)",
-        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.count_keys(['name','type']); s.close(); print(r); assert 'counts' in r\" (Python wrapper works)"
+        "RUN: grep -q 'get_entries.*fleet' stellaris_save_extractor/base.py (uses get_entries for fleets)",
+        "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import RustSession; s=RustSession('test_save.sav'); e=SaveExtractor('test_save.sav'); start=time.time(); r=e._analyze_player_fleets(['16781652','486539286']); elapsed=time.time()-start; s.close(); print(f'Time: {elapsed:.3f}s'); assert elapsed < 0.05\" (faster than iter_section approach)"
       ],
-      "notes": ""
+      "notes": "Depends on MIG-002 (get_entries)"
     },
     {
-      "id": "OPT-004",
-      "title": "Add contains_tokens operation to serve.rs",
+      "id": "MIG-005",
+      "title": "Migrate get_diplomacy relations parsing",
       "priority": 4,
-      "description": "Aho-Corasick scan for simple string presence checks - replaces re.search patterns",
-      "files": ["stellaris-parser/src/commands/serve.rs", "stellaris-parser/Cargo.toml", "rust_bridge.py"],
-      "passes": true,
+      "description": "Replace 80KB-limited regex with Rust session - accuracy critical for large empires",
+      "files": ["stellaris_save_extractor/diplomacy.py"],
+      "passes": false,
       "criteria": [
-        "RUN: grep -q 'aho-corasick' stellaris-parser/Cargo.toml (dependency added)",
-        "RUN: grep -q 'contains_tokens' stellaris-parser/src/commands/serve.rs (operation implemented)",
-        "RUN: grep -q 'contains_tokens' rust_bridge.py (Python wrapper exists)",
-        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
-        "RUN: echo '{\"op\":\"contains_tokens\",\"tokens\":[\"country\",\"nonexistent_xyz\"]}' | ./stellaris-parser/target/release/stellaris-parser serve --path test_save.sav 2>/dev/null | grep -q 'matches' (returns matches)",
-        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.contains_tokens(['country','xyz123']); s.close(); print(r); assert r.get('matches',{}).get('country')==True\" (Python wrapper works)"
+        "RUN: grep -q '_get_diplomacy_rust' stellaris_save_extractor/diplomacy.py (Rust method exists)",
+        "RUN: grep -q '_get_diplomacy_regex' stellaris_save_extractor/diplomacy.py (fallback exists)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import RustSession; s=RustSession('test_save.sav'); e=SaveExtractor('test_save.sav'); r=e.get_diplomacy(); s.close(); print('relations' in str(r) or 'opinion' in str(r) or len(r) > 0)\" (get_diplomacy works with session)"
       ],
-      "notes": ""
+      "notes": "Follow MIGRATION_PATTERN.md - baseline first, compare output"
     },
     {
-      "id": "OPT-005",
-      "title": "Update endgame.py to use count_keys",
+      "id": "MIG-006",
+      "title": "Migrate get_military_summary",
       "priority": 5,
-      "description": "Replace re.findall crisis counting with count_keys operation",
-      "files": ["stellaris_save_extractor/endgame.py"],
-      "passes": true,
+      "description": "Fleet and war data extraction using Rust session",
+      "files": ["stellaris_save_extractor/military.py"],
+      "passes": false,
       "criteria": [
-        "RUN: grep -q 'count_keys' stellaris_save_extractor/endgame.py (uses count_keys)",
-        "RUN: grep -q '_get_active_session' stellaris_save_extractor/endgame.py (imports session helper)",
-        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; sess=session('test_save.sav').__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_crisis_status(); print('crisis_systems_count:', r.get('crisis_systems_count')); sess.close()\" 2>&1 | grep -q 'crisis_systems_count' (get_crisis_status works)"
+        "RUN: grep -q '_get_military_summary_rust' stellaris_save_extractor/military.py (Rust method exists)",
+        "RUN: grep -q '_get_active_session' stellaris_save_extractor/military.py (imports session)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import RustSession; s=RustSession('test_save.sav'); e=SaveExtractor('test_save.sav'); r=e.get_military_summary(); s.close(); print(r); assert isinstance(r, dict)\" (works with session)"
       ],
-      "notes": "Criterion 1 updated: Original checked for zero re.findall on gamestate in entire file, but _regex fallback methods legitimately use regex. Now checks that count_keys is used. Criterion 3 updated: session() is a context manager, use __enter__() or RustSession directly."
+      "notes": "Follow MIGRATION_PATTERN.md"
     },
     {
-      "id": "OPT-006",
-      "title": "Update leviathans.py to use contains_tokens",
+      "id": "MIG-007",
+      "title": "Migrate get_planets",
       "priority": 6,
-      "description": "Replace re.search defeat checks with contains_tokens operation",
-      "files": ["stellaris_save_extractor/leviathans.py"],
-      "passes": true,
+      "description": "Planet data with complex nested structures (pops, buildings, districts)",
+      "files": ["stellaris_save_extractor/planets.py"],
+      "passes": false,
       "criteria": [
-        "RUN: grep -q '_check_leviathans_defeated_rust' stellaris_save_extractor/leviathans.py (rust defeat check method exists)",
-        "RUN: grep -q 'contains_tokens' stellaris_save_extractor/leviathans.py (uses contains_tokens)",
-        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import RustSession; s=RustSession('test_save.sav'); e=SaveExtractor('test_save.sav'); r=e.get_leviathans(); print(r); s.close()\" 2>&1 | grep -q 'leviathans' (get_leviathans works)"
+        "RUN: grep -q '_get_planets_rust' stellaris_save_extractor/planets.py (Rust method exists)",
+        "RUN: grep -q '_get_active_session' stellaris_save_extractor/planets.py (imports session)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import RustSession; s=RustSession('test_save.sav'); e=SaveExtractor('test_save.sav'); r=e.get_planets(); s.close(); print(f'Got {len(r)} planets'); assert len(r) > 0\" (works with session)"
       ],
-      "notes": "Criterion 1 updated per P008: Mixin files have regex fallbacks which are intentional. Check that rust-specific methods exist rather than zero regex usage. Criterion 3 updated: Use RustSession directly instead of session() context manager in one-liner."
+      "notes": "Follow MIGRATION_PATTERN.md - complex nested structures, test thoroughly"
     },
     {
-      "id": "OPT-007",
-      "title": "Add get_country_summaries operation",
+      "id": "MIG-008",
+      "title": "Performance validation - target <2s briefing",
       "priority": 7,
-      "description": "Return lightweight country projections to replace 15 full iterations",
-      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": true,
-      "criteria": [
-        "RUN: grep -q 'get_country_summaries' stellaris-parser/src/commands/serve.rs (operation implemented)",
-        "RUN: grep -q 'get_country_summaries' rust_bridge.py (Python wrapper exists)",
-        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds successfully)",
-        "RUN: echo '{\"op\":\"get_country_summaries\",\"fields\":[\"name\",\"type\"]}' | ./stellaris-parser/target/release/stellaris-parser serve --path test_save.sav 2>/dev/null | grep -q 'countries' (returns countries)",
-        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_country_summaries(['name']); s.close(); print(len(r.get('countries',[]))); assert len(r.get('countries',[])) > 0\" (Python wrapper works)"
-      ],
-      "notes": ""
-    },
-    {
-      "id": "OPT-008",
-      "title": "Performance validation",
-      "priority": 8,
-      "description": "Verify briefing generation is significantly faster",
+      "description": "Verify full briefing meets target after all migrations",
       "files": [],
-      "passes": true,
+      "passes": false,
       "criteria": [
-        "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import session; start=time.time(); ctx=session('test_save.sav'); sess=ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); ctx.__exit__(None,None,None); elapsed=time.time()-start; print(f'Briefing time: {elapsed:.1f}s'); assert elapsed < 15, f'Too slow: {elapsed}s'\" (briefing under 15 seconds)"
+        "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import session; start=time.time(); ctx=session('test_save.sav'); sess=ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); ctx.__exit__(None,None,None); elapsed=time.time()-start; print(f'Briefing: {elapsed:.2f}s'); assert elapsed < 3, f'Too slow: {elapsed}s'\" (briefing under 3 seconds)"
       ],
-      "notes": "Criterion updated: Must keep reference to context manager (ctx), not just session. session(...).__enter__() loses the ctx reference, triggering immediate GC which runs finally block and clears _tls.session."
+      "notes": "Target is <2s, criteria allows 3s buffer. Current baseline: 3.87s"
     }
   ],
   "discovered": []

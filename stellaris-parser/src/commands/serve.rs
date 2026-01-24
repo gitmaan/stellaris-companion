@@ -22,6 +22,7 @@ enum Request {
         #[serde(default = "default_batch_size")]
         batch_size: usize,
     },
+    GetEntry { section: String, key: String },
     CountKeys { keys: Vec<String> },
     ContainsTokens { tokens: Vec<String> },
     GetCountrySummaries { fields: Vec<String> },
@@ -47,6 +48,10 @@ struct SuccessResponse {
 enum ResponseData {
     Extract {
         data: Value,
+    },
+    SingleEntry {
+        entry: Value,
+        found: bool,
     },
     StreamHeader {
         stream: bool,
@@ -268,6 +273,33 @@ fn handle_iter_section(parsed: &ParsedSave, section: String, batch_size: usize) 
     })
 }
 
+/// Handle get_entry operation - fetch a single entry by section and key
+fn handle_get_entry(parsed: &ParsedSave, section: String, key: String) -> io::Result<()> {
+    // Get the section from gamestate
+    if let Some(section_value) = parsed.gamestate.get(&section) {
+        if let Value::Object(map) = section_value {
+            if let Some(entry_value) = map.get(&key) {
+                return write_response(&SuccessResponse {
+                    ok: true,
+                    data: ResponseData::SingleEntry {
+                        entry: entry_value.clone(),
+                        found: true,
+                    },
+                });
+            }
+        }
+    }
+
+    // Entry not found - return null with found=false
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::SingleEntry {
+            entry: Value::Null,
+            found: false,
+        },
+    })
+}
+
 /// Handle count_keys operation - traverse tree and count occurrences of specified keys
 fn handle_count_keys(parsed: &ParsedSave, keys: Vec<String>) -> io::Result<()> {
     use std::collections::HashSet;
@@ -426,6 +458,9 @@ pub fn run(path: &str) -> Result<()> {
             Request::IterSection { section, batch_size } => {
                 handle_iter_section(&parsed, section, batch_size)
             }
+            Request::GetEntry { section, key } => {
+                handle_get_entry(&parsed, section, key)
+            }
             Request::CountKeys { keys } => {
                 handle_count_keys(&parsed, keys)
             }
@@ -492,6 +527,19 @@ mod tests {
             Request::IterSection { section, batch_size } => {
                 assert_eq!(section, "country");
                 assert_eq!(batch_size, 50);
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_get_entry_request() {
+        let json = r#"{"op": "get_entry", "section": "country", "key": "0"}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::GetEntry { section, key } => {
+                assert_eq!(section, "country");
+                assert_eq!(key, "0");
             }
             _ => panic!("Wrong request type"),
         }

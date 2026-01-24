@@ -322,6 +322,31 @@ class RustSession:
                 entry = frame["entry"]
                 yield entry.get("key", ""), entry.get("value", {})
 
+    def get_entry(self, section: str, key: str) -> dict | None:
+        """Fetch a single entry by section and key ID.
+
+        This is more efficient than iter_section when you know the exact
+        entry you need, as it avoids iterating over the entire section.
+
+        Args:
+            section: Section name (e.g., "country", "fleet")
+            key: Entry ID/key (e.g., "0", "12345")
+
+        Returns:
+            The entry dict if found, None if not found.
+            Note: Entry might be the string "none" for deleted entries,
+            so always check isinstance(result, dict) before use.
+
+        Example:
+            >>> sess.get_entry("country", "0")
+            {"name": "UNE", "type": "default", ...}
+        """
+        self._send({"op": "get_entry", "section": section, "key": key})
+        response = self._recv()
+        if response.get("found", False):
+            return response.get("entry")
+        return None
+
     def count_keys(self, keys: list[str]) -> dict:
         """Count occurrences of specific keys throughout the parsed save.
 
