@@ -378,11 +378,11 @@
       "priority": 10,
       "description": "Verify that all migrated fields (leaders, wars, diplomacy, technology, megastructures, crisis, fallen_empires) use signals, not gamestate regex.",
       "files": [],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); required=['leaders','wars','diplomacy','technology','megastructures','crisis','fallen_empires']; missing=[f for f in required if f not in s]; print(f'Missing signals: {missing}'); assert not missing\" (all signal types present)"
       ],
-      "notes": "This validates the expanded signals coverage. At this point, history.py should rarely need gamestate."
+      "notes": "All signal types are now present. build_history_enrichment uses signals for all migrated fields. Only galaxy settings and systems count still require gamestate."
     }
   ],
   "discovered": []
