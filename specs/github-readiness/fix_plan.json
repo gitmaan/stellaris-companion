@@ -1,0 +1,171 @@
+{
+  "name": "GitHub Readiness",
+  "description": "Prepare codebase for public GitHub publication",
+  "created": "2026-01-24",
+  "stories": [
+    {
+      "id": "GHR-001",
+      "title": "Fix .gitignore and remove tracked artifacts",
+      "priority": 1,
+      "passes": true,
+      "criteria": [
+        "grep -q 'stellaris-parser/target/' .gitignore",
+        "grep -q '_results.md' .gitignore",
+        "! git ls-files --cached | grep -q 'stellaris-parser/target/'",
+        "! git ls-files --cached | grep -q '_results.md$'"
+      ],
+      "notes": "Completed: benchmark_results.md was tracked, removed from index with git rm --cached"
+    },
+    {
+      "id": "GHR-002",
+      "title": "Move experiment files to experiments/ directory",
+      "priority": 2,
+      "passes": false,
+      "criteria": [
+        "test -d experiments",
+        "test -f experiments/test_fresh_stress.py",
+        "test -f experiments/test_tool_stress.py",
+        "test -f experiments/test_option_a.py",
+        "test -f experiments/test_optimized_prompt.py",
+        "test -f experiments/test_optimized_vs_production.py",
+        "test -f experiments/benchmark_option_b.py",
+        "test -f experiments/benchmark_comparison.py",
+        "! test -f test_fresh_stress.py",
+        "! test -f benchmark_option_b.py"
+      ],
+      "notes": "Move root-level test_*.py and benchmark_*.py that are experiments, not unit tests"
+    },
+    {
+      "id": "GHR-003",
+      "title": "Delete dead personality.py v1 code",
+      "priority": 3,
+      "passes": false,
+      "criteria": [
+        "! grep -q 'def build_personality_prompt(' personality.py",
+        "! grep -q 'def _build_standard_personality(' personality.py",
+        "! grep -q 'def _build_machine_personality(' personality.py",
+        "! grep -q 'def _build_hive_mind_personality(' personality.py",
+        "! grep -q 'def _build_situational_tone(' personality.py",
+        "! grep -q 'def _build_tool_instructions(' personality.py",
+        "python3 -c \"from personality import build_optimized_prompt; print('OK')\"",
+        "python3 -c \"from personality import load_patch_notes; print('OK')\""
+      ],
+      "notes": "Delete lines 329-515. Keep load_patch_notes, _build_machine_optimized, _build_hive_optimized"
+    },
+    {
+      "id": "GHR-004",
+      "title": "Delete or move build_personality_prompt_v2",
+      "priority": 3,
+      "passes": false,
+      "criteria": [
+        "! grep -q 'def build_personality_prompt_v2(' personality.py || test -f experiments/test_optimized_vs_production.py",
+        "python3 -c \"from personality import build_optimized_prompt; print('OK')\""
+      ],
+      "notes": "Either delete v2 or keep it if experiments/test_optimized_vs_production.py needs it"
+    },
+    {
+      "id": "GHR-005",
+      "title": "Delete deprecated companion.py methods",
+      "priority": 3,
+      "passes": false,
+      "criteria": [
+        "! grep -q 'def get_full_briefing(' backend/core/companion.py",
+        "! grep -q 'def chat_async(' backend/core/companion.py",
+        "python3 -c \"from backend.core.companion import StrategicCompanion; print('OK')\""
+      ],
+      "notes": "Delete get_full_briefing (deprecated) and chat_async (never called)"
+    },
+    {
+      "id": "GHR-006",
+      "title": "Add docstrings to conversation.py",
+      "priority": 4,
+      "passes": false,
+      "criteria": [
+        "grep -q '\"\"\"' backend/core/conversation.py",
+        "python3 -c \"from backend.core.conversation import ConversationManager; print(ConversationManager.__doc__ or 'NO DOC')\" | grep -v 'NO DOC'"
+      ],
+      "notes": "Currently 0% docstring coverage"
+    },
+    {
+      "id": "GHR-007",
+      "title": "Add docstrings to reporting.py",
+      "priority": 4,
+      "passes": false,
+      "criteria": [
+        "grep -q '\"\"\"' backend/core/reporting.py",
+        "head -20 backend/core/reporting.py | grep -q '\"\"\"'"
+      ],
+      "notes": "Currently 0% docstring coverage"
+    },
+    {
+      "id": "GHR-008",
+      "title": "Standardize logging in ingestion_worker.py",
+      "priority": 5,
+      "passes": false,
+      "criteria": [
+        "! grep -q 'print(' backend/core/ingestion_worker.py || grep 'print(' backend/core/ingestion_worker.py | grep -q 'file=sys.stderr'",
+        "python3 -c \"from backend.core.ingestion_worker import run_worker_job; print('OK')\""
+      ],
+      "notes": "Replace print() with logger or keep stderr prints for timing diagnostics (acceptable)"
+    },
+    {
+      "id": "GHR-009",
+      "title": "Run black formatter on Python files",
+      "priority": 5,
+      "passes": false,
+      "criteria": [
+        "pip3 show black > /dev/null 2>&1 || pip3 install black",
+        "black --check backend/ stellaris_save_extractor/ personality.py save_extractor.py 2>&1 | grep -q 'would be reformatted' && exit 1 || exit 0"
+      ],
+      "notes": "Normalize quote styles and formatting"
+    },
+    {
+      "id": "GHR-010",
+      "title": "Fix hardcoded paths in benchmark_comparison.py",
+      "priority": 6,
+      "passes": false,
+      "criteria": [
+        "! grep -q '/Users/avani/' experiments/benchmark_comparison.py || ! test -f experiments/benchmark_comparison.py"
+      ],
+      "notes": "Replace absolute paths with relative or Path(__file__).parent patterns"
+    },
+    {
+      "id": "GHR-011",
+      "title": "Add basic tests for signals.py",
+      "priority": 7,
+      "passes": false,
+      "criteria": [
+        "test -f tests/test_signals.py",
+        "grep -q 'def test_' tests/test_signals.py",
+        "grep -q 'build_snapshot_signals' tests/test_signals.py",
+        "python3 -m pytest tests/test_signals.py -v --tb=short 2>&1 | grep -q 'passed'"
+      ],
+      "notes": "At minimum test build_snapshot_signals returns expected structure"
+    },
+    {
+      "id": "GHR-012",
+      "title": "Add basic tests for events.py",
+      "priority": 7,
+      "passes": false,
+      "criteria": [
+        "test -f tests/test_events.py",
+        "grep -q 'def test_' tests/test_events.py",
+        "grep -q 'compute_events' tests/test_events.py",
+        "python3 -m pytest tests/test_events.py -v --tb=short 2>&1 | grep -q 'passed'"
+      ],
+      "notes": "At minimum test compute_events with mock snapshots"
+    }
+  ],
+  "patterns": [
+    {
+      "id": "GHR-P001",
+      "learned": "2026-01-24",
+      "description": "Verify function usage before marking dead - check full call chain including indirect calls"
+    },
+    {
+      "id": "GHR-P002",
+      "learned": "2026-01-24",
+      "description": "build_optimized_prompt() is the active production function, not build_personality_prompt() or v2"
+    }
+  ]
+}
