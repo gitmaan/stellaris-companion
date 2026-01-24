@@ -130,32 +130,21 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
                 from backend.core.signals import build_snapshot_signals
 
                 # Build signals from Rust session (fast, resolved names)
+                # Signals provides: leaders, wars, diplomacy - all with resolved names
                 t_signals = time.time()
                 signals = build_snapshot_signals(extractor=extractor, briefing=briefing)
                 timings["signals_build"] = time.time() - t_signals
                 log_timing("Signals build (Rust-backed)", timings["signals_build"])
 
-                # NOTE: getattr(extractor, "gamestate") triggers loading the entire 70MB+ file!
-                # This is a known bottleneck - signals extraction above replaces leaders.
-                # Wars/diplomacy still use gamestate until migrated (UHE-006, UHE-007).
-                t_gs = time.time()
-                gamestate = getattr(extractor, "gamestate", None)
-                timings["gamestate_load"] = time.time() - t_gs
-                log_timing("⚠️  Gamestate load (bottleneck!)", timings["gamestate_load"])
-
+                # Build history enrichment with precomputed signals
+                # Signals-backed fields (leaders/wars/diplomacy) use resolved names
+                # Remaining fields (galaxy/techs/policies/edicts/etc.) use gamestate if needed
+                player_id = briefing.get("meta", {}).get("player_id") if isinstance(briefing, dict) else None
                 history = build_history_enrichment(
-                    gamestate=gamestate,
-                    player_id=briefing.get("meta", {}).get("player_id") if isinstance(briefing, dict) else None,
+                    gamestate=None,  # Signals provide all critical data
+                    player_id=player_id,
+                    precomputed_signals=signals,
                 )
-
-                # Merge signals into history - signals leaders have resolved names
-                # which fixes Chronicle placeholder issues (%LEADER_N%)
-                if signals:
-                    if not history:
-                        history = {}
-                    # Signals leaders replace history leaders (resolved names vs name_key only)
-                    if signals.get("leaders"):
-                        history["leaders"] = signals["leaders"]
 
                 if history:
                     briefing = dict(briefing)

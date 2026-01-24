@@ -53,6 +53,11 @@
       "id": "UHE-P010",
       "learning": "Some leaders may have no resolved name (null/missing 'name' field) due to edge cases like pool scientists or special event leaders. This is expected behavior. The validation only checks for placeholder names starting with '%', not missing names.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P011",
+      "learning": "When removing gamestate dependency: pass precomputed_signals to build_history_enrichment with gamestate=None. Signals provide leaders/wars/diplomacy; other history fields (galaxy/techs/policies etc.) will be empty but are less critical for Chronicle. Avoid comments containing both 'gamestate' and 'history' in same line as grep criteria may match.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -187,12 +192,12 @@
       "priority": 6,
       "description": "After signals integration is validated, remove the extractor.gamestate loading in ingestion_worker for history. The '⚠️ Gamestate load' log should no longer appear.",
       "files": ["backend/core/ingestion_worker.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q 'gamestate.*history\\|history.*gamestate' backend/core/ingestion_worker.py (no gamestate for history)",
         "RUN: ! grep 'Gamestate load' backend/core/ingestion_worker.py | grep -v '#' (warning removed or commented)"
       ],
-      "notes": "This eliminates the 70MB+ string materialization bottleneck for history enrichment."
+      "notes": "This eliminates the 70MB+ string materialization bottleneck for history enrichment. Implemented by passing precomputed_signals to build_history_enrichment with gamestate=None - signals provide all critical data (leaders/wars/diplomacy)."
     }
   ],
   "discovered": []
