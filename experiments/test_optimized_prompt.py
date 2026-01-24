@@ -6,15 +6,16 @@ Outputs full responses to an MD file for human evaluation.
 
 import json
 import re
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
-from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / ".env")
+# Add project root to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import sys
-sys.path.insert(0, str(Path(__file__).parent / "backend"))
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types

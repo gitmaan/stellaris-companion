@@ -8,13 +8,17 @@ Tests whether model correctly uses tools vs hallucinates.
 """
 
 import json
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
+# Add project root to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import os
 # Load .env manually
-env_path = Path(__file__).parent / ".env"
+env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
     for line in env_path.read_text().split('\n'):
         if '=' in line and not line.startswith('#'):

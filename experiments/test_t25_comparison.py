@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 # Add project root
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from save_loader import find_most_recent_save
 from save_extractor import SaveExtractor

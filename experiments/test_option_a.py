@@ -18,10 +18,13 @@ import time
 import sys
 from pathlib import Path
 
+# Add project root to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 sys.stdout.reconfigure(line_buffering=True)
 
 # Load .env
-env_path = Path(__file__).parent / ".env"
+env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
     for line in env_path.read_text().split('\n'):
         if '=' in line and not line.startswith('#'):

@@ -20,7 +20,7 @@
       "id": "GHR-002",
       "title": "Move experiment files to experiments/ directory",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "test -d experiments",
         "test -f experiments/test_fresh_stress.py",
@@ -29,11 +29,11 @@
         "test -f experiments/test_optimized_prompt.py",
         "test -f experiments/test_optimized_vs_production.py",
         "test -f experiments/benchmark_option_b.py",
-        "test -f experiments/benchmark_comparison.py",
+        "test -f experiments/benchmark_extraction.py",
         "! test -f test_fresh_stress.py",
         "! test -f benchmark_option_b.py"
       ],
-      "notes": "Move root-level test_*.py and benchmark_*.py that are experiments, not unit tests"
+      "notes": "Moved 23 experiment files to experiments/. Updated imports to use parent.parent for project root. benchmark_comparison.py never existed (was incorrectly referenced in cleanup findings)"
     },
     {
       "id": "GHR-003",
@@ -121,13 +121,14 @@
     },
     {
       "id": "GHR-010",
-      "title": "Fix hardcoded paths in benchmark_comparison.py",
+      "title": "Fix hardcoded paths in experiment files",
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "criteria": [
-        "! grep -q '/Users/avani/' experiments/benchmark_comparison.py || ! test -f experiments/benchmark_comparison.py"
+        "! grep -q '/Users/avani/' experiments/benchmark_extraction.py",
+        "! grep -q '/Users/avani/' experiments/benchmark_option_b.py"
       ],
-      "notes": "Replace absolute paths with relative or Path(__file__).parent patterns"
+      "notes": "benchmark_comparison.py never existed. Other experiment files don't have hardcoded paths."
     },
     {
       "id": "GHR-011",
@@ -166,6 +167,16 @@
       "id": "GHR-P002",
       "learned": "2026-01-24",
       "description": "build_optimized_prompt() is the active production function, not build_personality_prompt() or v2"
+    },
+    {
+      "id": "GHR-P003",
+      "learned": "2026-01-24",
+      "description": "benchmark_comparison.py was incorrectly referenced in cleanup findings - file never existed. Actual benchmark files are benchmark_extraction.py and benchmark_option_b.py"
+    },
+    {
+      "id": "GHR-P004",
+      "learned": "2026-01-24",
+      "description": "When moving files to experiments/, update sys.path.insert to use parent.parent and .env paths similarly"
     }
   ]
 }

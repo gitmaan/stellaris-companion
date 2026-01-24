@@ -13,12 +13,16 @@ If the model answers without tools, it's either:
 """
 
 import json
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
+# Add project root to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / ".env")
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
