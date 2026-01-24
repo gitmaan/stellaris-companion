@@ -39,6 +39,7 @@ class SaveExtractorBase:
         self._section_bounds_cache: dict[str, tuple[int, int] | None] = {}
         self._building_types = None  # Lazy-loaded building ID→type map
         self._country_names = None  # Lazy-loaded country ID→name map
+        self._player_status_cache = None  # Cached player status (expensive to compute)
 
     def close(self) -> None:
         """Release large in-memory state (best-effort)."""
@@ -51,6 +52,7 @@ class SaveExtractorBase:
         self._section_bounds_cache.clear()
         self._building_types = None
         self._country_names = None
+        self._player_status_cache = None
 
     def __enter__(self) -> SaveExtractorBase:
         return self

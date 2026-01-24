@@ -105,7 +105,15 @@ class PlayerMixin:
         Returns:
             Dict with empire info, military, economy, and territory data.
             All field names are self-documenting to prevent LLM misinterpretation.
+
+        Note:
+            Results are cached per-instance since player status is expensive to compute
+            and doesn't change within a single save file analysis.
         """
+        # Return cached result if available (expensive computation)
+        if self._player_status_cache is not None:
+            return self._player_status_cache
+
         player_id = self.get_player_empire_id()
 
         result = {
@@ -188,6 +196,8 @@ class PlayerMixin:
             },
         }
 
+        # Cache the result for subsequent calls
+        self._player_status_cache = result
         return result
 
     def get_empire(self, name: str) -> dict:
