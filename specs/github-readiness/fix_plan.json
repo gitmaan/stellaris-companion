@@ -101,12 +101,12 @@
       "id": "GHR-008",
       "title": "Standardize logging in ingestion_worker.py",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "! grep -q 'print(' backend/core/ingestion_worker.py || grep 'print(' backend/core/ingestion_worker.py | grep -q 'file=sys.stderr'",
         "python3 -c \"from backend.core.ingestion_worker import run_worker_job; print('OK')\""
       ],
-      "notes": "Replace print() with logger or keep stderr prints for timing diagnostics (acceptable)"
+      "notes": "All 6 print() calls already use file=sys.stderr for timing diagnostics. This is acceptable for worker processes per the established pattern."
     },
     {
       "id": "GHR-009",
@@ -187,6 +187,11 @@
       "id": "GHR-P006",
       "learned": "2026-01-25",
       "description": "Main companion class is named 'Companion', not 'StrategicCompanion'. Criteria in fix_plan.json should reference the correct class name."
+    },
+    {
+      "id": "GHR-P007",
+      "learned": "2026-01-25",
+      "description": "ingestion_worker.py already has all print() calls using file=sys.stderr for timing diagnostics. The story was incorrectly marked as failing when the criteria were already satisfied."
     }
   ]
 }
