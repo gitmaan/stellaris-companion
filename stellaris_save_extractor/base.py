@@ -9,11 +9,12 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -949,6 +950,14 @@ class SaveExtractorBase:
         Returns:
             Dict with categorized fleet counts and details
         """
+        # Use Rust-optimized version when session is active
+        session = _get_active_session()
+        if session:
+            return self._analyze_player_fleets_rust(fleet_ids, max_to_analyze)
+        return self._analyze_player_fleets_regex(fleet_ids, max_to_analyze)
+
+    def _analyze_player_fleets_original(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
+        """Original implementation - kept for reference during migration."""
         result = {
             'total_fleet_ids': len(fleet_ids),
             'starbase_count': 0,
@@ -1047,6 +1056,222 @@ class SaveExtractorBase:
                     fleet_name = fleet_name.replace('_FLEET', '').replace('_', ' ').title() + ' Fleet'
 
                 # Store all military fleets (no truncation - callers can slice if needed)
+                result['military_fleets'].append({
+                    'id': fid,
+                    'name': fleet_name,
+                    'ships': ship_count,
+                    'military_power': round(mp, 0),
+                })
+            else:
+                result['civilian_fleet_count'] += 1
+
+        return result
+
+    def _analyze_player_fleets_rust(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
+        """Rust-optimized fleet analysis using iter_section.
+
+        Uses structured iteration instead of regex scanning. Benefits:
+        - No 100KB block size limits (complete fleet data)
+        - No regex parsing errors on nested structures
+        - Faster iteration via Rust session
+        """
+        session = _get_active_session()
+        if not session:
+            return self._analyze_player_fleets_regex(fleet_ids, max_to_analyze)
+
+        result = {
+            'total_fleet_ids': len(fleet_ids),
+            'starbase_count': 0,
+            'military_fleet_count': 0,
+            'civilian_fleet_count': 0,
+            'military_ships': 0,
+            'total_military_power': 0.0,
+            'military_fleets': [],
+        }
+
+        # Convert to set for O(1) lookup
+        fleet_id_set = set(str(fid) for fid in fleet_ids)
+
+        # Iterate all fleets, filter by ownership
+        analyzed = 0
+        for fid, fleet in session.iter_section('fleet'):
+            if fid not in fleet_id_set:
+                continue
+
+            if not isinstance(fleet, dict):
+                continue
+
+            analyzed += 1
+            if analyzed > max_to_analyze:
+                # Estimate remaining based on ratios
+                ratio = len(fleet_ids) / max_to_analyze
+                result['starbase_count'] = int(result['starbase_count'] * ratio)
+                result['military_fleet_count'] = int(result['military_fleet_count'] * ratio)
+                result['civilian_fleet_count'] = int(result['civilian_fleet_count'] * ratio)
+                result['_note'] = f'Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs'
+                break
+
+            # Direct dict access - no regex needed
+            is_station = fleet.get('station') == 'yes'
+            is_civilian = fleet.get('civilian') == 'yes'
+
+            # Get ship count from ships list/dict
+            ships = fleet.get('ships', [])
+            if isinstance(ships, list):
+                ship_count = len(ships)
+            elif isinstance(ships, dict):
+                ship_count = len(ships)
+            else:
+                ship_count = 0
+
+            # Get military power
+            mp = fleet.get('military_power')
+            mp = float(mp) if mp is not None else 0.0
+
+            if is_station:
+                result['starbase_count'] += 1
+            elif is_civilian:
+                result['civilian_fleet_count'] += 1
+            elif mp > 100:  # Threshold filters out space creatures with tiny mp
+                result['military_fleet_count'] += 1
+                result['military_ships'] += ship_count
+                result['total_military_power'] += mp
+
+                # Extract fleet name
+                fleet_name = self._extract_fleet_name_from_data(fleet, fid)
+
+                result['military_fleets'].append({
+                    'id': fid,
+                    'name': fleet_name,
+                    'ships': ship_count,
+                    'military_power': round(mp, 0),
+                })
+            else:
+                result['civilian_fleet_count'] += 1
+
+        return result
+
+    def _extract_fleet_name_from_data(self, fleet: dict, fid: str) -> str:
+        """Extract fleet name from parsed fleet data structure."""
+        name_data = fleet.get('name')
+
+        if not name_data:
+            return f"Fleet {fid}"
+
+        # Name can be a string or a dict with key field
+        if isinstance(name_data, str):
+            fleet_name = name_data
+        elif isinstance(name_data, dict):
+            fleet_name = name_data.get('key', f"Fleet {fid}")
+
+            # Handle %SEQ% format - look for num variable
+            if fleet_name == '%SEQ%':
+                variables = name_data.get('variables', [])
+                for var in variables:
+                    if isinstance(var, dict) and var.get('key') == 'num':
+                        value = var.get('value', {})
+                        if isinstance(value, dict):
+                            num = value.get('key')
+                            if num:
+                                return f"Fleet #{num}"
+                return f"Fleet {fid}"
+        else:
+            return f"Fleet {fid}"
+
+        # Clean up localization keys
+        if fleet_name.startswith('shipclass_'):
+            fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
+        elif fleet_name.startswith('NAME_'):
+            fleet_name = fleet_name.replace('NAME_', '').replace('_', ' ')
+        elif fleet_name.startswith('TRANS_'):
+            fleet_name = 'Transport Fleet'
+        elif fleet_name.endswith('_FLEET'):
+            fleet_name = fleet_name.replace('_FLEET', '').replace('_', ' ').title() + ' Fleet'
+
+        return fleet_name
+
+    def _analyze_player_fleets_regex(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
+        """Original regex-based implementation - used as fallback."""
+        result = {
+            'total_fleet_ids': len(fleet_ids),
+            'starbase_count': 0,
+            'military_fleet_count': 0,
+            'civilian_fleet_count': 0,
+            'military_ships': 0,
+            'total_military_power': 0.0,
+            'military_fleets': [],
+        }
+
+        fleet_section_start = self._find_fleet_section_start()
+        if fleet_section_start == -1:
+            return result
+
+        fleet_section = self.gamestate[fleet_section_start:]
+
+        analyzed = 0
+        for fid in fleet_ids:
+            if analyzed >= max_to_analyze:
+                ratio = len(fleet_ids) / max_to_analyze
+                result['starbase_count'] = int(result['starbase_count'] * ratio)
+                result['military_fleet_count'] = int(result['military_fleet_count'] * ratio)
+                result['civilian_fleet_count'] = int(result['civilian_fleet_count'] * ratio)
+                result['_note'] = f'Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs'
+                break
+
+            pattern = rf'\n\t{fid}=\n\t\{{'
+            match = re.search(pattern, fleet_section)
+            if not match:
+                continue
+
+            fleet_start = match.start()
+            search_window = fleet_section[fleet_start + 10:fleet_start + 100000]
+            next_fleet = re.search(r'\n\t\d+=\n\t\{', search_window)
+            if next_fleet:
+                block_end = next_fleet.start() + 10
+            else:
+                block_end = 100000
+
+            fleet_data = fleet_section[fleet_start:fleet_start + block_end]
+            analyzed += 1
+
+            is_station = re.search(r'\n\t\tstation=yes', fleet_data) is not None
+            is_civilian = re.search(r'\n\t\tcivilian=yes', fleet_data) is not None
+
+            ships_match = re.search(r'ships=\s*\{([^}]+)\}', fleet_data)
+            ship_count = len(ships_match.group(1).split()) if ships_match else 0
+
+            mp_match = re.search(r'military_power=([\d.]+)', fleet_data)
+            mp = float(mp_match.group(1)) if mp_match else 0.0
+
+            if is_station:
+                result['starbase_count'] += 1
+            elif is_civilian:
+                result['civilian_fleet_count'] += 1
+            elif mp > 100:
+                result['military_fleet_count'] += 1
+                result['military_ships'] += ship_count
+                result['total_military_power'] += mp
+
+                name_match = re.search(r'key="([^"]+)"', fleet_data)
+                fleet_name = name_match.group(1) if name_match else f"Fleet {fid}"
+
+                if fleet_name == '%SEQ%':
+                    num_match = re.search(r'key="num"[^}]*key="(\d+)"', fleet_data)
+                    if num_match:
+                        fleet_num = int(num_match.group(1))
+                        fleet_name = f"Fleet #{fleet_num}"
+                    else:
+                        fleet_name = f"Fleet {fid}"
+
+                if fleet_name.startswith('shipclass_'):
+                    fleet_name = fleet_name.replace('shipclass_', '').replace('_name', '').title()
+                elif fleet_name.startswith('NAME_'):
+                    fleet_name = fleet_name.replace('NAME_', '').replace('_', ' ')
+                elif fleet_name.startswith('TRANS_'):
+                    fleet_name = 'Transport Fleet'
+                elif fleet_name.endswith('_FLEET'):
+                    fleet_name = fleet_name.replace('_FLEET', '').replace('_', ' ').title() + ' Fleet'
+
                 result['military_fleets'].append({
                     'id': fid,
                     'name': fleet_name,
