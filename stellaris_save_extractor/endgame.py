@@ -80,6 +80,11 @@ class EndgameMixin:
         Returns:
             Dict with crisis status details
         """
+        # Check for active session at start - delegate to regex if not available
+        session = _get_active_session()
+        if not session:
+            return self._get_crisis_status_regex()
+
         result = {
             "crisis_active": False,
             "crisis_type": None,
@@ -94,9 +99,7 @@ class EndgameMixin:
         crisis_countries = []
         crisis_types_found = set()
 
-        for country_id, country_data in iter_section_entries(
-            self.gamestate_path, "country"
-        ):
+        for country_id, country_data in session.iter_section("country"):
             if not isinstance(country_data, dict):
                 continue
 
@@ -174,19 +177,10 @@ class EndgameMixin:
             "extradimensional_system",  # Generic extradimensional flag
         ]
 
-        # Use count_keys operation if session is active
-        sess = _get_active_session()
-        if sess is not None:
-            counts_result = sess.count_keys(crisis_system_flags)
-            counts = counts_result.get("counts", {})
-            total_crisis_systems = sum(counts.values())
-        else:
-            # Fallback to regex if no active session
-            total_crisis_systems = 0
-            for flag in crisis_system_flags:
-                total_crisis_systems += len(re.findall(rf"\b{flag}=", self.gamestate))
-
-        result["crisis_systems_count"] = total_crisis_systems
+        # Use count_keys operation (session guaranteed to be active from start check)
+        counts_result = session.count_keys(crisis_system_flags)
+        counts = counts_result.get("counts", {})
+        result["crisis_systems_count"] = sum(counts.values())
 
         return result
 
@@ -340,6 +334,11 @@ class EndgameMixin:
         Returns:
             Dict with L-Gate status details
         """
+        # Check for active session at start - delegate to regex if not available
+        session = _get_active_session()
+        if not session:
+            return self._get_lgate_status_regex()
+
         result = {
             "lgate_enabled": False,
             "insights_collected": 0,
@@ -348,10 +347,12 @@ class EndgameMixin:
             "player_activation_progress": 0,
         }
 
-        # Check if L-Gates are enabled - use regex since it's just a flag scan
-        if "lgate_enabled=yes" in self.gamestate:
+        # Check if L-Gates are enabled using contains_tokens
+        lgate_tokens = session.contains_tokens(["lgate_enabled=yes", "lgate_enabled=no"])
+        matches = lgate_tokens.get("matches", {})
+        if matches.get("lgate_enabled=yes"):
             result["lgate_enabled"] = True
-        elif "lgate_enabled=no" in self.gamestate:
+        elif matches.get("lgate_enabled=no"):
             result["lgate_enabled"] = False
             return result  # No point checking further
 
@@ -374,20 +375,24 @@ class EndgameMixin:
                         except (ValueError, TypeError):
                             pass
 
-            # Check for activation tech progress in potential block
-            potential = country_data.get("potential", {})
-            if isinstance(potential, dict):
-                activation_progress = potential.get("tech_lgate_activation")
-                if activation_progress is not None:
-                    try:
-                        result["player_activation_progress"] = int(activation_progress)
-                    except (ValueError, TypeError):
-                        pass
+                # Check for activation tech progress in tech_status.potential block
+                potential = tech_status.get("potential", {})
+                if isinstance(potential, dict):
+                    activation_progress = potential.get("tech_lgate_activation")
+                    if activation_progress is not None:
+                        try:
+                            result["player_activation_progress"] = int(activation_progress)
+                        except (ValueError, TypeError):
+                            pass
 
-        # Check if L-Gate has been opened - use regex for flag scan
-        if re.search(
-            r"lcluster_|l_cluster_opened|gray_tempest_country", self.gamestate
-        ):
+        # Check if L-Gate has been opened using contains_tokens
+        lcluster_tokens = session.contains_tokens([
+            "lcluster_",
+            "l_cluster_opened",
+            "gray_tempest_country"
+        ])
+        lcluster_matches = lcluster_tokens.get("matches", {})
+        if any(lcluster_matches.values()):
             result["lgate_opened"] = True
 
         return result
@@ -495,6 +500,11 @@ class EndgameMixin:
         Returns:
             Dict with menace status details
         """
+        # Check for active session at start - delegate to regex if not available
+        session = _get_active_session()
+        if not session:
+            return self._get_menace_regex()
+
         result = {
             "has_crisis_perk": False,
             "menace_level": 0,
@@ -614,6 +624,11 @@ class EndgameMixin:
         Returns:
             Dict with Great Khan status details
         """
+        # Check for active session at start - delegate to regex if not available
+        session = _get_active_session()
+        if not session:
+            return self._get_great_khan_regex()
+
         result = {
             "marauders_present": False,
             "marauder_count": 0,
@@ -625,9 +640,7 @@ class EndgameMixin:
         marauder_count = 0
         khan_country_id = None
 
-        for country_id, country_data in iter_section_entries(
-            self.gamestate_path, "country"
-        ):
+        for country_id, country_data in session.iter_section("country"):
             if not isinstance(country_data, dict):
                 continue
 
@@ -662,31 +675,32 @@ class EndgameMixin:
         if khan_country_id is not None:
             result["khan_country_id"] = khan_country_id
 
-        # Check for Khan defeated via flag search (more reliable)
-        khan_defeated_patterns = [
-            r"great_khan_dead",
-            r"great_khan_defeated",
-            r"khan_successor",  # Khan died, successors fighting
+        # Check for Khan defeated via flag search using contains_tokens
+        khan_defeated_tokens = [
+            "great_khan_dead",
+            "great_khan_defeated",
+            "khan_successor",  # Khan died, successors fighting
         ]
+        defeated_result = session.contains_tokens(khan_defeated_tokens)
+        defeated_matches = defeated_result.get("matches", {})
 
-        for pattern in khan_defeated_patterns:
-            if re.search(pattern, self.gamestate):
-                result["khan_risen"] = True  # Was risen at some point
-                result["khan_status"] = "defeated"
-                break
+        if any(defeated_matches.values()):
+            result["khan_risen"] = True  # Was risen at some point
+            result["khan_status"] = "defeated"
 
         # Check for Khan rising via flags if not detected by country type
         if not result["khan_risen"]:
-            khan_patterns = [
-                r"great_khan_risen",
-                r"great_khan=yes",
-                r"khan_country",
+            khan_risen_tokens = [
+                "great_khan_risen",
+                "great_khan=yes",
+                "khan_country",
             ]
-            for pattern in khan_patterns:
-                if re.search(pattern, self.gamestate):
-                    result["khan_risen"] = True
-                    result["khan_status"] = "active"
-                    break
+            risen_result = session.contains_tokens(khan_risen_tokens)
+            risen_matches = risen_result.get("matches", {})
+
+            if any(risen_matches.values()):
+                result["khan_risen"] = True
+                result["khan_status"] = "active"
 
         return result
 
