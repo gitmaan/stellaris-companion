@@ -699,6 +699,66 @@ def extract_snapshot_metrics(briefing: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_event_state_from_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
+    """Build a compact state snapshot used for event detection and reporting.
+
+    This intentionally excludes large, low-signal lists (planets, ship breakdowns, etc.)
+    while preserving the keys consumed by `backend.core.events.compute_events()` and
+    `backend.core.reporting`.
+    """
+    if not isinstance(briefing, dict):
+        return {}
+
+    meta = briefing.get("meta") if isinstance(briefing.get("meta"), dict) else {}
+    military = briefing.get("military") if isinstance(briefing.get("military"), dict) else {}
+    economy = briefing.get("economy") if isinstance(briefing.get("economy"), dict) else {}
+    territory = briefing.get("territory") if isinstance(briefing.get("territory"), dict) else {}
+    technology = briefing.get("technology") if isinstance(briefing.get("technology"), dict) else {}
+    diplomacy = briefing.get("diplomacy") if isinstance(briefing.get("diplomacy"), dict) else {}
+
+    net_monthly = economy.get("net_monthly") if isinstance(economy.get("net_monthly"), dict) else {}
+    colonies = territory.get("colonies") if isinstance(territory.get("colonies"), dict) else {}
+
+    # Keep only economy nets used by event detection (plus a few high-signal ones).
+    economy_state = {
+        "net_monthly": {
+            k: net_monthly.get(k)
+            for k in ("energy", "alloys", "consumer_goods", "food", "minerals")
+            if k in net_monthly
+        }
+    }
+
+    territory_state = {"colonies": {"total_count": colonies.get("total_count")}} if colonies else {"colonies": {}}
+
+    # Military keys used by event detection/reporting.
+    military_state = {
+        k: military.get(k)
+        for k in ("military_power", "military_fleets", "fleet_count")
+        if k in military
+    }
+
+    technology_state = {k: technology.get(k) for k in ("tech_count",) if k in technology}
+    diplomacy_state = {}
+    if "federation" in diplomacy:
+        diplomacy_state["federation"] = diplomacy.get("federation")
+
+    # History payload is already “small by design” (built by history enrichment helpers).
+    history = briefing.get("history") if isinstance(briefing.get("history"), dict) else {}
+
+    event_state: dict[str, Any] = {
+        "meta": {k: meta.get(k) for k in ("date", "empire_name", "campaign_id", "player_id") if k in meta},
+        "military": military_state,
+        "economy": economy_state,
+        "territory": territory_state,
+        "technology": technology_state,
+        "diplomacy": diplomacy_state,
+    }
+    if history:
+        event_state["history"] = history
+
+    return event_state
+
+
 def build_history_enrichment(*, gamestate: str | None, player_id: int | None) -> dict[str, Any]:
     """Build the optional `history` payload stored with a snapshot.
 
@@ -755,6 +815,7 @@ def record_snapshot_from_briefing(
     save_path: Path | None,
     save_hash: str | None,
     briefing: dict[str, Any],
+    briefing_json: str | None = None,
 ) -> tuple[bool, int | None, str]:
     """Record a snapshot when you already have a full briefing dict.
 
@@ -781,6 +842,7 @@ def record_snapshot_from_briefing(
         last_game_date=metrics.get("game_date"),
     )
 
+    full_json = briefing_json if isinstance(briefing_json, str) and briefing_json else json.dumps(briefing, ensure_ascii=False, separators=(",", ":"))
     inserted, snapshot_id = db.insert_snapshot_if_new(
         session_id=session_id,
         game_date=metrics.get("game_date"),
@@ -790,15 +852,34 @@ def record_snapshot_from_briefing(
         wars_count=(wars.get("count") if isinstance(wars, dict) else metrics.get("wars_count")),
         energy_net=metrics.get("energy_net"),
         alloys_net=metrics.get("alloys_net"),
-        full_briefing_json=json.dumps(briefing, ensure_ascii=False, separators=(",", ":")),
+        # Full briefings are stored on the session row (latest) and only kept per-snapshot for the baseline.
+        full_briefing_json=full_json,
+        event_state_json=json.dumps(
+            build_event_state_from_briefing(briefing),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
     )
     if inserted and snapshot_id is not None:
+        try:
+            # Persist the latest full briefing once per session (overwrite), not per snapshot row.
+            db.update_session_latest_briefing(
+                session_id=session_id,
+                latest_briefing_json=full_json,
+                last_game_date=metrics.get("game_date"),
+            )
+        except Exception:
+            pass
         try:
             db.record_events_for_new_snapshot(session_id=session_id, snapshot_id=snapshot_id, current_briefing=briefing)
         except Exception:
             pass
         try:
             db.enforce_full_briefing_retention(session_id=session_id)
+        except Exception:
+            pass
+        try:
+            db.maybe_checkpoint_wal()
         except Exception:
             pass
 
@@ -883,6 +964,7 @@ def record_snapshot_from_companion(
         last_game_date=metrics.get("game_date"),
     )
 
+    full_json = json.dumps(briefing_for_storage, ensure_ascii=False, separators=(",", ":"))
     inserted, snapshot_id = db.insert_snapshot_if_new(
         session_id=session_id,
         game_date=metrics.get("game_date"),
@@ -892,9 +974,22 @@ def record_snapshot_from_companion(
         wars_count=wars.get("count") if isinstance(wars, dict) else metrics.get("wars_count"),
         energy_net=metrics.get("energy_net"),
         alloys_net=metrics.get("alloys_net"),
-        full_briefing_json=json.dumps(briefing_for_storage, ensure_ascii=False, separators=(",", ":")),
+        full_briefing_json=full_json,
+        event_state_json=json.dumps(
+            build_event_state_from_briefing(briefing_for_storage),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
     )
     if inserted and snapshot_id is not None:
+        try:
+            db.update_session_latest_briefing(
+                session_id=session_id,
+                latest_briefing_json=full_json,
+                last_game_date=metrics.get("game_date"),
+            )
+        except Exception:
+            pass
         try:
             db.record_events_for_new_snapshot(session_id=session_id, snapshot_id=snapshot_id, current_briefing=briefing_for_storage)
         except Exception:
@@ -902,6 +997,10 @@ def record_snapshot_from_companion(
             pass
         try:
             db.enforce_full_briefing_retention(session_id=session_id)
+        except Exception:
+            pass
+        try:
+            db.maybe_checkpoint_wal()
         except Exception:
             pass
 

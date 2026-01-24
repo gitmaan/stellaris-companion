@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.database import GameDatabase
-from backend.core.history import compute_save_id, extract_campaign_id_from_gamestate, extract_snapshot_metrics
+from backend.core.history import compute_save_id, extract_snapshot_metrics
 
 
 _HISTORY_KEYWORDS = re.compile(
@@ -116,9 +116,8 @@ def build_history_context_for_companion(
     briefing = getattr(companion, "_current_snapshot", None) or {}
     metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
 
-    campaign_id = None
-    if getattr(companion, "extractor", None) and getattr(companion.extractor, "gamestate", None):
-        campaign_id = extract_campaign_id_from_gamestate(companion.extractor.gamestate)
+    # Prefer campaign_id from the snapshot meta to avoid loading the full gamestate in hot paths.
+    campaign_id = metrics.get("campaign_id") if isinstance(metrics, dict) else None
 
     return build_history_context(
         db=db,
@@ -129,4 +128,3 @@ def build_history_context_for_companion(
         max_events=max_events,
         max_points=max_points,
     )
-

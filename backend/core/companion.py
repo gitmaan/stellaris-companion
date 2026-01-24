@@ -1128,23 +1128,26 @@ class Companion:
         """Attempt to load the latest full briefing JSON from SQLite."""
         try:
             from backend.core.database import get_default_db
-            from backend.core.history import compute_save_id, extract_campaign_id_from_gamestate
+            from backend.core.history import compute_save_id
 
             db = get_default_db()
 
             # Best-effort: target the current save/campaign if possible.
-            if self.extractor and getattr(self.extractor, "gamestate", None) and self.save_path:
-                campaign_id = extract_campaign_id_from_gamestate(self.extractor.gamestate)
-                player_id = self.extractor.get_player_empire_id()
-                save_id = compute_save_id(
-                    campaign_id=campaign_id,
-                    player_id=player_id,
-                    empire_name=(self.metadata or {}).get("name"),
-                    save_path=self.save_path,
-                )
-                session_id = db.get_active_or_latest_session_id(save_id=save_id)
+            if self.save_path:
+                # Avoid loading the full gamestate just to compute campaign_id; use save_path lookup.
+                session_id = db.get_active_or_latest_session_id_for_save_path(save_path=str(self.save_path))
+                if not session_id and self.extractor:
+                    # Fallback: derive save_id without campaign_id (empire+root), which is cheap and stable.
+                    save_id = compute_save_id(
+                        campaign_id=None,
+                        player_id=self.extractor.get_player_empire_id(),
+                        empire_name=(self.metadata or {}).get("name"),
+                        save_path=self.save_path,
+                    )
+                    session_id = db.get_active_or_latest_session_id(save_id=save_id)
+
                 if session_id:
-                    json_text = db.get_latest_snapshot_full_briefing_json(session_id=session_id)
+                    json_text = db.get_latest_session_briefing_json(session_id=session_id) or db.get_latest_snapshot_full_briefing_json(session_id=session_id)
                     if json_text:
                         try:
                             parsed = json.loads(json_text)
@@ -1156,7 +1159,9 @@ class Companion:
                         except Exception:
                             return json_text, None
 
-            json_text = db.get_latest_snapshot_full_briefing_json_any()
+            json_text = db.get_latest_session_briefing_json_any()
+            if not json_text:
+                json_text = db.get_latest_snapshot_full_briefing_json_any()
             if not json_text:
                 return None, None
             try:

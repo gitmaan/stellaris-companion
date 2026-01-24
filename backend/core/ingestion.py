@@ -382,6 +382,7 @@ class IngestionManager:
                         save_path=save_path,
                         save_hash=save_hash if isinstance(save_hash, str) else None,
                         briefing=parsed,
+                        briefing_json=briefing_json,
                     )
             except Exception as e:
                 logger.warning("snapshot_persist_failed error=%s", e)

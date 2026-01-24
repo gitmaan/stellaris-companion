@@ -101,14 +101,30 @@ def build_session_report_text(
     first_metrics: dict[str, Any] = {}
     last_metrics: dict[str, Any] = {}
 
-    if first_row and isinstance(first_row.get("full_briefing_json"), str):
+    # Baseline metrics: prefer the baseline full briefing JSON if available, else fall back to event_state_json.
+    if first_row and isinstance(first_row.get("full_briefing_json") or first_row.get("event_state_json"), str):
         try:
-            first_metrics = _extract_report_metrics(json.loads(first_row["full_briefing_json"]))
+            first_payload = first_row.get("full_briefing_json") or first_row.get("event_state_json")
+            first_metrics = _extract_report_metrics(json.loads(first_payload))
         except Exception:
             first_metrics = {}
-    if last_row and isinstance(last_row.get("full_briefing_json"), str):
+
+    # Latest metrics: prefer the session-level latest briefing cache; fall back to snapshot JSON/state.
+    latest_json = None
+    try:
+        latest_json = db.get_latest_session_briefing_json(session_id=session_id)
+    except Exception:
+        latest_json = None
+
+    if isinstance(latest_json, str) and latest_json:
         try:
-            last_metrics = _extract_report_metrics(json.loads(last_row["full_briefing_json"]))
+            last_metrics = _extract_report_metrics(json.loads(latest_json))
+        except Exception:
+            last_metrics = {}
+    elif last_row and isinstance(last_row.get("full_briefing_json") or last_row.get("event_state_json"), str):
+        try:
+            last_payload = last_row.get("full_briefing_json") or last_row.get("event_state_json")
+            last_metrics = _extract_report_metrics(json.loads(last_payload))
         except Exception:
             last_metrics = {}
 

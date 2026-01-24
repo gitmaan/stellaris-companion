@@ -23,8 +23,9 @@ DEFAULT_DB_FILENAME = "stellaris_history.db"
 ENV_DB_PATH = "STELLARIS_DB_PATH"
 
 # Default DB retention (no user-facing knobs).
-# Keep the earliest full briefing (baseline) plus the most recent N per session.
-DEFAULT_KEEP_FULL_BRIEFINGS_RECENT = 20
+# Keep the earliest full briefing (baseline). The latest briefing is stored on the session row
+# (see `sessions.latest_briefing_json`) to avoid writing a large JSON blob per snapshot.
+DEFAULT_KEEP_FULL_BRIEFINGS_RECENT = 0
 
 
 @dataclass(frozen=True)
@@ -176,7 +177,15 @@ class GameDatabase:
                 """,
                 "CREATE INDEX IF NOT EXISTS idx_events_session_captured ON events(session_id, captured_at);",
                 "CREATE INDEX IF NOT EXISTS idx_events_session_type ON events(session_id, event_type);",
-            ]
+            ],
+            2: [
+                # Store the latest full briefing JSON on the session row (one per session),
+                # so we don't write a large blob per snapshot.
+                "ALTER TABLE sessions ADD COLUMN latest_briefing_json TEXT;",
+                # Store a compact per-snapshot state used for event generation/reporting, even if
+                # full_briefing_json is not retained.
+                "ALTER TABLE snapshots ADD COLUMN event_state_json TEXT;",
+            ],
         }
 
         current = self.get_schema_version()
@@ -280,6 +289,125 @@ class GameDatabase:
                 (save_path, empire_name, last_game_date, session_id),
             )
 
+    def update_session_latest_briefing(
+        self,
+        *,
+        session_id: str,
+        latest_briefing_json: str,
+        last_game_date: str | None = None,
+    ) -> None:
+        """Persist the latest full briefing JSON for a session (single row overwrite).
+
+        This is used as the primary persistence mechanism for precomputed ask mode
+        across restarts, without storing a large blob on every snapshot row.
+        """
+        with self._lock:
+            self._conn.execute(
+                """
+                UPDATE sessions
+                SET
+                    latest_briefing_json = ?,
+                    last_game_date = COALESCE(?, last_game_date),
+                    last_updated_at = strftime('%s','now')
+                WHERE id = ?;
+                """,
+                (latest_briefing_json, last_game_date, session_id),
+            )
+
+    def backfill_session_latest_briefing_from_snapshots(self, *, session_id: str) -> bool:
+        """Populate sessions.latest_briefing_json from the newest snapshot full briefing (best-effort).
+
+        This is used when upgrading older DBs that stored full_briefing_json on snapshot rows.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT full_briefing_json, game_date
+                FROM snapshots
+                WHERE session_id = ?
+                  AND full_briefing_json IS NOT NULL
+                  AND full_briefing_json != ''
+                ORDER BY captured_at DESC, id DESC
+                LIMIT 1;
+                """,
+                (session_id,),
+            ).fetchone()
+            if not row:
+                return False
+            latest_json = row["full_briefing_json"]
+            if not latest_json:
+                return False
+            self._conn.execute(
+                """
+                UPDATE sessions
+                SET
+                    latest_briefing_json = ?,
+                    last_game_date = COALESCE(?, last_game_date),
+                    last_updated_at = strftime('%s','now')
+                WHERE id = ?;
+                """,
+                (str(latest_json), row["game_date"], session_id),
+            )
+            return True
+
+    def backfill_latest_briefings_all_sessions(self, *, limit_sessions: int = 500) -> int:
+        """Backfill sessions.latest_briefing_json for many sessions (best-effort)."""
+        lim = max(1, min(int(limit_sessions), 5000))
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT id
+                FROM sessions
+                WHERE latest_briefing_json IS NULL OR latest_briefing_json = ''
+                ORDER BY COALESCE(last_updated_at, started_at) DESC
+                LIMIT ?;
+                """,
+                (lim,),
+            ).fetchall()
+        updated = 0
+        for r in rows:
+            sid = str(r["id"])
+            try:
+                if self.backfill_session_latest_briefing_from_snapshots(session_id=sid):
+                    updated += 1
+            except Exception:
+                continue
+        return updated
+
+    def get_latest_session_briefing_json(self, *, session_id: str) -> str | None:
+        """Return the latest full briefing JSON stored on the session row."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT latest_briefing_json
+                FROM sessions
+                WHERE id = ?
+                LIMIT 1;
+                """,
+                (session_id,),
+            ).fetchone()
+            if not row:
+                return None
+            value = row["latest_briefing_json"]
+            return str(value) if value else None
+
+    def get_latest_session_briefing_json_any(self) -> str | None:
+        """Return the latest full briefing JSON across all sessions (best-effort)."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT latest_briefing_json
+                FROM sessions
+                WHERE latest_briefing_json IS NOT NULL AND latest_briefing_json != ''
+                ORDER BY COALESCE(last_updated_at, started_at) DESC
+                LIMIT 1;
+                """
+            ).fetchone()
+            if not row:
+                return None
+            value = row["latest_briefing_json"]
+            return str(value) if value else None
+
     def get_latest_snapshot_identity(self, session_id: str) -> dict[str, Any] | None:
         with self._lock:
             row = self._conn.execute(
@@ -341,6 +469,7 @@ class GameDatabase:
         energy_net: float | None,
         alloys_net: float | None,
         full_briefing_json: str | None,
+        event_state_json: str | None,
     ) -> int:
         with self._lock:
             cur = self._conn.execute(
@@ -354,9 +483,10 @@ class GameDatabase:
                     wars_count,
                     energy_net,
                     alloys_net,
-                    full_briefing_json
+                    full_briefing_json,
+                    event_state_json
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     session_id,
@@ -368,6 +498,7 @@ class GameDatabase:
                     energy_net,
                     alloys_net,
                     full_briefing_json,
+                    event_state_json,
                 ),
             )
             return int(cur.lastrowid)
@@ -384,6 +515,7 @@ class GameDatabase:
         energy_net: float | None,
         alloys_net: float | None,
         full_briefing_json: str | None,
+        event_state_json: str | None,
     ) -> tuple[bool, int | None]:
         latest = self.get_latest_snapshot_identity(session_id)
         if latest:
@@ -394,6 +526,9 @@ class GameDatabase:
             if (save_hash is None) and game_date and latest_date == game_date:
                 return False, None
 
+        # Only keep a full per-snapshot briefing for the baseline snapshot (first one in session).
+        baseline_full = full_briefing_json if latest is None else None
+
         snapshot_id = self.insert_snapshot(
             session_id=session_id,
             game_date=game_date,
@@ -403,7 +538,8 @@ class GameDatabase:
             wars_count=wars_count,
             energy_net=energy_net,
             alloys_net=alloys_net,
-            full_briefing_json=full_briefing_json,
+            full_briefing_json=baseline_full,
+            event_state_json=event_state_json,
         )
         self.update_session(session_id=session_id, last_game_date=game_date)
         return True, snapshot_id
@@ -484,6 +620,62 @@ class GameDatabase:
                 tuple(params),
             )
             return int(cur.rowcount or 0)
+
+    def enforce_full_briefing_retention_all_sessions(
+        self,
+        *,
+        keep_recent: int = DEFAULT_KEEP_FULL_BRIEFINGS_RECENT,
+        keep_first: bool = True,
+        limit_sessions: int = 500,
+    ) -> int:
+        """Best-effort maintenance: apply full-briefing retention to many sessions.
+
+        This helps older DBs that accumulated per-snapshot full JSON before retention rules
+        were tightened.
+        """
+        lim = max(1, min(int(limit_sessions), 5000))
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT id
+                FROM sessions
+                ORDER BY COALESCE(last_updated_at, started_at) DESC
+                LIMIT ?;
+                """,
+                (lim,),
+            ).fetchall()
+        total_cleared = 0
+        for r in rows:
+            sid = str(r["id"])
+            try:
+                total_cleared += self.enforce_full_briefing_retention(
+                    session_id=sid,
+                    keep_recent=keep_recent,
+                    keep_first=keep_first,
+                )
+            except Exception:
+                continue
+        return total_cleared
+
+    def maybe_checkpoint_wal(self, *, threshold_bytes: int = 64 * 1024 * 1024) -> bool:
+        """Checkpoint+truncate WAL when it grows too large (best-effort)."""
+        if self.path == Path(":memory:"):
+            return False
+        try:
+            wal_path = Path(str(self.path) + "-wal")
+            if not wal_path.exists():
+                return False
+            if wal_path.stat().st_size < int(threshold_bytes):
+                return False
+        except Exception:
+            return False
+
+        try:
+            with self._lock:
+                self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+            return True
+        except Exception:
+            return False
 
     def get_db_stats(self) -> dict[str, Any]:
         """Return small DB stats for status reporting."""
@@ -575,7 +767,7 @@ class GameDatabase:
                 """
                 SELECT id, session_id, captured_at, game_date, save_hash,
                        military_power, colony_count, wars_count, energy_net, alloys_net,
-                       full_briefing_json
+                       full_briefing_json, event_state_json
                 FROM snapshots
                 WHERE id = ?;
                 """,
@@ -649,18 +841,25 @@ class GameDatabase:
         if not prev_row or not curr_row:
             return 0
 
-        prev_json = prev_row.get("full_briefing_json")
-        if not isinstance(prev_json, str) or not prev_json:
+        prev_state_json = prev_row.get("event_state_json") or prev_row.get("full_briefing_json")
+        if not isinstance(prev_state_json, str) or not prev_state_json:
             return 0
-
         try:
-            prev_briefing = json.loads(prev_json)
+            prev_briefing = json.loads(prev_state_json)
         except Exception:
             return 0
 
+        # Compute current state from the live briefing (avoid depending on persisted JSON).
+        try:
+            from backend.core.history import build_event_state_from_briefing
+
+            curr_state = build_event_state_from_briefing(current_briefing)
+        except Exception:
+            curr_state = current_briefing
+
         detected = compute_events(
             prev=prev_briefing if isinstance(prev_briefing, dict) else {},
-            curr=current_briefing if isinstance(current_briefing, dict) else {},
+            curr=curr_state if isinstance(curr_state, dict) else {},
             from_snapshot_id=int(prev_id),
             to_snapshot_id=int(snapshot_id),
         )
@@ -690,6 +889,23 @@ class GameDatabase:
             ).fetchone()
             return str(row["id"]) if row else None
 
+    def get_active_or_latest_session_id_for_save_path(self, *, save_path: str) -> str | None:
+        """Best-effort lookup by last known save_path (useful on startup without parsing gamestate)."""
+        if not save_path:
+            return None
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT id
+                FROM sessions
+                WHERE save_path = ?
+                ORDER BY (ended_at IS NULL) DESC, COALESCE(last_updated_at, started_at) DESC
+                LIMIT 1;
+                """,
+                (str(save_path),),
+            ).fetchone()
+            return str(row["id"]) if row else None
+
     def get_recent_events(self, *, session_id: str, limit: int = 20) -> list[dict[str, Any]]:
         lim = max(1, min(int(limit), 100))
         with self._lock:
@@ -709,7 +925,7 @@ class GameDatabase:
         with self._lock:
             first = self._conn.execute(
                 """
-                SELECT id, captured_at, game_date, full_briefing_json
+                SELECT id, captured_at, game_date, full_briefing_json, event_state_json
                 FROM snapshots
                 WHERE session_id = ?
                 ORDER BY captured_at ASC, id ASC
@@ -719,7 +935,7 @@ class GameDatabase:
             ).fetchone()
             last = self._conn.execute(
                 """
-                SELECT id, captured_at, game_date, full_briefing_json
+                SELECT id, captured_at, game_date, full_briefing_json, event_state_json
                 FROM snapshots
                 WHERE session_id = ?
                 ORDER BY captured_at DESC, id DESC
@@ -814,4 +1030,24 @@ def get_default_db(db_path: str | Path | None = None) -> GameDatabase:
 
     if _default_db is None:
         _default_db = GameDatabase()
+        # Best-effort background maintenance for older DBs.
+        # Keeps startup fast while preventing unbounded full JSON accumulation.
+        def _maintenance(db: GameDatabase) -> None:
+            try:
+                db.backfill_latest_briefings_all_sessions(limit_sessions=500)
+            except Exception:
+                pass
+            try:
+                db.enforce_full_briefing_retention_all_sessions(keep_recent=DEFAULT_KEEP_FULL_BRIEFINGS_RECENT, keep_first=True)
+            except Exception:
+                pass
+            try:
+                db.maybe_checkpoint_wal()
+            except Exception:
+                pass
+
+        try:
+            threading.Thread(target=_maintenance, args=(_default_db,), daemon=True, name="db-maintenance").start()
+        except Exception:
+            pass
     return _default_db
