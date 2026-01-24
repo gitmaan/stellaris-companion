@@ -33,6 +33,11 @@
       "id": "UHE-P006",
       "learning": "Integration pattern: build signals first (fast, Rust-backed), then build history enrichment from gamestate (slow, regex), then merge signals into history (signals.leaders replaces history.leaders). This allows incremental migration.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P007",
+      "learning": "Event name resolution: _get_leader_name() helper in events.py provides fallback chain (name → name_key with cleanup → #id). Cleanup matches _extract_leader_name_rust() patterns (_CHR_, NAME_ prefix). Event data should include both 'name' and 'name_key' for debugging.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -99,13 +104,13 @@
       "priority": 2,
       "description": "When building leader event summaries (hired, died, removed), prefer leader['name'] over name_key. Fallback chain: name → name_key → #{id}.",
       "files": ["backend/core/events.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q \"get('name')\\|\\['name'\\]\" backend/core/events.py (uses name field)",
         "RUN: grep -E 'leader.*name.*name_key|name_key.*fallback' backend/core/events.py (has fallback logic)",
         "RUN: python3 -c \"from backend.core.events import compute_events; print('Import OK')\" (importable)"
       ],
-      "notes": "Event summaries feed into Chronicle. Using resolved names here fixes Chronicle narrative quality."
+      "notes": "Event summaries feed into Chronicle. Using resolved names here fixes Chronicle narrative quality. Added _get_leader_name() helper with fallback chain matching _extract_leader_name_rust() patterns."
     },
     {
       "id": "UHE-006",

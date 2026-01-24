@@ -100,6 +100,37 @@ def _extract_player_leaders(briefing: dict[str, Any]) -> dict[int, dict[str, Any
     return out
 
 
+def _get_leader_name(leader: dict[str, Any]) -> str:
+    """Get best available leader name with fallback chain.
+
+    Priority: name (resolved) → name_key (with cleanup) → #{id}
+
+    This ensures Chronicle and event summaries use human-readable names
+    instead of placeholders like %LEADER_2%.
+    """
+    # Prefer resolved name (from signals/Rust extraction)
+    name = leader.get('name')
+    if name and isinstance(name, str) and name.strip():
+        return name.strip()
+
+    # Fallback to name_key with cleanup
+    name_key = leader.get('name_key')
+    if name_key and isinstance(name_key, str):
+        key = name_key.strip()
+        # Clean up common patterns (same logic as _extract_leader_name_rust)
+        if '_CHR_' in key:
+            return key.split('_CHR_')[-1]
+        if key.startswith('NAME_'):
+            return key[5:].replace('_', ' ')
+        # Return as-is if not a placeholder template
+        if not key.startswith('%'):
+            return key
+
+    # Final fallback to ID
+    lid = leader.get('id')
+    return f"#{lid}" if lid is not None else "#unknown"
+
+
 def _extract_diplomacy_sets(briefing: dict[str, Any]) -> tuple[set[int], set[int], dict[str, set[int]]]:
     history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
     dip = history.get("diplomacy") if isinstance(history, dict) else None
@@ -478,25 +509,25 @@ def compute_events(
         l = curr_leaders.get(lid, {})
         cls = l.get("class") or "leader"
         lvl = l.get("level")
-        name = l.get("name_key") or f"#{lid}"
+        name = _get_leader_name(l)  # Prefer resolved name, fallback to name_key
         lvl_text = f" (Lv{lvl})" if isinstance(lvl, int) else ""
         events.append(
             DetectedEvent(
                 event_type="leader_hired",
                 summary=f"Hired {cls}: {name}{lvl_text}",
-                data={"leader_id": lid, "class": cls, "level": lvl, "name_key": l.get("name_key"), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={"leader_id": lid, "class": cls, "level": lvl, "name": l.get("name"), "name_key": l.get("name_key"), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
             )
         )
 
     for lid in removed:
         l = prev_leaders.get(lid, {})
         cls = l.get("class") or "leader"
-        name = l.get("name_key") or f"#{lid}"
+        name = _get_leader_name(l)  # Prefer resolved name, fallback to name_key
         events.append(
             DetectedEvent(
                 event_type="leader_removed",
                 summary=f"Leader removed: {cls} {name}",
-                data={"leader_id": lid, "class": cls, "name_key": l.get("name_key"), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                data={"leader_id": lid, "class": cls, "name": l.get("name"), "name_key": l.get("name_key"), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
             )
         )
 
@@ -505,12 +536,12 @@ def compute_events(
         after = curr_leaders.get(lid, {})
         if (before.get("death_date") is None) and after.get("death_date"):
             cls = after.get("class") or "leader"
-            name = after.get("name_key") or f"#{lid}"
+            name = _get_leader_name(after)  # Prefer resolved name, fallback to name_key
             events.append(
                 DetectedEvent(
                     event_type="leader_died",
                     summary=f"Leader died: {cls} {name} (death_date {after.get('death_date')})",
-                    data={"leader_id": lid, "class": cls, "name_key": after.get("name_key"), "death_date": after.get("death_date"), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    data={"leader_id": lid, "class": cls, "name": after.get("name"), "name_key": after.get("name_key"), "death_date": after.get("death_date"), "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
                 )
             )
 
