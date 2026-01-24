@@ -44,6 +44,9 @@ def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, An
     # Extract leader signals with resolved names
     signals["leaders"] = _extract_leader_signals(extractor)
 
+    # Extract war signals
+    signals["wars"] = _extract_war_signals(extractor)
+
     return signals
 
 
@@ -120,4 +123,43 @@ def _extract_leader_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     return {
         "count": len(normalized),
         "leaders": normalized,
+    }
+
+
+def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract normalized war data for history diffing.
+
+    Uses extractor.get_wars() which provides structured war data
+    including participants, war goals, and exhaustion values.
+
+    Returns:
+        Dict with:
+        - player_at_war: bool
+        - count: int
+        - wars: list of war names (for event detection diff)
+    """
+    raw = extractor.get_wars()
+
+    if not isinstance(raw, dict):
+        return {"player_at_war": False, "count": 0, "wars": []}
+
+    player_at_war = bool(raw.get("player_at_war", False))
+    raw_wars = raw.get("wars", [])
+
+    if not isinstance(raw_wars, list):
+        return {"player_at_war": player_at_war, "count": 0, "wars": []}
+
+    # Extract war names for event detection (war started/ended diffs)
+    war_names: list[str] = []
+    for war in raw_wars:
+        if not isinstance(war, dict):
+            continue
+        name = war.get("name")
+        if name and isinstance(name, str) and name.strip():
+            war_names.append(name.strip())
+
+    return {
+        'player_at_war': player_at_war,
+        'count': len(war_names),
+        'wars': war_names,
     }

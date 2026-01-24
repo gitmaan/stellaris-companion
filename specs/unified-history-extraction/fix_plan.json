@@ -118,13 +118,13 @@
       "priority": 3,
       "description": "Extend build_snapshot_signals to include wars using extractor.get_wars(). Normalize to {player_at_war, count, wars: [...]}.",
       "files": ["backend/core/signals.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_wars' backend/core/signals.py (uses extractor method)",
         "RUN: grep -q \"'wars'\" backend/core/signals.py (includes wars field)",
-        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); print(f'Wars: {s.get(\\\"wars\\\", {})}')\" (wars extraction works)"
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); wars=s.get('wars', {}); print(f'Wars: {wars}'); assert isinstance(wars, dict) and 'wars' in wars\" (wars extraction works)"
       ],
-      "notes": "Wars from extractor.get_wars() are already structured. Just normalize format and include player_at_war boolean."
+      "notes": "Wars from extractor.get_wars() are already structured. Normalizes to {player_at_war, count, wars: [...]}. War names may contain unresolved localization keys like %ADJ% - this is expected behavior from the save file."
     },
     {
       "id": "UHE-007",
