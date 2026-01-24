@@ -5,12 +5,13 @@ import re
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import iter_section_entries, ParserError
+    from rust_bridge import iter_section_entries, ParserError, _get_active_session
 
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -34,20 +35,10 @@ class ArmiesMixin:
               - by_type: Dict mapping army type to count
               - total_strength: Sum of max_health for combat power estimate
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_armies_rust()
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for armies: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback: regex-based parsing
+        # Dispatch to Rust version when session is active (P030)
+        session = _get_active_session()
+        if session:
+            return self._get_armies_rust()
         return self._get_armies_regex()
 
     def _get_armies_rust(self) -> dict:
@@ -56,6 +47,11 @@ class ArmiesMixin:
         Returns:
             Dict with army details
         """
+        # Check for active session at start - delegate to regex if not available (P030)
+        session = _get_active_session()
+        if not session:
+            return self._get_armies_regex()
+
         result = {
             "armies": [],
             "count": 0,
@@ -68,8 +64,8 @@ class ArmiesMixin:
         by_type: dict[str, int] = {}
         total_strength = 0.0
 
-        # Iterate over army section using Rust parser
-        for army_id, army_data in iter_section_entries(self.gamestate_path, "army"):
+        # Iterate over army section using session.iter_section() directly (P031)
+        for army_id, army_data in session.iter_section("army"):
             if not isinstance(army_data, dict):
                 continue
 
