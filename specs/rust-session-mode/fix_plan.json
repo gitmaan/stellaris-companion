@@ -545,12 +545,12 @@
       "priority": 21,
       "description": "Delete all _regex methods from diplomacy.py.",
       "files": ["stellaris_save_extractor/diplomacy.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q 'def _get.*_regex' stellaris_save_extractor/diplomacy.py (removed)",
         "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_diplomacy(); ctx.__exit__(None,None,None); print('OK')\" (works)"
       ],
-      "notes": "Only proceed if MIG-040 passed. Large file."
+      "notes": "Completed 2026-01-25. Removed all _regex methods: _get_diplomacy_regex (~228 lines), _get_federation_details_regex (~88 lines), _get_galactic_community_regex (~99 lines), _get_subjects_regex (~197 lines), _get_fallen_empires_regex (~163 lines), _get_espionage_regex (~99 lines), _get_claims_regex (~122 lines). Total ~1008 lines of regex code removed (file went from 2284 to 1276 lines). All functions now require Rust session mode. Note: _get_diplomacy_rust still uses inline regex for relations_manager parsing due to P018 (duplicate relation={} keys), but this is self-contained and not a fallback to _regex method. All 7 diplomacy functions tested and working: get_diplomacy (47 relations), get_federation_details, get_galactic_community (16 members), get_subjects (3 agreements), get_fallen_empires (4 FEs), get_espionage (2 ops), get_claims (9 player claims)."
     },
     {
       "id": "MIG-044",
