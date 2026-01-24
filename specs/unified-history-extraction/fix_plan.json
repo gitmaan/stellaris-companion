@@ -242,7 +242,7 @@
       "priority": 8,
       "description": "Add technology extraction to signals using extractor.get_technology() (already Rust-backed). Replaces extract_player_techs_from_gamestate regex.",
       "files": ["backend/core/signals.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_technology' backend/core/signals.py (uses extractor method)",
         "RUN: grep -q \"'technology'\\|'techs'\" backend/core/signals.py (includes tech field)",

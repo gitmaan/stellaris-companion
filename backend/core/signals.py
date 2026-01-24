@@ -50,6 +50,9 @@ def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, An
     # Extract diplomacy signals
     signals["diplomacy"] = _extract_diplomacy_signals(extractor)
 
+    # Extract technology signals
+    signals["technology"] = _extract_technology_signals(extractor)
+
     return signals
 
 
@@ -320,4 +323,63 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         'rivals': rivals,
         'treaties': treaties,
         'empire_names': empire_names,
+    }
+
+
+def _extract_technology_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract normalized technology data for history diffing.
+
+    Uses extractor.get_technology() which provides comprehensive tech data
+    including researched techs, in-progress, and available.
+
+    Returns format compatible with events.py _extract_tech_list():
+        Dict with:
+        - player_id: int | None
+        - techs: sorted list of completed tech names
+        - count: number of completed techs
+        - in_progress: list of {id, category, progress} for current research
+    """
+    raw = extractor.get_technology()
+
+    if not isinstance(raw, dict):
+        return {
+            'player_id': None,
+            'techs': [],
+            'count': 0,
+            'in_progress': [],
+        }
+
+    # Extract player ID
+    try:
+        player_id = extractor.get_player_empire_id()
+    except Exception:
+        player_id = None
+
+    # Get completed technologies
+    researched = raw.get('researched_techs', [])
+    if not isinstance(researched, list):
+        researched = []
+
+    # Ensure all are strings and sort
+    techs = sorted([str(t) for t in researched if t])
+
+    # Extract in-progress research
+    in_progress_raw = raw.get('in_progress', {})
+    in_progress: list[dict[str, Any]] = []
+
+    if isinstance(in_progress_raw, dict):
+        for category in ('physics', 'society', 'engineering'):
+            current = in_progress_raw.get(category)
+            if isinstance(current, dict) and current.get('tech'):
+                in_progress.append({
+                    'id': current.get('tech'),
+                    'category': category,
+                    'progress': current.get('progress', 0),
+                })
+
+    return {
+        'player_id': player_id,
+        'techs': techs,
+        'count': len(techs),
+        'in_progress': in_progress,
     }
