@@ -11,7 +11,7 @@ Scope: the Electron app (`electron/`) + Electron-focused backend (`backend/api`,
 
 ## Implementation Progress
 
-> **Last updated:** 2026-01-19
+> **Last updated:** 2026-01-24
 
 ### ✅ Completed
 
@@ -64,6 +64,7 @@ Scope: the Electron app (`electron/`) + Electron-focused backend (`backend/api`,
 - ✅ Fix `backend-status` updates: current logic is tied to whether Electron spawned Python, not whether the backend is reachable.
 - ✅ Add request timeouts (AbortController) and prevent overlapping health checks.
 - ✅ Stop doing "full precompute on every save update"; switch to tiered compute + latest-only scheduling.
+- ✅ Prevent renderer request storms: keep `useBackend()` return stable across loading updates to avoid `useEffect` loops that can spam chronicle generation (and Gemini network calls); this can look like “Wi‑Fi dies” on macOS because the network gets saturated until the app is closed.
 
 ### P1 — Big performance wins
 - ✅ ~~Avoid loading/decoding the entire `gamestate` into a giant Python string for every parse~~ — Lazy loading implemented; full mmap optimization deferred.
