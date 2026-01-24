@@ -28,9 +28,9 @@ function getConnectionStatus(payload: BackendStatusEvent | null): ConnectionStat
 function getStatusLabel(status: ConnectionStatus, stage: string | null): string {
   switch (status) {
     case 'ready':
-      return 'Ready'
+      return 'Systems Online'
     case 'analyzing':
-      return stage ? `Analyzing (${stage})…` : 'Analyzing save…'
+      return stage ? `Surveying (${stage})…` : 'Surveying Empire…'
     case 'connecting':
       return 'Connecting...'
     case 'no-save':
