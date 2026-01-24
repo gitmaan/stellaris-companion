@@ -8,11 +8,12 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type for type hints
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,127 @@ class EconomyMixin:
                 "unemployed_pops": 200
             }
         """
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_pop_statistics_rust()
+        return self._get_pop_statistics_regex()
+
+    def _get_pop_statistics_rust(self) -> dict:
+        """Rust-optimized pop statistics using iter_section.
+
+        Benefits over regex version:
+        - No 50MB chunk slicing (memory efficient)
+        - No regex parsing on nested structures
+        - Complete data without truncation risks
+        - Direct dict access for fields
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_pop_statistics_regex()
+
+        result = {
+            'total_pops': 0,
+            'by_species': {},
+            'by_job_category': {},
+            'by_stratum': {},
+            'happiness_avg': 0.0,
+            'employed_pops': 0,
+            'unemployed_pops': 0,
+        }
+
+        # Step 1: Get player's planet IDs (as set of strings for comparison)
+        planet_ids = self._get_player_planet_ids()
+        if not planet_ids:
+            return result
+
+        player_planet_set = set(str(pid) for pid in planet_ids)
+
+        # Step 2: Build species ID to name mapping
+        species_names = self._get_species_names()
+
+        # Tracking for statistics
+        species_counts = {}
+        job_category_counts = {}
+        stratum_counts = {}
+        happiness_sum = 0.0
+        happiness_weight = 0
+        total_pops = 0
+
+        # Step 3: Iterate over pop_groups section using Rust session
+        for pop_group_id, entry in session.iter_section('pop_groups'):
+            # P010: entry might be string "none" for deleted entries
+            if not isinstance(entry, dict):
+                continue
+
+            # Check if this pop group is on a player-owned planet
+            planet_id = entry.get('planet')
+            if planet_id is None:
+                continue
+            # Planet ID can be int or string, normalize to string for comparison
+            if str(planet_id) not in player_planet_set:
+                continue
+
+            # Get the size of this pop group (number of pops)
+            size = entry.get('size')
+            if size is None:
+                continue
+            try:
+                pop_size = int(size)
+            except (ValueError, TypeError):
+                continue
+            if pop_size == 0:
+                continue
+
+            total_pops += pop_size
+
+            # Extract species and category from key nested dict
+            key_data = entry.get('key')
+            if isinstance(key_data, dict):
+                # Extract species ID
+                species_id = key_data.get('species')
+                if species_id is not None:
+                    species_id_str = str(species_id)
+                    species_name = species_names.get(species_id_str, f"Species_{species_id_str}")
+                    species_counts[species_name] = species_counts.get(species_name, 0) + pop_size
+
+                # Extract category (job category: ruler, specialist, worker, slave, etc.)
+                category = key_data.get('category')
+                if category:
+                    job_category_counts[category] = job_category_counts.get(category, 0) + pop_size
+                    # Use category as stratum (they're equivalent in Stellaris)
+                    stratum_counts[category] = stratum_counts.get(category, 0) + pop_size
+
+            # Extract happiness (0.0 to 1.0 scale in save, convert to percentage)
+            # Use weighted sum for efficiency instead of storing all values
+            happiness = entry.get('happiness')
+            if happiness is not None:
+                try:
+                    happiness_val = float(happiness) * 100  # Convert to percentage
+                    happiness_sum += happiness_val * pop_size
+                    happiness_weight += pop_size
+                except (ValueError, TypeError):
+                    pass
+
+        # Finalize results
+        result['total_pops'] = total_pops
+        result['by_species'] = species_counts
+        result['by_job_category'] = job_category_counts
+        result['by_stratum'] = stratum_counts
+
+        # Employed pops = total minus unemployed category
+        unemployed = job_category_counts.get('unemployed', 0)
+        result['employed_pops'] = total_pops - unemployed
+        result['unemployed_pops'] = unemployed
+
+        # Calculate average happiness
+        if happiness_weight > 0:
+            result['happiness_avg'] = round(happiness_sum / happiness_weight, 1)
+
+        return result
+
+    def _get_pop_statistics_regex(self) -> dict:
+        """Original regex implementation - fallback for non-session mode."""
         result = {
             'total_pops': 0,
             'by_species': {},
@@ -342,14 +464,10 @@ class EconomyMixin:
             'sr_living_metal', 'sr_zro', 'sr_dark_matter', 'minor_artifacts', 'astral_threads'
         ]
 
-        # Find player's country data using Rust iterator
-        player_data = None
-        for country_id, country_data in iter_section_entries(self.save_path, "country"):
-            if str(country_id) == str(player_id):
-                player_data = country_data
-                break
+        # Use cached player country entry for fast lookup
+        player_data = self._get_player_country_entry(player_id)
 
-        if not player_data:
+        if not player_data or not isinstance(player_data, dict):
             result['error'] = "Could not find player country"
             return result
 

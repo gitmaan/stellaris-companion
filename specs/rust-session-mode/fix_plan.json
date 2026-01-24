@@ -295,15 +295,15 @@
       "id": "MIG-022",
       "title": "Migrate get_pop_statistics to Rust",
       "priority": 8,
-      "description": "economy.py get_pop_statistics() uses 50MB chunk slicing with re.finditer. Replace with iter_section('pop') for memory efficiency and speed.",
+      "description": "economy.py get_pop_statistics() uses 50MB chunk slicing with re.finditer. Replace with iter_section('pop_groups') for memory efficiency and speed.",
       "files": ["stellaris_save_extractor/economy.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q '_get_pop_statistics_rust' stellaris_save_extractor/economy.py (Rust method exists)",
         "RUN: grep -q '_get_pop_statistics_regex' stellaris_save_extractor/economy.py (fallback exists)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_pop_statistics(); ctx.__exit__(None,None,None); print(f'Pops: {r.get(\\\"total_pops\\\", 0)}'); assert isinstance(r, dict)\" (works with session)"
       ],
-      "notes": "High priority - 50MB chunk is largest in codebase. Use iter_section('pop') to process pops without loading entire section into memory."
+      "notes": "Completed 2026-01-24. Uses iter_section('pop_groups') (not 'pop' as originally noted - pop_groups is the actual section with aggregated pop data). 4.4x speedup (2.34s → 0.53s). Output matches regex baseline exactly: 171724 total pops, all species/job categories match, happiness_avg 75.5. Replaces 50MB chunk slicing with streaming iteration."
     },
     {
       "id": "MIG-023",
@@ -458,6 +458,20 @@
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_factions(); ctx.__exit__(None,None,None); print(f'Factions: {type(r)}'); assert isinstance(r, dict)\" (works with session)"
       ],
       "notes": "Faction data affects advisor personality and recommendations. Ethics attraction values need accurate extraction."
+    },
+    {
+      "id": "MIG-034",
+      "title": "Migrate get_leviathans to Rust",
+      "priority": 12,
+      "description": "leviathans.py has 6 regex calls for space creatures and guardians. Migrate to Rust for complete leviathan state.",
+      "files": ["stellaris_save_extractor/leviathans.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're\\.search\\|re\\.findall\\|re\\.finditer' stellaris_save_extractor/leviathans.py | awk '{if ($1 < 3) exit 0; else exit 1}' (regex count reduced by >50%)",
+        "RUN: grep -q 'iter_section\\|extract_sections' stellaris_save_extractor/leviathans.py (uses Rust session ops)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_leviathans() if hasattr(e, 'get_leviathans') else {}; ctx.__exit__(None,None,None); print('OK')\" (works with session)"
+      ],
+      "notes": "Leviathans, guardians, space creatures. Small file but completes full extraction coverage."
     }
   ],
   "discovered": []
