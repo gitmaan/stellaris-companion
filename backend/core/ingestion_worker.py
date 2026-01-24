@@ -77,40 +77,82 @@ def _build_t1_status(*, extractor: SaveExtractor) -> dict[str, Any]:
 
 
 def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
+    import sys
+
+    def log_timing(label: str, elapsed: float) -> None:
+        print(f"[TIMING] {label}: {elapsed*1000:.1f}ms", file=sys.stderr, flush=True)
+
     started = time.time()
+    timings: dict[str, float] = {}
+
     try:
         tier = job["tier"]
         save_path = job["save_path"]
 
         # Use session mode to parse save once and reuse for all extractor calls
+        t0 = time.time()
         from rust_bridge import session as rust_session
+        timings["import_rust_bridge"] = time.time() - t0
 
-        with rust_session(save_path):
+        t0 = time.time()
+        ctx = rust_session(save_path)
+        ctx.__enter__()
+        timings["rust_session_start"] = time.time() - t0
+        log_timing("Rust session started", timings["rust_session_start"])
+
+        try:
+            t0 = time.time()
             extractor = SaveExtractor(str(save_path))
+            timings["extractor_init"] = time.time() - t0
+            log_timing("SaveExtractor init", timings["extractor_init"])
 
             if tier == "t1":
+                t0 = time.time()
                 payload = {"status": _build_t1_status(extractor=extractor)}
+                timings["t1_build"] = time.time() - t0
+                log_timing("T1 status build", timings["t1_build"])
+
+                timings["total"] = time.time() - started
+                log_timing("TOTAL (t1)", timings["total"])
                 out_q.put({"ok": True, "payload": payload, "worker_pid": os.getpid()})
                 return
 
             if tier == "t2":
+                t0 = time.time()
                 briefing = extractor.get_complete_briefing()
+                timings["briefing"] = time.time() - t0
+                log_timing("get_complete_briefing", timings["briefing"])
 
             # Add history/event enrichment for DB + recap/event detection.
             try:
+                t0 = time.time()
                 from backend.core.history import build_history_enrichment
 
+                # NOTE: getattr(extractor, "gamestate") triggers loading the entire 70MB+ file!
+                # This is a known bottleneck - history enrichment should use Rust session instead.
+                t_gs = time.time()
+                gamestate = getattr(extractor, "gamestate", None)
+                timings["gamestate_load"] = time.time() - t_gs
+                log_timing("⚠️  Gamestate load (bottleneck!)", timings["gamestate_load"])
+
                 history = build_history_enrichment(
-                    gamestate=getattr(extractor, "gamestate", None),
+                    gamestate=gamestate,
                     player_id=briefing.get("meta", {}).get("player_id") if isinstance(briefing, dict) else None,
                 )
                 if history:
                     briefing = dict(briefing)
                     briefing["history"] = history
-            except Exception:
-                pass
+                timings["history_enrichment"] = time.time() - t0
+                log_timing("History enrichment (total)", timings["history_enrichment"])
+            except Exception as e:
+                timings["history_enrichment"] = 0
+                print(f"[TIMING] History enrichment error: {e}", file=sys.stderr, flush=True)
 
+            t0 = time.time()
             briefing_json = json.dumps(briefing, ensure_ascii=False, separators=(",", ":"), default=str)
+            timings["json_serialize"] = time.time() - t0
+            log_timing("JSON serialize", timings["json_serialize"])
+
             meta = briefing.get("meta", {}) if isinstance(briefing, dict) else {}
 
             payload = {
@@ -121,12 +163,29 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
                 "save_hash": _compute_save_hash_from_briefing(briefing) if isinstance(briefing, dict) else None,
                 "game_date": meta.get("date") if isinstance(meta, dict) else None,
                 "duration_ms": (time.time() - started) * 1000,
+                "timings": timings,
             }
+
+            timings["total"] = time.time() - started
+            log_timing("TOTAL (t2)", timings["total"])
+
+            # Print timing summary
+            print(f"\n[TIMING SUMMARY]", file=sys.stderr, flush=True)
+            for k, v in sorted(timings.items(), key=lambda x: -x[1]):
+                print(f"  {k}: {v*1000:.1f}ms", file=sys.stderr, flush=True)
+            print("", file=sys.stderr, flush=True)
+
             out_q.put({"ok": True, "payload": payload, "worker_pid": os.getpid()})
             return
+        finally:
+            t0 = time.time()
+            ctx.__exit__(None, None, None)
+            log_timing("Rust session close", time.time() - t0)
 
         out_q.put({"ok": False, "error": f"Unknown tier: {tier}", "worker_pid": os.getpid()})
     except Exception as e:
+        import traceback
+        print(f"[TIMING] Error: {e}\n{traceback.format_exc()}", file=sys.stderr, flush=True)
         out_q.put({"ok": False, "error": str(e), "worker_pid": os.getpid()})
 
 

@@ -76,14 +76,12 @@ class IngestionManager:
         db: Any,
         stable_window_seconds: float = 0.6,
         stable_max_wait_seconds: float = 10.0,
-        t2_idle_delay_seconds: float = 12.0,
     ) -> None:
         self._companion = companion
         self._db = db
 
         self._stable_window_seconds = max(0.2, float(stable_window_seconds))
         self._stable_max_wait_seconds = max(2.0, float(stable_max_wait_seconds))
-        self._t2_idle_delay_seconds = max(3.0, float(t2_idle_delay_seconds))
 
         self._lock = threading.RLock()
         self._wakeup = threading.Event()
@@ -151,6 +149,20 @@ class IngestionManager:
                 payload["ingestion"]["db"] = db.get_db_stats()
             except Exception:
                 pass
+
+        # Add empire_type for themed UI messages
+        try:
+            identity = getattr(self._companion, "identity", None)
+            if isinstance(identity, dict):
+                if identity.get("is_machine"):
+                    payload["empire_type"] = "machine"
+                elif identity.get("is_hive_mind"):
+                    payload["empire_type"] = "hive_mind"
+                else:
+                    payload["empire_type"] = "standard"
+        except Exception:
+            pass
+
         return payload
 
     def get_latest_t1_status(self) -> dict[str, Any] | None:
@@ -287,8 +299,10 @@ class IngestionManager:
             with self._lock:
                 self._set_stage_locked("waiting_for_stable_save", "waiting for file stability")
 
+            stable_start = time.time()
             if not self._wait_for_stable_save(save_path, request_id=request_id):
                 continue
+            logger.info("[TIMING] Save stability wait: %.1fms", (time.time() - stable_start) * 1000)
 
             with self._lock:
                 if request_id != self._request_id:
@@ -319,9 +333,11 @@ class IngestionManager:
             self._set_stage_locked("parsing_t1", "computing status snapshot")
 
             # Tier 1 worker (cancelable)
+            t1_start = time.time()
             t1 = self._run_worker_tier("t1", save_path=save_path, request_id=request_id)
             if t1 is None:
                 continue
+            logger.info("[TIMING] T1 worker complete: %.1fms", (time.time() - t1_start) * 1000)
 
             with self._lock:
                 if request_id != self._request_id:
@@ -331,28 +347,18 @@ class IngestionManager:
                 self._status.stage_detail = "status snapshot ready"
                 self._status.updated_at = time.time()
 
-            # Tier 2 scheduling: idle-only unless forced by chat.
-            if not force_t2:
-                while True:
-                    with self._lock:
-                        if request_id != self._request_id:
-                            break
-                        last_event = self._last_save_event_at
-                        if self._force_t2:
-                            break
-                    if last_event and time.time() - last_event >= self._t2_idle_delay_seconds:
-                        break
-                    time.sleep(0.25)
-
+            # Tier 2: Start immediately after T1 - cancellation handles rapid saves
             with self._lock:
                 if request_id != self._request_id:
                     continue
                 self._force_t2 = False
                 self._set_stage_locked("precomputing_t2", "building complete briefing")
 
+            t2_start = time.time()
             t2 = self._run_worker_tier("t2", save_path=save_path, request_id=request_id)
             if t2 is None:
                 continue
+            logger.info("[TIMING] T2 worker complete: %.1fms", (time.time() - t2_start) * 1000)
 
             briefing_json = t2.get("briefing_json")
             t2_meta = t2.get("meta")
@@ -374,6 +380,7 @@ class IngestionManager:
                 self._set_stage_locked("persisting", "saving snapshot and activating cache")
 
             # Persist + activate cache (main process only).
+            persist_start = time.time()
             try:
                 parsed = json.loads(briefing_json)
                 if isinstance(parsed, dict):
@@ -386,7 +393,9 @@ class IngestionManager:
                     )
             except Exception as e:
                 logger.warning("snapshot_persist_failed error=%s", e)
+            logger.info("[TIMING] DB persist: %.1fms", (time.time() - persist_start) * 1000)
 
+            activate_start = time.time()
             try:
                 self._companion.apply_precomputed_briefing(
                     save_path=save_path,
@@ -401,6 +410,7 @@ class IngestionManager:
                     self._status.last_error = f"Failed to activate cache: {e}"
                     self._set_stage_locked("error", "activation failed")
                 continue
+            logger.info("[TIMING] Cache activation: %.1fms", (time.time() - activate_start) * 1000)
 
             with self._lock:
                 if request_id != self._request_id:
@@ -413,6 +423,7 @@ class IngestionManager:
                 self._status.t2_last_save_hash = save_hash if isinstance(save_hash, str) else None
                 self._status.last_error = None
                 self._set_stage_locked("ready", "complete briefing ready")
+                logger.info("[TIMING] T2 complete - status now 'ready'")
 
     def _run_worker_tier(self, tier: Literal["t1", "t2"], *, save_path: Path, request_id: int) -> dict[str, Any] | None:
         cancel_event = threading.Event()

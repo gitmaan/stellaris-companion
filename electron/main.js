@@ -914,7 +914,19 @@ ipcMain.handle('install-update', async () => {
 
 // App Lifecycle
 
+// Timing helper for startup diagnostics
+function logTiming(label, startTime) {
+  const elapsed = Date.now() - startTime
+  console.log(`[TIMING] ${label}: ${elapsed}ms`)
+  return Date.now()
+}
+
 app.whenReady().then(async () => {
+  const appStartTime = Date.now()
+  let phaseStart = appStartTime
+  console.log('[TIMING] ═══════════════════════════════════════════')
+  console.log('[TIMING] Electron app startup begin')
+
   // If a second instance is started, focus the existing window instead.
   app.on('second-instance', () => {
     if (!mainWindow) return
@@ -925,11 +937,12 @@ app.whenReady().then(async () => {
 
   // Use existing token from env (dev mode) or generate new one (production)
   authToken = process.env.STELLARIS_API_TOKEN || generateAuthToken()
-  console.log('Auth token configured')
+  phaseStart = logTiming('Auth token configured', phaseStart)
 
   try {
     const chosenPort = await findAvailablePort(DEFAULT_BACKEND_PORT)
     backendPort = chosenPort
+    phaseStart = logTiming('Find available port', phaseStart)
     if (chosenPort !== DEFAULT_BACKEND_PORT) {
       console.warn(`Default port ${DEFAULT_BACKEND_PORT} in use; using port ${chosenPort} instead`)
     }
@@ -939,16 +952,20 @@ app.whenReady().then(async () => {
 
   // Create the main window
   createWindow()
+  phaseStart = logTiming('Create window', phaseStart)
 
   // Create the system tray (ELEC-006)
   createTray()
+  phaseStart = logTiming('Create tray', phaseStart)
 
   // Get settings with actual secrets and start backend if needed
   const settings = await getSettingsWithSecrets()
   backendConfigured = !!settings.googleApiKey
+  phaseStart = logTiming('Load settings (keytar)', phaseStart)
 
   // Always start health checks (even if we don't spawn Python) so the UI gets accurate status.
   startHealthCheck()
+  phaseStart = logTiming('Start health check', phaseStart)
 
   // If backend is reachable already, don't spawn another process.
   let backendAlreadyRunning = false
@@ -956,15 +973,19 @@ app.whenReady().then(async () => {
     await checkBackendHealth()
     backendAlreadyRunning = true
     console.log('Backend already running')
+    phaseStart = logTiming('Backend already running (health check)', phaseStart)
   } catch (e) {
+    phaseStart = logTiming('Backend not running (will start)', phaseStart)
     // Not running or not authorized (still shows status via health checks).
   }
 
   if (!backendAlreadyRunning && settings.googleApiKey) {
     startPythonBackend(settings)
+    phaseStart = logTiming('Start Python backend (spawn)', phaseStart)
 
     // Wait for backend to be ready
     const ready = await waitForBackendReady()
+    phaseStart = logTiming('Wait for backend ready', phaseStart)
     if (ready) {
       console.log('Backend health check passed')
     } else {
@@ -975,6 +996,10 @@ app.whenReady().then(async () => {
       console.log('No Google API key configured, skipping backend start')
     }
   }
+
+  console.log('[TIMING] ═══════════════════════════════════════════')
+  console.log(`[TIMING] TOTAL Electron startup: ${Date.now() - appStartTime}ms`)
+  console.log('[TIMING] ═══════════════════════════════════════════')
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
