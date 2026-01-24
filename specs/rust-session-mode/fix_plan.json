@@ -571,12 +571,12 @@
       "priority": 21,
       "description": "Delete _get_technology_regex.",
       "files": ["stellaris_save_extractor/technology.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q '_regex' stellaris_save_extractor/technology.py (removed)",
         "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_technology(); ctx.__exit__(None,None,None); print('OK')\" (works)"
       ],
-      "notes": "Only proceed if MIG-040 passed."
+      "notes": "Completed 2026-01-25. Removed all _regex methods: _get_technology_regex (~202 lines), _extract_researched_techs_regex (~50 lines). Total ~252 lines of regex code removed (file went from 414 to ~149 lines). Also removed unused imports (re, zipfile, datetime, Path) and RUST_BRIDGE_AVAILABLE check. Updated get_technology() to call _get_technology_rust() directly. _get_technology_rust raises ParserError if no session. All technology data extracted correctly: 296 techs, all 3 in_progress categories with progress, research_speed working, repeatables tracked."
     },
     {
       "id": "MIG-046",
