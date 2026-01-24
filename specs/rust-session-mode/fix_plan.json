@@ -311,13 +311,13 @@
       "priority": 8,
       "description": "base.py _get_country_names_map_regex() is a hot path resolving 300+ country names. Use iter_section('country') with batch name extraction.",
       "files": ["stellaris_save_extractor/base.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q '_get_country_names_map_rust' stellaris_save_extractor/base.py (Rust method exists)",
         "RUN: grep -q '_get_country_names_map_regex' stellaris_save_extractor/base.py (fallback exists)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e._get_country_names_map(); ctx.__exit__(None,None,None); print(f'Countries: {len(r)}'); assert len(r) > 0\" (works with session)"
       ],
-      "notes": "Hot path called by multiple extractors. Use iter_section('country') and extract name from each country dict. Handle name templates like leader names (P018)."
+      "notes": "Already implemented. Uses iter_section_entries() which dispatches to session via _get_active_session(). Resolves template names with _resolve_template_name_from_rust(). 1.3x speedup (0.45s vs 0.57s). 57 countries extracted correctly."
     },
     {
       "id": "MIG-024",
@@ -472,6 +472,137 @@
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_leviathans() if hasattr(e, 'get_leviathans') else {}; ctx.__exit__(None,None,None); print('OK')\" (works with session)"
       ],
       "notes": "Leviathans, guardians, space creatures. Small file but completes full extraction coverage."
+    },
+    {
+      "id": "MIG-040",
+      "title": "Remove regex fallbacks from economy.py (ESCAPE HATCH)",
+      "priority": 20,
+      "description": "ESCAPE HATCH: First fallback removal. If this fails, add pattern and STOP further removals. Delete _regex methods, update dispatch to call Rust directly.",
+      "files": ["stellaris_save_extractor/economy.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q 'def _get_resources_regex' stellaris_save_extractor/economy.py (regex method removed)",
+        "RUN: grep -q 'def get_resources' stellaris_save_extractor/economy.py (main method exists)",
+        "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_resources(); ctx.__exit__(None,None,None); assert 'stockpiles' in r or 'current' in r, 'FAILED'; print('ESCAPE HATCH PASSED')\" (works without fallback)"
+      ],
+      "notes": "ESCAPE HATCH: If criterion 3 fails, add pattern 'Fallback removal failed: [reason]' and STOP. Do NOT proceed with MIG-041+."
+    },
+    {
+      "id": "MIG-041",
+      "title": "Remove regex fallbacks from planets.py",
+      "priority": 21,
+      "description": "Delete _get_planets_regex, _get_population_by_planet_regex. Update dispatch to call Rust directly.",
+      "files": ["stellaris_save_extractor/planets.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q 'def _get_planets_regex' stellaris_save_extractor/planets.py (removed)",
+        "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_planets(); ctx.__exit__(None,None,None); print('OK')\" (works)"
+      ],
+      "notes": "Only proceed if MIG-040 passed."
+    },
+    {
+      "id": "MIG-042",
+      "title": "Remove regex fallbacks from player.py",
+      "priority": 21,
+      "description": "Delete all _regex methods from player.py.",
+      "files": ["stellaris_save_extractor/player.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q '_regex' stellaris_save_extractor/player.py (removed)",
+        "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_player_status(); ctx.__exit__(None,None,None); print('OK')\" (works)"
+      ],
+      "notes": "Only proceed if MIG-040 passed."
+    },
+    {
+      "id": "MIG-043",
+      "title": "Remove regex fallbacks from diplomacy.py",
+      "priority": 21,
+      "description": "Delete all _regex methods from diplomacy.py.",
+      "files": ["stellaris_save_extractor/diplomacy.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q 'def _get.*_regex' stellaris_save_extractor/diplomacy.py (removed)",
+        "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_diplomacy(); ctx.__exit__(None,None,None); print('OK')\" (works)"
+      ],
+      "notes": "Only proceed if MIG-040 passed. Large file."
+    },
+    {
+      "id": "MIG-044",
+      "title": "Remove regex fallbacks from military.py",
+      "priority": 21,
+      "description": "Delete all _regex methods from military.py.",
+      "files": ["stellaris_save_extractor/military.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q 'def _get.*_regex' stellaris_save_extractor/military.py (removed)",
+        "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); e.get_wars(); e.get_fleets(); ctx.__exit__(None,None,None); print('OK')\" (works)"
+      ],
+      "notes": "Only proceed if MIG-040 passed."
+    },
+    {
+      "id": "MIG-045",
+      "title": "Remove regex fallbacks from technology.py",
+      "priority": 21,
+      "description": "Delete _get_technology_regex.",
+      "files": ["stellaris_save_extractor/technology.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q '_regex' stellaris_save_extractor/technology.py (removed)",
+        "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_technology(); ctx.__exit__(None,None,None); print('OK')\" (works)"
+      ],
+      "notes": "Only proceed if MIG-040 passed."
+    },
+    {
+      "id": "MIG-046",
+      "title": "Remove regex fallbacks from base.py",
+      "priority": 21,
+      "description": "Delete all _regex methods from base.py. Core file.",
+      "files": ["stellaris_save_extractor/base.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q 'def _get.*_regex\\|def _analyze.*_regex\\|def _count.*_regex' stellaris_save_extractor/base.py (removed)",
+        "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); ctx.__exit__(None,None,None); assert 'meta' in b; print('OK')\" (works)"
+      ],
+      "notes": "Only proceed if MIG-040 passed. Core file - test thoroughly."
+    },
+    {
+      "id": "MIG-047",
+      "title": "Remove regex fallbacks from leaders.py",
+      "priority": 21,
+      "description": "Delete _get_leaders_regex. KEEP species traits regex (P018 - duplicate keys).",
+      "files": ["stellaris_save_extractor/leaders.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q 'def _get_leaders_regex' stellaris_save_extractor/leaders.py (main regex removed)",
+        "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_leaders(); ctx.__exit__(None,None,None); assert 'leaders' in r; print('OK')\" (works)"
+      ],
+      "notes": "Only proceed if MIG-040 passed. P018: Keep species traits regex for duplicate keys."
+    },
+    {
+      "id": "MIG-048",
+      "title": "Remove RUST_BRIDGE_AVAILABLE checks",
+      "priority": 22,
+      "description": "Remove all RUST_BRIDGE_AVAILABLE conditionals. Rust is now required.",
+      "files": ["stellaris_save_extractor/base.py", "stellaris_save_extractor/economy.py", "stellaris_save_extractor/planets.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q 'RUST_BRIDGE_AVAILABLE' stellaris_save_extractor/*.py (no optional checks)",
+        "RUN: grep -q 'from rust_bridge import' stellaris_save_extractor/base.py (direct import)"
+      ],
+      "notes": "Final cleanup. Rust is now a hard requirement."
+    },
+    {
+      "id": "MIG-049",
+      "title": "Update README for Rust requirement",
+      "priority": 23,
+      "description": "Document that Rust build is required.",
+      "files": ["README.md"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'cargo build' README.md (build instructions)",
+        "RUN: grep -qi 'rust.*require' README.md (requirement documented)"
+      ],
+      "notes": "Final documentation."
     }
   ],
   "discovered": []
