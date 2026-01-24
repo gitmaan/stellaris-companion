@@ -38,8 +38,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
     return (
       <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>
-        <h2>Something went wrong</h2>
-        <p>The UI encountered an unexpected error.</p>
+        <h2>Anomaly Detected</h2>
+        <p>An unexpected error has disrupted operations.</p>
         <button onClick={this.handleReload}>Reload</button>
         {this.state.errorMessage && (
           <pre style={{ marginTop: 16, whiteSpace: 'pre-wrap' }}>

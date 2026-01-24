@@ -34,7 +34,7 @@ function getStatusLabel(status: ConnectionStatus, stage: string | null): string 
     case 'connecting':
       return 'Connecting...'
     case 'no-save':
-      return 'No Save'
+      return 'Awaiting First Contact'
     case 'not-configured':
       return 'Not configured'
     case 'disconnected':

@@ -223,7 +223,7 @@ function ChatPage() {
         <div className="chat-messages">
           <div className="chat-welcome">
             <h2>Stellaris Advisor</h2>
-            <p>Ask questions about your empire, strategy, or game state.</p>
+            <p>Your strategic advisor awaits.</p>
             <div className="chat-suggestions">
               <p className="suggestions-label">Try asking:</p>
               <ul>

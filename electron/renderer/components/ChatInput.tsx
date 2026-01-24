@@ -44,7 +44,7 @@ function ChatInput({ onSend, disabled, loading }: ChatInputProps) {
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={loading ? 'Waiting for response...' : 'Ask your advisor...'}
+        placeholder={loading ? 'Awaiting response...' : 'Hail the Curators...'}
         disabled={isDisabled}
         autoFocus
       />
