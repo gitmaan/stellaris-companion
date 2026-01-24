@@ -8,11 +8,12 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError
+    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
     ParserError = Exception  # Fallback type
+    _get_active_session = lambda: None
 
 logger = logging.getLogger(__name__)
 
@@ -1132,6 +1133,122 @@ class MilitaryMixin:
               - by_type: Dict mapping type to count
               - ruined_available: List of ruined megastructures player could repair
         """
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_megastructures_rust()
+        return self._get_megastructures_regex()
+
+    def _get_megastructures_rust(self) -> dict:
+        """Rust-optimized megastructure extraction using iter_section.
+
+        Benefits over regex:
+        - No 3MB chunk size limit (complete megastructure data)
+        - No regex parsing errors on nested structures
+        - Direct dict access - cleaner and more reliable
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_megastructures_regex()
+
+        result = {
+            'megastructures': [],
+            'count': 0,
+            'by_type': {},
+            'ruined_available': [],
+        }
+
+        player_id = self.get_player_empire_id()
+
+        player_megas = []
+        ruined_megas = []
+        by_type: dict[str, int] = {}
+
+        for mega_id, entry in session.iter_section('megastructures'):
+            # P010: entry might be string "none" for deleted entries
+            if not isinstance(entry, dict):
+                continue
+
+            # P011: Use .get() with defaults
+            mega_type = entry.get('type')
+            if not mega_type:
+                continue
+
+            # Owner can be a string number or int
+            owner_val = entry.get('owner')
+            owner = None
+            if owner_val is not None:
+                try:
+                    owner = int(owner_val)
+                except (ValueError, TypeError):
+                    pass
+
+            # Planet ID (4294967295 means null)
+            planet_val = entry.get('planet')
+            planet_id = None
+            if planet_val is not None and str(planet_val) != '4294967295':
+                planet_id = str(planet_val)
+
+            # Check if this is a ruined megastructure (could be repaired)
+            is_ruined = 'ruined' in mega_type
+
+            # Track ruined megastructures that could potentially be repaired
+            if is_ruined:
+                ruined_info = {
+                    'id': mega_id,
+                    'type': mega_type,
+                    'owner': owner,
+                }
+                if planet_id:
+                    ruined_info['planet_id'] = planet_id
+                ruined_megas.append(ruined_info)
+
+            # Only count megastructures owned by player
+            if owner != player_id:
+                continue
+
+            # Determine status from type name
+            status = 'complete'
+            if is_ruined:
+                status = 'ruined'
+            elif '_restored' in mega_type:
+                status = 'restored'
+            elif any(x in mega_type for x in ['_0', '_1', '_2', '_3', '_4', '_site']):
+                status = 'under_construction'
+
+            # Clean up type name for display
+            display_type = mega_type
+            # Remove stage suffixes for cleaner grouping
+            for suffix in ['_ruined', '_restored', '_0', '_1', '_2', '_3', '_4', '_5', '_site']:
+                if display_type.endswith(suffix):
+                    display_type = display_type[:-len(suffix)]
+                    break
+
+            mega_info = {
+                'id': mega_id,
+                'type': mega_type,
+                'display_type': display_type,
+                'status': status,
+            }
+
+            if planet_id:
+                mega_info['planet_id'] = planet_id
+
+            player_megas.append(mega_info)
+
+            # Count by display type
+            by_type[display_type] = by_type.get(display_type, 0) + 1
+
+        result['megastructures'] = player_megas
+        result['count'] = len(player_megas)
+        result['by_type'] = by_type
+        # Return all ruined megastructures - late-game galaxies can have many
+        result['ruined_available'] = ruined_megas
+
+        return result
+
+    def _get_megastructures_regex(self) -> dict:
+        """Original regex-based megastructure extraction - fallback."""
         result = {
             'megastructures': [],
             'count': 0,

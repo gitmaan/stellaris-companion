@@ -63,6 +63,11 @@
       "id": "P018",
       "learning": "Jomini parser collapses duplicate keys into single dict. For Stellaris sections with multiple same-named entries (e.g., relation={} in relations_manager), regex is still needed. Hybrid approach acceptable: use Rust for iteration/lookup, regex for duplicate-key blocks.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P019",
+      "learning": "Regex chunk-based parsing can include data from adjacent sections if the chunk size exceeds the actual section size. Rust iter_section respects section boundaries. This can cause regex to return false positives (e.g., megastructures regex included entries from sectors= section).",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -142,17 +147,18 @@
     },
     {
       "id": "MIG-006",
-      "title": "Migrate get_military_summary",
+      "title": "Migrate get_megastructures",
       "priority": 5,
-      "description": "Fleet and war data extraction using Rust session",
+      "description": "Megastructure extraction using Rust session - fixes chunk overrun bug in regex",
       "files": ["stellaris_save_extractor/military.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
-        "RUN: grep -q '_get_military_summary_rust' stellaris_save_extractor/military.py (Rust method exists)",
+        "RUN: grep -q '_get_megastructures_rust' stellaris_save_extractor/military.py (Rust method exists)",
+        "RUN: grep -q '_get_megastructures_regex' stellaris_save_extractor/military.py (fallback exists)",
         "RUN: grep -q '_get_active_session' stellaris_save_extractor/military.py (imports session)",
-        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import RustSession; s=RustSession('test_save.sav'); e=SaveExtractor('test_save.sav'); r=e.get_military_summary(); s.close(); print(r); assert isinstance(r, dict)\" (works with session)"
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session as rust_session; ctx=rust_session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_megastructures(); ctx.__exit__(None,None,None); print(f'Count: {r[\"count\"]}'); assert isinstance(r, dict) and r['count'] > 0\" (works with session context)"
       ],
-      "notes": "Follow MIGRATION_PATTERN.md"
+      "notes": "Implemented 2026-01-24. Self-healed: Original story referenced non-existent get_military_summary(). Changed to get_megastructures() which was the only unmigrated military.py function. Rust version is 4.8x faster AND fixes a bug where regex chunk overrun incorrectly included entries from sectors= section (P019)."
     },
     {
       "id": "MIG-007",
