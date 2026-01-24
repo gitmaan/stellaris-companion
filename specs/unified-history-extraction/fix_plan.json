@@ -103,6 +103,11 @@
       "id": "UHE-P020",
       "learning": "War name resolution: War names in Stellaris saves use nested structures with localization keys (e.g., 'war_vs_adjectives') and variables. Variables contain adjectives from SPEC_*, PRESCRIPTED_adjective_*, or nested %ADJECTIVE% templates. Use recursive extraction with _extract_nested_value() and _clean_war_name_part() to resolve 'Human Secessionist War' from '%ADJ%' placeholder.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P021",
+      "learning": "When deleting legacy extraction functions, also update all callers: build_history_enrichment now uses only signals (no gamestate fallback), record_snapshot_from_companion uses history from briefing only (becomes legacy path). Keep extract_campaign_id_from_gamestate and extract_galaxy_settings_from_gamestate for edge cases.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -444,14 +449,14 @@
       "priority": 12,
       "description": "Remove legacy gamestate extraction functions from history.py. No users yet, so no backward compat needed. Keep only what's actually used.",
       "files": ["backend/core/history.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q 'def extract_player_leaders_from_gamestate' backend/core/history.py (leaders extractor removed)",
         "RUN: ! grep -q 'def extract_player_diplomacy_from_gamestate' backend/core/history.py (diplomacy extractor removed)",
         "RUN: ! grep -q 'def extract_player_techs_from_gamestate' backend/core/history.py (techs extractor removed)",
         "RUN: python3 -c \"from backend.core.history import build_history_enrichment; print('Import OK')\" (module still works)"
       ],
-      "notes": "Delete: extract_player_leaders_from_gamestate, extract_player_diplomacy_from_gamestate, extract_player_techs_from_gamestate, extract_player_policies_from_gamestate, extract_player_edicts_from_gamestate, extract_megastructures_from_gamestate, extract_crisis_from_gamestate, extract_fallen_empires_from_gamestate, extract_player_wars_from_gamestate. Keep: extract_campaign_id_from_gamestate (still used), extract_galaxy_settings_from_gamestate (until UHE-020), extract_system_count_from_gamestate (until UHE-021). Run AFTER UHE-020 and UHE-021."
+      "notes": "Deleted: extract_player_leaders_from_gamestate, extract_player_diplomacy_from_gamestate, extract_player_techs_from_gamestate, extract_player_policies_from_gamestate, extract_player_edicts_from_gamestate, extract_megastructures_from_gamestate, extract_crisis_from_gamestate, extract_fallen_empires_from_gamestate, extract_player_wars_from_gamestate. Kept: extract_campaign_id_from_gamestate (still used for campaign identification), extract_galaxy_settings_from_gamestate (still kept for potential edge cases). Updated build_history_enrichment to use only signals. Updated record_snapshot_from_companion to use history from briefing only (legacy path)."
     },
     {
       "id": "UHE-024",
@@ -459,12 +464,12 @@
       "priority": 12,
       "description": "Ensure build_history_enrichment uses signals for galaxy_settings and systems, completing the migration. After this, gamestate param can be removed entirely.",
       "files": ["backend/core/history.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'signals.*galaxy_settings\\|signals.*systems' backend/core/history.py (uses galaxy/systems from signals)",
         "RUN: python3 -c \"from backend.core.history import build_history_enrichment; print('Import OK')\" (module works)"
       ],
-      "notes": "After UHE-020/021 add galaxy_settings and systems to signals, update history.py to use them. This completes the full migration - no more gamestate needed for history enrichment."
+      "notes": "Completed as part of UHE-023. build_history_enrichment now uses only signals for all history data. Galaxy settings come from signals['galaxy_settings'], systems from signals['systems']. No more gamestate extraction in history enrichment path."
     }
   ],
   "discovered": []
