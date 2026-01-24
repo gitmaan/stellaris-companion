@@ -584,12 +584,12 @@
       "priority": 21,
       "description": "Delete all _regex methods from base.py. Core file.",
       "files": ["stellaris_save_extractor/base.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q 'def _get.*_regex\\|def _analyze.*_regex\\|def _count.*_regex' stellaris_save_extractor/base.py (removed)",
         "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); ctx.__exit__(None,None,None); assert 'meta' in b; print('OK')\" (works)"
       ],
-      "notes": "Only proceed if MIG-040 passed. Core file - test thoroughly."
+      "notes": "Completed 2026-01-25. Removed all _regex methods: _get_building_types_regex (~23 lines), _get_ship_to_fleet_mapping_regex (~24 lines), _count_player_starbases_regex (~70 lines), _get_country_names_map_regex (~74 lines), _resolve_template_name (~68 lines), _analyze_player_fleets_original (~127 lines), _analyze_player_fleets_regex (~109 lines), _get_species_names_regex (~40 lines), _get_player_planet_ids_regex (~33 lines), _get_pop_ids_for_planets_regex (~55 lines). Total ~623 lines of regex code removed. Made rust_bridge import required (no try/except). Removed all RUST_BRIDGE_AVAILABLE checks. All functions now require Rust session mode. Full briefing tested and working."
     },
     {
       "id": "MIG-047",
