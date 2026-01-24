@@ -1,0 +1,164 @@
+{
+  "feature": "Unified History Extraction (Option D)",
+  "description": "Push extraction upstream into ingestion pipeline. History module becomes pure diffing, consuming normalized SnapshotSignals built from Rust-backed SaveExtractor. Fixes Chronicle name resolution issues.",
+  "spec_dir": "specs/unified-history-extraction",
+  "branch": "ralph/unified-history-extraction",
+  "patterns": [
+    {
+      "id": "UHE-P001",
+      "learning": "Ingestion worker runs in subprocess with active Rust session - signals should be built there, not in main process",
+      "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P002",
+      "learning": "Leader names have multiple formats: _CHR_ suffix, NAME_ prefix with underscores, %LEADER_N% templates with variables. _extract_leader_name_rust() in leaders.py handles all cases.",
+      "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P003",
+      "learning": "Keep both 'name' (resolved) and 'name_key' (raw) - name for UI/narrative, name_key for debugging/localization",
+      "date": "2026-01-24"
+    }
+  ],
+  "stories": [
+    {
+      "id": "UHE-001",
+      "title": "Create signals.py module with SnapshotSignals builder",
+      "priority": 1,
+      "description": "Add backend/core/signals.py with build_snapshot_signals() that extracts normalized history data using SaveExtractor. Include format_version for schema evolution.",
+      "files": ["backend/core/signals.py"],
+      "passes": true,
+      "criteria": [
+        "RUN: test -f backend/core/signals.py (module exists)",
+        "RUN: grep -q 'def build_snapshot_signals' backend/core/signals.py (main function exists)",
+        "RUN: grep -q 'format_version' backend/core/signals.py (versioning included)",
+        "RUN: python3 -c \"from backend.core.signals import build_snapshot_signals; print('Import OK')\" (importable)"
+      ],
+      "notes": "Core function signature: build_snapshot_signals(*, extractor: SaveExtractor, briefing: dict) -> dict. Returns {format_version, generated_at, player_id, leaders: {...}}."
+    },
+    {
+      "id": "UHE-002",
+      "title": "Implement leader extraction in signals.py",
+      "priority": 1,
+      "description": "build_snapshot_signals uses extractor.get_leaders() and normalizes output with resolved names. Each leader has: id, class, level, name (resolved), name_key (raw), death_date, date_added, recruitment_date.",
+      "files": ["backend/core/signals.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_leaders' backend/core/signals.py (uses extractor method)",
+        "RUN: grep -q \"'name'\" backend/core/signals.py (includes resolved name field)",
+        "RUN: grep -q \"'name_key'\" backend/core/signals.py (includes raw name_key field)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); leaders=s.get('leaders',{}).get('leaders',[]); has_names=any(l.get('name') for l in leaders[:5]); print(f'Leaders with resolved names: {has_names}'); assert has_names\" (leaders have resolved names)"
+      ],
+      "notes": "Uses _extract_leader_name_rust pattern from leaders.py. Must handle all name formats."
+    },
+    {
+      "id": "UHE-003",
+      "title": "Add leader date extraction to SaveExtractor",
+      "priority": 1,
+      "description": "History needs death_date, date_added, recruitment_date but current get_leaders() doesn't extract them. Add these fields to _get_leaders_rust().",
+      "files": ["stellaris_save_extractor/leaders.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'death_date\\|date_added\\|recruitment_date' stellaris_save_extractor/leaders.py (date fields extracted)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_leaders(); ctx.__exit__(None,None,None); leaders=r.get('leaders',[]); print(f'Sample leader keys: {list(leaders[0].keys()) if leaders else []}')\" (shows date fields if present)"
+      ],
+      "notes": "death_date may be null for living leaders. date_added and recruitment_date indicate when leader joined. These are critical for hire/death event detection."
+    },
+    {
+      "id": "UHE-004",
+      "title": "Integrate signals into ingestion_worker.py",
+      "priority": 2,
+      "description": "Update t2 worker to call build_snapshot_signals() and attach to briefing. Remove extractor.gamestate dependency for history.",
+      "files": ["backend/core/ingestion_worker.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'build_snapshot_signals\\|from.*signals import' backend/core/ingestion_worker.py (imports signals module)",
+        "RUN: grep -q 'signals' backend/core/ingestion_worker.py (uses signals)",
+        "RUN: ! grep 'extractor.gamestate' backend/core/ingestion_worker.py | grep -v '#' | grep -q 'history\\|leaders\\|wars\\|diplomacy' (no gamestate for history extraction)"
+      ],
+      "notes": "Signals should be built in worker subprocess where Rust session is active. Attach as briefing['signals'] or merge into briefing['history']."
+    },
+    {
+      "id": "UHE-005",
+      "title": "Update events.py to use resolved leader names",
+      "priority": 2,
+      "description": "When building leader event summaries (hired, died, removed), prefer leader['name'] over name_key. Fallback chain: name → name_key → #{id}.",
+      "files": ["backend/core/events.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q \"get('name')\\|\\['name'\\]\" backend/core/events.py (uses name field)",
+        "RUN: grep -E 'leader.*name.*name_key|name_key.*fallback' backend/core/events.py (has fallback logic)",
+        "RUN: python3 -c \"from backend.core.events import compute_events; print('Import OK')\" (importable)"
+      ],
+      "notes": "Event summaries feed into Chronicle. Using resolved names here fixes Chronicle narrative quality."
+    },
+    {
+      "id": "UHE-006",
+      "title": "Add wars extraction to signals.py",
+      "priority": 3,
+      "description": "Extend build_snapshot_signals to include wars using extractor.get_wars(). Normalize to {player_at_war, count, wars: [...]}.",
+      "files": ["backend/core/signals.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_wars' backend/core/signals.py (uses extractor method)",
+        "RUN: grep -q \"'wars'\" backend/core/signals.py (includes wars field)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); print(f'Wars: {s.get(\\\"wars\\\", {})}')\" (wars extraction works)"
+      ],
+      "notes": "Wars from extractor.get_wars() are already structured. Just normalize format and include player_at_war boolean."
+    },
+    {
+      "id": "UHE-007",
+      "title": "Add diplomacy extraction to signals.py",
+      "priority": 3,
+      "description": "Extend build_snapshot_signals to include diplomacy using extractor.get_diplomacy(). Normalize allies/rivals/treaties to stable ID sets.",
+      "files": ["backend/core/signals.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_diplomacy' backend/core/signals.py (uses extractor method)",
+        "RUN: grep -q \"'diplomacy'\\|'allies'\\|'rivals'\" backend/core/signals.py (includes diplomacy fields)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); print(f'Diplomacy keys: {list(s.get(\\\"diplomacy\\\", {}).keys())}')\" (diplomacy extraction works)"
+      ],
+      "notes": "Diplomacy includes allies (country IDs), rivals (country IDs), treaties by type. Uses stable IDs for reliable diffs."
+    },
+    {
+      "id": "UHE-008",
+      "title": "Update history.py to accept precomputed signals",
+      "priority": 4,
+      "description": "Add compatibility layer: history functions can accept precomputed signals payload instead of parsing gamestate. Keep old functions for backward compat with existing snapshots.",
+      "files": ["backend/core/history.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'signals\\|precomputed' backend/core/history.py (accepts signals parameter)",
+        "RUN: grep -q 'extract_player_leaders_from_gamestate' backend/core/history.py (old function still exists for compat)",
+        "RUN: python3 -c \"from backend.core.history import build_history_enrichment; print('Import OK')\" (importable)"
+      ],
+      "notes": "Old snapshots only have name_key. New snapshots have full signals with resolved names. History module bridges both."
+    },
+    {
+      "id": "UHE-009",
+      "title": "End-to-end validation with test save",
+      "priority": 5,
+      "description": "Verify full pipeline: ingest save → signals built → events use resolved names → no %LEADER_% in event summaries.",
+      "files": [],
+      "passes": false,
+      "criteria": [
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; from backend.core.events import compute_events; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); signals=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); leaders=signals.get('leaders',{}).get('leaders',[]); bad_names=[l for l in leaders if l.get('name','').startswith('%')]; print(f'Leaders with unresolved names: {len(bad_names)}'); assert len(bad_names)==0, f'Found {bad_names}'\" (no unresolved leader names)"
+      ],
+      "notes": "This validates the core fix: Chronicle will now receive resolved names for all leaders."
+    },
+    {
+      "id": "UHE-010",
+      "title": "Remove gamestate dependency from ingestion history path",
+      "priority": 6,
+      "description": "After signals integration is validated, remove the extractor.gamestate loading in ingestion_worker for history. The '⚠️ Gamestate load' log should no longer appear.",
+      "files": ["backend/core/ingestion_worker.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: ! grep -q 'gamestate.*history\\|history.*gamestate' backend/core/ingestion_worker.py (no gamestate for history)",
+        "RUN: ! grep 'Gamestate load' backend/core/ingestion_worker.py | grep -v '#' (warning removed or commented)"
+      ],
+      "notes": "This eliminates the 70MB+ string materialization bottleneck for history enrichment."
+    }
+  ],
+  "discovered": []
+}
