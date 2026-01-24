@@ -90,12 +90,12 @@
       "id": "GHR-007",
       "title": "Add docstrings to reporting.py",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "grep -q '\"\"\"' backend/core/reporting.py",
         "head -20 backend/core/reporting.py | grep -q '\"\"\"'"
       ],
-      "notes": "Currently 0% docstring coverage"
+      "notes": "Added docstrings to all 5 functions: _safe_int, _safe_float, _fmt_delta, _extract_report_metrics, build_session_report_text. Module-level docstring already existed."
     },
     {
       "id": "GHR-008",

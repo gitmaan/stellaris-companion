@@ -13,6 +13,14 @@ from backend.core.database import GameDatabase
 
 
 def _safe_int(value: Any) -> int | None:
+    """Safely convert a value to int, returning None on failure.
+
+    Args:
+        value: Any value to convert to integer.
+
+    Returns:
+        The integer value, or None if conversion fails or value is None.
+    """
     try:
         if value is None:
             return None
@@ -22,6 +30,14 @@ def _safe_int(value: Any) -> int | None:
 
 
 def _safe_float(value: Any) -> float | None:
+    """Safely convert a value to float, returning None on failure.
+
+    Args:
+        value: Any value to convert to float.
+
+    Returns:
+        The float value, or None if conversion fails or value is None.
+    """
     try:
         if value is None:
             return None
@@ -31,6 +47,18 @@ def _safe_float(value: Any) -> float | None:
 
 
 def _fmt_delta(before: Any, after: Any) -> str:
+    """Format a before/after delta for display in reports.
+
+    Handles various cases: both None, one None, numeric deltas with +/- signs,
+    and generic string conversion for other types.
+
+    Args:
+        before: The initial value (can be None, int, float, or any type).
+        after: The final value (can be None, int, float, or any type).
+
+    Returns:
+        A formatted string showing the change, e.g., "100 → 150 (+50)".
+    """
     if before is None and after is None:
         return "N/A"
     if before is None and after is not None:
@@ -47,6 +75,19 @@ def _fmt_delta(before: Any, after: Any) -> str:
 
 
 def _extract_report_metrics(briefing: dict[str, Any]) -> dict[str, Any]:
+    """Extract key metrics from a briefing dict for session reporting.
+
+    Pulls out date, empire name, military stats, economy stats, territory,
+    tech count, federation info, and active wars from the nested briefing
+    structure.
+
+    Args:
+        briefing: A full briefing dictionary with meta, military, economy,
+            territory, technology, diplomacy, and history sections.
+
+    Returns:
+        A flat dictionary with extracted metrics suitable for delta comparison.
+    """
     meta = briefing.get("meta", {}) if isinstance(briefing, dict) else {}
     military = briefing.get("military", {}) if isinstance(briefing, dict) else {}
     economy = briefing.get("economy", {}) if isinstance(briefing, dict) else {}
@@ -92,6 +133,20 @@ def build_session_report_text(
     session_id: str,
     max_events: int = 20,
 ) -> str:
+    """Build a deterministic end-of-session report from database snapshots.
+
+    Retrieves the first and last snapshots for a session, computes deltas
+    for key metrics (military power, fleet count, colonies, economy, tech),
+    and appends recent notable events.
+
+    Args:
+        db: The GameDatabase instance to query.
+        session_id: The session identifier to generate a report for.
+        max_events: Maximum number of recent events to include (default 20).
+
+    Returns:
+        A formatted multi-line string report showing empire progress and events.
+    """
     stats = db.get_session_snapshot_stats(session_id)
     snap_count = stats.get("snapshot_count", 0)
     first_date = stats.get("first_game_date")
