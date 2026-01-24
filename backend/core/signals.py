@@ -153,11 +153,207 @@ def _extract_leader_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     }
 
 
+def _clean_war_name_part(raw: str) -> str:
+    """Clean a war name part by removing prefixes and formatting.
+
+    Args:
+        raw: Raw name string (e.g., "SPEC_Ubaric", "PRESCRIPTED_adjective_humans1")
+
+    Returns:
+        Cleaned, human-readable string
+    """
+    if not raw:
+        return ""
+
+    result = raw
+
+    # Remove common prefixes
+    for prefix in ("SPEC_", "ADJ_", "NAME_", "PRESCRIPTED_adjective_", "PRESCRIPTED_"):
+        if result.startswith(prefix):
+            result = result[len(prefix):]
+            break
+
+    # Handle specific patterns like "humans1" -> "Human"
+    # These are species prefixes followed by a number
+    import re
+    species_match = re.match(r'^([a-zA-Z]+)(\d+)$', result)
+    if species_match:
+        result = species_match.group(1).title()
+
+    # Convert underscores to spaces
+    result = result.replace("_", " ").strip()
+
+    # Title case if all lowercase
+    if result.islower():
+        result = result.title()
+
+    return result
+
+
+def _extract_nested_value(value_block: dict[str, Any]) -> str:
+    """Recursively extract a resolved value from a nested name block.
+
+    War names can have deeply nested structures like:
+    {key: "PRESCRIPTED_adjective_humans1", variables: [{key: "1", value: {key: "Secessionist_War"}}]}
+
+    Args:
+        value_block: Nested value dict with key and optional variables
+
+    Returns:
+        Best resolved value from the nested structure
+    """
+    if not isinstance(value_block, dict):
+        return str(value_block) if value_block else ""
+
+    key = value_block.get("key", "")
+    variables = value_block.get("variables", [])
+
+    # If this key starts with %, it needs resolution from variables
+    if isinstance(key, str) and key.startswith("%") and key.endswith("%"):
+        # Look for variable values
+        if isinstance(variables, list):
+            for var in variables:
+                if isinstance(var, dict):
+                    nested_value = var.get("value")
+                    if isinstance(nested_value, dict):
+                        return _extract_nested_value(nested_value)
+                    elif nested_value:
+                        return _clean_war_name_part(str(nested_value))
+        return ""
+
+    # Check for nested variables that might have the actual value
+    if isinstance(variables, list) and variables:
+        nested_parts: list[str] = []
+
+        # Look for adjective variable (common in war names)
+        for var in variables:
+            if not isinstance(var, dict):
+                continue
+            var_key = var.get("key")
+            nested_value = var.get("value")
+
+            if var_key == "adjective" and isinstance(nested_value, dict):
+                adj_key = nested_value.get("key", "")
+                if adj_key:
+                    return _clean_war_name_part(adj_key)
+
+            # For numbered keys, extract values
+            if isinstance(var_key, str) and var_key.isdigit():
+                if isinstance(nested_value, dict):
+                    extracted = _extract_nested_value(nested_value)
+                    if extracted:
+                        nested_parts.append(extracted)
+                elif nested_value:
+                    nested_parts.append(_clean_war_name_part(str(nested_value)))
+
+        # If we found nested parts, return them combined
+        if nested_parts:
+            # Common pattern: adjective + war type -> "Human Secessionist War"
+            cleaned_key = _clean_war_name_part(key)
+            if cleaned_key and not cleaned_key.startswith("%"):
+                return f"{cleaned_key} {' '.join(nested_parts)}"
+            return " ".join(nested_parts)
+
+    # Return the key itself, cleaned up
+    return _clean_war_name_part(key)
+
+
+def _resolve_war_name_from_block(name_block: Any) -> str | None:
+    """Resolve a war name from its name block structure.
+
+    War names in Stellaris saves can be:
+    - Simple strings: "War Name"
+    - Complex nested structures with localization keys and variables:
+      {key="war_vs_adjectives", variables=[{key="1", value={key="%ADJECTIVE%", variables=[...]}}]}
+      {key="%ADJ%", variables=[{key="1", value={key="PRESCRIPTED_adjective_humans1", variables=[...]}}]}
+
+    Common patterns:
+    - war_vs_adjectives: "{adj1}-{adj2} {suffix}" (e.g., "Ubaric-Ziiran War")
+    - %ADJ%: Placeholder that needs resolution from nested variables
+
+    Args:
+        name_block: The name field from war data (dict or string)
+
+    Returns:
+        Human-readable war name or None if unresolvable
+    """
+    if name_block is None:
+        return None
+
+    if isinstance(name_block, str):
+        return name_block.strip() if name_block.strip() else None
+
+    if not isinstance(name_block, dict):
+        return None
+
+    key = name_block.get("key", "")
+    variables = name_block.get("variables", [])
+
+    # Extract resolved values from variables
+    values: dict[str, str] = {}
+    if isinstance(variables, list):
+        for var in variables:
+            if not isinstance(var, dict):
+                continue
+            var_key = var.get("key")
+            if var_key is None:
+                continue
+
+            value_block = var.get("value")
+            if isinstance(value_block, dict):
+                # Recursively extract the resolved value
+                resolved = _extract_nested_value(value_block)
+                values[str(var_key)] = resolved
+            elif value_block is not None:
+                values[str(var_key)] = _clean_war_name_part(str(value_block))
+
+    # Resolve based on known patterns
+    if key == "war_vs_adjectives":
+        # Pattern: "{1}-{2} {3}" where 1 and 2 are adjectives, 3 is suffix (usually "War")
+        adj1 = values.get("1", "?")
+        adj2 = values.get("2", "?")
+        suffix = values.get("3", "War")
+        return f"{adj1}-{adj2} {suffix}"
+
+    # Check if key itself is a placeholder that needs resolution
+    if key.startswith("%") and key.endswith("%"):
+        # Try to resolve from variables
+        # Common pattern: %ADJ% with variable 1 containing the value(s)
+        if values.get("1"):
+            return values["1"]
+        # Return first available value
+        for v in values.values():
+            if v and isinstance(v, str) and v.strip():
+                return v.strip()
+        return None
+
+    # Key might be a localization key we can't resolve but values provide context
+    # Construct a readable name from available parts
+    if values:
+        # Try numbered keys in order
+        parts = []
+        for i in range(1, 10):
+            val = values.get(str(i))
+            if val and val.strip():
+                parts.append(val.strip())
+        if parts:
+            return " ".join(parts)
+
+    # Return the key itself if it looks like a real name (not a localization key)
+    if key and not key.startswith("%") and not "_" in key[:4]:
+        return key
+
+    return None
+
+
 def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     """Extract normalized war data for history diffing.
 
     Uses extractor.get_wars() which provides structured war data
     including participants, war goals, and exhaustion values.
+
+    Also attempts to resolve war name placeholders like %ADJ% to produce
+    human-readable names like "Ubaric-Ziiran War" for Chronicle.
 
     Returns:
         Dict with:
@@ -176,7 +372,7 @@ def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     if not isinstance(raw_wars, list):
         return {"player_at_war": player_at_war, "count": 0, "wars": []}
 
-    # Extract war names for event detection (war started/ended diffs)
+    # First get war names from the extractor (already processed)
     war_names: list[str] = []
     for war in raw_wars:
         if not isinstance(war, dict):
@@ -185,11 +381,86 @@ def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         if name and isinstance(name, str) and name.strip():
             war_names.append(name.strip())
 
+    # Try to resolve placeholder names by accessing raw war data directly
+    # This is done when Rust session is active
+    try:
+        from rust_bridge import _get_active_session, iter_section_entries
+        session = _get_active_session()
+        if session:
+            resolved_names = _resolve_war_names_from_raw(extractor, session)
+            if resolved_names:
+                war_names = resolved_names
+    except ImportError:
+        pass
+
     return {
         'player_at_war': player_at_war,
         'count': len(war_names),
         'wars': war_names,
     }
+
+
+def _resolve_war_names_from_raw(extractor: "SaveExtractor", session) -> list[str]:
+    """Resolve war names from raw war data using Rust session.
+
+    Accesses war section directly to get full name blocks with variables,
+    allowing resolution of placeholders like %ADJ%.
+
+    Args:
+        extractor: SaveExtractor instance
+        session: Active Rust session
+
+    Returns:
+        List of resolved war names for player wars
+    """
+    try:
+        from rust_bridge import iter_section_entries
+
+        player_id = extractor.get_player_empire_id()
+        player_id_str = str(player_id)
+
+        resolved_names: list[str] = []
+
+        for war_id, war_data in iter_section_entries(extractor.save_path, "war"):
+            if not isinstance(war_data, dict):
+                continue
+
+            # Check if player is involved in this war
+            attacker_ids: list[str] = []
+            attackers = war_data.get("attackers", [])
+            if isinstance(attackers, list):
+                for attacker in attackers:
+                    if isinstance(attacker, dict):
+                        country = attacker.get("country")
+                        if country is not None:
+                            attacker_ids.append(str(country))
+
+            defender_ids: list[str] = []
+            defenders = war_data.get("defenders", [])
+            if isinstance(defenders, list):
+                for defender in defenders:
+                    if isinstance(defender, dict):
+                        country = defender.get("country")
+                        if country is not None:
+                            defender_ids.append(str(country))
+
+            if player_id_str not in attacker_ids and player_id_str not in defender_ids:
+                continue
+
+            # Resolve war name from name block
+            name_block = war_data.get("name")
+            resolved = _resolve_war_name_from_block(name_block)
+
+            if resolved:
+                resolved_names.append(resolved)
+            else:
+                # Fallback to war ID
+                resolved_names.append(f"War #{war_id}")
+
+        return resolved_names
+
+    except Exception:
+        return []
 
 
 def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:

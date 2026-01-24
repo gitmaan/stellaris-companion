@@ -98,6 +98,11 @@
       "id": "UHE-P019",
       "learning": "System count extraction: use get_starbases() which is already Rust-backed. Each starbase represents a controlled system, so starbase count equals system count. Returns count and by_level breakdown (citadel, starport, etc.) useful for expansion milestones.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P020",
+      "learning": "War name resolution: War names in Stellaris saves use nested structures with localization keys (e.g., 'war_vs_adjectives') and variables. Variables contain adjectives from SPEC_*, PRESCRIPTED_adjective_*, or nested %ADJECTIVE% templates. Use recursive extraction with _extract_nested_value() and _clean_war_name_part() to resolve 'Human Secessionist War' from '%ADJ%' placeholder.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -426,12 +431,12 @@
       "priority": 11,
       "description": "Resolve %ADJ%, %LEADER%, %TARGET% placeholders in war names. Look up empire adjectives and leader names to produce readable war names like 'War of Human Aggression' instead of 'War of %ADJ% Aggression'.",
       "files": ["backend/core/signals.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'resolve_war_name\\|_resolve_placeholder\\|%ADJ%' backend/core/signals.py (war name resolution logic exists)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); wars=s.get('wars',{}).get('wars',[]); has_placeholder=[w for w in wars if '%' in str(w)]; print(f'Wars with placeholders: {len(has_placeholder)}'); print(f'Sample wars: {wars[:3]}')\" (check war names)"
       ],
-      "notes": "War names may contain: %ADJ% (empire adjective like 'Human'), %LEADER% (leader name), %TARGET% (target empire). Need to look up these values from country data. Empire adjectives are in get_player_status() or country entries."
+      "notes": "War names may contain: %ADJ% (empire adjective like 'Human'), %LEADER% (leader name), %TARGET% (target empire). Implementation uses _resolve_war_name_from_block() with recursive _extract_nested_value() to handle deeply nested variable structures. Handles patterns like 'war_vs_adjectives' and '%ADJ%' templates."
     },
     {
       "id": "UHE-023",
