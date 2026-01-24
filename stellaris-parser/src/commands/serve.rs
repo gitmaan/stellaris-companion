@@ -23,6 +23,12 @@ enum Request {
         batch_size: usize,
     },
     GetEntry { section: String, key: String },
+    GetEntries {
+        section: String,
+        keys: Vec<String>,
+        #[serde(default)]
+        fields: Option<Vec<String>>,
+    },
     CountKeys { keys: Vec<String> },
     ContainsTokens { tokens: Vec<String> },
     GetCountrySummaries { fields: Vec<String> },
@@ -52,6 +58,9 @@ enum ResponseData {
     SingleEntry {
         entry: Value,
         found: bool,
+    },
+    MultipleEntries {
+        entries: Vec<Value>,
     },
     StreamHeader {
         stream: bool,
@@ -300,6 +309,58 @@ fn handle_get_entry(parsed: &ParsedSave, section: String, key: String) -> io::Re
     })
 }
 
+/// Handle get_entries operation - batch fetch multiple entries by keys with optional field projection
+fn handle_get_entries(
+    parsed: &ParsedSave,
+    section: String,
+    keys: Vec<String>,
+    fields: Option<Vec<String>>,
+) -> io::Result<()> {
+    let mut entries: Vec<Value> = Vec::new();
+
+    // Get the section from gamestate
+    if let Some(section_value) = parsed.gamestate.get(&section) {
+        if let Value::Object(map) = section_value {
+            for key in &keys {
+                if let Some(entry_value) = map.get(key) {
+                    // Apply field projection if specified
+                    let projected = if let Some(ref field_list) = fields {
+                        if let Value::Object(entry_obj) = entry_value {
+                            let mut projected_obj = Map::new();
+                            projected_obj.insert("_key".to_string(), json!(key));
+                            for field in field_list {
+                                if let Some(field_value) = entry_obj.get(field) {
+                                    projected_obj.insert(field.clone(), field_value.clone());
+                                }
+                            }
+                            Value::Object(projected_obj)
+                        } else {
+                            // Non-object entry (e.g., "none"), include as-is with key
+                            let mut obj = Map::new();
+                            obj.insert("_key".to_string(), json!(key));
+                            obj.insert("_value".to_string(), entry_value.clone());
+                            Value::Object(obj)
+                        }
+                    } else {
+                        // No projection - include full entry with key
+                        let mut obj = Map::new();
+                        obj.insert("_key".to_string(), json!(key));
+                        obj.insert("_value".to_string(), entry_value.clone());
+                        Value::Object(obj)
+                    };
+                    entries.push(projected);
+                }
+                // Note: keys that don't exist are silently skipped
+            }
+        }
+    }
+
+    write_response(&SuccessResponse {
+        ok: true,
+        data: ResponseData::MultipleEntries { entries },
+    })
+}
+
 /// Handle count_keys operation - traverse tree and count occurrences of specified keys
 fn handle_count_keys(parsed: &ParsedSave, keys: Vec<String>) -> io::Result<()> {
     use std::collections::HashSet;
@@ -461,6 +522,9 @@ pub fn run(path: &str) -> Result<()> {
             Request::GetEntry { section, key } => {
                 handle_get_entry(&parsed, section, key)
             }
+            Request::GetEntries { section, keys, fields } => {
+                handle_get_entries(&parsed, section, keys, fields)
+            }
             Request::CountKeys { keys } => {
                 handle_count_keys(&parsed, keys)
             }
@@ -550,6 +614,34 @@ mod tests {
         let json = r#"{"op": "close"}"#;
         let req: Request = serde_json::from_str(json).unwrap();
         assert!(matches!(req, Request::Close));
+    }
+
+    #[test]
+    fn test_get_entries_request() {
+        let json = r#"{"op": "get_entries", "section": "country", "keys": ["0", "1", "2"]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::GetEntries { section, keys, fields } => {
+                assert_eq!(section, "country");
+                assert_eq!(keys, vec!["0", "1", "2"]);
+                assert!(fields.is_none());
+            }
+            _ => panic!("Wrong request type"),
+        }
+    }
+
+    #[test]
+    fn test_get_entries_request_with_fields() {
+        let json = r#"{"op": "get_entries", "section": "country", "keys": ["0"], "fields": ["name", "type"]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        match req {
+            Request::GetEntries { section, keys, fields } => {
+                assert_eq!(section, "country");
+                assert_eq!(keys, vec!["0"]);
+                assert_eq!(fields, Some(vec!["name".to_string(), "type".to_string()]));
+            }
+            _ => panic!("Wrong request type"),
+        }
     }
 
     #[test]

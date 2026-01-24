@@ -347,6 +347,43 @@ class RustSession:
             return response.get("entry")
         return None
 
+    def get_entries(
+        self, section: str, keys: list[str], fields: list[str] | None = None
+    ) -> list[dict]:
+        """Batch fetch multiple entries by section and keys with optional field projection.
+
+        This is more efficient than multiple get_entry calls or iter_section when
+        you know the exact entries you need (e.g., fetching owned fleets by ID).
+
+        Args:
+            section: Section name (e.g., "country", "fleet")
+            keys: List of entry IDs/keys (e.g., ["0", "1", "2"])
+            fields: Optional list of field names to extract (projection).
+                   If None, returns full entries with _key and _value.
+                   If specified, returns entries with _key plus only those fields.
+
+        Returns:
+            List of entry dicts. Each entry contains:
+            - With projection: {"_key": "id", "field1": value, "field2": value, ...}
+            - Without projection: {"_key": "id", "_value": <full entry>}
+
+            Note: Keys that don't exist are silently skipped.
+            Entry values might be the string "none" for deleted entries.
+
+        Example:
+            >>> sess.get_entries("country", ["0", "1", "2"])
+            [{"_key": "0", "_value": {...}}, {"_key": "1", "_value": {...}}, ...]
+
+            >>> sess.get_entries("country", ["0"], fields=["name", "type"])
+            [{"_key": "0", "name": "UNE", "type": "default"}]
+        """
+        request = {"op": "get_entries", "section": section, "keys": keys}
+        if fields is not None:
+            request["fields"] = fields
+        self._send(request)
+        response = self._recv()
+        return response.get("entries", [])
+
     def count_keys(self, keys: list[str]) -> dict:
         """Count occurrences of specific keys throughout the parsed save.
 

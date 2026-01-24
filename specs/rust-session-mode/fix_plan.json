@@ -43,6 +43,11 @@
       "id": "P014",
       "learning": "Follow MIGRATION_PATTERN.md: 1.BASELINE 2.ANALYZE 3.IMPLEMENT 4.COMPARE 5.BENCHMARK 6.DISPATCH 7.FALLBACK",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P015",
+      "learning": "get_entries returns list of dicts with _key field. With projection: {_key, field1, field2...}. Without projection: {_key, _value}. Missing keys silently skipped.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -68,7 +73,7 @@
       "priority": 1,
       "description": "Batch fetch multiple entries by IDs with optional field projection - key for owned fleet lookup",
       "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_entries' stellaris-parser/src/commands/serve.rs (operation exists)",
         "RUN: grep -q 'def get_entries' rust_bridge.py (Python wrapper exists)",
@@ -76,7 +81,7 @@
         "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entries('country', ['0','1','2']); s.close(); print(len(r)); assert len(r) >= 1\" (returns multiple entries)",
         "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entries('country', ['0'], fields=['name','type']); s.close(); print(r); assert 'name' in str(r) or len(r) > 0\" (field projection works)"
       ],
-      "notes": ""
+      "notes": "Implemented 2026-01-24. Returns list of entry dicts with _key field. Supports optional field projection. Missing keys are silently skipped."
     },
     {
       "id": "MIG-003",
