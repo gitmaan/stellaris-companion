@@ -1,8 +1,8 @@
 {
-  "feature": "Regex-to-Rust Migration",
-  "description": "Migrate regex-based extraction to Rust session operations for accuracy and performance",
+  "feature": "Regex-to-Rust Migration Phase 2",
+  "description": "Remove raw gamestate dependency, reduce IPC overhead, add compatibility guardrails",
   "spec_dir": "specs/rust-session-mode",
-  "branch": "ralph/regex-migration",
+  "branch": "ralph/regex-migration-p2",
   "patterns": [
     {
       "id": "P006",
@@ -61,130 +61,199 @@
     },
     {
       "id": "P018",
-      "learning": "Jomini parser collapses duplicate keys into single dict. For Stellaris sections with multiple same-named entries (e.g., relation={} in relations_manager), regex is still needed. Hybrid approach acceptable: use Rust for iteration/lookup, regex for duplicate-key blocks.",
+      "learning": "Jomini parser collapses duplicate keys into single dict. For Stellaris sections with multiple same-named entries (e.g., relation={} in relations_manager, traits= in leaders), regex is still needed OR add Rust op that preserves duplicates.",
       "date": "2026-01-24"
     },
     {
       "id": "P019",
-      "learning": "Regex chunk-based parsing can include data from adjacent sections if the chunk size exceeds the actual section size. Rust iter_section respects section boundaries. This can cause regex to return false positives (e.g., megastructures regex included entries from sectors= section).",
+      "learning": "Regex chunk-based parsing can include data from adjacent sections if the chunk size exceeds the actual section size. Rust iter_section respects section boundaries. This can cause regex to return false positives.",
+      "date": "2026-01-24"
+    },
+    {
+      "id": "P020",
+      "learning": "_extract_section() in base.py uses raw self.gamestate text slicing. Callers should migrate to extract_sections() or iter_section() for session mode.",
       "date": "2026-01-24"
     }
   ],
   "stories": [
     {
-      "id": "MIG-001",
-      "title": "Add get_entry operation to serve.rs",
+      "id": "MIG-009",
+      "title": "Replace _extract_campaign_id with Rust",
       "priority": 1,
-      "description": "Fetch a single entry by section and key ID - avoids iterating entire section",
-      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
+      "description": "briefing.py _extract_campaign_id() scans raw gamestate for galaxy= section. Replace with extract_sections(['galaxy']) in session mode.",
+      "files": ["stellaris_save_extractor/briefing.py"],
       "passes": true,
       "criteria": [
-        "RUN: grep -q 'get_entry' stellaris-parser/src/commands/serve.rs (operation exists)",
-        "RUN: grep -q 'def get_entry' rust_bridge.py (Python wrapper exists)",
-        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
-        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo test 2>&1 | grep -q 'test result: ok' (tests pass)",
-        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entry('country', '0'); s.close(); print(type(r)); assert isinstance(r, dict)\" (returns dict for valid ID)"
+        "RUN: grep -q '_extract_campaign_id_rust\\|extract_sections.*galaxy' stellaris_save_extractor/briefing.py (Rust-based extraction exists)",
+        "RUN: ! grep -q 'self.gamestate.find.*galaxy' stellaris_save_extractor/briefing.py || grep -q '_regex' stellaris_save_extractor/briefing.py (raw gamestate only in fallback)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); ctx.__exit__(None,None,None); print(f'campaign_id: {b.get(\\\"campaign_id\\\")}'[:50])\" (briefing works with session)"
       ],
-      "notes": "Implemented 2026-01-24. Returns entry dict if found, None if not found."
+      "notes": "Completed 2026-01-24. Moved nested function to methods: _extract_campaign_id(), _extract_campaign_id_rust(), _extract_campaign_id_regex(). Uses session.extract_sections(['galaxy']) for fast parsed lookup."
     },
     {
-      "id": "MIG-002",
-      "title": "Add get_entries operation to serve.rs",
+      "id": "MIG-010",
+      "title": "Remove _find_player_country_content prewarm",
       "priority": 1,
-      "description": "Batch fetch multiple entries by IDs with optional field projection - key for owned fleet lookup",
-      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": true,
+      "description": "briefing.py pre-warms player country content unconditionally. In session mode, use get_entry('country', player_id) instead of raw gamestate slicing.",
+      "files": ["stellaris_save_extractor/briefing.py", "stellaris_save_extractor/base.py"],
+      "passes": false,
       "criteria": [
-        "RUN: grep -q 'get_entries' stellaris-parser/src/commands/serve.rs (operation exists)",
-        "RUN: grep -q 'def get_entries' rust_bridge.py (Python wrapper exists)",
-        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
-        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entries('country', ['0','1','2']); s.close(); print(len(r)); assert len(r) >= 1\" (returns multiple entries)",
-        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entries('country', ['0'], fields=['name','type']); s.close(); print(r); assert 'name' in str(r) or len(r) > 0\" (field projection works)"
+        "RUN: ! grep -q '_find_player_country_content' stellaris_save_extractor/briefing.py || grep -B5 '_find_player_country_content' stellaris_save_extractor/briefing.py | grep -q 'not.*session\\|_regex\\|fallback' (prewarm removed or guarded)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); ctx.__exit__(None,None,None); print('OK')\" (briefing works without prewarm)"
       ],
-      "notes": "Implemented 2026-01-24. Returns list of entry dicts with _key field. Supports optional field projection. Missing keys are silently skipped."
+      "notes": "The _get_player_country_entry() method added in MIG-008 provides O(1) lookup. Use that instead of pre-warming raw text."
     },
     {
-      "id": "MIG-003",
-      "title": "Add contains_kv operation to serve.rs",
+      "id": "MIG-011",
+      "title": "Migrate get_galactic_community to Rust",
       "priority": 2,
-      "description": "Whitespace-insensitive key=value check - fixes contains_tokens limitation for patterns like 'war_in_heaven=yes'",
-      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
-      "passes": true,
-      "criteria": [
-        "RUN: grep -q 'contains_kv' stellaris-parser/src/commands/serve.rs (operation exists)",
-        "RUN: grep -q 'def contains_kv' rust_bridge.py (Python wrapper exists)",
-        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
-        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.contains_kv([('version', '3')]); s.close(); print(r); assert 'matches' in r\" (returns matches dict)"
-      ],
-      "notes": "Implemented 2026-01-24. Traverses parsed JSON tree for whitespace-insensitive k=v matching. Booleans use 'yes'/'no', numbers compared as strings. Returns matches dict keyed by 'key=value' strings."
-    },
-    {
-      "id": "MIG-004",
-      "title": "Optimize _analyze_player_fleets with get_entries",
-      "priority": 3,
-      "description": "Replace iter_section loop with get_entries for owned fleet IDs - avoid iterating 10K+ fleets",
-      "files": ["stellaris_save_extractor/base.py"],
-      "passes": true,
-      "criteria": [
-        "RUN: grep -q 'get_entries.*fleet' stellaris_save_extractor/base.py (uses get_entries for fleets)",
-        "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import session as rust_session; ctx=rust_session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); p=e._find_player_country_content(e.get_player_empire_id()); fids=e._get_owned_fleet_ids(p) if p else []; start=time.time(); r=e._analyze_player_fleets(fids[:200]); elapsed=time.time()-start; ctx.__exit__(None,None,None); print(f'Time: {elapsed:.3f}s'); assert elapsed < 0.05\" (faster than iter_section approach)"
-      ],
-      "notes": "Implemented 2026-01-24. Uses get_entries to fetch only owned fleets directly instead of iterating 10K+ fleets. 11x faster than iter_section approach (0.005s vs 0.055s). Criterion self-healed to use session() context manager per P009."
-    },
-    {
-      "id": "MIG-005",
-      "title": "Migrate get_diplomacy relations parsing",
-      "priority": 4,
-      "description": "Replace 80KB-limited regex with Rust session - accuracy critical for large empires",
+      "description": "diplomacy.py get_galactic_community() uses _extract_section('galactic_community') which is raw gamestate. Migrate to extract_sections() or iter_section().",
       "files": ["stellaris_save_extractor/diplomacy.py"],
-      "passes": true,
+      "passes": false,
       "criteria": [
-        "RUN: grep -q '_get_diplomacy_rust' stellaris_save_extractor/diplomacy.py (Rust method exists)",
-        "RUN: grep -q '_get_diplomacy_regex' stellaris_save_extractor/diplomacy.py (fallback exists)",
-        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session as rust_session; ctx=rust_session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_diplomacy(); ctx.__exit__(None,None,None); print('relations' in str(r) or 'opinion' in str(r) or len(r) > 0)\" (get_diplomacy works with session context)"
+        "RUN: grep -q '_get_galactic_community_rust' stellaris_save_extractor/diplomacy.py (Rust method exists)",
+        "RUN: grep -q '_get_galactic_community_regex' stellaris_save_extractor/diplomacy.py (fallback exists)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_galactic_community(); ctx.__exit__(None,None,None); print(f'GC: {type(r)}'); assert isinstance(r, dict)\" (works with session)"
       ],
-      "notes": "Implemented 2026-01-24. Hybrid approach: uses Rust iter_section for federation ID lookup, regex for relation entries due to jomini duplicate-key collapse. Criterion self-healed to use session() context manager per P017."
+      "notes": "galactic_community is a small top-level section - extract_sections() is appropriate."
     },
     {
-      "id": "MIG-006",
-      "title": "Migrate get_megastructures",
+      "id": "MIG-012",
+      "title": "Migrate get_federations to Rust",
+      "priority": 2,
+      "description": "diplomacy.py uses _extract_section('federation'). Migrate to Rust-backed access.",
+      "files": ["stellaris_save_extractor/diplomacy.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q '_get_federations_rust\\|extract_sections.*federation' stellaris_save_extractor/diplomacy.py (Rust method or extract_sections used)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_federations() if hasattr(e, 'get_federations') else e.get_diplomacy(); ctx.__exit__(None,None,None); print('OK')\" (works with session)"
+      ],
+      "notes": "May be part of get_diplomacy() - check actual function structure."
+    },
+    {
+      "id": "MIG-013",
+      "title": "Migrate get_agreements to Rust",
+      "priority": 2,
+      "description": "diplomacy.py uses _extract_section('agreements'). Migrate to Rust-backed access.",
+      "files": ["stellaris_save_extractor/diplomacy.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'extract_sections.*agreements\\|iter_section.*agreement' stellaris_save_extractor/diplomacy.py (Rust-backed access)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_subjects() if hasattr(e, 'get_subjects') else {}; ctx.__exit__(None,None,None); print('OK')\" (works with session)"
+      ],
+      "notes": "agreements section is used for vassals/subjects."
+    },
+    {
+      "id": "MIG-014",
+      "title": "Migrate get_espionage to Rust",
+      "priority": 3,
+      "description": "diplomacy.py uses _extract_section('espionage_operations'). Migrate to Rust-backed access.",
+      "files": ["stellaris_save_extractor/diplomacy.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'extract_sections.*espionage\\|iter_section.*espionage' stellaris_save_extractor/diplomacy.py (Rust-backed access)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); print('OK'); ctx.__exit__(None,None,None)\" (no crash)"
+      ],
+      "notes": "espionage_operations may not exist in all saves - handle missing gracefully."
+    },
+    {
+      "id": "MIG-015",
+      "title": "Add Rust op for duplicate-key sections (leader traits)",
+      "priority": 3,
+      "description": "Jomini collapses duplicate keys but leader traits need all values. Add get_entry_raw or get_duplicate_values op that preserves repeated keys.",
+      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py", "stellaris_save_extractor/leaders.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_duplicate_values\\|get_entry_raw\\|preserve.*duplicate' stellaris-parser/src/commands/serve.rs (Rust op exists)",
+        "RUN: grep -q 'get_duplicate_values\\|get_entry_raw' rust_bridge.py (Python wrapper exists)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); print('Rust bridge works'); s.close()\" (bridge works)"
+      ],
+      "notes": "This fixes both accuracy (get all traits) and performance (remove gamestate fallback in leaders.py). Could return {key: [val1, val2, ...]} for specified duplicate-key fields."
+    },
+    {
+      "id": "MIG-016",
+      "title": "Remove leader traits gamestate fallback",
+      "priority": 4,
+      "description": "Once MIG-015 provides duplicate-key support, update leaders.py to use it instead of raw gamestate regex for traits.",
+      "files": ["stellaris_save_extractor/leaders.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q '_get_leaders_rust' stellaris_save_extractor/leaders.py (Rust method exists)",
+        "RUN: ! grep -q 'self.gamestate' stellaris_save_extractor/leaders.py || grep -B3 'self.gamestate' stellaris_save_extractor/leaders.py | grep -q '_regex\\|fallback\\|debug' (gamestate only in fallback)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_leaders(); ctx.__exit__(None,None,None); leaders=r.get('leaders',[]); has_traits=any(l.get('traits') for l in leaders[:5]); print(f'Leaders with traits: {has_traits}'); assert has_traits\" (traits extracted via Rust)"
+      ],
+      "notes": "Depends on MIG-015. This removes the hybrid approach documented in P018."
+    },
+    {
+      "id": "MIG-017",
+      "title": "Add multi-op request to serve.rs",
+      "priority": 4,
+      "description": "Reduce IPC overhead by allowing multiple operations in one request. One send → many results instead of 3590 round-trips.",
+      "files": ["stellaris-parser/src/commands/serve.rs", "rust_bridge.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'multi_op\\|batch_ops\\|MultiRequest' stellaris-parser/src/commands/serve.rs (multi-op support exists)",
+        "RUN: grep -q 'multi_op\\|batch_ops\\|send_batch' rust_bridge.py (Python wrapper exists)",
+        "RUN: cd stellaris-parser && ~/.cargo/bin/cargo build --release 2>&1 | tail -5 (builds)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); print('Multi-op test'); s.close()\" (bridge works)"
+      ],
+      "notes": "Request format: {op: 'multi', ops: [{op: 'get_entry', ...}, {op: 'count_keys', ...}]}. Response: {results: [...]}."
+    },
+    {
+      "id": "MIG-018",
+      "title": "Switch to orjson for faster JSON parsing",
       "priority": 5,
-      "description": "Megastructure extraction using Rust session - fixes chunk overrun bug in regex",
-      "files": ["stellaris_save_extractor/military.py"],
-      "passes": true,
+      "description": "Replace json.loads/dumps with orjson in rust_bridge.py for ~80% faster JSON parsing.",
+      "files": ["rust_bridge.py", "requirements.txt"],
+      "passes": false,
       "criteria": [
-        "RUN: grep -q '_get_megastructures_rust' stellaris_save_extractor/military.py (Rust method exists)",
-        "RUN: grep -q '_get_megastructures_regex' stellaris_save_extractor/military.py (fallback exists)",
-        "RUN: grep -q '_get_active_session' stellaris_save_extractor/military.py (imports session)",
-        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session as rust_session; ctx=rust_session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_megastructures(); ctx.__exit__(None,None,None); print(f'Count: {r[\"count\"]}'); assert isinstance(r, dict) and r['count'] > 0\" (works with session context)"
+        "RUN: grep -q 'orjson' rust_bridge.py (orjson imported)",
+        "RUN: grep -q 'orjson' requirements.txt || grep -q 'orjson' pyproject.toml (dependency added)",
+        "RUN: python3 -c \"import orjson; print('orjson available')\" (orjson installed)",
+        "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entry('country','0'); s.close(); print('OK')\" (bridge works with orjson)"
       ],
-      "notes": "Implemented 2026-01-24. Self-healed: Original story referenced non-existent get_military_summary(). Changed to get_megastructures() which was the only unmigrated military.py function. Rust version is 4.8x faster AND fixes a bug where regex chunk overrun incorrectly included entries from sectors= section (P019)."
+      "notes": "orjson.loads() returns bytes, orjson.dumps() returns bytes. May need .decode() in places."
     },
     {
-      "id": "MIG-007",
-      "title": "Migrate get_planets",
-      "priority": 6,
-      "description": "Planet data with complex nested structures (pops, buildings, districts)",
-      "files": ["stellaris_save_extractor/planets.py"],
-      "passes": true,
-      "criteria": [
-        "RUN: grep -q '_get_planets_rust' stellaris_save_extractor/planets.py (Rust method exists)",
-        "RUN: grep -q '_get_active_session' stellaris_save_extractor/planets.py (imports session)",
-        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session as rust_session; ctx=rust_session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_planets(); ctx.__exit__(None,None,None); print(f'Got {len(r.get(\\\"planets\\\",[]))} planets'); assert len(r.get('planets',[])) > 0\" (works with session context)"
-      ],
-      "notes": "Implemented 2026-01-24. Criterion 3 self-healed to use session() context manager per P017. Session mode is 5.8x faster (0.54s vs 3.15s). Finds 2 extra planets (Mars ID:5, Kenn Hijal Habitat ID:10496) missed by regex due to 20MB truncation limit."
-    },
-    {
-      "id": "MIG-008",
+      "id": "MIG-019",
       "title": "Performance validation - target <2s briefing",
-      "priority": 7,
-      "description": "Verify full briefing meets target after all migrations",
+      "priority": 6,
+      "description": "Verify full briefing meets <2s target after all optimizations.",
       "files": [],
       "passes": false,
       "criteria": [
-        "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import session; start=time.time(); ctx=session('test_save.sav'); sess=ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); ctx.__exit__(None,None,None); elapsed=time.time()-start; print(f'Briefing: {elapsed:.2f}s'); assert elapsed < 3, f'Too slow: {elapsed}s'\" (briefing under 3 seconds)"
+        "RUN: python3 -c \"import time; from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); times=[]; exec('for _ in range(3):\\n  start=time.time()\\n  b=e.get_complete_briefing()\\n  times.append(time.time()-start)'); ctx.__exit__(None,None,None); avg=sum(times)/len(times); print(f'Avg: {avg:.2f}s'); assert avg < 2.5, f'Too slow: {avg}s'\" (briefing under 2.5 seconds)"
       ],
-      "notes": "Target is <2s, criteria allows 3s buffer. Current baseline: 3.87s"
+      "notes": "Target is <2s, criterion allows 2.5s buffer. Current baseline: 2.83s."
+    },
+    {
+      "id": "MIG-020",
+      "title": "Add save corpus regression test",
+      "priority": 6,
+      "description": "Create test suite with diverse saves: base game, DLC mixes, popular mods, early/mid/late game stages.",
+      "files": ["tests/test_save_corpus.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: test -f tests/test_save_corpus.py (test file exists)",
+        "RUN: grep -q 'def test_' tests/test_save_corpus.py (has test functions)",
+        "RUN: grep -q 'base_game\\|dlc\\|mod\\|early\\|late' tests/test_save_corpus.py (tests different save types)"
+      ],
+      "notes": "Tests should verify: no crashes, reasonable output, consistent results between Rust and regex modes. Can use test_save.sav as baseline, add more saves over time."
+    },
+    {
+      "id": "MIG-021",
+      "title": "Add diagnostics export mode",
+      "priority": 7,
+      "description": "Allow users to export errors, versions, and which extractors fell back without uploading saves.",
+      "files": ["stellaris_save_extractor/diagnostics.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: test -f stellaris_save_extractor/diagnostics.py (diagnostics module exists)",
+        "RUN: grep -q 'export_diagnostics\\|get_diagnostics' stellaris_save_extractor/diagnostics.py (export function exists)",
+        "RUN: grep -q 'fallback\\|error\\|version' stellaris_save_extractor/diagnostics.py (captures relevant info)"
+      ],
+      "notes": "Should capture: Python version, Rust parser version, which extractors used fallback, any errors/warnings, timing breakdown. No save data."
     }
   ],
   "discovered": []

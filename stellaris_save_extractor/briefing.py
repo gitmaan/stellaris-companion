@@ -5,6 +5,15 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
+# Rust bridge for fast Clausewitz parsing
+try:
+    from rust_bridge import extract_sections, _get_active_session
+    RUST_BRIDGE_AVAILABLE = True
+except ImportError:
+    RUST_BRIDGE_AVAILABLE = False
+    extract_sections = None
+    _get_active_session = lambda: None
+
 class BriefingMixin:
     """Domain methods extracted from the original SaveExtractor."""
 
@@ -193,6 +202,54 @@ class BriefingMixin:
             },
         }
 
+    def _extract_campaign_id(self) -> str | None:
+        """Extract the campaign ID (galaxy name UUID) from the save.
+
+        Dispatches to Rust or regex implementation based on session availability.
+        """
+        session = _get_active_session()
+        if session:
+            return self._extract_campaign_id_rust()
+        return self._extract_campaign_id_regex()
+
+    def _extract_campaign_id_rust(self) -> str | None:
+        """Extract campaign ID using Rust extract_sections (session mode)."""
+        session = _get_active_session()
+        if not session:
+            return self._extract_campaign_id_regex()
+
+        try:
+            sections = session.extract_sections(['galaxy'])
+            galaxy = sections.get('galaxy', {})
+            if isinstance(galaxy, dict):
+                name = galaxy.get('name')
+                if isinstance(name, str) and name:
+                    return name
+            return None
+        except Exception:
+            # Fall back to regex on any error
+            return self._extract_campaign_id_regex()
+
+    def _extract_campaign_id_regex(self) -> str | None:
+        """Extract campaign ID using regex (fallback)."""
+        # Stellaris saves include a top-level galaxy block with name="<uuid>".
+        start = self.gamestate.find("\ngalaxy=")
+        if start == -1:
+            if self.gamestate.startswith("galaxy="):
+                start = 0
+            else:
+                return None
+        window = self.gamestate[start : start + 20000]
+        key = 'name="'
+        pos = window.find(key)
+        if pos == -1:
+            return None
+        end = window.find('"', pos + len(key))
+        if end == -1:
+            return None
+        value = window[pos + len(key) : end].strip()
+        return value or None
+
     def get_complete_briefing(self) -> dict:
         """Get a complete, untruncated briefing for /ask injection.
 
@@ -204,46 +261,36 @@ class BriefingMixin:
             Dictionary containing full lists (leaders, planets, relations, fleets,
             starbases, wars, etc.) with no top-k truncation.
         """
-
-        def _extract_campaign_id() -> str | None:
-            # Stellaris saves include a top-level galaxy block with name="<uuid>".
-            start = self.gamestate.find("\ngalaxy=")
-            if start == -1:
-                if self.gamestate.startswith("galaxy="):
-                    start = 0
-                else:
-                    return None
-            window = self.gamestate[start : start + 20000]
-            key = 'name="'
-            pos = window.find(key)
-            if pos == -1:
-                return None
-            end = window.find('"', pos + len(key))
-            if end == -1:
-                return None
-            value = window[pos + len(key) : end].strip()
-            return value or None
-
         meta = self.get_metadata()
         player = self.get_player_status()
         identity = self.get_empire_identity()
-        situation = self.get_situation()
         resources = self.get_resources()
+
+        # Pre-warm the player country content cache for methods that still use regex
+        # This saves ~0.45s as many methods share this data
+        player_id = self.get_player_empire_id()
+        self._find_player_country_content(player_id)
+
+        # Call methods that get_situation() would call - we'll build situation inline
         diplomacy = self.get_diplomacy()
+        fallen = self.get_fallen_empires()
+        crisis = self.get_crisis_status()
+        wars = self.get_wars()
+
+        # Build situation inline from already-fetched data (saves ~1s vs calling get_situation)
+        situation = self._build_situation_from_data(meta, wars, diplomacy, resources, crisis, fallen)
+
         planets = self.get_planets()
         starbases = self.get_starbases()
         leaders = self.get_leaders()
         technology = self.get_technology()
         fleets = self.get_fleets()
-        wars = self.get_wars()
-        fallen = self.get_fallen_empires()
         naval_capacity = self.get_naval_capacity()
         megastructures = self.get_megastructures()
         species = self.get_species_full()
         species_rights = self.get_species_rights()
         claims = self.get_claims()
         armies = self.get_armies()
-        crisis = self.get_crisis_status()
         lgate = self.get_lgate_status()
         menace = self.get_menace()
         great_khan = self.get_great_khan()
@@ -258,7 +305,7 @@ class BriefingMixin:
                 "date": player_clean.get("date") or meta.get("date"),
                 "version": meta.get("version"),
                 "player_id": player_clean.get("player_id"),
-                "campaign_id": _extract_campaign_id(),
+                "campaign_id": self._extract_campaign_id(),
             },
             "identity": identity,
             "situation": situation,
@@ -510,6 +557,107 @@ class BriefingMixin:
         if errors:
             out["errors"] = errors
         return out
+
+    def _build_situation_from_data(self, meta: dict, wars: dict, diplomacy: dict,
+                                     resources: dict, crisis: dict, fallen: dict) -> dict:
+        """Build situation dict from pre-fetched data (avoids redundant calls).
+
+        This is an internal optimization for get_complete_briefing() which already
+        has all the data needed to compute the situation.
+        """
+        result = {
+            'game_phase': 'early',
+            'year': 2200,
+            'at_war': False,
+            'war_count': 0,
+            'contacts_made': False,
+            'contact_count': 0,
+            'rivals': [],
+            'allies': [],
+            'crisis_active': False,
+        }
+
+        # Get game date and calculate year
+        date_str = meta.get('date', '2200.01.01')
+        try:
+            year = int(date_str.split('.')[0])
+            result['year'] = year
+
+            # Determine game phase
+            if year < 2230:
+                result['game_phase'] = 'early'
+            elif year < 2300:
+                result['game_phase'] = 'mid_early'
+            elif year < 2350:
+                result['game_phase'] = 'mid_late'
+            elif year < 2400:
+                result['game_phase'] = 'late'
+            else:
+                result['game_phase'] = 'endgame'
+        except (ValueError, IndexError):
+            pass
+
+        # Check war status
+        result['war_count'] = wars.get('count', 0)
+        result['at_war'] = wars.get('player_at_war', False)
+        result['wars'] = wars.get('wars', [])
+
+        # Check diplomatic situation
+        result['contact_count'] = diplomacy.get('relation_count', 0)
+        result['contacts_made'] = result['contact_count'] > 0
+        result['allies'] = diplomacy.get('allies', [])
+        result['rivals'] = diplomacy.get('rivals', [])
+
+        # Get economy data
+        net_monthly = resources.get('net_monthly', {})
+        result['economy'] = {
+            'energy_net': net_monthly.get('energy', 0),
+            'minerals_net': net_monthly.get('minerals', 0),
+            'alloys_net': net_monthly.get('alloys', 0),
+            'consumer_goods_net': net_monthly.get('consumer_goods', 0),
+            'research_net': (
+                net_monthly.get('physics_research', 0) +
+                net_monthly.get('society_research', 0) +
+                net_monthly.get('engineering_research', 0)
+            ),
+            '_note': 'Raw monthly net values - interpret based on empire size and game phase'
+        }
+
+        # Count negative resources
+        negative_resources = sum(1 for v in [
+            net_monthly.get('energy', 0),
+            net_monthly.get('minerals', 0),
+            net_monthly.get('food', 0),
+            net_monthly.get('consumer_goods', 0),
+            net_monthly.get('alloys', 0),
+        ] if v < 0)
+        result['economy']['resources_in_deficit'] = negative_resources
+
+        # Check for crisis
+        result['crisis_active'] = crisis.get('crisis_active', False)
+        if result['crisis_active']:
+            result['crisis_type'] = crisis.get('crisis_type')
+            result['player_is_crisis_fighter'] = crisis.get('player_is_crisis_fighter', False)
+
+        # Check for Fallen Empires
+        if fallen.get('total_count', 0) > 0:
+            result['fallen_empires'] = {
+                'total_count': fallen['total_count'],
+                'dormant_count': fallen['dormant_count'],
+                'awakened_count': fallen['awakened_count'],
+                'war_in_heaven': fallen['war_in_heaven'],
+                'empires': [
+                    {
+                        'name': e['name'],
+                        'status': e['status'],
+                        'archetype': e['archetype'],
+                        'power_ratio': e['power_ratio'],
+                    }
+                    for e in fallen.get('fallen_empires', [])
+                ]
+            }
+
+        return result
 
     def get_situation(self) -> dict:
         """Analyze current game situation for personality tone modifiers.
