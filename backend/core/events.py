@@ -131,6 +131,48 @@ def _get_leader_name(leader: dict[str, Any]) -> str:
     return f"#{lid}" if lid is not None else "#unknown"
 
 
+def _extract_empire_names(briefing: dict[str, Any]) -> dict[int, str]:
+    """Extract empire_names mapping from history.diplomacy.
+
+    Returns:
+        Dict mapping country_id (int) to empire name (str).
+        Signals provides this via diplomacy.empire_names.
+    """
+    history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
+    dip = history.get("diplomacy") if isinstance(history, dict) else None
+    if not isinstance(dip, dict):
+        return {}
+
+    names = dip.get("empire_names")
+    if not isinstance(names, dict):
+        return {}
+
+    # Normalize keys to int and values to str
+    result: dict[int, str] = {}
+    for k, v in names.items():
+        try:
+            cid = int(k)
+            if isinstance(v, str) and v.strip():
+                result[cid] = v.strip()
+        except (ValueError, TypeError):
+            continue
+    return result
+
+
+def _get_empire_name(cid: int, empire_names: dict[int, str]) -> str:
+    """Get empire name with fallback to ID.
+
+    Priority: empire_names[cid] → 'empire #{cid}'
+
+    This ensures Chronicle and event summaries use human-readable names
+    like 'Tzynn Empire' instead of 'empire #16777221'.
+    """
+    name = empire_names.get(cid)
+    if name:
+        return name
+    return f"empire #{cid}"
+
+
 def _extract_diplomacy_sets(briefing: dict[str, Any]) -> tuple[set[int], set[int], dict[str, set[int]]]:
     history = briefing.get("history", {}) if isinstance(briefing, dict) else {}
     dip = history.get("diplomacy") if isinstance(history, dict) else None
@@ -549,55 +591,65 @@ def compute_events(
     prev_allies, prev_rivals, prev_treaties = _extract_diplomacy_sets(prev)
     curr_allies, curr_rivals, curr_treaties = _extract_diplomacy_sets(curr)
 
+    # Merge empire names from both snapshots for best coverage
+    empire_names = _extract_empire_names(prev)
+    empire_names.update(_extract_empire_names(curr))
+
     for cid in sorted(curr_allies - prev_allies)[:5]:
+        empire_name = _get_empire_name(cid, empire_names)
         events.append(
             DetectedEvent(
                 event_type="alliance_formed",
-                summary=f"Alliance formed with empire #{cid}",
-                data={"country_id": cid, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                summary=f"Alliance formed with {empire_name}",
+                data={"country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
             )
         )
     for cid in sorted(prev_allies - curr_allies)[:5]:
+        empire_name = _get_empire_name(cid, empire_names)
         events.append(
             DetectedEvent(
                 event_type="alliance_ended",
-                summary=f"Alliance ended with empire #{cid}",
-                data={"country_id": cid, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                summary=f"Alliance ended with {empire_name}",
+                data={"country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
             )
         )
     for cid in sorted(curr_rivals - prev_rivals)[:5]:
+        empire_name = _get_empire_name(cid, empire_names)
         events.append(
             DetectedEvent(
                 event_type="rivalry_declared",
-                summary=f"Rivalry declared with empire #{cid}",
-                data={"country_id": cid, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                summary=f"Rivalry declared with {empire_name}",
+                data={"country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
             )
         )
     for cid in sorted(prev_rivals - curr_rivals)[:5]:
+        empire_name = _get_empire_name(cid, empire_names)
         events.append(
             DetectedEvent(
                 event_type="rivalry_ended",
-                summary=f"Rivalry ended with empire #{cid}",
-                data={"country_id": cid, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                summary=f"Rivalry ended with {empire_name}",
+                data={"country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
             )
         )
 
     for treaty, curr_set in curr_treaties.items():
         prev_set = prev_treaties.get(treaty, set())
         for cid in sorted(curr_set - prev_set)[:5]:
+            empire_name = _get_empire_name(cid, empire_names)
             events.append(
                 DetectedEvent(
                     event_type="treaty_signed",
-                    summary=f"Treaty signed ({treaty}) with empire #{cid}",
-                    data={"treaty": treaty, "country_id": cid, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    summary=f"Treaty signed ({treaty}) with {empire_name}",
+                    data={"treaty": treaty, "country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
                 )
             )
         for cid in sorted(prev_set - curr_set)[:5]:
+            empire_name = _get_empire_name(cid, empire_names)
             events.append(
                 DetectedEvent(
                     event_type="treaty_ended",
-                    summary=f"Treaty ended ({treaty}) with empire #{cid}",
-                    data={"treaty": treaty, "country_id": cid, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
+                    summary=f"Treaty ended ({treaty}) with {empire_name}",
+                    data={"treaty": treaty, "country_id": cid, "empire_name": empire_name, "from_snapshot_id": from_snapshot_id, "to_snapshot_id": to_snapshot_id},
                 )
             )
 
