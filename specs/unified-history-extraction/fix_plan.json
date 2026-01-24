@@ -68,6 +68,11 @@
       "id": "UHE-P013",
       "learning": "When adding fallback helpers like _get_empire_name(), the fallback value (e.g., 'empire #{cid}') is legitimate code. Criteria checking 'no raw IDs' must be specific to summary strings, not the whole file. Use grep -E 'summary=.*pattern' to check only direct uses in event summaries.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P014",
+      "learning": "Megastructure stage is not explicit in get_megastructures() output - derive from type suffix. Types like 'gateway_0', 'dyson_sphere_1' have suffix _N for stage N. Complete megastructures (no suffix like 'habitat_major_orbital') default to stage 5. Check for _site suffix (stage 0) before assuming complete.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -256,13 +261,13 @@
       "priority": 8,
       "description": "Add megastructures extraction to signals using extractor.get_megastructures() (already Rust-backed). Replaces extract_megastructures_from_gamestate regex.",
       "files": ["backend/core/signals.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_megastructures' backend/core/signals.py (uses extractor method)",
         "RUN: grep -q \"'megastructures'\" backend/core/signals.py (includes megastructures field)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); megas=s.get('megastructures',{}); print(f'Megastructures: {type(megas)}')\" (megastructures extraction works)"
       ],
-      "notes": "Megastructure events (built, upgraded) are notable Chronicle moments. Normalize to list of {type, stage} for diffing."
+      "notes": "Megastructure events (built, upgraded) are notable Chronicle moments. Normalize to list of {type, stage} for diffing. Stage is derived from type suffix (_0 through _5), defaulting to 5 for complete megastructures without suffix."
     },
     {
       "id": "UHE-015",

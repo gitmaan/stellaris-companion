@@ -53,6 +53,9 @@ def build_snapshot_signals(*, extractor: "SaveExtractor", briefing: dict[str, An
     # Extract technology signals
     signals["technology"] = _extract_technology_signals(extractor)
 
+    # Extract megastructures signals
+    signals["megastructures"] = _extract_megastructures_signals(extractor)
+
     return signals
 
 
@@ -382,4 +385,101 @@ def _extract_technology_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         'techs': techs,
         'count': len(techs),
         'in_progress': in_progress,
+    }
+
+
+def _extract_megastructures_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+    """Extract normalized megastructures data for history diffing.
+
+    Uses extractor.get_megastructures() which provides comprehensive megastructure data
+    including type, status, and ownership.
+
+    Returns format compatible with events.py _extract_megastructures():
+        Dict with:
+        - player_id: int | None
+        - megastructures: list of dicts with id, type, stage
+        - count: number of player megastructures
+        - by_type: dict mapping type to count
+    """
+    raw = extractor.get_megastructures()
+
+    if not isinstance(raw, dict):
+        return {
+            'player_id': None,
+            'megastructures': [],
+            'count': 0,
+            'by_type': {},
+        }
+
+    # Extract player ID
+    try:
+        player_id = extractor.get_player_empire_id()
+    except Exception:
+        player_id = None
+
+    raw_megas = raw.get('megastructures', [])
+    if not isinstance(raw_megas, list):
+        raw_megas = []
+
+    # Normalize megastructures for events.py compatibility
+    normalized: list[dict[str, Any]] = []
+
+    for mega in raw_megas:
+        if not isinstance(mega, dict):
+            continue
+
+        mega_id = mega.get('id')
+        try:
+            mega_id_int = int(mega_id) if mega_id is not None else None
+        except (ValueError, TypeError):
+            continue
+
+        if mega_id_int is None:
+            continue
+
+        mega_type = mega.get('type', '')
+
+        # Derive stage from type suffix (e.g., _0, _1, _2, _3, _4, _5)
+        # Complete megastructures have no numeric suffix
+        stage = 0
+        if isinstance(mega_type, str):
+            for i in range(6):
+                if mega_type.endswith(f'_{i}'):
+                    stage = i
+                    break
+            if '_site' in mega_type:
+                stage = 0
+            elif '_restored' in mega_type or 'ruined' not in mega_type:
+                # Check if it's a complete megastructure (no stage suffix)
+                if not any(mega_type.endswith(f'_{i}') for i in range(6)):
+                    if '_site' not in mega_type:
+                        # Complete megastructure typically at stage 5
+                        stage = 5
+
+        entry: dict[str, Any] = {
+            'id': mega_id_int,
+            'type': mega_type,
+            'stage': stage,
+        }
+
+        # Include display_type and status if available (useful for UI)
+        if mega.get('display_type'):
+            entry['display_type'] = mega.get('display_type')
+        if mega.get('status'):
+            entry['status'] = mega.get('status')
+        if mega.get('planet_id'):
+            entry['planet_id'] = mega.get('planet_id')
+
+        normalized.append(entry)
+
+    # Get by_type counts from raw data
+    by_type = raw.get('by_type', {})
+    if not isinstance(by_type, dict):
+        by_type = {}
+
+    return {
+        'player_id': player_id,
+        'megastructures': normalized,
+        'count': len(normalized),
+        'by_type': by_type,
     }
