@@ -2,7 +2,48 @@ import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import ChatMessage from '../components/ChatMessage'
 import ChatInput from '../components/ChatInput'
 import VirtualChatList from '../components/VirtualChatList'
-import { useBackend, ChatResponse, isChatRetryResponse } from '../hooks/useBackend'
+import { useBackend, ChatResponse, isChatRetryResponse, EmpireType } from '../hooks/useBackend'
+
+// Themed loading messages for different empire types
+const LOADING_MESSAGES = {
+  universal: [
+    'Consulting the Curators...',
+    'Surveying the situation...',
+    'Analyzing sensor data...',
+    'Processing anomaly...',
+    'Compiling situation report...',
+    'Running simulations...',
+    'Accessing the archives...',
+    'Cross-referencing star charts...',
+    // Easter eggs
+    'Waiting for end-game lag to clear...',
+    'Checking if the Fallen Empire noticed...',
+    'Consulting the Shroud...',
+    'What was, will be...',
+  ],
+  machine: [
+    'Processing directive...',
+    'The network ponders...',
+    'Calculating optimal outcome...',
+    'Querying subroutines...',
+  ],
+  hive_mind: [
+    'The collective considers...',
+    'Syncing with the overmind...',
+    'Assimilating information...',
+    'Consensus forming...',
+  ],
+}
+
+function getLoadingMessage(empireType: EmpireType | null): string {
+  const pool = [...LOADING_MESSAGES.universal]
+  if (empireType === 'machine') {
+    pool.push(...LOADING_MESSAGES.machine)
+  } else if (empireType === 'hive_mind') {
+    pool.push(...LOADING_MESSAGES.hive_mind)
+  }
+  return pool[Math.floor(Math.random() * pool.length)]
+}
 
 interface Message {
   id: string
@@ -36,6 +77,8 @@ function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [sessionKey] = useState(() => `chat-${Date.now()}`)
+  const [empireType, setEmpireType] = useState<EmpireType | null>(null)
+  const [loadingMessage, setLoadingMessage] = useState<string>('Consulting the Curators...')
 
   // Track mounted state to prevent state updates after unmount
   const isMountedRef = useRef(true)
@@ -48,6 +91,23 @@ function ChatPage() {
     }
   }, [])
 
+  // Subscribe to backend status to get empire type
+  useEffect(() => {
+    if (!window.electronAPI?.onBackendStatus) return
+
+    const cleanup = window.electronAPI.onBackendStatus((status) => {
+      if (status?.empire_type) {
+        setEmpireType(status.empire_type)
+      }
+    })
+
+    return () => {
+      if (typeof cleanup === 'function') {
+        cleanup()
+      }
+    }
+  }, [])
+
   const handleSend = useCallback(async (text: string) => {
     // Add user message
     const userMessage: Message = {
@@ -57,6 +117,7 @@ function ChatPage() {
       timestamp: new Date(),
     }
     setMessages(prev => capMessages([...prev, userMessage]))
+    setLoadingMessage(getLoadingMessage(empireType))
     setIsLoading(true)
 
     try {
@@ -118,7 +179,7 @@ function ChatPage() {
         setIsLoading(false)
       }
     }
-  }, [backend, sessionKey])
+  }, [backend, sessionKey, empireType])
 
   const items = useMemo(() => {
     const base = messages.map(message => ({
@@ -147,14 +208,14 @@ function ChatPage() {
               <span className="loading-dot"></span>
               <span className="loading-dot"></span>
             </div>
-            <span className="loading-text">Advisor is thinking...</span>
+            <span className="loading-text">{loadingMessage}</span>
           </div>
         ),
       })
     }
 
     return base
-  }, [messages, isLoading])
+  }, [messages, isLoading, loadingMessage])
 
   return (
     <div className="chat-page">

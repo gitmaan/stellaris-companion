@@ -7,12 +7,15 @@ import { useState, useCallback, useMemo } from 'react'
 // API Response Types (match backend/api/server.py)
 // ============================================
 
+export type EmpireType = 'machine' | 'hive_mind' | 'standard'
+
 export interface HealthResponse {
   status: string
   save_loaded: boolean
   empire_name: string | null
   game_date: string | null
   precompute_ready: boolean
+  empire_type?: EmpireType
   ingestion?: {
     stage?: string
     stage_detail?: string | null
