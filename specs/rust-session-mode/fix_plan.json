@@ -269,13 +269,13 @@
       "priority": 6,
       "description": "Create test suite with diverse saves: base game, DLC mixes, popular mods, early/mid/late game stages.",
       "files": ["tests/test_save_corpus.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: test -f tests/test_save_corpus.py (test file exists)",
         "RUN: grep -q 'def test_' tests/test_save_corpus.py (has test functions)",
         "RUN: grep -q 'base_game\\|dlc\\|mod\\|early\\|late' tests/test_save_corpus.py (tests different save types)"
       ],
-      "notes": "Tests should verify: no crashes, reasonable output, consistent results between Rust and regex modes. Can use test_save.sav as baseline, add more saves over time."
+      "notes": "Completed 2026-01-24. Comprehensive test suite (473 lines) with: basic functionality tests, save type coverage, Rust/regex consistency tests, performance regression tests, data quality tests. Uses test_save.sav as baseline, structured for easy corpus expansion."
     },
     {
       "id": "MIG-021",
@@ -283,13 +283,181 @@
       "priority": 7,
       "description": "Allow users to export errors, versions, and which extractors fell back without uploading saves.",
       "files": ["stellaris_save_extractor/diagnostics.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: test -f stellaris_save_extractor/diagnostics.py (diagnostics module exists)",
         "RUN: grep -q 'export_diagnostics\\|get_diagnostics' stellaris_save_extractor/diagnostics.py (export function exists)",
         "RUN: grep -q 'fallback\\|error\\|version' stellaris_save_extractor/diagnostics.py (captures relevant info)"
       ],
-      "notes": "Should capture: Python version, Rust parser version, which extractors used fallback, any errors/warnings, timing breakdown. No save data."
+      "notes": "Completed 2026-01-24. Created diagnostics.py module with: DiagnosticsCollector class (thread-local), get_diagnostics() for snapshot, export_diagnostics() for JSON export, timing/fallback/error recording, version detection (Python, Rust parser, orjson). Includes decorators @timed_extractor and @record_fallback_on_exception for easy instrumentation. No save data included in exports."
+    },
+    {
+      "id": "MIG-022",
+      "title": "Migrate get_pop_statistics to Rust",
+      "priority": 8,
+      "description": "economy.py get_pop_statistics() uses 50MB chunk slicing with re.finditer. Replace with iter_section('pop') for memory efficiency and speed.",
+      "files": ["stellaris_save_extractor/economy.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q '_get_pop_statistics_rust' stellaris_save_extractor/economy.py (Rust method exists)",
+        "RUN: grep -q '_get_pop_statistics_regex' stellaris_save_extractor/economy.py (fallback exists)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_pop_statistics(); ctx.__exit__(None,None,None); print(f'Pops: {r.get(\\\"total_pops\\\", 0)}'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "High priority - 50MB chunk is largest in codebase. Use iter_section('pop') to process pops without loading entire section into memory."
+    },
+    {
+      "id": "MIG-023",
+      "title": "Migrate _get_country_names_map to Rust",
+      "priority": 8,
+      "description": "base.py _get_country_names_map_regex() is a hot path resolving 300+ country names. Use iter_section('country') with batch name extraction.",
+      "files": ["stellaris_save_extractor/base.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q '_get_country_names_map_rust' stellaris_save_extractor/base.py (Rust method exists)",
+        "RUN: grep -q '_get_country_names_map_regex' stellaris_save_extractor/base.py (fallback exists)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e._get_country_names_map(); ctx.__exit__(None,None,None); print(f'Countries: {len(r)}'); assert len(r) > 0\" (works with session)"
+      ],
+      "notes": "Hot path called by multiple extractors. Use iter_section('country') and extract name from each country dict. Handle name templates like leader names (P018)."
+    },
+    {
+      "id": "MIG-024",
+      "title": "Migrate get_fleet_composition to Rust",
+      "priority": 9,
+      "description": "military.py _get_fleet_composition_regex() has triple nested loops with small snippet slicing. Use iter_section for ships/designs.",
+      "files": ["stellaris_save_extractor/military.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q '_get_fleet_composition_rust' stellaris_save_extractor/military.py (Rust method exists)",
+        "RUN: grep -q '_get_fleet_composition_regex' stellaris_save_extractor/military.py (fallback exists)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_fleet_composition(); ctx.__exit__(None,None,None); print(f'Fleets: {len(r.get(\\\"fleets\\\", []))}'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "Complex extraction: design→size mapping, then ship→design lookup, then aggregate by fleet. Use batch_ops (P025) for multiple get_entry calls."
+    },
+    {
+      "id": "MIG-025",
+      "title": "Migrate get_diplomacy core methods to Rust",
+      "priority": 9,
+      "description": "diplomacy.py has 75 regex calls across multiple methods. Migrate get_relations, get_treaties, get_claims to use iter_section.",
+      "files": ["stellaris_save_extractor/diplomacy.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're\\.search\\|re\\.findall\\|re\\.finditer' stellaris_save_extractor/diplomacy.py | awk '{if ($1 < 50) exit 0; else exit 1}' (regex count reduced)",
+        "RUN: grep -q 'iter_section.*relation\\|iter_section.*diplomacy' stellaris_save_extractor/diplomacy.py (uses iter_section)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_diplomacy(); ctx.__exit__(None,None,None); print('OK'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "Large file with many regex calls. Focus on highest-impact methods first. Relations data has duplicate keys (relation={}) - may need get_duplicate_values (P023)."
+    },
+    {
+      "id": "MIG-026",
+      "title": "Migrate get_budget_breakdown to Rust",
+      "priority": 10,
+      "description": "economy.py get_budget_breakdown() uses recursive brace matching. Replace with extract_sections for parsed dict access.",
+      "files": ["stellaris_save_extractor/economy.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q '_get_budget_breakdown_rust' stellaris_save_extractor/economy.py (Rust method exists)",
+        "RUN: grep -q '_get_budget_breakdown_regex' stellaris_save_extractor/economy.py (fallback exists)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_budget_breakdown(); ctx.__exit__(None,None,None); print(f'Budget: {type(r)}'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "Uses recursive extract_top_level_categories() helper. With Rust parsed dict, can directly access nested budget structure without brace counting."
+    },
+    {
+      "id": "MIG-027",
+      "title": "Migrate get_planets to Rust",
+      "priority": 10,
+      "description": "planets.py has 36 regex calls. _get_planets_regex uses 20MB chunk slicing. Migrate remaining methods to iter_section('planets').",
+      "files": ["stellaris_save_extractor/planets.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're\\.search\\|re\\.findall\\|re\\.finditer' stellaris_save_extractor/planets.py | awk '{if ($1 < 20) exit 0; else exit 1}' (regex count reduced by >40%)",
+        "RUN: grep -q '_get_planets_rust' stellaris_save_extractor/planets.py (Rust method exists)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_planets(); ctx.__exit__(None,None,None); print(f'Planets: {len(r.get(\\\"colonies\\\", []))}'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "planets.py already has some Rust usage. Focus on _get_planets_regex (20MB chunk), get_archaeology, _get_population_by_planet_regex."
+    },
+    {
+      "id": "MIG-028",
+      "title": "Migrate get_player_status to Rust",
+      "priority": 10,
+      "description": "player.py has 32 regex calls with only 4 Rust usages. Core player data is frequently accessed - migrate main extraction methods.",
+      "files": ["stellaris_save_extractor/player.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're\\.search\\|re\\.findall\\|re\\.finditer' stellaris_save_extractor/player.py | awk '{if ($1 < 20) exit 0; else exit 1}' (regex count reduced by >35%)",
+        "RUN: grep -q 'iter_section\\|get_entry' stellaris_save_extractor/player.py (uses Rust session ops)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_player_status(); ctx.__exit__(None,None,None); print(f'Player: {r.get(\\\"empire_name\\\", \\\"unknown\\\")}'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "Player status is called on every save load. Uses _get_player_country_entry() which is already Rust-backed - extend to other player.py methods."
+    },
+    {
+      "id": "MIG-029",
+      "title": "Migrate get_technology to Rust",
+      "priority": 11,
+      "description": "technology.py has 18 regex calls extracting tech trees. Use iter_section for tech data.",
+      "files": ["stellaris_save_extractor/technology.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're\\.search\\|re\\.findall\\|re\\.finditer' stellaris_save_extractor/technology.py | awk '{if ($1 < 12) exit 0; else exit 1}' (regex count reduced by >30%)",
+        "RUN: grep -q '_get_technology_rust\\|iter_section.*tech' stellaris_save_extractor/technology.py (Rust method exists)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_technology(); ctx.__exit__(None,None,None); print(f'Techs: {len(r.get(\\\"researched\\\", []))}'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "Tech data includes researched list, in_progress, and available options. May have duplicate keys for tech_status entries."
+    },
+    {
+      "id": "MIG-030",
+      "title": "Migrate get_crisis_status to Rust",
+      "priority": 11,
+      "description": "endgame.py has 18 regex calls for crisis/endgame detection. Migrate to Rust for accuracy in late-game state detection.",
+      "files": ["stellaris_save_extractor/endgame.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're\\.search\\|re\\.findall\\|re\\.finditer' stellaris_save_extractor/endgame.py | awk '{if ($1 < 10) exit 0; else exit 1}' (regex count reduced by >40%)",
+        "RUN: grep -q 'iter_section\\|extract_sections\\|get_entry' stellaris_save_extractor/endgame.py (uses Rust session ops)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_crisis_status(); ctx.__exit__(None,None,None); print(f'Crisis: {type(r)}'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "Crisis detection affects Chronicle narratives. Regex may miss nested crisis state. Already has 11 Rust usages - extend coverage."
+    },
+    {
+      "id": "MIG-031",
+      "title": "Migrate get_armies to Rust",
+      "priority": 12,
+      "description": "armies.py has 11 regex calls for ground forces extraction. Migrate to iter_section('army') for accurate army counts.",
+      "files": ["stellaris_save_extractor/armies.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're\\.search\\|re\\.findall\\|re\\.finditer' stellaris_save_extractor/armies.py | awk '{if ($1 < 6) exit 0; else exit 1}' (regex count reduced by >45%)",
+        "RUN: grep -q 'iter_section\\|extract_sections' stellaris_save_extractor/armies.py (uses Rust session ops)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_armies(); ctx.__exit__(None,None,None); print(f'Armies: {type(r)}'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "Army data for invasion planning. Regex snippet slicing may truncate large army lists."
+    },
+    {
+      "id": "MIG-032",
+      "title": "Migrate get_special_projects to Rust",
+      "priority": 12,
+      "description": "projects.py has 10 regex calls for megaprojects and special projects. Migrate to Rust for complete project state.",
+      "files": ["stellaris_save_extractor/projects.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're\\.search\\|re\\.findall\\|re\\.finditer' stellaris_save_extractor/projects.py | awk '{if ($1 < 5) exit 0; else exit 1}' (regex count reduced by >50%)",
+        "RUN: grep -q 'iter_section\\|extract_sections' stellaris_save_extractor/projects.py (uses Rust session ops)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_special_projects() if hasattr(e, 'get_special_projects') else {}; ctx.__exit__(None,None,None); print('OK')\" (works with session)"
+      ],
+      "notes": "Special projects include archaeological sites, precursor chains. Accurate state tracking for Chronicle."
+    },
+    {
+      "id": "MIG-033",
+      "title": "Migrate get_factions to Rust",
+      "priority": 12,
+      "description": "politics.py has 9 regex calls for faction extraction. Migrate to Rust for accurate faction happiness and ethics.",
+      "files": ["stellaris_save_extractor/politics.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -c 're\\.search\\|re\\.findall\\|re\\.finditer' stellaris_save_extractor/politics.py | awk '{if ($1 < 5) exit 0; else exit 1}' (regex count reduced by >45%)",
+        "RUN: grep -q 'iter_section\\|extract_sections' stellaris_save_extractor/politics.py (uses Rust session ops)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_factions(); ctx.__exit__(None,None,None); print(f'Factions: {type(r)}'); assert isinstance(r, dict)\" (works with session)"
+      ],
+      "notes": "Faction data affects advisor personality and recommendations. Ethics attraction values need accurate extraction."
     }
   ],
   "discovered": []
