@@ -39,7 +39,7 @@
       "id": "GHR-003",
       "title": "Delete dead personality.py v1 code",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "! grep -q 'def build_personality_prompt(' personality.py",
         "! grep -q 'def _build_standard_personality(' personality.py",
@@ -50,7 +50,7 @@
         "python3 -c \"from personality import build_optimized_prompt; print('OK')\"",
         "python3 -c \"from personality import load_patch_notes; print('OK')\""
       ],
-      "notes": "Delete lines 329-515. Keep load_patch_notes, _build_machine_optimized, _build_hive_optimized"
+      "notes": "Deleted ~187 lines of dead v1 code. Kept: load_patch_notes, get_available_patches, _build_machine_optimized, _build_hive_optimized, build_optimized_prompt"
     },
     {
       "id": "GHR-004",
