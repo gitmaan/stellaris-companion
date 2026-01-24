@@ -58,6 +58,11 @@
       "id": "UHE-P011",
       "learning": "When removing gamestate dependency: pass precomputed_signals to build_history_enrichment with gamestate=None. Signals provide leaders/wars/diplomacy; other history fields (galaxy/techs/policies etc.) will be empty but are less critical for Chronicle. Avoid comments containing both 'gamestate' and 'history' in same line as grep criteria may match.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P012",
+      "learning": "Empire names come from multiple sources in get_diplomacy(): allies/rivals/defensive_pacts/etc have {id, name} format, while relations list has {country_id, empire_name} format. Collect from all sources to maximize coverage. Store as diplomacy.empire_names: {int_id: str_name} for easy lookup.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -198,6 +203,127 @@
         "RUN: ! grep 'Gamestate load' backend/core/ingestion_worker.py | grep -v '#' (warning removed or commented)"
       ],
       "notes": "This eliminates the 70MB+ string materialization bottleneck for history enrichment. Implemented by passing precomputed_signals to build_history_enrichment with gamestate=None - signals provide all critical data (leaders/wars/diplomacy)."
+    },
+    {
+      "id": "UHE-011",
+      "title": "Add empire names to diplomacy signals",
+      "priority": 7,
+      "description": "get_diplomacy() already returns {id, name} dicts for allies/rivals. Capture empire names in signals so events can show 'Alliance formed with Tzynn Empire' instead of 'empire #16777221'.",
+      "files": ["backend/core/signals.py"],
+      "passes": true,
+      "criteria": [
+        "RUN: grep -q 'empire_name\\|country_name' backend/core/signals.py (captures empire names)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); diplo=s.get('diplomacy',{}); names=diplo.get('empire_names',{}); print(f'Empire names captured: {len(names)}')\" (empire names extracted)"
+      ],
+      "notes": "Store as diplomacy.empire_names: {country_id: name} map. This enables events.py to look up names for any country ID. Collects names from allies, rivals, all treaty types, and the full relations list."
+    },
+    {
+      "id": "UHE-012",
+      "title": "Update events.py to use empire names in diplomacy events",
+      "priority": 7,
+      "description": "Use empire names from signals in alliance/rivalry/treaty event summaries. Fallback chain: empire_names[id] → 'empire #{id}'.",
+      "files": ["backend/core/events.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'empire_name\\|_get_empire_name' backend/core/events.py (uses empire names)",
+        "RUN: grep -q 'Alliance formed with' backend/core/events.py (has diplomacy events)",
+        "RUN: ! grep -q 'empire #{cid}' backend/core/events.py (no longer uses raw IDs)"
+      ],
+      "notes": "Add _get_empire_name(cid, empire_names) helper similar to _get_leader_name(). Chronicle will show 'Declared rivalry with Fanatic Purifiers' instead of 'empire #42'."
+    },
+    {
+      "id": "UHE-013",
+      "title": "Add technology signals",
+      "priority": 8,
+      "description": "Add technology extraction to signals using extractor.get_technology() (already Rust-backed). Replaces extract_player_techs_from_gamestate regex.",
+      "files": ["backend/core/signals.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_technology' backend/core/signals.py (uses extractor method)",
+        "RUN: grep -q \"'technology'\\|'techs'\" backend/core/signals.py (includes tech field)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); tech=s.get('technology',{}); print(f'Tech fields: {list(tech.keys())[:5]}')\" (technology extraction works)"
+      ],
+      "notes": "Normalize to list of tech IDs for history diffing (tech_researched events). get_technology() returns researched, in_progress, available."
+    },
+    {
+      "id": "UHE-014",
+      "title": "Add megastructures signals",
+      "priority": 8,
+      "description": "Add megastructures extraction to signals using extractor.get_megastructures() (already Rust-backed). Replaces extract_megastructures_from_gamestate regex.",
+      "files": ["backend/core/signals.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_megastructures' backend/core/signals.py (uses extractor method)",
+        "RUN: grep -q \"'megastructures'\" backend/core/signals.py (includes megastructures field)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); megas=s.get('megastructures',{}); print(f'Megastructures: {type(megas)}')\" (megastructures extraction works)"
+      ],
+      "notes": "Megastructure events (built, upgraded) are notable Chronicle moments. Normalize to list of {type, stage} for diffing."
+    },
+    {
+      "id": "UHE-015",
+      "title": "Add crisis signals",
+      "priority": 8,
+      "description": "Add crisis status extraction to signals using extractor.get_crisis_status() (already Rust-backed). Replaces extract_crisis_from_gamestate regex.",
+      "files": ["backend/core/signals.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_crisis_status' backend/core/signals.py (uses extractor method)",
+        "RUN: grep -q \"'crisis'\" backend/core/signals.py (includes crisis field)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); crisis=s.get('crisis',{}); print(f'Crisis: {crisis}')\" (crisis extraction works)"
+      ],
+      "notes": "Crisis events are major Chronicle milestones. Normalize to {active, type, progress} for event detection."
+    },
+    {
+      "id": "UHE-016",
+      "title": "Add fallen empires signals",
+      "priority": 9,
+      "description": "Add fallen empires extraction to signals using extractor.get_fallen_empires() (already Rust-backed). Replaces extract_fallen_empires_from_gamestate regex.",
+      "files": ["backend/core/signals.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'get_fallen_empires' backend/core/signals.py (uses extractor method)",
+        "RUN: grep -q \"'fallen_empires'\" backend/core/signals.py (includes fallen empires field)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); fe=s.get('fallen_empires',{}); print(f'Fallen empires: {type(fe)}')\" (fallen empires extraction works)"
+      ],
+      "notes": "Track awakened empires and war in heaven. Normalize to list of {id, type, awakened} for event detection."
+    },
+    {
+      "id": "UHE-017",
+      "title": "Add policies and edicts signals",
+      "priority": 9,
+      "description": "Add policies/edicts extraction to signals. Policies use player.py, edicts may need new extractor method.",
+      "files": ["backend/core/signals.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q \"'policies'\\|'edicts'\" backend/core/signals.py (includes policy/edict fields)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); print(f'Policies: {type(s.get(\\\"policies\\\",{}))}')\" (policies extraction works)"
+      ],
+      "notes": "Policy changes (economic_policy, war_philosophy, etc.) can be Chronicle-worthy. Normalize to dict of policy_type: current_value."
+    },
+    {
+      "id": "UHE-018",
+      "title": "Update history.py to use expanded signals",
+      "priority": 10,
+      "description": "Update build_history_enrichment to use technology, megastructures, crisis, fallen_empires from signals instead of gamestate regex.",
+      "files": ["backend/core/history.py"],
+      "passes": false,
+      "criteria": [
+        "RUN: grep -q 'signals.*technology\\|signals.*megastructures\\|signals.*crisis' backend/core/history.py (uses expanded signals)",
+        "RUN: python3 -c \"from backend.core.history import build_history_enrichment; print('Import OK')\" (importable)"
+      ],
+      "notes": "Incremental migration - each signal type replaces corresponding extract_*_from_gamestate call. Eventually all history extraction uses signals."
+    },
+    {
+      "id": "UHE-019",
+      "title": "Final validation - no gamestate regex for migrated fields",
+      "priority": 10,
+      "description": "Verify that all migrated fields (leaders, wars, diplomacy, technology, megastructures, crisis, fallen_empires) use signals, not gamestate regex.",
+      "files": [],
+      "passes": false,
+      "criteria": [
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; from backend.core.signals import build_snapshot_signals; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); b=e.get_complete_briefing(); s=build_snapshot_signals(extractor=e, briefing=b); ctx.__exit__(None,None,None); required=['leaders','wars','diplomacy','technology','megastructures','crisis','fallen_empires']; missing=[f for f in required if f not in s]; print(f'Missing signals: {missing}'); assert not missing\" (all signal types present)"
+      ],
+      "notes": "This validates the expanded signals coverage. At this point, history.py should rarely need gamestate."
     }
   ],
   "discovered": []

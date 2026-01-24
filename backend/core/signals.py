@@ -180,6 +180,7 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         - allies: list of country IDs (sorted)
         - rivals: list of country IDs (sorted)
         - treaties: dict mapping treaty type to list of country IDs
+        - empire_names: dict mapping country_id to empire name (for event summaries)
     """
     raw = extractor.get_diplomacy()
 
@@ -189,6 +190,7 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
             'allies': [],
             'rivals': [],
             'treaties': {},
+            'empire_names': {},
         }
 
     # Extract player ID from extractor
@@ -196,6 +198,47 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         player_id = extractor.get_player_empire_id()
     except Exception:
         player_id = None
+
+    # Collect empire names from all diplomatic relations
+    # get_diplomacy() returns {id, name} dicts for allies, rivals, etc.
+    empire_names: dict[int, str] = {}
+
+    def collect_empire_names(items: Any) -> None:
+        """Collect empire names from list of {id, name} dicts."""
+        if not isinstance(items, list):
+            return
+        for item in items:
+            if isinstance(item, dict):
+                cid = item.get('id')
+                name = item.get('name')
+                if cid is not None and name and isinstance(name, str):
+                    try:
+                        empire_names[int(cid)] = name
+                    except (ValueError, TypeError):
+                        continue
+
+    # Collect names from all sources that have {id, name} format
+    collect_empire_names(raw.get('allies', []))
+    collect_empire_names(raw.get('rivals', []))
+    collect_empire_names(raw.get('defensive_pacts', []))
+    collect_empire_names(raw.get('non_aggression_pacts', []))
+    collect_empire_names(raw.get('commercial_pacts', []))
+    collect_empire_names(raw.get('migration_treaties', []))
+    collect_empire_names(raw.get('sensor_links', []))
+    collect_empire_names(raw.get('closed_borders', []))
+
+    # Also collect from relations list which has more contacts
+    relations = raw.get('relations', [])
+    if isinstance(relations, list):
+        for rel in relations:
+            if isinstance(rel, dict):
+                cid = rel.get('country_id')
+                name = rel.get('empire_name')
+                if cid is not None and name and isinstance(name, str):
+                    try:
+                        empire_names[int(cid)] = name
+                    except (ValueError, TypeError):
+                        continue
 
     # Helper to extract country IDs from list of {id, name} dicts
     def extract_ids(items: Any) -> list[int]:
@@ -276,4 +319,5 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
         'allies': allies,
         'rivals': rivals,
         'treaties': treaties,
+        'empire_names': empire_names,
     }
