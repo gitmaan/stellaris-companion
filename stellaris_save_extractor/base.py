@@ -1068,12 +1068,13 @@ class SaveExtractorBase:
         return result
 
     def _analyze_player_fleets_rust(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
-        """Rust-optimized fleet analysis using iter_section.
+        """Rust-optimized fleet analysis using get_entries.
 
-        Uses structured iteration instead of regex scanning. Benefits:
+        Uses direct batch lookup instead of iterating all fleets. Benefits:
+        - Fetches only owned fleets (200 IDs) instead of iterating 10K+ fleets
         - No 100KB block size limits (complete fleet data)
         - No regex parsing errors on nested structures
-        - Faster iteration via Rust session
+        - Much faster via direct Rust session get_entries call
         """
         session = _get_active_session()
         if not session:
@@ -1089,27 +1090,18 @@ class SaveExtractorBase:
             'military_fleets': [],
         }
 
-        # Convert to set for O(1) lookup
-        fleet_id_set = set(str(fid) for fid in fleet_ids)
+        # Use get_entries to fetch only owned fleets directly (not all 10K+ fleets)
+        # Limit to max_to_analyze for performance in huge saves
+        ids_to_fetch = [str(fid) for fid in fleet_ids[:max_to_analyze]]
+        entries = session.get_entries('fleet', ids_to_fetch)
 
-        # Iterate all fleets, filter by ownership
-        analyzed = 0
-        for fid, fleet in session.iter_section('fleet'):
-            if fid not in fleet_id_set:
-                continue
+        for entry in entries:
+            fid = entry.get('_key', '')
+            fleet = entry.get('_value')
 
+            # P010: entry might be string "none" for deleted entries
             if not isinstance(fleet, dict):
                 continue
-
-            analyzed += 1
-            if analyzed > max_to_analyze:
-                # Estimate remaining based on ratios
-                ratio = len(fleet_ids) / max_to_analyze
-                result['starbase_count'] = int(result['starbase_count'] * ratio)
-                result['military_fleet_count'] = int(result['military_fleet_count'] * ratio)
-                result['civilian_fleet_count'] = int(result['civilian_fleet_count'] * ratio)
-                result['_note'] = f'Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs'
-                break
 
             # Direct dict access - no regex needed
             is_station = fleet.get('station') == 'yes'
@@ -1148,6 +1140,14 @@ class SaveExtractorBase:
                 })
             else:
                 result['civilian_fleet_count'] += 1
+
+        # Add estimation note if we limited the analysis
+        if len(fleet_ids) > max_to_analyze:
+            ratio = len(fleet_ids) / max_to_analyze
+            result['starbase_count'] = int(result['starbase_count'] * ratio)
+            result['military_fleet_count'] = int(result['military_fleet_count'] * ratio)
+            result['civilian_fleet_count'] = int(result['civilian_fleet_count'] * ratio)
+            result['_note'] = f'Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs'
 
         return result
 
