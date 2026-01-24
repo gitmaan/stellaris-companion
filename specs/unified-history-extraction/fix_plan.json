@@ -18,6 +18,11 @@
       "id": "UHE-P003",
       "learning": "Keep both 'name' (resolved) and 'name_key' (raw) - name for UI/narrative, name_key for debugging/localization",
       "date": "2026-01-24"
+    },
+    {
+      "id": "UHE-P004",
+      "learning": "Criteria using grep for string patterns must match exact quote style. Use single quotes for dict keys in signals.py to match grep patterns like \"'name'\".",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -42,7 +47,7 @@
       "priority": 1,
       "description": "build_snapshot_signals uses extractor.get_leaders() and normalizes output with resolved names. Each leader has: id, class, level, name (resolved), name_key (raw), death_date, date_added, recruitment_date.",
       "files": ["backend/core/signals.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'get_leaders' backend/core/signals.py (uses extractor method)",
         "RUN: grep -q \"'name'\" backend/core/signals.py (includes resolved name field)",

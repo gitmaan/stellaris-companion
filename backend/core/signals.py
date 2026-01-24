@@ -98,15 +98,15 @@ def _extract_leader_signals(extractor: "SaveExtractor") -> dict[str, Any]:
 
         # Name resolution: 'name' field from get_leaders() is already resolved
         # when Rust session is active (via _extract_leader_name_rust)
-        resolved_name = leader.get("name")
+        resolved_name = leader.get('name')
         if resolved_name:
-            entry["name"] = resolved_name
+            entry['name'] = resolved_name
 
         # Keep name_key for debugging/localization (extract from raw data if available)
         # This would be the %LEADER_N% or NAME_* key before resolution
-        name_key = leader.get("name_key")
+        name_key = leader.get('name_key')
         if name_key:
-            entry["name_key"] = name_key
+            entry['name_key'] = name_key
 
         # Date fields for history diffing (hire/death events)
         # These may be null/missing depending on leader state
