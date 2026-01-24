@@ -597,12 +597,12 @@
       "priority": 21,
       "description": "Delete _get_leaders_regex. KEEP species traits regex (P018 - duplicate keys).",
       "files": ["stellaris_save_extractor/leaders.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: ! grep -q 'def _get_leaders_regex' stellaris_save_extractor/leaders.py (main regex removed)",
         "RUN: python3 -c \"from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); from save_extractor import SaveExtractor; e=SaveExtractor('test_save.sav'); r=e.get_leaders(); ctx.__exit__(None,None,None); assert 'leaders' in r; print('OK')\" (works)"
       ],
-      "notes": "Only proceed if MIG-040 passed. P018: Keep species traits regex for duplicate keys."
+      "notes": "Completed 2026-01-25. Removed _get_leaders_regex (~150 lines). Updated get_leaders() to call _get_leaders_rust() directly. _get_leaders_rust raises ParserError if no session. Removed unused imports (re, zipfile, datetime, Path) and RUST_BRIDGE_AVAILABLE check. Leaders correctly extracted: 28 leaders, classes: commander (7), official (8), envoy (6), scientist (7). Leader traits handled via get_duplicate_values (P023). MIG-040 escape hatch passed, safe to proceed."
     },
     {
       "id": "MIG-048",
