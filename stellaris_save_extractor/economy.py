@@ -8,7 +8,13 @@ from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing
 try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError, _get_active_session
+    from rust_bridge import (
+        extract_sections,
+        iter_section_entries,
+        ParserError,
+        _get_active_session,
+    )
+
     RUST_BRIDGE_AVAILABLE = True
 except ImportError:
     RUST_BRIDGE_AVAILABLE = False
@@ -26,45 +32,45 @@ class EconomyMixin:
     # resource-name list for these indices, so we map the commonly-traded set
     # by their observed indices (used consistently across fluctuations/bought/sold).
     _MARKET_RESOURCE_BY_INDEX = {
-        0: 'energy',
-        1: 'minerals',
-        2: 'food',
-        9: 'consumer_goods',
-        10: 'alloys',
-        11: 'volatile_motes',
-        12: 'exotic_gases',
-        13: 'rare_crystals',
-        14: 'sr_living_metal',
-        15: 'sr_zro',
-        16: 'sr_dark_matter',
+        0: "energy",
+        1: "minerals",
+        2: "food",
+        9: "consumer_goods",
+        10: "alloys",
+        11: "volatile_motes",
+        12: "exotic_gases",
+        13: "rare_crystals",
+        14: "sr_living_metal",
+        15: "sr_zro",
+        16: "sr_dark_matter",
     }
 
     _BUDGET_TRACKED_RESOURCES = [
-        'energy',
-        'minerals',
-        'food',
-        'consumer_goods',
-        'alloys',
-        'unity',
-        'influence',
-        'physics_research',
-        'society_research',
-        'engineering_research',
-        'volatile_motes',
-        'exotic_gases',
-        'rare_crystals',
-        'sr_living_metal',
-        'sr_zro',
-        'sr_dark_matter',
-        'minor_artifacts',
-        'astral_threads',
+        "energy",
+        "minerals",
+        "food",
+        "consumer_goods",
+        "alloys",
+        "unity",
+        "influence",
+        "physics_research",
+        "society_research",
+        "engineering_research",
+        "volatile_motes",
+        "exotic_gases",
+        "rare_crystals",
+        "sr_living_metal",
+        "sr_zro",
+        "sr_dark_matter",
+        "minor_artifacts",
+        "astral_threads",
         # Appears inside the budget's `trade_policy={...}` breakdown.
-        'trade',
+        "trade",
     ]
 
     def _extract_braced_block(self, content: str, key: str) -> str | None:
         """Extract the full `key={...}` block from a larger text chunk."""
-        match = re.search(rf'\b{re.escape(key)}\s*=\s*\{{', content)
+        match = re.search(rf"\b{re.escape(key)}\s*=\s*\{{", content)
         if not match:
             return None
 
@@ -73,10 +79,10 @@ class EconomyMixin:
         started = False
 
         for i, char in enumerate(content[start:], start):
-            if char == '{':
+            if char == "{":
                 brace_count += 1
                 started = True
-            elif char == '}':
+            elif char == "}":
                 brace_count -= 1
                 if started and brace_count == 0:
                     return content[start : i + 1]
@@ -87,8 +93,8 @@ class EconomyMixin:
         """Parse a simple `{ 1 2.5 -3 }` list into floats."""
         if not block:
             return []
-        open_brace = block.find('{')
-        close_brace = block.rfind('}')
+        open_brace = block.find("{")
+        close_brace = block.rfind("}")
         if open_brace == -1 or close_brace == -1 or close_brace <= open_brace:
             return []
         inner = block[open_brace + 1 : close_brace]
@@ -106,7 +112,7 @@ class EconomyMixin:
         if not block:
             return result
         for m in re.finditer(
-            r'\bcountry=(\d+)\s*amount=\s*\{\s*([^}]+?)\s*\}',
+            r"\bcountry=(\d+)\s*amount=\s*\{\s*([^}]+?)\s*\}",
             block,
             re.DOTALL,
         ):
@@ -129,7 +135,7 @@ class EconomyMixin:
         amounts: dict[str, float] = {}
         if not block:
             return amounts
-        for key, value in re.findall(r'\b([a-z_]+)=([\d.-]+)', block):
+        for key, value in re.findall(r"\b([a-z_]+)=([\d.-]+)", block):
             try:
                 amounts[key] = float(value)
             except ValueError:
@@ -137,10 +143,10 @@ class EconomyMixin:
         return amounts
 
     def _extract_block_inner(self, block: str) -> str:
-        open_brace = block.find('{')
-        close_brace = block.rfind('}')
+        open_brace = block.find("{")
+        close_brace = block.rfind("}")
         if open_brace == -1 or close_brace == -1 or close_brace <= open_brace:
-            return ''
+            return ""
         return block[open_brace + 1 : close_brace]
 
     def get_pop_statistics(self) -> dict:
@@ -186,13 +192,13 @@ class EconomyMixin:
             return self._get_pop_statistics_regex()
 
         result = {
-            'total_pops': 0,
-            'by_species': {},
-            'by_job_category': {},
-            'by_stratum': {},
-            'happiness_avg': 0.0,
-            'employed_pops': 0,
-            'unemployed_pops': 0,
+            "total_pops": 0,
+            "by_species": {},
+            "by_job_category": {},
+            "by_stratum": {},
+            "happiness_avg": 0.0,
+            "employed_pops": 0,
+            "unemployed_pops": 0,
         }
 
         # Step 1: Get player's planet IDs (as set of strings for comparison)
@@ -214,13 +220,13 @@ class EconomyMixin:
         total_pops = 0
 
         # Step 3: Iterate over pop_groups section using Rust session
-        for pop_group_id, entry in session.iter_section('pop_groups'):
+        for pop_group_id, entry in session.iter_section("pop_groups"):
             # P010: entry might be string "none" for deleted entries
             if not isinstance(entry, dict):
                 continue
 
             # Check if this pop group is on a player-owned planet
-            planet_id = entry.get('planet')
+            planet_id = entry.get("planet")
             if planet_id is None:
                 continue
             # Planet ID can be int or string, normalize to string for comparison
@@ -228,7 +234,7 @@ class EconomyMixin:
                 continue
 
             # Get the size of this pop group (number of pops)
-            size = entry.get('size')
+            size = entry.get("size")
             if size is None:
                 continue
             try:
@@ -241,25 +247,33 @@ class EconomyMixin:
             total_pops += pop_size
 
             # Extract species and category from key nested dict
-            key_data = entry.get('key')
+            key_data = entry.get("key")
             if isinstance(key_data, dict):
                 # Extract species ID
-                species_id = key_data.get('species')
+                species_id = key_data.get("species")
                 if species_id is not None:
                     species_id_str = str(species_id)
-                    species_name = species_names.get(species_id_str, f"Species_{species_id_str}")
-                    species_counts[species_name] = species_counts.get(species_name, 0) + pop_size
+                    species_name = species_names.get(
+                        species_id_str, f"Species_{species_id_str}"
+                    )
+                    species_counts[species_name] = (
+                        species_counts.get(species_name, 0) + pop_size
+                    )
 
                 # Extract category (job category: ruler, specialist, worker, slave, etc.)
-                category = key_data.get('category')
+                category = key_data.get("category")
                 if category:
-                    job_category_counts[category] = job_category_counts.get(category, 0) + pop_size
+                    job_category_counts[category] = (
+                        job_category_counts.get(category, 0) + pop_size
+                    )
                     # Use category as stratum (they're equivalent in Stellaris)
-                    stratum_counts[category] = stratum_counts.get(category, 0) + pop_size
+                    stratum_counts[category] = (
+                        stratum_counts.get(category, 0) + pop_size
+                    )
 
             # Extract happiness (0.0 to 1.0 scale in save, convert to percentage)
             # Use weighted sum for efficiency instead of storing all values
-            happiness = entry.get('happiness')
+            happiness = entry.get("happiness")
             if happiness is not None:
                 try:
                     happiness_val = float(happiness) * 100  # Convert to percentage
@@ -269,32 +283,32 @@ class EconomyMixin:
                     pass
 
         # Finalize results
-        result['total_pops'] = total_pops
-        result['by_species'] = species_counts
-        result['by_job_category'] = job_category_counts
-        result['by_stratum'] = stratum_counts
+        result["total_pops"] = total_pops
+        result["by_species"] = species_counts
+        result["by_job_category"] = job_category_counts
+        result["by_stratum"] = stratum_counts
 
         # Employed pops = total minus unemployed category
-        unemployed = job_category_counts.get('unemployed', 0)
-        result['employed_pops'] = total_pops - unemployed
-        result['unemployed_pops'] = unemployed
+        unemployed = job_category_counts.get("unemployed", 0)
+        result["employed_pops"] = total_pops - unemployed
+        result["unemployed_pops"] = unemployed
 
         # Calculate average happiness
         if happiness_weight > 0:
-            result['happiness_avg'] = round(happiness_sum / happiness_weight, 1)
+            result["happiness_avg"] = round(happiness_sum / happiness_weight, 1)
 
         return result
 
     def _get_pop_statistics_regex(self) -> dict:
         """Original regex implementation - fallback for non-session mode."""
         result = {
-            'total_pops': 0,
-            'by_species': {},
-            'by_job_category': {},
-            'by_stratum': {},
-            'happiness_avg': 0.0,
-            'employed_pops': 0,
-            'unemployed_pops': 0,
+            "total_pops": 0,
+            "by_species": {},
+            "by_job_category": {},
+            "by_stratum": {},
+            "happiness_avg": 0.0,
+            "employed_pops": 0,
+            "unemployed_pops": 0,
         }
 
         # Step 1: Get player's planet IDs (as integers for comparison)
@@ -309,17 +323,19 @@ class EconomyMixin:
 
         # Step 3: Find pop_groups section (this is where actual pop data lives)
         # Structure: pop_groups=\n{\n\tID=\n\t{ key={ species=X category="Y" } planet=Z size=N happiness=H ... }
-        pop_groups_match = re.search(r'\npop_groups=\n\{', self.gamestate)
+        pop_groups_match = re.search(r"\npop_groups=\n\{", self.gamestate)
         if not pop_groups_match:
             # Fallback: try alternate format
-            pop_groups_match = re.search(r'^pop_groups=\s*\{', self.gamestate, re.MULTILINE)
+            pop_groups_match = re.search(
+                r"^pop_groups=\s*\{", self.gamestate, re.MULTILINE
+            )
             if not pop_groups_match:
-                result['error'] = "Could not find pop_groups section"
+                result["error"] = "Could not find pop_groups section"
                 return result
 
         pop_start = pop_groups_match.start()
         # Pop groups section can be large in late game
-        pop_chunk = self.gamestate[pop_start:pop_start + 50000000]  # Up to 50MB
+        pop_chunk = self.gamestate[pop_start : pop_start + 50000000]  # Up to 50MB
 
         # Tracking for statistics
         species_counts = {}
@@ -330,30 +346,30 @@ class EconomyMixin:
 
         # Parse pop groups - each group represents multiple pops of same type
         # Format: \n\tID=\n\t{ ... key={ species=X category="Y" } ... planet=Z size=N ...
-        pop_pattern = r'\n\t(\d+)=\n\t\{'
+        pop_pattern = r"\n\t(\d+)=\n\t\{"
         groups_processed = 0
         max_groups = 50000  # Safety limit
 
         for match in re.finditer(pop_pattern, pop_chunk):
             if groups_processed >= max_groups:
-                result['_note'] = f'Processed {max_groups} pop groups (limit reached)'
+                result["_note"] = f"Processed {max_groups} pop groups (limit reached)"
                 break
 
             groups_processed += 1
             block_start = match.start() + 1
 
             # Get pop group block content
-            block_chunk = pop_chunk[block_start:block_start + 2500]
+            block_chunk = pop_chunk[block_start : block_start + 2500]
 
             # Find end of this pop group's block
             brace_count = 0
             block_end = 0
             started = False
             for i, char in enumerate(block_chunk):
-                if char == '{':
+                if char == "{":
                     brace_count += 1
                     started = True
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if started and brace_count == 0:
                         block_end = i + 1
@@ -362,7 +378,7 @@ class EconomyMixin:
             pop_block = block_chunk[:block_end] if block_end > 0 else block_chunk
 
             # Check if this pop group is on a player-owned planet
-            planet_match = re.search(r'\n\s*planet=(\d+)', pop_block)
+            planet_match = re.search(r"\n\s*planet=(\d+)", pop_block)
             if not planet_match:
                 continue
 
@@ -371,7 +387,7 @@ class EconomyMixin:
                 continue
 
             # Get the size of this pop group (number of pops)
-            size_match = re.search(r'\n\s*size=(\d+)', pop_block)
+            size_match = re.search(r"\n\s*size=(\d+)", pop_block)
             if not size_match:
                 continue
 
@@ -383,47 +399,57 @@ class EconomyMixin:
 
             # Extract species from key={ species=X ... } block
             # Species is inside the nested key block
-            key_match = re.search(r'key=\s*\{([^}]+)\}', pop_block)
+            key_match = re.search(r"key=\s*\{([^}]+)\}", pop_block)
             if key_match:
                 key_block = key_match.group(1)
 
                 # Extract species ID
-                species_match = re.search(r'species=(\d+)', key_block)
+                species_match = re.search(r"species=(\d+)", key_block)
                 if species_match:
                     species_id = species_match.group(1)
-                    species_name = species_names.get(species_id, f"Species_{species_id}")
-                    species_counts[species_name] = species_counts.get(species_name, 0) + pop_size
+                    species_name = species_names.get(
+                        species_id, f"Species_{species_id}"
+                    )
+                    species_counts[species_name] = (
+                        species_counts.get(species_name, 0) + pop_size
+                    )
 
                 # Extract category (job category: ruler, specialist, worker, slave, etc.)
                 category_match = re.search(r'category="([^"]+)"', key_block)
                 if category_match:
                     category = category_match.group(1)
-                    job_category_counts[category] = job_category_counts.get(category, 0) + pop_size
+                    job_category_counts[category] = (
+                        job_category_counts.get(category, 0) + pop_size
+                    )
                     # Use category as stratum (they're equivalent in Stellaris)
-                    stratum_counts[category] = stratum_counts.get(category, 0) + pop_size
+                    stratum_counts[category] = (
+                        stratum_counts.get(category, 0) + pop_size
+                    )
 
             # Extract happiness (0.0 to 1.0 scale in save, convert to percentage)
             # Weight by pop size for accurate average
-            happiness_match = re.search(r'\n\s*happiness=([\d.]+)', pop_block)
+            happiness_match = re.search(r"\n\s*happiness=([\d.]+)", pop_block)
             if happiness_match:
                 happiness = float(happiness_match.group(1))
                 # Add each pop's happiness (weighted by size)
                 happiness_values.extend([happiness * 100] * pop_size)
 
         # Finalize results
-        result['total_pops'] = total_pops
-        result['by_species'] = species_counts
-        result['by_job_category'] = job_category_counts
-        result['by_stratum'] = stratum_counts
+        result["total_pops"] = total_pops
+        result["by_species"] = species_counts
+        result["by_job_category"] = job_category_counts
+        result["by_stratum"] = stratum_counts
 
         # Employed pops = total minus unemployed category
-        unemployed = job_category_counts.get('unemployed', 0)
-        result['employed_pops'] = total_pops - unemployed
-        result['unemployed_pops'] = unemployed
+        unemployed = job_category_counts.get("unemployed", 0)
+        result["employed_pops"] = total_pops - unemployed
+        result["unemployed_pops"] = unemployed
 
         # Calculate average happiness
         if happiness_values:
-            result['happiness_avg'] = round(sum(happiness_values) / len(happiness_values), 1)
+            result["happiness_avg"] = round(
+                sum(happiness_values) / len(happiness_values), 1
+            )
 
         return result
 
@@ -438,9 +464,13 @@ class EconomyMixin:
             try:
                 return self._get_resources_rust()
             except ParserError as e:
-                logger.warning(f"Rust parser failed for resources: {e}, falling back to regex")
+                logger.warning(
+                    f"Rust parser failed for resources: {e}, falling back to regex"
+                )
             except Exception as e:
-                logger.warning(f"Unexpected error from Rust parser: {e}, falling back to regex")
+                logger.warning(
+                    f"Unexpected error from Rust parser: {e}, falling back to regex"
+                )
 
         # Fallback to regex
         return self._get_resources_regex()
@@ -448,55 +478,69 @@ class EconomyMixin:
     def _get_resources_rust(self) -> dict:
         """Get resource information using Rust parser."""
         result = {
-            'stockpiles': {},
-            'monthly_income': {},
-            'monthly_expenses': {},
-            'net_monthly': {}
+            "stockpiles": {},
+            "monthly_income": {},
+            "monthly_expenses": {},
+            "net_monthly": {},
         }
 
         player_id = self.get_player_empire_id()
 
         # All tracked resources
         ALL_RESOURCES = [
-            'energy', 'minerals', 'food', 'consumer_goods', 'alloys',
-            'physics_research', 'society_research', 'engineering_research',
-            'influence', 'unity', 'volatile_motes', 'exotic_gases', 'rare_crystals',
-            'sr_living_metal', 'sr_zro', 'sr_dark_matter', 'minor_artifacts', 'astral_threads'
+            "energy",
+            "minerals",
+            "food",
+            "consumer_goods",
+            "alloys",
+            "physics_research",
+            "society_research",
+            "engineering_research",
+            "influence",
+            "unity",
+            "volatile_motes",
+            "exotic_gases",
+            "rare_crystals",
+            "sr_living_metal",
+            "sr_zro",
+            "sr_dark_matter",
+            "minor_artifacts",
+            "astral_threads",
         ]
 
         # Use cached player country entry for fast lookup
         player_data = self._get_player_country_entry(player_id)
 
         if not player_data or not isinstance(player_data, dict):
-            result['error'] = "Could not find player country"
+            result["error"] = "Could not find player country"
             return result
 
         # Extract stockpiles from standard_economy_module.resources
-        econ_module = player_data.get('standard_economy_module', {})
+        econ_module = player_data.get("standard_economy_module", {})
         if isinstance(econ_module, dict):
-            resources = econ_module.get('resources', {})
+            resources = econ_module.get("resources", {})
             if isinstance(resources, dict):
                 for resource in ALL_RESOURCES:
                     if resource in resources:
                         try:
-                            result['stockpiles'][resource] = float(resources[resource])
+                            result["stockpiles"][resource] = float(resources[resource])
                         except (ValueError, TypeError):
                             pass
 
         # Extract budget data
-        budget = player_data.get('budget', {})
+        budget = player_data.get("budget", {})
         if not isinstance(budget, dict):
-            result['error'] = "Could not find budget section"
+            result["error"] = "Could not find budget section"
             return result
 
         # The budget has current_month which contains income and expenses
-        current_month = budget.get('current_month', {})
+        current_month = budget.get("current_month", {})
         if not isinstance(current_month, dict):
             # Fallback - check for income/expenses directly on budget
             current_month = budget
 
-        income_section = current_month.get('income', {})
-        expenses_section = current_month.get('expenses', {})
+        income_section = current_month.get("income", {})
+        expenses_section = current_month.get("expenses", {})
 
         # Sum up income from all sources
         income_resources = {}
@@ -507,11 +551,13 @@ class EconomyMixin:
                         if resource in ALL_RESOURCES:
                             try:
                                 value = float(value_str)
-                                income_resources[resource] = income_resources.get(resource, 0) + value
+                                income_resources[resource] = (
+                                    income_resources.get(resource, 0) + value
+                                )
                             except (ValueError, TypeError):
                                 pass
 
-        result['monthly_income'] = income_resources
+        result["monthly_income"] = income_resources
 
         # Sum up expenses from all sources
         expenses_resources = {}
@@ -522,88 +568,98 @@ class EconomyMixin:
                         if resource in ALL_RESOURCES:
                             try:
                                 value = float(value_str)
-                                expenses_resources[resource] = expenses_resources.get(resource, 0) + value
+                                expenses_resources[resource] = (
+                                    expenses_resources.get(resource, 0) + value
+                                )
                             except (ValueError, TypeError):
                                 pass
 
-        result['monthly_expenses'] = expenses_resources
+        result["monthly_expenses"] = expenses_resources
 
         # Calculate net
-        for resource in set(list(income_resources.keys()) + list(expenses_resources.keys())):
+        for resource in set(
+            list(income_resources.keys()) + list(expenses_resources.keys())
+        ):
             income = income_resources.get(resource, 0)
             expense = expenses_resources.get(resource, 0)
-            result['net_monthly'][resource] = round(income - expense, 2)
+            result["net_monthly"][resource] = round(income - expense, 2)
 
         # Add a summary of key resources
-        result['summary'] = {
-            'energy_net': result['net_monthly'].get('energy', 0),
-            'minerals_net': result['net_monthly'].get('minerals', 0),
-            'food_net': result['net_monthly'].get('food', 0),
-            'alloys_net': result['net_monthly'].get('alloys', 0),
-            'consumer_goods_net': result['net_monthly'].get('consumer_goods', 0),
-            'research_total': (result['net_monthly'].get('physics_research', 0) +
-                              result['net_monthly'].get('society_research', 0) +
-                              result['net_monthly'].get('engineering_research', 0)),
-            'volatile_motes_net': result['net_monthly'].get('volatile_motes', 0),
-            'exotic_gases_net': result['net_monthly'].get('exotic_gases', 0),
-            'rare_crystals_net': result['net_monthly'].get('rare_crystals', 0),
-            'living_metal_net': result['net_monthly'].get('sr_living_metal', 0),
-            'zro_net': result['net_monthly'].get('sr_zro', 0),
-            'dark_matter_net': result['net_monthly'].get('sr_dark_matter', 0),
-            'minor_artifacts': result['stockpiles'].get('minor_artifacts', 0),
+        result["summary"] = {
+            "energy_net": result["net_monthly"].get("energy", 0),
+            "minerals_net": result["net_monthly"].get("minerals", 0),
+            "food_net": result["net_monthly"].get("food", 0),
+            "alloys_net": result["net_monthly"].get("alloys", 0),
+            "consumer_goods_net": result["net_monthly"].get("consumer_goods", 0),
+            "research_total": (
+                result["net_monthly"].get("physics_research", 0)
+                + result["net_monthly"].get("society_research", 0)
+                + result["net_monthly"].get("engineering_research", 0)
+            ),
+            "volatile_motes_net": result["net_monthly"].get("volatile_motes", 0),
+            "exotic_gases_net": result["net_monthly"].get("exotic_gases", 0),
+            "rare_crystals_net": result["net_monthly"].get("rare_crystals", 0),
+            "living_metal_net": result["net_monthly"].get("sr_living_metal", 0),
+            "zro_net": result["net_monthly"].get("sr_zro", 0),
+            "dark_matter_net": result["net_monthly"].get("sr_dark_matter", 0),
+            "minor_artifacts": result["stockpiles"].get("minor_artifacts", 0),
         }
 
         # Add strategic resource stockpiles (only if present)
         strategic = {}
-        for res in ['sr_living_metal', 'sr_zro', 'sr_dark_matter']:
-            if res in result['stockpiles'] and result['stockpiles'][res] > 0:
-                strategic[res.replace('sr_', '')] = result['stockpiles'][res]
+        for res in ["sr_living_metal", "sr_zro", "sr_dark_matter"]:
+            if res in result["stockpiles"] and result["stockpiles"][res] > 0:
+                strategic[res.replace("sr_", "")] = result["stockpiles"][res]
         if strategic:
-            result['strategic_stockpiles'] = strategic
+            result["strategic_stockpiles"] = strategic
 
         return result
 
     def _get_resources_regex(self) -> dict:
         """Get resource information using regex (fallback method)."""
         result = {
-            'stockpiles': {},
-            'monthly_income': {},
-            'monthly_expenses': {},
-            'net_monthly': {}
+            "stockpiles": {},
+            "monthly_income": {},
+            "monthly_expenses": {},
+            "net_monthly": {},
         }
 
         player_id = self.get_player_empire_id()
 
         # Find the country section and player's budget
-        country_match = re.search(r'^country=\s*\{', self.gamestate, re.MULTILINE)
+        country_match = re.search(r"^country=\s*\{", self.gamestate, re.MULTILINE)
         if not country_match:
-            result['error'] = "Could not find country section"
+            result["error"] = "Could not find country section"
             return result
 
         start = country_match.start()
-        player_match = re.search(r'\n\t0=\s*\{', self.gamestate[start:start + 1000000])
+        player_match = re.search(
+            r"\n\t0=\s*\{", self.gamestate[start : start + 1000000]
+        )
         if not player_match:
-            result['error'] = "Could not find player country"
+            result["error"] = "Could not find player country"
             return result
 
         player_start = start + player_match.start()
         # Need larger chunk to reach standard_economy_module (around offset 300k+)
-        player_chunk = self.gamestate[player_start:player_start + 400000]
+        player_chunk = self.gamestate[player_start : player_start + 400000]
 
         # Find budget section
-        budget_match = re.search(r'budget=\s*\{', player_chunk)
+        budget_match = re.search(r"budget=\s*\{", player_chunk)
         if not budget_match:
-            result['error'] = "Could not find budget section"
+            result["error"] = "Could not find budget section"
             return result
 
         budget_start = budget_match.start()
         # Extract budget block (it's large, ~50k chars)
         brace_count = 0
         budget_end = budget_start
-        for i, char in enumerate(player_chunk[budget_start:budget_start + 100000], budget_start):
-            if char == '{':
+        for i, char in enumerate(
+            player_chunk[budget_start : budget_start + 100000], budget_start
+        ):
+            if char == "{":
                 brace_count += 1
-            elif char == '}':
+            elif char == "}":
                 brace_count -= 1
                 if brace_count == 0:
                     budget_end = i + 1
@@ -613,25 +669,39 @@ class EconomyMixin:
 
         # All tracked resources including strategic resources
         STOCKPILE_RESOURCES = [
-            'energy', 'minerals', 'food', 'consumer_goods', 'alloys',
-            'physics_research', 'society_research', 'engineering_research',
-            'influence', 'unity', 'volatile_motes', 'exotic_gases', 'rare_crystals',
-            'sr_living_metal', 'sr_zro', 'sr_dark_matter', 'minor_artifacts', 'astral_threads'
+            "energy",
+            "minerals",
+            "food",
+            "consumer_goods",
+            "alloys",
+            "physics_research",
+            "society_research",
+            "engineering_research",
+            "influence",
+            "unity",
+            "volatile_motes",
+            "exotic_gases",
+            "rare_crystals",
+            "sr_living_metal",
+            "sr_zro",
+            "sr_dark_matter",
+            "minor_artifacts",
+            "astral_threads",
         ]
 
         # Extract ACTUAL stockpiles from standard_economy_module.resources
         # This is where Stellaris stores the current accumulated resource values
-        econ_module_match = re.search(r'standard_economy_module=\s*\{', player_chunk)
+        econ_module_match = re.search(r"standard_economy_module=\s*\{", player_chunk)
         if econ_module_match:
             econ_start = econ_module_match.start()
-            econ_chunk = player_chunk[econ_start:econ_start + 3000]
-            resources_match = re.search(r'resources=\s*\{([^}]+)\}', econ_chunk)
+            econ_chunk = player_chunk[econ_start : econ_start + 3000]
+            resources_match = re.search(r"resources=\s*\{([^}]+)\}", econ_chunk)
             if resources_match:
                 resources_block = resources_match.group(1)
                 for resource in STOCKPILE_RESOURCES:
-                    res_match = re.search(rf'{resource}=([\d.-]+)', resources_block)
+                    res_match = re.search(rf"{resource}=([\d.-]+)", resources_block)
                     if res_match:
-                        result['stockpiles'][resource] = float(res_match.group(1))
+                        result["stockpiles"][resource] = float(res_match.group(1))
 
         # Extract total income from various sources
         income_resources = {}
@@ -640,77 +710,97 @@ class EconomyMixin:
         # All tracked resources including strategic resources
         ALL_RESOURCES = [
             # Basic resources
-            'energy', 'minerals', 'food', 'consumer_goods', 'alloys',
+            "energy",
+            "minerals",
+            "food",
+            "consumer_goods",
+            "alloys",
             # Research
-            'physics_research', 'society_research', 'engineering_research',
+            "physics_research",
+            "society_research",
+            "engineering_research",
             # Influence/Unity
-            'influence', 'unity',
+            "influence",
+            "unity",
             # Exotic resources
-            'volatile_motes', 'exotic_gases', 'rare_crystals',
+            "volatile_motes",
+            "exotic_gases",
+            "rare_crystals",
             # Strategic resources (late-game)
-            'sr_living_metal', 'sr_zro', 'sr_dark_matter',
+            "sr_living_metal",
+            "sr_zro",
+            "sr_dark_matter",
             # Special resources (DLC-dependent)
-            'minor_artifacts', 'astral_threads'
+            "minor_artifacts",
+            "astral_threads",
         ]
 
         # Parse income section more thoroughly
-        income_section_match = re.search(r'income=\s*\{(.+?)\}\s*expenses=', budget_block, re.DOTALL)
+        income_section_match = re.search(
+            r"income=\s*\{(.+?)\}\s*expenses=", budget_block, re.DOTALL
+        )
         if income_section_match:
             income_section = income_section_match.group(1)
             # Sum up resources from all income sources
             for resource in ALL_RESOURCES:
-                matches = re.findall(rf'{resource}=([\d.]+)', income_section)
+                matches = re.findall(rf"{resource}=([\d.]+)", income_section)
                 if matches:
                     income_resources[resource] = sum(float(m) for m in matches)
 
-        result['monthly_income'] = income_resources
+        result["monthly_income"] = income_resources
 
         # Parse expenses section
-        expenses_match = re.search(r'expenses=\s*\{(.+?)\}\s*(?:balance|$)', budget_block, re.DOTALL)
+        expenses_match = re.search(
+            r"expenses=\s*\{(.+?)\}\s*(?:balance|$)", budget_block, re.DOTALL
+        )
         if expenses_match:
             expenses_section = expenses_match.group(1)
             for resource in ALL_RESOURCES:
-                matches = re.findall(rf'{resource}=([\d.]+)', expenses_section)
+                matches = re.findall(rf"{resource}=([\d.]+)", expenses_section)
                 if matches:
                     expenses_resources[resource] = sum(float(m) for m in matches)
 
-        result['monthly_expenses'] = expenses_resources
+        result["monthly_expenses"] = expenses_resources
 
         # Calculate net
-        for resource in set(list(income_resources.keys()) + list(expenses_resources.keys())):
+        for resource in set(
+            list(income_resources.keys()) + list(expenses_resources.keys())
+        ):
             income = income_resources.get(resource, 0)
             expense = expenses_resources.get(resource, 0)
-            result['net_monthly'][resource] = round(income - expense, 2)
+            result["net_monthly"][resource] = round(income - expense, 2)
 
         # Add a summary of key resources
-        result['summary'] = {
-            'energy_net': result['net_monthly'].get('energy', 0),
-            'minerals_net': result['net_monthly'].get('minerals', 0),
-            'food_net': result['net_monthly'].get('food', 0),
-            'alloys_net': result['net_monthly'].get('alloys', 0),
-            'consumer_goods_net': result['net_monthly'].get('consumer_goods', 0),
-            'research_total': (result['net_monthly'].get('physics_research', 0) +
-                              result['net_monthly'].get('society_research', 0) +
-                              result['net_monthly'].get('engineering_research', 0)),
+        result["summary"] = {
+            "energy_net": result["net_monthly"].get("energy", 0),
+            "minerals_net": result["net_monthly"].get("minerals", 0),
+            "food_net": result["net_monthly"].get("food", 0),
+            "alloys_net": result["net_monthly"].get("alloys", 0),
+            "consumer_goods_net": result["net_monthly"].get("consumer_goods", 0),
+            "research_total": (
+                result["net_monthly"].get("physics_research", 0)
+                + result["net_monthly"].get("society_research", 0)
+                + result["net_monthly"].get("engineering_research", 0)
+            ),
             # Exotic resources (mid-game)
-            'volatile_motes_net': result['net_monthly'].get('volatile_motes', 0),
-            'exotic_gases_net': result['net_monthly'].get('exotic_gases', 0),
-            'rare_crystals_net': result['net_monthly'].get('rare_crystals', 0),
+            "volatile_motes_net": result["net_monthly"].get("volatile_motes", 0),
+            "exotic_gases_net": result["net_monthly"].get("exotic_gases", 0),
+            "rare_crystals_net": result["net_monthly"].get("rare_crystals", 0),
             # Strategic resources (late-game) - only include if non-zero
-            'living_metal_net': result['net_monthly'].get('sr_living_metal', 0),
-            'zro_net': result['net_monthly'].get('sr_zro', 0),
-            'dark_matter_net': result['net_monthly'].get('sr_dark_matter', 0),
+            "living_metal_net": result["net_monthly"].get("sr_living_metal", 0),
+            "zro_net": result["net_monthly"].get("sr_zro", 0),
+            "dark_matter_net": result["net_monthly"].get("sr_dark_matter", 0),
             # Special resources
-            'minor_artifacts': result['stockpiles'].get('minor_artifacts', 0),
+            "minor_artifacts": result["stockpiles"].get("minor_artifacts", 0),
         }
 
         # Add strategic resource stockpiles (only if present)
         strategic = {}
-        for res in ['sr_living_metal', 'sr_zro', 'sr_dark_matter']:
-            if res in result['stockpiles'] and result['stockpiles'][res] > 0:
-                strategic[res.replace('sr_', '')] = result['stockpiles'][res]
+        for res in ["sr_living_metal", "sr_zro", "sr_dark_matter"]:
+            if res in result["stockpiles"] and result["stockpiles"][res] > 0:
+                strategic[res.replace("sr_", "")] = result["stockpiles"][res]
         if strategic:
-            result['strategic_stockpiles'] = strategic
+            result["strategic_stockpiles"] = strategic
 
         return result
 
@@ -726,36 +816,42 @@ class EconomyMixin:
         top_n = max(1, min(int(top_n or 5), 10))
 
         result = {
-            'enabled': False,
-            'galactic_market_host_country_id': None,
-            'player_has_galactic_access': None,
-            'resources': {},
-            'top_overpriced': [],
-            'top_underpriced': [],
-            'internal_market_fluctuations': {},
+            "enabled": False,
+            "galactic_market_host_country_id": None,
+            "player_has_galactic_access": None,
+            "resources": {},
+            "top_overpriced": [],
+            "top_underpriced": [],
+            "internal_market_fluctuations": {},
         }
 
-        market = self._extract_section('market')
+        market = self._extract_section("market")
         if not market:
-            result['error'] = 'Could not find market section'
+            result["error"] = "Could not find market section"
             return result
 
-        enabled_match = re.search(r'\benabled=(yes|no)\b', market)
+        enabled_match = re.search(r"\benabled=(yes|no)\b", market)
         if enabled_match:
-            result['enabled'] = enabled_match.group(1) == 'yes'
+            result["enabled"] = enabled_match.group(1) == "yes"
 
-        host_match = re.search(r'\n\tcountry=(\d+)\n\}', market)
+        host_match = re.search(r"\n\tcountry=(\d+)\n\}", market)
         if host_match:
-            result['galactic_market_host_country_id'] = int(host_match.group(1))
+            result["galactic_market_host_country_id"] = int(host_match.group(1))
 
-        fluctuations = self._parse_number_list_block(self._extract_braced_block(market, 'fluctuations') or '')
+        fluctuations = self._parse_number_list_block(
+            self._extract_braced_block(market, "fluctuations") or ""
+        )
         galactic_flags = self._parse_number_list_block(
-            self._extract_braced_block(market, 'galactic_market_resources') or ''
+            self._extract_braced_block(market, "galactic_market_resources") or ""
         )
 
         # Map access by ID list (id[i] -> access[i]).
-        ids = self._parse_number_list_block(self._extract_braced_block(market, 'id') or '')
-        access_flags = self._parse_number_list_block(self._extract_braced_block(market, 'galactic_market_access') or '')
+        ids = self._parse_number_list_block(
+            self._extract_braced_block(market, "id") or ""
+        )
+        access_flags = self._parse_number_list_block(
+            self._extract_braced_block(market, "galactic_market_access") or ""
+        )
         player_id = self.get_player_empire_id()
         try:
             id_to_access = {
@@ -763,12 +859,12 @@ class EconomyMixin:
                 for i in range(len(ids))
                 if int(ids[i]) != -1
             }
-            result['player_has_galactic_access'] = bool(id_to_access.get(player_id, 0))
+            result["player_has_galactic_access"] = bool(id_to_access.get(player_id, 0))
         except Exception:
-            result['player_has_galactic_access'] = None
+            result["player_has_galactic_access"] = None
 
-        bought_block = self._extract_braced_block(market, 'resources_bought') or ''
-        sold_block = self._extract_braced_block(market, 'resources_sold') or ''
+        bought_block = self._extract_braced_block(market, "resources_bought") or ""
+        sold_block = self._extract_braced_block(market, "resources_sold") or ""
         bought_by_country = self._parse_country_amount_arrays(bought_block)
         sold_by_country = self._parse_country_amount_arrays(sold_block)
 
@@ -795,58 +891,69 @@ class EconomyMixin:
             if idx < len(galactic_flags):
                 is_galactic = bool(int(galactic_flags[idx]))
 
-            result['resources'][resource] = {
-                'fluctuation': fluct,
-                'is_galactic': is_galactic,
-                'global_bought': int(global_bought.get(idx, 0)),
-                'global_sold': int(global_sold.get(idx, 0)),
-                'player_bought': int(player_bought[idx]) if idx < len(player_bought) else 0,
-                'player_sold': int(player_sold[idx]) if idx < len(player_sold) else 0,
+            result["resources"][resource] = {
+                "fluctuation": fluct,
+                "is_galactic": is_galactic,
+                "global_bought": int(global_bought.get(idx, 0)),
+                "global_sold": int(global_sold.get(idx, 0)),
+                "player_bought": (
+                    int(player_bought[idx]) if idx < len(player_bought) else 0
+                ),
+                "player_sold": int(player_sold[idx]) if idx < len(player_sold) else 0,
             }
 
         # Internal market per-country overrides (if present).
-        internal_block = self._extract_braced_block(market, 'internal_market_fluctuations') or ''
+        internal_block = (
+            self._extract_braced_block(market, "internal_market_fluctuations") or ""
+        )
         if internal_block:
             # Find player's entry: country=<id> resources={ ... }
             m = re.search(
-                rf'\bcountry={player_id}\b\s*resources=\s*\{{([^}}]*)\}}',
+                rf"\bcountry={player_id}\b\s*resources=\s*\{{([^}}]*)\}}",
                 internal_block,
                 re.DOTALL,
             )
             if m:
-                result['internal_market_fluctuations'] = self._parse_resource_amounts_block(m.group(1))
+                result["internal_market_fluctuations"] = (
+                    self._parse_resource_amounts_block(m.group(1))
+                )
 
         # Rank by fluctuation if available.
         sortable = [
-            (k, v.get('fluctuation'))
-            for k, v in result['resources'].items()
-            if isinstance(v.get('fluctuation'), (int, float))
+            (k, v.get("fluctuation"))
+            for k, v in result["resources"].items()
+            if isinstance(v.get("fluctuation"), (int, float))
         ]
         sortable = [(k, float(v)) for k, v in sortable if v is not None]
         sortable.sort(key=lambda kv: kv[1], reverse=True)
-        result['top_overpriced'] = [{'resource': k, 'fluctuation': v} for k, v in sortable[:top_n]]
-        result['top_underpriced'] = [{'resource': k, 'fluctuation': v} for k, v in sorted(sortable, key=lambda kv: kv[1])[:top_n]]
+        result["top_overpriced"] = [
+            {"resource": k, "fluctuation": v} for k, v in sortable[:top_n]
+        ]
+        result["top_underpriced"] = [
+            {"resource": k, "fluctuation": v}
+            for k, v in sorted(sortable, key=lambda kv: kv[1])[:top_n]
+        ]
 
         return result
 
     def get_trade_value(self) -> dict:
         """Get trade policy/conversion and a lightweight collection summary."""
         result = {
-            'trade_policy': None,
-            'trade_conversions': {},
-            'trade_policy_income': {},
-            'trade_value': None,
-            'collection': {
-                'starbases_scanned': 0,
-                'trade_hub_modules': 0,
-                'offworld_trading_companies': 0,
+            "trade_policy": None,
+            "trade_conversions": {},
+            "trade_policy_income": {},
+            "trade_value": None,
+            "collection": {
+                "starbases_scanned": 0,
+                "trade_hub_modules": 0,
+                "offworld_trading_companies": 0,
             },
         }
 
         player_id = self.get_player_empire_id()
         country_content = self._find_player_country_content(player_id)
         if not country_content:
-            result['error'] = 'Could not find player country block'
+            result["error"] = "Could not find player country block"
             return result
 
         # Policy selection appears in the policies list.
@@ -855,42 +962,52 @@ class EconomyMixin:
             country_content,
         )
         if policy_match:
-            result['trade_policy'] = policy_match.group(1)
+            result["trade_policy"] = policy_match.group(1)
 
         # Conversions stored as trade_conversions={ energy=... unity=... trade=... consumer_goods=... }
-        conversions_block = self._extract_braced_block(country_content, 'trade_conversions') or ''
+        conversions_block = (
+            self._extract_braced_block(country_content, "trade_conversions") or ""
+        )
         if conversions_block:
             inner = self._extract_block_inner(conversions_block)
-            for k, v in re.findall(r'\b([a-z_]+)=([\d.-]+)', inner):
+            for k, v in re.findall(r"\b([a-z_]+)=([\d.-]+)", inner):
                 try:
-                    result['trade_conversions'][k] = float(v)
+                    result["trade_conversions"][k] = float(v)
                 except ValueError:
                     continue
 
         # Budget contains a `trade_policy={...}` category with monthly amounts.
-        budget_block = self._extract_braced_block(country_content, 'budget') or ''
+        budget_block = self._extract_braced_block(country_content, "budget") or ""
         if budget_block:
-            income_block = self._extract_braced_block(budget_block, 'income') or ''
-            trade_policy_block = self._extract_braced_block(income_block, 'trade_policy') or ''
+            income_block = self._extract_braced_block(budget_block, "income") or ""
+            trade_policy_block = (
+                self._extract_braced_block(income_block, "trade_policy") or ""
+            )
             if trade_policy_block:
                 amounts = self._parse_resource_amounts_block(trade_policy_block)
-                result['trade_policy_income'] = amounts
-                if 'trade' in amounts:
-                    result['trade_value'] = amounts.get('trade')
+                result["trade_policy_income"] = amounts
+                if "trade" in amounts:
+                    result["trade_value"] = amounts.get("trade")
 
         # Trade collection summary from starbases (best-effort).
         starbases = self.get_starbases()
-        sb_list = starbases.get('starbases', []) if isinstance(starbases, dict) else []
-        result['collection']['starbases_scanned'] = len(sb_list)
+        sb_list = starbases.get("starbases", []) if isinstance(starbases, dict) else []
+        result["collection"]["starbases_scanned"] = len(sb_list)
         hub_count = 0
         offworld_count = 0
         for sb in sb_list:
-            modules = sb.get('modules', []) if isinstance(sb, dict) else []
-            buildings = sb.get('buildings', []) if isinstance(sb, dict) else []
-            hub_count += sum(1 for m in modules if isinstance(m, str) and 'trading_hub' in m)
-            offworld_count += sum(1 for b in buildings if isinstance(b, str) and 'offworld_trading_company' in b)
-        result['collection']['trade_hub_modules'] = hub_count
-        result['collection']['offworld_trading_companies'] = offworld_count
+            modules = sb.get("modules", []) if isinstance(sb, dict) else []
+            buildings = sb.get("buildings", []) if isinstance(sb, dict) else []
+            hub_count += sum(
+                1 for m in modules if isinstance(m, str) and "trading_hub" in m
+            )
+            offworld_count += sum(
+                1
+                for b in buildings
+                if isinstance(b, str) and "offworld_trading_company" in b
+            )
+        result["collection"]["trade_hub_modules"] = hub_count
+        result["collection"]["offworld_trading_companies"] = offworld_count
 
         return result
 
@@ -898,26 +1015,151 @@ class EconomyMixin:
         """Get budget totals + top sources per resource (compact, non-snapshot)."""
         top_n_sources = max(1, min(int(top_n_sources or 5), 10))
 
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_budget_breakdown_rust(top_n_sources)
+        return self._get_budget_breakdown_regex(top_n_sources)
+
+    def _get_budget_breakdown_rust(self, top_n_sources: int = 5) -> dict:
+        """Rust-optimized budget breakdown using get_entry for direct dict access.
+
+        Benefits over regex version:
+        - No brace counting or regex parsing
+        - Direct dict access for budget structure
+        - Complete data without truncation risks
+        - Cleaner code with less parsing logic
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_budget_breakdown_regex(top_n_sources)
+
         result = {
-            'by_resource': {},
-            'tracked_resources': list(self._BUDGET_TRACKED_RESOURCES),
-            'income_source_count': 0,
-            'expense_source_count': 0,
+            "by_resource": {},
+            "tracked_resources": list(self._BUDGET_TRACKED_RESOURCES),
+            "income_source_count": 0,
+            "expense_source_count": 0,
+        }
+
+        player_id = self.get_player_empire_id()
+        tracked = set(self._BUDGET_TRACKED_RESOURCES)
+
+        # Get player country entry via Rust session
+        player_entry = session.get_entry("country", str(player_id))
+        if not player_entry or not isinstance(player_entry, dict):
+            result["error"] = "Could not find player country"
+            return result
+
+        # Navigate to budget.current_month
+        budget = player_entry.get("budget", {})
+        if not isinstance(budget, dict):
+            result["error"] = "Could not find budget section"
+            return result
+
+        current_month = budget.get("current_month", {})
+        if not isinstance(current_month, dict):
+            # Fallback - check for income/expenses directly on budget
+            current_month = budget
+
+        income_section = current_month.get("income", {})
+        expenses_section = current_month.get("expenses", {})
+
+        # Build income by category
+        income_by_cat: dict[str, dict[str, float]] = {}
+        if isinstance(income_section, dict):
+            for category, resources in income_section.items():
+                if not isinstance(resources, dict):
+                    continue
+                amounts: dict[str, float] = {}
+                for res, val in resources.items():
+                    if res not in tracked:
+                        continue
+                    try:
+                        amounts[res] = float(val)
+                    except (ValueError, TypeError):
+                        continue
+                if amounts:
+                    income_by_cat[category] = amounts
+
+        # Build expenses by category
+        expenses_by_cat: dict[str, dict[str, float]] = {}
+        if isinstance(expenses_section, dict):
+            for category, resources in expenses_section.items():
+                if not isinstance(resources, dict):
+                    continue
+                amounts: dict[str, float] = {}
+                for res, val in resources.items():
+                    if res not in tracked:
+                        continue
+                    try:
+                        amounts[res] = float(val)
+                    except (ValueError, TypeError):
+                        continue
+                if amounts:
+                    expenses_by_cat[category] = amounts
+
+        result["income_source_count"] = len(income_by_cat)
+        result["expense_source_count"] = len(expenses_by_cat)
+
+        # Build per-resource breakdown
+        for resource in self._BUDGET_TRACKED_RESOURCES:
+            income_total = sum(v.get(resource, 0.0) for v in income_by_cat.values())
+            expense_total = sum(v.get(resource, 0.0) for v in expenses_by_cat.values())
+            net = round(income_total - expense_total, 2)
+
+            top_income = sorted(
+                (
+                    {"source": src, "amount": round(vals.get(resource, 0.0), 2)}
+                    for src, vals in income_by_cat.items()
+                    if vals.get(resource, 0.0) != 0.0
+                ),
+                key=lambda d: d["amount"],
+                reverse=True,
+            )[:top_n_sources]
+
+            top_expenses = sorted(
+                (
+                    {"source": src, "amount": round(vals.get(resource, 0.0), 2)}
+                    for src, vals in expenses_by_cat.items()
+                    if vals.get(resource, 0.0) != 0.0
+                ),
+                key=lambda d: d["amount"],
+                reverse=True,
+            )[:top_n_sources]
+
+            result["by_resource"][resource] = {
+                "income_total": round(income_total, 2),
+                "expenses_total": round(expense_total, 2),
+                "net": net,
+                "top_income_sources": top_income,
+                "top_expense_sources": top_expenses,
+            }
+
+        return result
+
+    def _get_budget_breakdown_regex(self, top_n_sources: int = 5) -> dict:
+        """Original regex implementation - fallback for non-session mode."""
+
+        result = {
+            "by_resource": {},
+            "tracked_resources": list(self._BUDGET_TRACKED_RESOURCES),
+            "income_source_count": 0,
+            "expense_source_count": 0,
         }
 
         player_id = self.get_player_empire_id()
         country_content = self._find_player_country_content(player_id)
         if not country_content:
-            result['error'] = 'Could not find player country block'
+            result["error"] = "Could not find player country block"
             return result
 
-        budget_block = self._extract_braced_block(country_content, 'budget')
+        budget_block = self._extract_braced_block(country_content, "budget")
         if not budget_block:
-            result['error'] = 'Could not find budget block'
+            result["error"] = "Could not find budget block"
             return result
 
-        income_block = self._extract_braced_block(budget_block, 'income') or ''
-        expenses_block = self._extract_braced_block(budget_block, 'expenses') or ''
+        income_block = self._extract_braced_block(budget_block, "income") or ""
+        expenses_block = self._extract_braced_block(budget_block, "expenses") or ""
 
         tracked = set(self._BUDGET_TRACKED_RESOURCES)
 
@@ -929,7 +1171,7 @@ class EconomyMixin:
             if not inner:
                 return categories
 
-            candidates = list(re.finditer(r'\n\s*([A-Za-z0-9_]+)\s*=\s*\{', inner))
+            candidates = list(re.finditer(r"\n\s*([A-Za-z0-9_]+)\s*=\s*\{", inner))
             pos = 0
             depth = 0
 
@@ -937,10 +1179,10 @@ class EconomyMixin:
                 brace_count = 0
                 started = False
                 for i, ch in enumerate(inner[start_idx:], start_idx):
-                    if ch == '{':
+                    if ch == "{":
                         brace_count += 1
                         started = True
-                    elif ch == '}':
+                    elif ch == "}":
                         brace_count -= 1
                         if started and brace_count == 0:
                             return inner[start_idx : i + 1], i + 1
@@ -949,7 +1191,9 @@ class EconomyMixin:
             for m in candidates:
                 if m.start() < pos:
                     continue
-                depth += inner[pos : m.start()].count('{') - inner[pos : m.start()].count('}')
+                depth += inner[pos : m.start()].count("{") - inner[
+                    pos : m.start()
+                ].count("}")
                 pos = m.start()
                 if depth != 0:
                     continue
@@ -960,7 +1204,7 @@ class EconomyMixin:
                 depth = 0
 
                 amounts: dict[str, float] = {}
-                for res, val in re.findall(r'\b([a-z_]+)=([\d.-]+)', cat_block):
+                for res, val in re.findall(r"\b([a-z_]+)=([\d.-]+)", cat_block):
                     if res not in tracked:
                         continue
                     try:
@@ -974,8 +1218,8 @@ class EconomyMixin:
 
         income_by_cat = extract_top_level_categories(income_block)
         expenses_by_cat = extract_top_level_categories(expenses_block)
-        result['income_source_count'] = len(income_by_cat)
-        result['expense_source_count'] = len(expenses_by_cat)
+        result["income_source_count"] = len(income_by_cat)
+        result["expense_source_count"] = len(expenses_by_cat)
 
         for resource in self._BUDGET_TRACKED_RESOURCES:
             income_total = sum(v.get(resource, 0.0) for v in income_by_cat.values())
@@ -984,30 +1228,30 @@ class EconomyMixin:
 
             top_income = sorted(
                 (
-                    {'source': src, 'amount': round(vals.get(resource, 0.0), 2)}
+                    {"source": src, "amount": round(vals.get(resource, 0.0), 2)}
                     for src, vals in income_by_cat.items()
                     if vals.get(resource, 0.0) != 0.0
                 ),
-                key=lambda d: d['amount'],
+                key=lambda d: d["amount"],
                 reverse=True,
             )[:top_n_sources]
 
             top_expenses = sorted(
                 (
-                    {'source': src, 'amount': round(vals.get(resource, 0.0), 2)}
+                    {"source": src, "amount": round(vals.get(resource, 0.0), 2)}
                     for src, vals in expenses_by_cat.items()
                     if vals.get(resource, 0.0) != 0.0
                 ),
-                key=lambda d: d['amount'],
+                key=lambda d: d["amount"],
                 reverse=True,
             )[:top_n_sources]
 
-            result['by_resource'][resource] = {
-                'income_total': round(income_total, 2),
-                'expenses_total': round(expense_total, 2),
-                'net': net,
-                'top_income_sources': top_income,
-                'top_expense_sources': top_expenses,
+            result["by_resource"][resource] = {
+                "income_total": round(income_total, 2),
+                "expenses_total": round(expense_total, 2),
+                "net": net,
+                "top_income_sources": top_income,
+                "top_expense_sources": top_expenses,
             }
 
         return result

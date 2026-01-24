@@ -353,13 +353,13 @@
       "priority": 10,
       "description": "economy.py get_budget_breakdown() uses recursive brace matching. Replace with extract_sections for parsed dict access.",
       "files": ["stellaris_save_extractor/economy.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q '_get_budget_breakdown_rust' stellaris_save_extractor/economy.py (Rust method exists)",
         "RUN: grep -q '_get_budget_breakdown_regex' stellaris_save_extractor/economy.py (fallback exists)",
         "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_budget_breakdown(); ctx.__exit__(None,None,None); print(f'Budget: {type(r)}'); assert isinstance(r, dict)\" (works with session)"
       ],
-      "notes": "Uses recursive extract_top_level_categories() helper. With Rust parsed dict, can directly access nested budget structure without brace counting."
+      "notes": "Completed 2026-01-25. Uses session.get_entry('country', player_id) for direct dict access to budget.current_month.income/expenses. 5.4x speedup (0.686s → 0.127s). Output matches regex baseline exactly: 32 income sources, 47 expense sources, all resource nets match."
     },
     {
       "id": "MIG-027",
