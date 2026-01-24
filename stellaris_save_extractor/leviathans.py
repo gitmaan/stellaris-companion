@@ -105,32 +105,27 @@ class LeviathansMixin:
               - defeated_count: Number defeated by player
               - alive_count: Number still active
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_leviathans_rust()
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for leviathans: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback: regex-based parsing
+        # Dispatch to Rust version when session is active (P030)
+        session = _get_active_session()
+        if session:
+            return self._get_leviathans_rust()
         return self._get_leviathans_regex()
 
     def _get_leviathans_rust(self) -> dict:
         """Get leviathan status using Rust parser.
 
-        Uses hybrid approach:
-        - Rust parser for iterating over countries to find leviathan country types
-        - Regex for gamestate-wide flag searches (guardians, defeat markers)
+        Uses session mode for fast data access:
+        - session.iter_section() for countries to find leviathan country types (P031)
+        - session.contains_tokens() for fast guardian detection and defeat markers
 
         Returns:
             Dict with leviathan status details
         """
+        # Check for active session first (P030)
+        session = _get_active_session()
+        if not session:
+            return self._get_leviathans_regex()
+
         result = {
             "leviathans": [],
             "total_count": 0,
@@ -140,11 +135,9 @@ class LeviathansMixin:
 
         detected_types = set()
 
-        # First pass: detect leviathan countries via Rust parser iteration
-        for country_id, country_data in iter_section_entries(
-            self.gamestate_path, "country"
-        ):
-            if not isinstance(country_data, dict):
+        # First pass: detect leviathan countries via session.iter_section (P031)
+        for country_id, country_data in session.iter_section("country"):
+            if not isinstance(country_data, dict):  # P010: handle "none" strings
                 continue
 
             ctype = country_data.get("country_type") or country_data.get("type")
@@ -201,40 +194,28 @@ class LeviathansMixin:
             ],
         }
 
-        # Use contains_tokens for fast multi-pattern matching
-        session = _get_active_session()
-        if session:
-            # Collect all tokens for a single Aho-Corasick scan
-            all_tokens = []
-            token_to_guardian = {}
-            for lev_key, tokens in guardian_tokens.items():
-                for token in tokens:
-                    all_tokens.append(token)
-                    token_to_guardian[token] = lev_key
+        # Collect all tokens for a single Aho-Corasick scan
+        all_tokens = []
+        token_to_guardian = {}
+        for lev_key, tokens in guardian_tokens.items():
+            for token in tokens:
+                all_tokens.append(token)
+                token_to_guardian[token] = lev_key
 
-            result_data = session.contains_tokens(all_tokens)
-            matches = result_data.get("matches", {})
-            for token, found in matches.items():
-                if found and token in token_to_guardian:
-                    detected_types.add(token_to_guardian[token])
+        result_data = session.contains_tokens(all_tokens)
+        matches = result_data.get("matches", {})
+        for token, found in matches.items():
+            if found and token in token_to_guardian:
+                detected_types.add(token_to_guardian[token])
 
         # Build result list with status
         # Pre-compute defeat status for all detected types using contains_tokens
-        defeat_status = (
-            self._check_leviathans_defeated_rust(detected_types, session)
-            if session
-            else {}
-        )
+        defeat_status = self._check_leviathans_defeated_rust(detected_types, session)
 
         detected = []
         for lev_key in detected_types:
             info = self.LEVIATHAN_INFO.get(lev_key, {})
-            # Use pre-computed status if available, fall back to regex check
-            defeated = (
-                defeat_status.get(lev_key, False)
-                if session
-                else self._check_leviathan_defeated(lev_key)
-            )
+            defeated = defeat_status.get(lev_key, False)
 
             detected.append(
                 {
