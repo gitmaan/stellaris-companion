@@ -73,6 +73,11 @@
       "id": "P020",
       "learning": "_extract_section() in base.py uses raw self.gamestate text slicing. Callers should migrate to extract_sections() or iter_section() for session mode.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P021",
+      "learning": "Use session.get_entry(section, key) for O(1) lookup of a single entry by ID, instead of iter_section which scans all entries. Ideal when you already know the specific ID (e.g., federation ID from player country).",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -119,16 +124,17 @@
     },
     {
       "id": "MIG-012",
-      "title": "Migrate get_federations to Rust",
+      "title": "Migrate get_federation_details to Rust",
       "priority": 2,
-      "description": "diplomacy.py uses _extract_section('federation'). Migrate to Rust-backed access.",
+      "description": "diplomacy.py get_federation_details() uses _extract_section('federation'). Migrate to Rust-backed access using get_entry.",
       "files": ["stellaris_save_extractor/diplomacy.py"],
-      "passes": false,
+      "passes": true,
       "criteria": [
-        "RUN: grep -q '_get_federations_rust\\|extract_sections.*federation' stellaris_save_extractor/diplomacy.py (Rust method or extract_sections used)",
-        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_federations() if hasattr(e, 'get_federations') else e.get_diplomacy(); ctx.__exit__(None,None,None); print('OK')\" (works with session)"
+        "RUN: grep -q '_get_federation_details_rust' stellaris_save_extractor/diplomacy.py (Rust method exists)",
+        "RUN: grep -q '_get_federation_details_regex' stellaris_save_extractor/diplomacy.py (fallback exists)",
+        "RUN: python3 -c \"from save_extractor import SaveExtractor; from rust_bridge import session; ctx=session('test_save.sav'); ctx.__enter__(); e=SaveExtractor('test_save.sav'); r=e.get_federation_details(); ctx.__exit__(None,None,None); print(f'Fed: {type(r)}'); assert isinstance(r, dict)\" (works with session)"
       ],
-      "notes": "May be part of get_diplomacy() - check actual function structure."
+      "notes": "Completed 2026-01-24. Uses session.get_entry('federation', fed_id) for O(1) lookup. Extracts type/level/cohesion/experience/laws from federation_progression nested dict. Output matches regex baseline."
     },
     {
       "id": "MIG-013",

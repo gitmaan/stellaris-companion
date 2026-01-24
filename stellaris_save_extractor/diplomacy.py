@@ -457,6 +457,139 @@ class DiplomacyMixin:
 
     def get_federation_details(self) -> dict:
         """Get details for the player's federation (if any)."""
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_federation_details_rust()
+        return self._get_federation_details_regex()
+
+    def _get_federation_details_rust(self) -> dict:
+        """Rust-optimized version using get_entry.
+
+        Uses direct parsed JSON access instead of regex on raw gamestate.
+        Benefits:
+        - No regex parsing on raw text
+        - No truncation limits
+        - Handles nested structures correctly
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_federation_details_regex()
+
+        result = {
+            "federation_id": None,
+            "type": None,
+            "level": None,
+            "cohesion": None,
+            "experience": None,
+            "laws": {},
+            "members": [],
+            "president": None,
+        }
+
+        # Get player's country entry via Rust session
+        player_id = self.get_player_empire_id()
+        player_country = self._get_player_country_entry(player_id)
+        if not player_country or not isinstance(player_country, dict):
+            return result
+
+        # Get federation ID from player's country data
+        fed_id = player_country.get('federation')
+        if fed_id is None:
+            return result
+
+        try:
+            fed_id = int(fed_id)
+        except (ValueError, TypeError):
+            return result
+
+        # 4294967295 represents "none" in Stellaris
+        if fed_id == 4294967295:
+            return result
+
+        result["federation_id"] = fed_id
+
+        # Get federation entry directly by ID
+        fed_entry = session.get_entry('federation', str(fed_id))
+        if not fed_entry or not isinstance(fed_entry, dict):
+            return result
+
+        # Extract president (try 'leader' first, then 'president')
+        leader = fed_entry.get('leader')
+        if leader is not None:
+            try:
+                result["president"] = int(leader)
+            except (ValueError, TypeError):
+                pass
+        president = fed_entry.get('president')
+        if president is not None:
+            try:
+                result["president"] = int(president)
+            except (ValueError, TypeError):
+                pass
+
+        # Extract members
+        members = fed_entry.get('members')
+        if members and isinstance(members, list):
+            member_ids = []
+            for m in members:
+                try:
+                    member_ids.append(int(m))
+                except (ValueError, TypeError):
+                    continue
+            result["members"] = member_ids
+
+        # Extract federation_progression data
+        progression = fed_entry.get('federation_progression')
+        if progression and isinstance(progression, dict):
+            # Federation type
+            fed_type = progression.get('federation_type')
+            if not fed_type:
+                fed_type = progression.get('type')
+            if fed_type and isinstance(fed_type, str):
+                result["type"] = fed_type
+
+            # Experience (can be string or number)
+            exp = progression.get('experience')
+            if exp is not None:
+                try:
+                    exp_str = str(exp)
+                    result["experience"] = float(exp_str) if '.' in exp_str else int(exp_str)
+                except (ValueError, TypeError):
+                    pass
+
+            # Cohesion (can be string or number)
+            cohesion = progression.get('cohesion')
+            if cohesion is not None:
+                try:
+                    coh_str = str(cohesion)
+                    result["cohesion"] = float(coh_str) if '.' in coh_str else int(coh_str)
+                except (ValueError, TypeError):
+                    pass
+
+            # Level (try 'levels' first, then 'level')
+            level = progression.get('levels')
+            if level is None:
+                level = progression.get('level')
+            if level is not None:
+                try:
+                    result["level"] = int(level)
+                except (ValueError, TypeError):
+                    pass
+
+            # Laws
+            laws = progression.get('laws')
+            if laws and isinstance(laws, dict):
+                for key, value in laws.items():
+                    if isinstance(value, str):
+                        result["laws"][key] = value
+                    else:
+                        result["laws"][key] = str(value)
+
+        return result
+
+    def _get_federation_details_regex(self) -> dict:
+        """Original regex implementation - fallback for non-session use."""
         result = {
             "federation_id": None,
             "type": None,
