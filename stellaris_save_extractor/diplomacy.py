@@ -924,6 +924,200 @@ class DiplomacyMixin:
         Parses the top-level `agreements` section (Overlord DLC style).
         Returns compact summaries only (no huge discrete term payloads).
         """
+        # Dispatch to Rust version when session is active
+        session = _get_active_session()
+        if session:
+            return self._get_subjects_rust(limit)
+        return self._get_subjects_regex(limit)
+
+    def _get_subjects_rust(self, limit: int = 25) -> dict:
+        """Rust-optimized version using extract_sections.
+
+        Uses direct parsed JSON access instead of regex on raw gamestate.
+        Benefits:
+        - No regex parsing on raw text
+        - No truncation limits
+        - Handles nested structures correctly
+        """
+        session = _get_active_session()
+        if not session:
+            return self._get_subjects_regex(limit)
+
+        result = {
+            "player_id": self.get_player_empire_id(),
+            "as_overlord": {"subjects": [], "count": 0},
+            "as_subject": {"overlords": [], "count": 0},
+            "count": 0,
+        }
+
+        # Use extract_sections for this section
+        data = session.extract_sections(['agreements'])
+        agreements_section = data.get('agreements')
+
+        # Section might not exist if no agreements
+        if not agreements_section or not isinstance(agreements_section, dict):
+            return result
+
+        # The inner 'agreements' dict contains the actual entries
+        inner_agreements = agreements_section.get('agreements')
+        if not inner_agreements or not isinstance(inner_agreements, dict):
+            return result
+
+        player_id = result["player_id"]
+        overlord_entries: list[dict] = []
+        subject_entries: list[dict] = []
+
+        def parse_terms_rust(term_data: dict) -> dict:
+            """Parse term_data from parsed dict structure."""
+            if not isinstance(term_data, dict):
+                return {}
+
+            terms: dict = {}
+
+            # Boolean fields (convert "yes"/"no" to bool)
+            for bool_key in [
+                "can_subject_be_integrated",
+                "can_subject_do_diplomacy",
+                "can_subject_vote",
+                "has_access",
+                "has_sensors",
+                "has_cooldown_on_first_renegotiation",
+            ]:
+                val = term_data.get(bool_key)
+                if val is not None:
+                    terms[bool_key] = (val == "yes") if isinstance(val, str) else bool(val)
+
+            # String fields
+            for str_key in [
+                "joins_overlord_wars",
+                "calls_overlord_to_war",
+                "subject_expansion_type",
+            ]:
+                val = term_data.get(str_key)
+                if val and isinstance(val, str):
+                    terms[str_key] = val
+
+            # Agreement preset
+            preset = term_data.get("agreement_preset")
+            if preset and isinstance(preset, str):
+                terms["agreement_preset"] = preset
+
+            # Forced initial loyalty
+            fil = term_data.get("forced_initial_loyalty")
+            if fil is not None:
+                try:
+                    terms["forced_initial_loyalty"] = int(fil)
+                except (ValueError, TypeError):
+                    pass
+
+            # Discrete terms (list of {key, value} dicts)
+            discrete_terms = term_data.get("discrete_terms")
+            if discrete_terms and isinstance(discrete_terms, list):
+                parsed_discrete = {}
+                for item in discrete_terms:
+                    if isinstance(item, dict):
+                        k = item.get("key")
+                        v = item.get("value")
+                        if k and v:
+                            parsed_discrete[str(k)] = str(v)
+                if parsed_discrete:
+                    terms["discrete_terms"] = parsed_discrete
+
+            # Resource terms (list of {key, value} dicts)
+            resource_terms = term_data.get("resource_terms")
+            if resource_terms and isinstance(resource_terms, list):
+                parsed_resource = {}
+                for item in resource_terms:
+                    if isinstance(item, dict):
+                        k = item.get("key")
+                        v = item.get("value")
+                        if k and v is not None:
+                            try:
+                                parsed_resource[str(k)] = float(v)
+                            except (ValueError, TypeError):
+                                continue
+                if parsed_resource:
+                    terms["resource_terms"] = parsed_resource
+
+            return terms
+
+        # Iterate through all agreements
+        for agreement_id, adata in inner_agreements.items():
+            if not isinstance(adata, dict):
+                continue
+
+            # Get owner and target IDs
+            owner = adata.get("owner")
+            target = adata.get("target")
+            if owner is None or target is None:
+                continue
+
+            try:
+                owner_id = int(owner)
+                target_id = int(target)
+            except (ValueError, TypeError):
+                continue
+
+            # 4294967295 represents "none" in Stellaris
+            if owner_id == 4294967295 or target_id == 4294967295:
+                continue
+
+            # Extract basic fields
+            active_status = adata.get("active_status")
+            date_added = adata.get("date_added")
+            date_changed = adata.get("date_changed")
+
+            # Parse term_data
+            term_data_dict = adata.get("term_data", {})
+            term_data = parse_terms_rust(term_data_dict) if isinstance(term_data_dict, dict) else {}
+
+            # Parse subject_specialization
+            specialization = None
+            spec_level = None
+            spec_data = adata.get("subject_specialization")
+            if spec_data and isinstance(spec_data, dict):
+                spec_type = spec_data.get("specialist_type")
+                if spec_type and isinstance(spec_type, str):
+                    specialization = spec_type
+                level = spec_data.get("level")
+                if level is not None:
+                    try:
+                        spec_level = int(level)
+                    except (ValueError, TypeError):
+                        spec_level = 0
+
+            entry = {
+                "agreement_id": str(agreement_id),
+                "owner_id": owner_id,
+                "target_id": target_id,
+                "active_status": active_status if isinstance(active_status, str) else None,
+                "date_added": date_added if isinstance(date_added, str) else None,
+                "date_changed": date_changed if isinstance(date_changed, str) else None,
+                "preset": term_data.get("agreement_preset"),
+                "specialization": specialization,
+                "specialization_level": spec_level,
+                "terms": term_data,
+            }
+
+            if owner_id == player_id:
+                overlord_entries.append(entry)
+            if target_id == player_id:
+                subject_entries.append(entry)
+
+        # Sort as in regex version
+        overlord_entries.sort(key=lambda e: (e.get("preset") or "", e.get("target_id", 0)))
+        subject_entries.sort(key=lambda e: (e.get("preset") or "", e.get("owner_id", 0)))
+
+        result["as_overlord"]["count"] = len(overlord_entries)
+        result["as_overlord"]["subjects"] = overlord_entries[: max(0, min(int(limit), 50))]
+        result["as_subject"]["count"] = len(subject_entries)
+        result["as_subject"]["overlords"] = subject_entries[: max(0, min(int(limit), 50))]
+        result["count"] = result["as_overlord"]["count"] + result["as_subject"]["count"]
+
+        return result
+
+    def _get_subjects_regex(self, limit: int = 25) -> dict:
+        """Original regex implementation - fallback for non-session use."""
         result = {
             "player_id": self.get_player_empire_id(),
             "as_overlord": {"subjects": [], "count": 0},
