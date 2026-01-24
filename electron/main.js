@@ -867,6 +867,17 @@ ipcMain.handle('backend:chronicle', async (event, { session_id, force_refresh })
   }
 })
 
+ipcMain.handle('backend:regenerate-chapter', async (event, { session_id, chapter_number, confirm }) => {
+  try {
+    return await callBackendApi('/api/chronicle/regenerate-chapter', {
+      method: 'POST',
+      body: JSON.stringify({ session_id, chapter_number, confirm: confirm || false }),
+    })
+  } catch (e) {
+    return { error: e.message }
+  }
+})
+
 ipcMain.handle('backend:end-session', async () => {
   try {
     return await callBackendApi('/api/end-session', {

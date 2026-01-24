@@ -43,6 +43,14 @@ class ChronicleRequest(BaseModel):
     force_refresh: bool = False
 
 
+class RegenerateChapterRequest(BaseModel):
+    """Request body for /api/chronicle/regenerate-chapter endpoint."""
+
+    session_id: str
+    chapter_number: int
+    confirm: bool = False
+
+
 def get_auth_token() -> str | None:
     """Get the expected auth token from environment."""
     return os.environ.get(ENV_API_TOKEN)
@@ -554,6 +562,53 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=500,
                 detail={"error": f"Chronicle generation failed: {str(e)}"},
+            )
+
+    @app.post("/api/chronicle/regenerate-chapter", dependencies=[Depends(verify_token)])
+    def regenerate_chapter(
+        request: Request,
+        body: RegenerateChapterRequest,
+    ) -> dict[str, Any]:
+        """Regenerate a specific finalized chapter.
+
+        Requires confirm=true to proceed. Marks downstream chapters as context_stale.
+
+        Returns:
+            The regenerated chapter and list of stale chapter numbers.
+        """
+        db = getattr(request.app.state, "db", None)
+
+        if db is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"error": "Database not initialized"},
+            )
+
+        # Check if session exists
+        session = db.get_session_by_id(body.session_id)
+        if session is None:
+            raise HTTPException(
+                status_code=404,
+                detail={"error": "Session not found"},
+            )
+
+        from backend.core.chronicle import ChronicleGenerator
+
+        generator = ChronicleGenerator(db=db)
+
+        try:
+            result = generator.regenerate_chapter(
+                session_id=body.session_id,
+                chapter_number=body.chapter_number,
+                confirm=body.confirm,
+            )
+            return result
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail={"error": str(e)})
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail={"error": f"Chapter regeneration failed: {str(e)}"},
             )
 
     return app

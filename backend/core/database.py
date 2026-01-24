@@ -203,6 +203,11 @@ class GameDatabase:
                 """,
                 "CREATE INDEX IF NOT EXISTS idx_cached_chronicles_session ON cached_chronicles(session_id);",
             ],
+            4: [
+                # Add save_id for cross-session chronicle continuity
+                "ALTER TABLE cached_chronicles ADD COLUMN save_id TEXT;",
+                "CREATE INDEX IF NOT EXISTS idx_cached_chronicles_save ON cached_chronicles(save_id);",
+            ],
         }
 
         current = self.get_schema_version()
@@ -1086,23 +1091,196 @@ class GameDatabase:
         event_count: int,
         snapshot_count: int,
         chapters_json: str | None = None,
+        save_id: str | None = None,
     ) -> None:
         """Insert or update cached chronicle."""
         with self._lock:
             self._conn.execute(
                 """
                 INSERT INTO cached_chronicles
-                    (id, session_id, chronicle_text, chapters_json, event_count, snapshot_count)
-                VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?)
+                    (id, session_id, chronicle_text, chapters_json, event_count, snapshot_count, save_id)
+                VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(session_id) DO UPDATE SET
                     chronicle_text = excluded.chronicle_text,
                     chapters_json = excluded.chapters_json,
                     event_count = excluded.event_count,
                     snapshot_count = excluded.snapshot_count,
+                    save_id = COALESCE(excluded.save_id, save_id),
                     generated_at = datetime('now')
                 """,
-                (session_id, chronicle_text, chapters_json, event_count, snapshot_count),
+                (session_id, chronicle_text, chapters_json, event_count, snapshot_count, save_id),
             )
+
+    # --- Incremental Chronicle Support ---
+
+    def get_save_id_for_session(self, session_id: str) -> str | None:
+        """Get the save_id for a session."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT save_id FROM sessions WHERE id = ?",
+                (session_id,),
+            ).fetchone()
+            return row["save_id"] if row else None
+
+    def get_chronicle_by_save_id(self, save_id: str) -> dict[str, Any] | None:
+        """Get cached chronicle by save_id (cross-session)."""
+        with self._lock:
+            row = self._conn.execute(
+                """SELECT * FROM cached_chronicles
+                   WHERE save_id = ?
+                   ORDER BY generated_at DESC LIMIT 1""",
+                (save_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def get_all_events_by_save_id(self, *, save_id: str) -> list[dict[str, Any]]:
+        """Get ALL events across all sessions for a save_id (no limit cap).
+
+        Used by incremental chronicle generation which needs full cross-session history.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT e.id, e.captured_at, e.game_date, e.event_type, e.summary, e.data_json
+                FROM events e
+                JOIN sessions s ON e.session_id = s.id
+                WHERE s.save_id = ?
+                ORDER BY e.game_date ASC, e.captured_at ASC;
+                """,
+                (save_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_events_in_snapshot_range(
+        self,
+        *,
+        save_id: str,
+        from_snapshot_id: int | None = None,
+        to_snapshot_id: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get events within a snapshot ID range for a save_id."""
+        with self._lock:
+            if from_snapshot_id is None and to_snapshot_id is None:
+                return self.get_all_events_by_save_id(save_id=save_id)
+
+            # Build query based on provided bounds
+            conditions = ["s.save_id = ?"]
+            params: list[Any] = [save_id]
+
+            if from_snapshot_id is not None:
+                conditions.append("e.id > ?")
+                params.append(from_snapshot_id)
+            if to_snapshot_id is not None:
+                conditions.append("e.id <= ?")
+                params.append(to_snapshot_id)
+
+            query = f"""
+                SELECT e.id, e.captured_at, e.game_date, e.event_type, e.summary, e.data_json
+                FROM events e
+                JOIN sessions s ON e.session_id = s.id
+                WHERE {" AND ".join(conditions)}
+                ORDER BY e.game_date ASC, e.captured_at ASC;
+            """
+            rows = self._conn.execute(query, tuple(params)).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_snapshot_range_for_save(self, save_id: str) -> dict[str, Any]:
+        """Get first and last snapshot IDs and dates for a save_id."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT
+                    MIN(snap.id) AS first_snapshot_id,
+                    MAX(snap.id) AS last_snapshot_id,
+                    MIN(snap.game_date) AS first_game_date,
+                    MAX(snap.game_date) AS last_game_date,
+                    COUNT(snap.id) AS snapshot_count
+                FROM snapshots snap
+                JOIN sessions s ON snap.session_id = s.id
+                WHERE s.save_id = ?;
+                """,
+                (save_id,),
+            ).fetchone()
+            return dict(row) if row else {}
+
+    def get_all_sessions_for_save(self, save_id: str) -> list[dict[str, Any]]:
+        """Get all sessions (active and ended) for a save_id."""
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT id, save_id, empire_name, started_at, ended_at, last_game_date
+                FROM sessions
+                WHERE save_id = ?
+                ORDER BY started_at ASC;
+                """,
+                (save_id,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def upsert_chronicle_by_save_id(
+        self,
+        *,
+        save_id: str,
+        session_id: str,
+        chronicle_text: str,
+        chapters_json: str,
+        event_count: int,
+        snapshot_count: int,
+    ) -> None:
+        """Insert or update chronicle keyed by save_id."""
+        with self._lock:
+            # Check if chronicle exists for this save_id
+            existing_by_save = self._conn.execute(
+                "SELECT id FROM cached_chronicles WHERE save_id = ?",
+                (save_id,),
+            ).fetchone()
+
+            if existing_by_save:
+                self._conn.execute(
+                    """
+                    UPDATE cached_chronicles
+                    SET chronicle_text = ?,
+                        chapters_json = ?,
+                        event_count = ?,
+                        snapshot_count = ?,
+                        session_id = ?,
+                        generated_at = datetime('now')
+                    WHERE save_id = ?
+                    """,
+                    (chronicle_text, chapters_json, event_count, snapshot_count, session_id, save_id),
+                )
+            else:
+                # Check if there's a legacy record for this session_id (without save_id)
+                existing_by_session = self._conn.execute(
+                    "SELECT id FROM cached_chronicles WHERE session_id = ?",
+                    (session_id,),
+                ).fetchone()
+
+                if existing_by_session:
+                    # Migrate existing record to use save_id
+                    self._conn.execute(
+                        """
+                        UPDATE cached_chronicles
+                        SET save_id = ?,
+                            chronicle_text = ?,
+                            chapters_json = ?,
+                            event_count = ?,
+                            snapshot_count = ?,
+                            generated_at = datetime('now')
+                        WHERE session_id = ?
+                        """,
+                        (save_id, chronicle_text, chapters_json, event_count, snapshot_count, session_id),
+                    )
+                else:
+                    # Insert new record
+                    self._conn.execute(
+                        """
+                        INSERT INTO cached_chronicles
+                            (id, session_id, save_id, chronicle_text, chapters_json, event_count, snapshot_count)
+                        VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?)
+                        """,
+                        (session_id, save_id, chronicle_text, chapters_json, event_count, snapshot_count),
+                    )
 
 
 _default_db: GameDatabase | None = None

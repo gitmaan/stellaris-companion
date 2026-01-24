@@ -105,11 +105,43 @@ export interface RecapResponse {
   style?: string
 }
 
+export interface ChronicleChapter {
+  number: number
+  title: string
+  start_date: string
+  end_date: string
+  narrative: string
+  summary: string
+  is_finalized: boolean
+  context_stale: boolean
+  can_regenerate: boolean
+}
+
+export interface CurrentEra {
+  start_date: string
+  narrative: string
+  events_covered: number
+}
+
 export interface ChronicleResponse {
+  // New structured format
+  chapters: ChronicleChapter[]
+  current_era: CurrentEra | null
+  pending_chapters: number
+  message: string | null
+  // Backward compatible
   chronicle: string
   cached: boolean
   event_count: number
   generated_at: string
+}
+
+export interface RegenerateChapterResponse {
+  chapter: ChronicleChapter
+  regenerated: boolean
+  stale_chapters: number[]
+  error?: string
+  confirm_required?: boolean
 }
 
 export interface EndSessionResponse {
@@ -139,6 +171,7 @@ declare global {
         sessionEvents: (sessionId: string, limit?: number) => Promise<SessionEventsResponse | ErrorResponse>
         recap: (sessionId: string, style?: string) => Promise<RecapResponse | ErrorResponse>
         chronicle: (sessionId: string, forceRefresh?: boolean) => Promise<ChronicleResponse | ErrorResponse>
+        regenerateChapter: (sessionId: string, chapterNumber: number, confirm?: boolean) => Promise<RegenerateChapterResponse | ErrorResponse>
         endSession: () => Promise<EndSessionResponse | ErrorResponse>
       }
       getSettings: () => Promise<unknown>
@@ -334,6 +367,21 @@ export function useBackend() {
   }, [callApi])
 
   /**
+   * Regenerate a specific chapter of the chronicle
+   * @param chapterNumber - The chapter number to regenerate
+   * @param confirm - Must be true to proceed (safety check)
+   */
+  const regenerateChapter = useCallback(async (
+    sessionId: string,
+    chapterNumber: number,
+    confirm?: boolean
+  ): Promise<UseBackendResult<RegenerateChapterResponse>> => {
+    return callApi<RegenerateChapterResponse>('regenerateChapter', () =>
+      window.electronAPI!.backend.regenerateChapter(sessionId, chapterNumber, confirm)
+    )
+  }, [callApi])
+
+  /**
    * End the current active session
    */
   const endSession = useCallback(async (): Promise<UseBackendResult<EndSessionResponse>> => {
@@ -355,6 +403,7 @@ export function useBackend() {
     sessionEvents,
     recap,
     chronicle,
+    regenerateChapter,
     endSession,
 
     // Loading states (for UI components that need to track multiple calls)
@@ -364,7 +413,7 @@ export function useBackend() {
     // Type guards for consumers
     isErrorResponse,
     isChatRetryResponse,
-  }), [health, chat, status, sessions, sessionEvents, recap, chronicle, endSession, loadingStates])
+  }), [health, chat, status, sessions, sessionEvents, recap, chronicle, regenerateChapter, endSession, loadingStates])
 }
 
 export default useBackend

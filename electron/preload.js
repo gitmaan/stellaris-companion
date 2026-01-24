@@ -63,6 +63,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('backend:recap', { session_id: sessionId, style: style || 'summary' }),
     chronicle: (sessionId, forceRefresh) =>
       ipcRenderer.invoke('backend:chronicle', { session_id: sessionId, force_refresh: forceRefresh || false }),
+    regenerateChapter: (sessionId, chapterNumber, confirm) =>
+      ipcRenderer.invoke('backend:regenerate-chapter', {
+        session_id: sessionId,
+        chapter_number: chapterNumber,
+        confirm: confirm || false,
+      }),
     endSession: () => ipcRenderer.invoke('backend:end-session'),
   },
 

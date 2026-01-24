@@ -5,8 +5,11 @@ Chronicle Generation Engine
 LLM-powered narrative generation for empire storytelling.
 Produces dramatic, Stellaris Invicta-style chronicles from game events.
 
-See docs/CHRONICLE_IMPLEMENTATION.md for full specification.
-See docs/CHRONICLE_TESTING.md for prompt validation results.
+Supports incremental chapters - early chapters are permanent while new
+chapters are added as the game progresses.
+
+See docs/CHRONICLE_IMPLEMENTATION.md for original specification.
+See docs/CHRONICLE_INCREMENTAL.md for incremental chapter design.
 """
 
 from __future__ import annotations
@@ -21,10 +24,51 @@ from google import genai
 from backend.core.database import GameDatabase
 
 
-class ChronicleGenerator:
-    """Generate LLM-powered chronicles for empire sessions."""
+# Era-ending event types that trigger chapter finalization
+ERA_ENDING_EVENTS = {
+    'war_ended',
+    'crisis_defeated',
+    'fallen_empire_awakened',
+    'war_in_heaven_started',
+    'federation_joined',
+    'federation_left',
+}
 
-    # Staleness thresholds - regenerate if exceeded
+# Years between chapters (if no era-ending event)
+CHAPTER_TIME_THRESHOLD = 50
+
+# Minimum years after era-ending event before finalizing
+MIN_YEARS_AFTER_EVENT = 5
+
+# Maximum chapters to finalize per request (prevent timeout)
+MAX_CHAPTERS_PER_REQUEST = 2
+
+# Default chapters_json structure
+DEFAULT_CHAPTERS_DATA = {
+    "format_version": 1,
+    "chapters": [],
+    "current_era_start_date": None,
+    "current_era_start_snapshot_id": None,
+}
+
+
+def parse_year(date_str: str | None) -> int | None:
+    """Parse year from Stellaris date string (e.g., '2250.03.15')."""
+    if not date_str or not isinstance(date_str, str):
+        return None
+    try:
+        return int(date_str.split('.')[0])
+    except (ValueError, IndexError):
+        return None
+
+
+class ChronicleGenerator:
+    """Generate LLM-powered chronicles for empire sessions.
+
+    Supports incremental chapters keyed by save_id for cross-session continuity.
+    """
+
+    # Staleness thresholds for legacy blob-based cache
     STALE_EVENT_THRESHOLD = 10
     STALE_SNAPSHOT_THRESHOLD = 5
 
@@ -47,17 +91,672 @@ class ChronicleGenerator:
         *,
         force_refresh: bool = False,
     ) -> dict[str, Any]:
-        """Generate a full chronicle for the session.
+        """Generate an incremental chronicle for the session.
 
-        Returns cached version if available and recent.
+        Returns structured response with chapters and current era.
+        Maintains backward compatibility with legacy 'chronicle' string field.
         """
+        # Get save_id for cross-session continuity
+        save_id = self.db.get_save_id_for_session(session_id)
+        if not save_id:
+            session = self.db.get_session_by_id(session_id)
+            if not session:
+                raise ValueError(f"Session not found: {session_id}")
+            save_id = session.get("save_id")
+
+        if not save_id:
+            # Fallback to session-based chronicle (legacy)
+            return self._generate_legacy_chronicle(session_id, force_refresh=force_refresh)
+
+        # Load existing chapters data
+        cached = self.db.get_chronicle_by_save_id(save_id)
+        chapters_data = self._load_chapters_data(cached)
+
+        # Get current state
+        snapshot_range = self.db.get_snapshot_range_for_save(save_id)
+        if not snapshot_range.get("snapshot_count"):
+            return self._empty_chronicle_response()
+
+        current_date = snapshot_range.get("last_game_date")
+        current_snapshot_id = snapshot_range.get("last_snapshot_id")
+
+        # Gather briefing for current session
+        briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
+        briefing = json.loads(briefing_json) if briefing_json else {}
+
+        # Check if we need to finalize any chapters
+        chapters_finalized = 0
+        pending_chapters = 0
+
+        while chapters_finalized < MAX_CHAPTERS_PER_REQUEST:
+            should_finalize, trigger = self._should_finalize_chapter(
+                save_id=save_id,
+                chapters_data=chapters_data,
+                current_date=current_date,
+                current_snapshot_id=current_snapshot_id,
+            )
+            if not should_finalize:
+                break
+
+            # Finalize the chapter
+            self._finalize_chapter(
+                save_id=save_id,
+                chapters_data=chapters_data,
+                briefing=briefing,
+                trigger=trigger,
+            )
+            chapters_finalized += 1
+
+        # Count remaining pending chapters
+        pending_chapters = self._count_pending_chapters(
+            save_id=save_id,
+            chapters_data=chapters_data,
+            current_date=current_date,
+            current_snapshot_id=current_snapshot_id,
+        )
+
+        # Generate current era narrative
+        current_era = self._generate_current_era(
+            save_id=save_id,
+            chapters_data=chapters_data,
+            briefing=briefing,
+            current_date=current_date,
+        )
+
+        # Assemble full chronicle text for backward compatibility
+        full_text = self._assemble_chronicle_text(chapters_data, current_era)
+
+        # Calculate total event count
+        all_events = self.db.get_all_events_by_save_id(save_id=save_id)
+        event_count = len(all_events)
+        snapshot_count = snapshot_range.get("snapshot_count", 0)
+
+        # Save updated chapters
+        self.db.upsert_chronicle_by_save_id(
+            save_id=save_id,
+            session_id=session_id,
+            chronicle_text=full_text,
+            chapters_json=json.dumps(chapters_data, ensure_ascii=False),
+            event_count=event_count,
+            snapshot_count=snapshot_count,
+        )
+
+        # Build response
+        return {
+            # New structured format
+            "chapters": [
+                {
+                    "number": ch["number"],
+                    "title": ch["title"],
+                    "start_date": ch["start_date"],
+                    "end_date": ch["end_date"],
+                    "narrative": ch["narrative"],
+                    "summary": ch.get("summary", ""),
+                    "is_finalized": ch.get("is_finalized", True),
+                    "context_stale": ch.get("context_stale", False),
+                    "can_regenerate": ch.get("is_finalized", True),
+                }
+                for ch in chapters_data.get("chapters", [])
+            ],
+            "current_era": current_era,
+            "pending_chapters": pending_chapters,
+            "message": f"{pending_chapters} more chapters pending. Refresh to continue." if pending_chapters > 0 else None,
+            # Backward compatible
+            "chronicle": full_text,
+            "cached": chapters_finalized == 0 and current_era is None,
+            "event_count": event_count,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def regenerate_chapter(
+        self,
+        session_id: str,
+        chapter_number: int,
+        *,
+        confirm: bool = False,
+    ) -> dict[str, Any]:
+        """Regenerate a specific finalized chapter.
+
+        Returns error if confirm=False (requires explicit confirmation).
+        Marks downstream chapters as context_stale.
+        """
+        if not confirm:
+            return {"error": "Must confirm regeneration", "confirm_required": True}
+
+        save_id = self.db.get_save_id_for_session(session_id)
+        if not save_id:
+            raise ValueError(f"No save_id for session: {session_id}")
+
+        cached = self.db.get_chronicle_by_save_id(save_id)
+        if not cached:
+            raise ValueError(f"No chronicle found for save: {save_id}")
+
+        chapters_data = self._load_chapters_data(cached)
+        chapters = chapters_data.get("chapters", [])
+
+        if chapter_number < 1 or chapter_number > len(chapters):
+            raise ValueError(f"Invalid chapter number: {chapter_number}")
+
+        chapter = chapters[chapter_number - 1]
+        if not chapter.get("is_finalized"):
+            raise ValueError(f"Chapter {chapter_number} is not finalized")
+
+        # Get briefing for voice/context
+        briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
+        briefing = json.loads(briefing_json) if briefing_json else {}
+
+        # Get events for this chapter's time range
+        events = self.db.get_events_in_snapshot_range(
+            save_id=save_id,
+            from_snapshot_id=chapter.get("start_snapshot_id"),
+            to_snapshot_id=chapter.get("end_snapshot_id"),
+        )
+
+        # Get previous chapters for context
+        previous_chapters = chapters[:chapter_number - 1]
+
+        # Regenerate the chapter
+        new_content = self._generate_chapter_content(
+            chapter_number=chapter_number,
+            events=events,
+            briefing=briefing,
+            previous_chapters=previous_chapters,
+            start_date=chapter["start_date"],
+            end_date=chapter["end_date"],
+        )
+
+        # Update the chapter
+        chapter["title"] = new_content["title"]
+        chapter["narrative"] = new_content["narrative"]
+        chapter["summary"] = new_content["summary"]
+        chapter["generated_at"] = datetime.now(timezone.utc).isoformat()
+        chapter["context_stale"] = False
+
+        # Mark downstream chapters as stale
+        for i in range(chapter_number, len(chapters)):
+            chapters[i]["context_stale"] = True
+
+        # Save updated chapters
+        full_text = self._assemble_chronicle_text(chapters_data, None)
+        snapshot_range = self.db.get_snapshot_range_for_save(save_id)
+        all_events = self.db.get_all_events_by_save_id(save_id=save_id)
+
+        self.db.upsert_chronicle_by_save_id(
+            save_id=save_id,
+            session_id=session_id,
+            chronicle_text=full_text,
+            chapters_json=json.dumps(chapters_data, ensure_ascii=False),
+            event_count=len(all_events),
+            snapshot_count=snapshot_range.get("snapshot_count", 0),
+        )
+
+        return {
+            "chapter": chapter,
+            "regenerated": True,
+            "stale_chapters": list(range(chapter_number + 1, len(chapters) + 1)),
+        }
+
+    def generate_recap(
+        self,
+        session_id: str,
+        *,
+        style: str = "summary",
+        max_events: int = 30,
+    ) -> dict[str, Any]:
+        """Generate a recap for the session.
+
+        Args:
+            style: "summary" (deterministic) or "dramatic" (LLM-powered)
+        """
+        if style == "summary":
+            from backend.core.reporting import build_session_report_text
+
+            recap = build_session_report_text(db=self.db, session_id=session_id)
+            return {"recap": recap, "style": "summary"}
+
+        # Dramatic LLM-powered recap
+        data = self._gather_session_data(session_id, max_events=max_events)
+
+        if not data["events"]:
+            return {
+                "recap": "No events to recap. The story has yet to begin.",
+                "style": "dramatic",
+                "events_summarized": 0,
+            }
+
+        prompt = self._build_recap_prompt(data)
+
+        response = self.client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=prompt,
+            config={"temperature": 1.0, "max_output_tokens": 2048},
+        )
+
+        return {
+            "recap": response.text,
+            "style": "dramatic",
+            "events_summarized": len(data["events"]),
+        }
+
+    # --- Private Methods ---
+
+    def _load_chapters_data(self, cached: dict[str, Any] | None) -> dict[str, Any]:
+        """Load chapters_json or return default structure."""
+        if not cached:
+            return dict(DEFAULT_CHAPTERS_DATA)
+
+        chapters_json = cached.get("chapters_json")
+        if not chapters_json:
+            return dict(DEFAULT_CHAPTERS_DATA)
+
+        try:
+            data = json.loads(chapters_json)
+            if not isinstance(data, dict):
+                return dict(DEFAULT_CHAPTERS_DATA)
+            return data
+        except json.JSONDecodeError:
+            return dict(DEFAULT_CHAPTERS_DATA)
+
+    def _should_finalize_chapter(
+        self,
+        save_id: str,
+        chapters_data: dict[str, Any],
+        current_date: str | None,
+        current_snapshot_id: int | None,
+    ) -> tuple[bool, str | None]:
+        """Check if we should finalize a new chapter.
+
+        Returns (should_finalize, trigger_reason).
+        """
+        if not current_date or not current_snapshot_id:
+            return False, None
+
+        chapters = chapters_data.get("chapters", [])
+        current_year = parse_year(current_date)
+        if current_year is None:
+            return False, None
+
+        # Determine the era start point
+        if chapters:
+            last_chapter = chapters[-1]
+            era_start_date = last_chapter.get("end_date")
+            era_start_snapshot_id = last_chapter.get("end_snapshot_id")
+        else:
+            era_start_date = chapters_data.get("current_era_start_date")
+            era_start_snapshot_id = chapters_data.get("current_era_start_snapshot_id")
+            if not era_start_date:
+                # First chapter - get from snapshot range
+                snapshot_range = self.db.get_snapshot_range_for_save(save_id)
+                era_start_date = snapshot_range.get("first_game_date", "2200.01.01")
+                era_start_snapshot_id = snapshot_range.get("first_snapshot_id")
+
+        era_start_year = parse_year(era_start_date)
+        if era_start_year is None:
+            return False, None
+
+        # Check time threshold (50+ years)
+        years_elapsed = current_year - era_start_year
+        if years_elapsed >= CHAPTER_TIME_THRESHOLD:
+            return True, "time_threshold"
+
+        # Check for era-ending events
+        events = self.db.get_events_in_snapshot_range(
+            save_id=save_id,
+            from_snapshot_id=era_start_snapshot_id,
+            to_snapshot_id=current_snapshot_id,
+        )
+
+        for event in events:
+            if event.get("event_type") in ERA_ENDING_EVENTS:
+                event_year = parse_year(event.get("game_date"))
+                if event_year and (current_year - event_year) >= MIN_YEARS_AFTER_EVENT:
+                    return True, event.get("event_type")
+
+        return False, None
+
+    def _count_pending_chapters(
+        self,
+        save_id: str,
+        chapters_data: dict[str, Any],
+        current_date: str | None,
+        current_snapshot_id: int | None,
+    ) -> int:
+        """Count how many more chapters could be finalized."""
+        count = 0
+        temp_data = json.loads(json.dumps(chapters_data))  # Deep copy
+
+        # Simulate finalization to count pending
+        for _ in range(10):  # Max 10 to prevent infinite loop
+            should_finalize, trigger = self._should_finalize_chapter(
+                save_id=save_id,
+                chapters_data=temp_data,
+                current_date=current_date,
+                current_snapshot_id=current_snapshot_id,
+            )
+            if not should_finalize:
+                break
+
+            # Simulate adding a chapter
+            chapters = temp_data.get("chapters", [])
+            if chapters:
+                last_end = chapters[-1].get("end_date", "2200.01.01")
+            else:
+                snapshot_range = self.db.get_snapshot_range_for_save(save_id)
+                last_end = snapshot_range.get("first_game_date", "2200.01.01")
+
+            last_year = parse_year(last_end)
+            new_end_year = (last_year or 2200) + CHAPTER_TIME_THRESHOLD
+            new_end_date = f"{new_end_year}.01.01"
+
+            temp_data["chapters"].append({
+                "number": len(chapters) + 1,
+                "end_date": new_end_date,
+                "end_snapshot_id": current_snapshot_id,
+            })
+            count += 1
+
+        return count
+
+    def _finalize_chapter(
+        self,
+        save_id: str,
+        chapters_data: dict[str, Any],
+        briefing: dict[str, Any],
+        trigger: str | None,
+    ) -> None:
+        """Generate and finalize a new chapter."""
+        chapters = chapters_data.get("chapters", [])
+        chapter_number = len(chapters) + 1
+
+        # Determine chapter date range
+        if chapters:
+            last_chapter = chapters[-1]
+            start_date = last_chapter.get("end_date")
+            start_snapshot_id = last_chapter.get("end_snapshot_id")
+        else:
+            snapshot_range = self.db.get_snapshot_range_for_save(save_id)
+            start_date = snapshot_range.get("first_game_date", "2200.01.01")
+            start_snapshot_id = snapshot_range.get("first_snapshot_id")
+
+        # Find the end date based on trigger
+        if trigger == "time_threshold":
+            start_year = parse_year(start_date) or 2200
+            end_year = start_year + CHAPTER_TIME_THRESHOLD
+            end_date = f"{end_year}.01.01"
+        else:
+            # Use the triggering event's date as chapter end
+            events = self.db.get_all_events_by_save_id(save_id=save_id)
+            end_date = start_date
+            for event in reversed(events):
+                if event.get("event_type") == trigger:
+                    end_date = event.get("game_date", end_date)
+                    break
+
+        # Get end snapshot ID (approximate - use events captured_at)
+        snapshot_range = self.db.get_snapshot_range_for_save(save_id)
+        end_snapshot_id = snapshot_range.get("last_snapshot_id")
+
+        # Get events for this chapter
+        chapter_events = self.db.get_events_in_snapshot_range(
+            save_id=save_id,
+            from_snapshot_id=start_snapshot_id,
+            to_snapshot_id=end_snapshot_id,
+        )
+
+        # Filter events to chapter date range
+        end_year = parse_year(end_date)
+        chapter_events = [
+            e for e in chapter_events
+            if (parse_year(e.get("game_date")) or 0) <= (end_year or 9999)
+        ]
+
+        # Generate chapter content
+        content = self._generate_chapter_content(
+            chapter_number=chapter_number,
+            events=chapter_events,
+            briefing=briefing,
+            previous_chapters=chapters,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        # Add the new chapter
+        chapters_data["chapters"].append({
+            "number": chapter_number,
+            "title": content["title"],
+            "start_date": start_date,
+            "end_date": end_date,
+            "start_snapshot_id": start_snapshot_id,
+            "end_snapshot_id": end_snapshot_id,
+            "narrative": content["narrative"],
+            "summary": content["summary"],
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "is_finalized": True,
+            "context_stale": False,
+            "trigger": trigger,
+            "event_count": len(chapter_events),
+        })
+
+        # Update current era start
+        chapters_data["current_era_start_date"] = end_date
+        chapters_data["current_era_start_snapshot_id"] = end_snapshot_id
+
+    def _generate_chapter_content(
+        self,
+        chapter_number: int,
+        events: list[dict],
+        briefing: dict[str, Any],
+        previous_chapters: list[dict],
+        start_date: str,
+        end_date: str,
+    ) -> dict[str, str]:
+        """Generate chapter content using Gemini structured output."""
+        identity = briefing.get("identity", {})
+        empire_name = identity.get("empire_name", "Unknown Empire")
+        ethics = ", ".join(identity.get("ethics", []))
+        voice = self._get_voice_for_ethics(identity, ethics)
+
+        # Build context from previous chapters
+        context_lines = []
+        for ch in previous_chapters:
+            context_lines.append(
+                f"- Chapter {ch['number']} \"{ch.get('title', 'Untitled')}\" "
+                f"({ch.get('start_date', '?')} - {ch.get('end_date', '?')}): {ch.get('summary', '')}"
+            )
+        previous_context = "\n".join(context_lines) if context_lines else "This is the first chapter."
+
+        events_text = self._format_events(events)
+
+        prompt = f"""You are the Royal Chronicler of {empire_name}.
+
+=== CHRONICLER'S VOICE ===
+{voice}
+
+=== PREVIOUS CHAPTERS ===
+{previous_context}
+
+=== EVENTS FOR THIS CHAPTER ({start_date} to {end_date}) ===
+{events_text}
+
+=== YOUR TASK ===
+
+Write Chapter {chapter_number} of the empire's chronicle.
+
+Requirements:
+- Title: A dramatic, thematic name for this era (e.g., "The Cradle's Awakening", "The Great Handshake")
+- Narrative: 3-5 paragraphs of dramatic prose (500-800 words)
+- Summary: 2-3 sentences summarizing key events for future chapter context
+
+Do NOT give advice. You are a historian, not an advisor.
+Do NOT fabricate events not in the event list.
+
+Respond in this exact JSON format:
+{{"title": "Chapter Title", "narrative": "Full narrative text...", "summary": "Brief summary..."}}
+"""
+
+        try:
+            response = self.client.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config={
+                    "temperature": 1.0,
+                    "max_output_tokens": 2048,
+                    "response_mime_type": "application/json",
+                },
+            )
+
+            # Parse JSON response
+            result = json.loads(response.text)
+            return {
+                "title": result.get("title", f"Chapter {chapter_number}"),
+                "narrative": result.get("narrative", ""),
+                "summary": result.get("summary", ""),
+            }
+        except (json.JSONDecodeError, Exception) as e:
+            # Fallback: try to extract from plain text
+            return {
+                "title": f"Chapter {chapter_number}",
+                "narrative": f"[Generation error: {e}]",
+                "summary": "",
+            }
+
+    def _generate_current_era(
+        self,
+        save_id: str,
+        chapters_data: dict[str, Any],
+        briefing: dict[str, Any],
+        current_date: str | None,
+    ) -> dict[str, Any] | None:
+        """Generate the current era narrative (not finalized)."""
+        chapters = chapters_data.get("chapters", [])
+
+        # Determine era start
+        if chapters:
+            era_start_date = chapters[-1].get("end_date")
+            era_start_snapshot_id = chapters[-1].get("end_snapshot_id")
+        else:
+            era_start_date = chapters_data.get("current_era_start_date")
+            era_start_snapshot_id = chapters_data.get("current_era_start_snapshot_id")
+            if not era_start_date:
+                snapshot_range = self.db.get_snapshot_range_for_save(save_id)
+                era_start_date = snapshot_range.get("first_game_date", "2200.01.01")
+                era_start_snapshot_id = snapshot_range.get("first_snapshot_id")
+
+        # Get events for current era
+        events = self.db.get_events_in_snapshot_range(
+            save_id=save_id,
+            from_snapshot_id=era_start_snapshot_id,
+            to_snapshot_id=None,  # Up to current
+        )
+
+        if not events:
+            return None
+
+        identity = briefing.get("identity", {})
+        empire_name = identity.get("empire_name", "Unknown Empire")
+        ethics = ", ".join(identity.get("ethics", []))
+        voice = self._get_voice_for_ethics(identity, ethics)
+
+        # Build previous chapters context
+        context_lines = []
+        for ch in chapters:
+            context_lines.append(
+                f"- Chapter {ch['number']} \"{ch.get('title', 'Untitled')}\": {ch.get('summary', '')}"
+            )
+        previous_context = "\n".join(context_lines) if context_lines else "No previous chapters."
+
+        events_text = self._format_events(events)
+
+        prompt = f"""You are the Royal Chronicler of {empire_name}.
+
+=== CHRONICLER'S VOICE ===
+{voice}
+
+=== PREVIOUS CHAPTERS ===
+{previous_context}
+
+=== CURRENT ERA EVENTS ({era_start_date} to present) ===
+{events_text}
+
+=== YOUR TASK ===
+
+Write a brief narrative for "The Current Era" - the unfolding present.
+This is NOT a finalized chapter - it's a 1-2 paragraph teaser about current events.
+End with "The story continues..." to indicate this era is still being written.
+
+Do NOT give advice. You are a historian, not an advisor.
+"""
+
+        try:
+            response = self.client.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=prompt,
+                config={"temperature": 1.0, "max_output_tokens": 1024},
+            )
+
+            return {
+                "start_date": era_start_date,
+                "narrative": response.text,
+                "events_covered": len(events),
+            }
+        except Exception:
+            return {
+                "start_date": era_start_date,
+                "narrative": "The current era unfolds...\n\nThe story continues...",
+                "events_covered": len(events),
+            }
+
+    def _assemble_chronicle_text(
+        self,
+        chapters_data: dict[str, Any],
+        current_era: dict[str, Any] | None,
+    ) -> str:
+        """Assemble full chronicle text from chapters and current era."""
+        lines = []
+
+        chapters = chapters_data.get("chapters", [])
+        for ch in chapters:
+            lines.append(f"### CHAPTER {ch['number']}: {ch.get('title', 'Untitled').upper()}")
+            lines.append(f"**{ch.get('start_date', '?')} – {ch.get('end_date', '?')}**\n")
+            lines.append(ch.get("narrative", ""))
+            lines.append("")
+
+        if current_era:
+            lines.append("### THE CURRENT ERA")
+            lines.append(f"**{current_era.get('start_date', '?')} – Present**\n")
+            lines.append(current_era.get("narrative", ""))
+
+        return "\n".join(lines)
+
+    def _empty_chronicle_response(self) -> dict[str, Any]:
+        """Return empty chronicle response."""
+        return {
+            "chapters": [],
+            "current_era": None,
+            "pending_chapters": 0,
+            "message": None,
+            "chronicle": "No events recorded yet. The chronicle awaits the first chapters of history.",
+            "cached": False,
+            "event_count": 0,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # --- Legacy Support ---
+
+    def _generate_legacy_chronicle(
+        self,
+        session_id: str,
+        *,
+        force_refresh: bool = False,
+    ) -> dict[str, Any]:
+        """Generate chronicle using legacy blob-based approach (for backward compatibility)."""
         # Check cache (unless force refresh)
         if not force_refresh:
             cached = self._get_cached_if_valid(session_id)
             if cached:
                 return cached
 
-        # Gather data (uses get_all_events - no 100 cap)
+        # Gather data
         data = self._gather_session_data(session_id)
 
         if not data["events"]:
@@ -68,10 +767,10 @@ class ChronicleGenerator:
                 "generated_at": datetime.now(timezone.utc).isoformat(),
             }
 
-        # Build prompt with ethics-based voice
+        # Build prompt
         prompt = self._build_chronicler_prompt(data)
 
-        # Call Gemini (blocking - endpoint should be sync def)
+        # Call Gemini
         response = self.client.models.generate_content(
             model="gemini-3-flash-preview",
             contents=prompt,
@@ -97,55 +796,12 @@ class ChronicleGenerator:
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    def generate_recap(
-        self,
-        session_id: str,
-        *,
-        style: str = "summary",
-        max_events: int = 30,
-    ) -> dict[str, Any]:
-        """Generate a recap for the session.
-
-        Args:
-            style: "summary" (deterministic) or "dramatic" (LLM-powered)
-        """
-        if style == "summary":
-            from backend.core.reporting import build_session_report_text
-
-            recap = build_session_report_text(db=self.db, session_id=session_id)
-            return {"recap": recap, "style": "summary"}
-
-        # Dramatic LLM-powered recap (uses limited events - OK for recap)
-        data = self._gather_session_data(session_id, max_events=max_events)
-
-        if not data["events"]:
-            return {
-                "recap": "No events to recap. The story has yet to begin.",
-                "style": "dramatic",
-                "events_summarized": 0,
-            }
-
-        prompt = self._build_recap_prompt(data)
-
-        response = self.client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=prompt,
-            config={"temperature": 1.0, "max_output_tokens": 2048},
-        )
-
-        return {
-            "recap": response.text,
-            "style": "dramatic",
-            "events_summarized": len(data["events"]),
-        }
-
     def _get_cached_if_valid(self, session_id: str) -> dict[str, Any] | None:
         """Get cached chronicle if still valid (not stale)."""
         cached = self.db.get_cached_chronicle(session_id)
         if not cached:
             return None
 
-        # Check staleness by both event count AND snapshot count
         current_events = self.db.get_event_count(session_id)
         current_snapshots = self.db.get_snapshot_count(session_id)
 
@@ -153,9 +809,9 @@ class ChronicleGenerator:
         snapshot_delta = current_snapshots - cached["snapshot_count"]
 
         if event_delta >= self.STALE_EVENT_THRESHOLD:
-            return None  # Too many new events
+            return None
         if snapshot_delta >= self.STALE_SNAPSHOT_THRESHOLD:
-            return None  # Too many new snapshots (catches quiet periods)
+            return None
 
         return {
             "chronicle": cached["chronicle_text"],
@@ -172,17 +828,14 @@ class ChronicleGenerator:
         if not session:
             raise ValueError(f"Session not found: {session_id}")
 
-        # Get events - use get_all_events for chronicles (no cap)
         if max_events is None:
             events = self.db.get_all_events(session_id=session_id)
         else:
             events = self.db.get_recent_events(session_id=session_id, limit=max_events)
 
-        # Get briefing for identity/personality
         briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
         briefing = json.loads(briefing_json) if briefing_json else {}
 
-        # Get date range
         stats = self.db.get_session_snapshot_stats(session_id)
 
         return {
@@ -194,10 +847,7 @@ class ChronicleGenerator:
         }
 
     def _build_chronicler_prompt(self, data: dict[str, Any]) -> str:
-        """Build the full chronicler prompt with ethics-based voice.
-
-        See CHRONICLE_TESTING.md for validated prompt structure.
-        """
+        """Build the full chronicler prompt with ethics-based voice."""
         briefing = data["briefing"]
         identity = briefing.get("identity", {})
 
@@ -206,9 +856,7 @@ class ChronicleGenerator:
         authority = identity.get("authority", "unknown")
         civics = ", ".join(identity.get("civics", []))
 
-        # Ethics-based voice selection
         voice = self._get_voice_for_ethics(identity, ethics)
-
         events_text = self._format_events(data["events"])
         state_text = self._summarize_state(briefing)
 
@@ -322,7 +970,7 @@ Do NOT give advice. Write as a historian, not an advisor.
                 seen.add(key)
                 deduped.append(e)
 
-        # Group by year for readability
+        # Group by year
         by_year: dict[str, list[dict]] = {}
         for e in deduped:
             year = e.get("game_date", "")[:4] or "Unknown"
@@ -335,12 +983,12 @@ Do NOT give advice. Write as a historian, not an advisor.
             year_events = by_year[year]
             lines.append(f"\n=== {year} ===")
 
-            # Summarize if too many events in one year
             if len(year_events) > 15:
                 notable_types = {
                     "war_started",
                     "war_ended",
                     "crisis_started",
+                    "crisis_defeated",
                     "fallen_empire_awakened",
                     "war_in_heaven_started",
                     "federation_joined",
