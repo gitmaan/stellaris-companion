@@ -98,6 +98,11 @@
       "id": "P025",
       "learning": "batch_ops() sends multiple ops in one request: {op: 'multi', ops: [...]}. Returns list of results in same order. Use for many small queries (get_entry, count_keys) to avoid IPC round-trip latency. Does NOT support iter_section (streaming) or close.",
       "date": "2026-01-24"
+    },
+    {
+      "id": "P026",
+      "learning": "orjson.dumps() returns bytes (not str), orjson.loads() accepts both bytes and str. orjson raises ValueError on decode errors (not JSONDecodeError). Use _json_loads/_json_dumps wrappers from rust_bridge for consistent interface. Check _ORJSON_AVAILABLE for feature detection.",
+      "date": "2026-01-24"
     }
   ],
   "stories": [
@@ -232,14 +237,14 @@
       "priority": 5,
       "description": "Replace json.loads/dumps with orjson in rust_bridge.py for ~80% faster JSON parsing.",
       "files": ["rust_bridge.py", "requirements.txt"],
-      "passes": false,
+      "passes": true,
       "criteria": [
         "RUN: grep -q 'orjson' rust_bridge.py (orjson imported)",
         "RUN: grep -q 'orjson' requirements.txt || grep -q 'orjson' pyproject.toml (dependency added)",
         "RUN: python3 -c \"import orjson; print('orjson available')\" (orjson installed)",
         "RUN: python3 -c \"from rust_bridge import RustSession; s=RustSession('test_save.sav'); r=s.get_entry('country','0'); s.close(); print('OK')\" (bridge works with orjson)"
       ],
-      "notes": "orjson.loads() returns bytes, orjson.dumps() returns bytes. May need .decode() in places."
+      "notes": "Completed 2026-01-24. orjson.dumps() returns bytes (no encode needed). orjson.loads() accepts both bytes and str. Wrapped with _json_loads/_json_dumps helpers that fallback to stdlib json if orjson unavailable. orjson raises ValueError on decode errors (not JSONDecodeError). _ORJSON_AVAILABLE flag exposed for testing."
     },
     {
       "id": "MIG-019",

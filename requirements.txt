@@ -5,3 +5,4 @@ watchdog>=3.0
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 pydantic>=2.0.0
+orjson>=3.9.0

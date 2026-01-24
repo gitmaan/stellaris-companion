@@ -28,8 +28,25 @@ Session Mode:
 from __future__ import annotations
 
 import atexit
-import json
 import os
+
+# Use orjson for faster JSON parsing (~80% faster than stdlib json)
+try:
+    import orjson
+    _json_loads = orjson.loads
+    def _json_dumps(obj) -> bytes:
+        """orjson.dumps returns bytes, which is what we need for stdin."""
+        return orjson.dumps(obj)
+    _ORJSON_AVAILABLE = True
+except ImportError:
+    import json
+    _json_loads = json.loads
+    def _json_dumps(obj) -> bytes:
+        """Fallback to stdlib json, encode to bytes for consistency."""
+        return json.dumps(obj).encode()
+    _ORJSON_AVAILABLE = False
+
+import json  # Keep for error parsing fallback
 import platform
 import queue
 import subprocess
@@ -223,10 +240,11 @@ class RustSession:
                 break
 
             try:
-                response = json.loads(item)
+                response = _json_loads(item)
                 if response.get("done"):
                     break
-            except json.JSONDecodeError:
+            except (ValueError, TypeError):
+                # orjson raises ValueError, json raises JSONDecodeError (subclass of ValueError)
                 break
 
         self._in_stream = False
@@ -240,7 +258,7 @@ class RustSession:
         self._drain_stream()
 
         try:
-            data = json.dumps(request).encode() + b"\n"
+            data = _json_dumps(request) + b"\n"
             self._proc.stdin.write(data)
             self._proc.stdin.flush()
         except BrokenPipeError:
@@ -258,7 +276,7 @@ class RustSession:
         if isinstance(item, Exception):
             raise ParserError(f"Session reader error: {item}")
 
-        response = json.loads(item)
+        response = _json_loads(item)
         if not response.get("ok", False):
             raise ParserError(
                 message=response.get("message", "Unknown error"),
@@ -627,14 +645,15 @@ def _parse_error(stderr: bytes, exit_code: int | None = None) -> dict:
         Dict with keys: message, line, col, exit_code
     """
     try:
-        err = json.loads(stderr)
+        err = _json_loads(stderr)
         return {
             "message": err.get("message") or err.get("error", "Unknown error"),
             "line": err.get("line"),
             "col": err.get("col"),
             "exit_code": exit_code,
         }
-    except json.JSONDecodeError:
+    except (ValueError, TypeError):
+        # orjson raises ValueError, json raises JSONDecodeError (subclass of ValueError)
         # Fallback for non-JSON error output
         return {
             "message": stderr.decode(errors="replace").strip() or "Unknown error",
@@ -706,7 +725,7 @@ def _spawn_extract_sections(save_path: str | Path, sections: list[str]) -> dict:
         error_info = _parse_error(result.stderr, result.returncode)
         raise ParserError(**error_info)
 
-    return json.loads(result.stdout)
+    return _json_loads(result.stdout)
 
 
 def iter_section_entries(
@@ -775,7 +794,7 @@ def _spawn_iter_section_entries(
 
     for line in proc.stdout:
         if line.strip():
-            entry = json.loads(line)
+            entry = _json_loads(line)
             yield entry["key"], entry["value"]
 
     proc.wait()
