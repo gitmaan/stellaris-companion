@@ -134,14 +134,14 @@
       "id": "GHR-011",
       "title": "Add basic tests for signals.py",
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "test -f tests/test_signals.py",
         "grep -q 'def test_' tests/test_signals.py",
         "grep -q 'build_snapshot_signals' tests/test_signals.py",
         "python3 -m pytest tests/test_signals.py -v --tb=short 2>&1 | grep -q 'passed'"
       ],
-      "notes": "At minimum test build_snapshot_signals returns expected structure"
+      "notes": "Created 43 tests covering build_snapshot_signals and all 13 extraction functions (_extract_leader_signals, _extract_war_signals, etc.). Uses mock SaveExtractor to avoid needing Rust session or test saves. Also tests helper functions _clean_war_name_part and _resolve_war_name_from_block."
     },
     {
       "id": "GHR-012",
@@ -197,6 +197,11 @@
       "id": "GHR-P008",
       "learned": "2026-01-25",
       "description": "System Python on macOS is externally managed (PEP 668). Use project venv/ for installing tools like black: 'source venv/bin/activate && pip install black'"
+    },
+    {
+      "id": "GHR-P009",
+      "learned": "2026-01-26",
+      "description": "For signals.py tests, use mock SaveExtractor instead of requiring Rust session or real test saves. Mock each extractor method (get_leaders, get_wars, etc.) to return expected structures. Tests should verify return structure without hitting actual save files."
     }
   ]
 }
