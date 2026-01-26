@@ -2,8 +2,11 @@ name: Rust Parser Build
 
 on:
   push:
+    branches: [main]
     tags:
       - 'v*'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       debug_enabled:
@@ -15,7 +18,32 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Lint job runs on every push/PR for fast feedback
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        working-directory: stellaris-parser
+        run: cargo fmt --check
+
+      - name: Run clippy
+        working-directory: stellaris-parser
+        run: cargo clippy -- -D warnings
+
+      - name: Run tests
+        working-directory: stellaris-parser
+        run: cargo test
+
+  # Build jobs only run on tags (releases)
   build-windows:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +66,7 @@ jobs:
           path: stellaris-parser/target/release/stellaris-parser.exe
 
   build-macos-x64:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
@@ -63,6 +92,7 @@ jobs:
           path: stellaris-parser/target/release/stellaris-parser-darwin-x64
 
   build-macos-arm64:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -88,6 +118,7 @@ jobs:
           path: stellaris-parser/target/release/stellaris-parser-darwin-arm64
 
   build-linux:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
