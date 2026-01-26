@@ -36,8 +36,8 @@ pub fn run_save(path: &str, section: &str, schema_version: &str, format: &str) -
 
     // Parse the full gamestate using Windows-1252 encoding
     // (Stellaris saves use Windows-1252, not UTF-8)
-    let parsed: HashMap<String, Value> = from_windows1252_slice(&gamestate_content)
-        .with_context(|| "Failed to parse gamestate")?;
+    let parsed: HashMap<String, Value> =
+        from_windows1252_slice(&gamestate_content).with_context(|| "Failed to parse gamestate")?;
 
     // Get the requested section
     if let Some(section_value) = parsed.get(section) {

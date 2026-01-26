@@ -43,10 +43,9 @@ use serde_json::Value;
 #[allow(dead_code)]
 pub fn validate_json_strings(value: &Value) -> bool {
     match value {
-        Value::String(s) => {
-            // Check that the string is valid UTF-8 (it always is if we got here,
-            // but this documents the contract)
-            s.as_bytes().len() > 0 || s.is_empty()
+        Value::String(_) => {
+            // Strings from serde_json are always valid UTF-8
+            true
         }
         Value::Array(arr) => arr.iter().all(validate_json_strings),
         Value::Object(obj) => obj.values().all(validate_json_strings),

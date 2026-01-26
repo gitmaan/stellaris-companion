@@ -78,8 +78,8 @@ fn extract_sections(gamestate: &[u8], meta: Option<&[u8]>, sections: &[&str]) ->
 
     // Parse the full gamestate once using Windows-1252 encoding
     // (Stellaris saves use Windows-1252, not UTF-8)
-    let parsed: HashMap<String, Value> = from_windows1252_slice(gamestate)
-        .with_context(|| "Failed to parse gamestate")?;
+    let parsed: HashMap<String, Value> =
+        from_windows1252_slice(gamestate).with_context(|| "Failed to parse gamestate")?;
 
     // Extract requested sections from gamestate
     for section in sections {
@@ -179,7 +179,10 @@ mod tests {
         let test_path = "../test_save.sav";
         if Path::new(test_path).exists() {
             let result = read_sav_file(test_path);
-            assert!(result.is_ok(), "Should be able to read test_save.sav as ZIP");
+            assert!(
+                result.is_ok(),
+                "Should be able to read test_save.sav as ZIP"
+            );
             let (gamestate, meta) = result.unwrap();
             assert!(!gamestate.is_empty(), "Gamestate should not be empty");
             assert!(meta.is_some(), "Meta should be present in test save");

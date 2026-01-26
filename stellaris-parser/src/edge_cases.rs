@@ -41,8 +41,8 @@ species={
 "#;
 
         // Should parse without error
-        let parsed: HashMap<String, Value> =
-            from_utf8_slice(clausewitz_data).expect("Should parse Clausewitz data with duplicate keys");
+        let parsed: HashMap<String, Value> = from_utf8_slice(clausewitz_data)
+            .expect("Should parse Clausewitz data with duplicate keys");
 
         // Verify we can access the data
         let species = parsed.get("species").expect("species section should exist");
@@ -111,7 +111,9 @@ fleet_manager={
         );
 
         let parsed = result.unwrap();
-        let manager = parsed.get("fleet_manager").expect("fleet_manager should exist");
+        let manager = parsed
+            .get("fleet_manager")
+            .expect("fleet_manager should exist");
         assert!(manager.get("fleet").is_some(), "fleet key should exist");
     }
 
@@ -202,14 +204,8 @@ fleet_manager={
             from_utf8_slice(clausewitz_data).expect("Failed to parse quoted condensed syntax");
 
         let data = parsed.get("data").expect("data should exist");
-        assert_eq!(
-            data.get("first").and_then(|v| v.as_str()),
-            Some("hello")
-        );
-        assert_eq!(
-            data.get("second").and_then(|v| v.as_str()),
-            Some("world")
-        );
+        assert_eq!(data.get("first").and_then(|v| v.as_str()), Some("hello"));
+        assert_eq!(data.get("second").and_then(|v| v.as_str()), Some("world"));
     }
 
     /// Test that escape sequences in strings are handled correctly

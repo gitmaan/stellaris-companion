@@ -51,14 +51,9 @@ pub fn handle_error(err: anyhow::Error) -> ! {
         || message.contains("The system cannot find")
     {
         ErrorKind::FileNotFound
-    } else if message.contains("Failed to parse")
-        || message.contains("Failed to read ZIP")
-        || message.contains("No gamestate file")
-        || message.contains("No meta file")
-    {
-        ErrorKind::ParseError
     } else {
-        ErrorKind::ParseError // Default to parse error for other issues
+        // Default to parse error for parsing issues and other errors
+        ErrorKind::ParseError
     };
 
     exit_with_error(kind, &message);
