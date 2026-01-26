@@ -1,8 +1,22 @@
-google-genai>=1.0.0
-python-dotenv>=1.0.0
-discord.py>=2.0
-watchdog>=3.0
-fastapi>=0.100.0
-uvicorn[standard]>=0.23.0
-pydantic>=2.0.0
-orjson>=3.9.0
+# Stellaris Companion - Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core LLM integration
+google-genai==1.57.0
+
+# Environment configuration
+python-dotenv==1.2.1
+
+# Discord bot
+discord.py==2.6.4
+
+# File system monitoring
+watchdog==6.0.0
+
+# API server (for Electron app)
+fastapi==0.123.10
+uvicorn[standard]==0.40.0
+pydantic==2.12.5
+
+# Performance optimization (optional, falls back to stdlib json)
+orjson==3.10.18
