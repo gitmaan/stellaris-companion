@@ -42,7 +42,6 @@ dev = [
 [tool.ruff]
 target-version = "py310"
 line-length = 100
-exclude = ["v1_test.py"]  # legacy script with Python 3.12 f-string syntax
 
 [tool.ruff.lint]
 select = [
@@ -71,8 +70,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B011"]  # assert False is fine in tests
-"experiments/*" = ["E", "W", "F", "B"]  # experiment files are messy
-"v1_*.py" = ["E402", "E", "W", "F"]  # legacy scripts - don't lint
 "v2_*.py" = ["E402"]  # top-level scripts load dotenv before imports
 "backend/*.py" = ["E402"]  # backend files modify sys.path before imports
 "backend/**/*.py" = ["E402"]  # all backend submodules
