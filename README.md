@@ -1,5 +1,11 @@
 # Stellaris LLM Companion
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Rust CI](https://github.com/gitmaan/stellaris-companion/actions/workflows/rust-parser.yml/badge.svg)](https://github.com/gitmaan/stellaris-companion/actions/workflows/rust-parser.yml)
+[![Python CI](https://github.com/gitmaan/stellaris-companion/actions/workflows/python.yml/badge.svg)](https://github.com/gitmaan/stellaris-companion/actions/workflows/python.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Rust](https://img.shields.io/badge/rust-required-orange.svg)](https://rustup.rs/)
+
 AI-powered strategic advisor for Stellaris using Gemini 3 Flash. Chat with an intelligent advisor that understands your empire's situation, provides strategic analysis, and adapts its personality to your empire's ethics and civics.
 
 ## Features
