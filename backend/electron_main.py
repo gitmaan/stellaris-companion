@@ -25,8 +25,8 @@ import argparse
 import logging
 import os
 import sys
-from pathlib import Path
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 # Add project root to path for imports
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -199,9 +199,7 @@ def main() -> None:
     # Initialize companion (Electron ingestion manager owns save loading + precompute).
     try:
         companion = Companion(save_path=None, auto_precompute=False)
-        logger.info(
-            "Companion initialized (precompute managed by ingestion coordinator)"
-        )
+        logger.info("Companion initialized (precompute managed by ingestion coordinator)")
     except Exception as e:
         logger.error(f"Failed to initialize companion: {e}")
         sys.exit(1)

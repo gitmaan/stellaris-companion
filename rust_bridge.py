@@ -33,17 +33,23 @@ import os
 # Use orjson for faster JSON parsing (~80% faster than stdlib json)
 try:
     import orjson
+
     _json_loads = orjson.loads
+
     def _json_dumps(obj) -> bytes:
         """orjson.dumps returns bytes, which is what we need for stdin."""
         return orjson.dumps(obj)
+
     _ORJSON_AVAILABLE = True
 except ImportError:
     import json
+
     _json_loads = json.loads
+
     def _json_dumps(obj) -> bytes:
         """Fallback to stdlib json, encode to bytes for consistency."""
         return json.dumps(obj).encode()
+
     _ORJSON_AVAILABLE = False
 
 import json  # Keep for error parsing fallback
@@ -52,9 +58,9 @@ import queue
 import subprocess
 import sys
 import threading
-from contextlib import contextmanager
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import Iterator
 
 
 def _get_binary_path() -> Path:
@@ -94,7 +100,7 @@ def _get_binary_path() -> Path:
     # When running as a PyInstaller bundle inside Electron, sys.frozen is set
     # and the executable is at: resources/python-backend/stellaris-backend
     # The Rust parser is at: resources/rust-parser/<binary_name>
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # Running as a PyInstaller bundle
         # sys.executable points to the bundled executable
         # e.g., /path/to/resources/python-backend/stellaris-backend
@@ -504,12 +510,14 @@ class RustSession:
             This is specifically for fields with duplicate keys in Clausewitz format.
             For normal fields, use get_entry() instead.
         """
-        self._send({
-            "op": "get_duplicate_values",
-            "section": section,
-            "key": key,
-            "field": field,
-        })
+        self._send(
+            {
+                "op": "get_duplicate_values",
+                "section": section,
+                "key": key,
+                "field": field,
+            }
+        )
         response = self._recv()
         return response.get("values", [])
 
@@ -577,10 +585,8 @@ class RustSession:
 
     def _cleanup(self):
         """Forcefully clean up subprocess if still running."""
-        try:
+        with suppress(Exception):
             atexit.unregister(self._cleanup)
-        except Exception:
-            pass
 
         if self._proc and self._proc.poll() is None:
             self._proc.terminate()
@@ -728,9 +734,7 @@ def _spawn_extract_sections(save_path: str | Path, sections: list[str]) -> dict:
     return _json_loads(result.stdout)
 
 
-def iter_section_entries(
-    save_path: str | Path, section: str
-) -> Iterator[tuple[str, dict]]:
+def iter_section_entries(save_path: str | Path, section: str) -> Iterator[tuple[str, dict]]:
     """Stream entries from a large section without loading all into memory.
 
     If called within a session() context, uses the session's cached parsed data.
@@ -764,9 +768,7 @@ def iter_section_entries(
     yield from _spawn_iter_section_entries(save_path, section)
 
 
-def _spawn_iter_section_entries(
-    save_path: str | Path, section: str
-) -> Iterator[tuple[str, dict]]:
+def _spawn_iter_section_entries(save_path: str | Path, section: str) -> Iterator[tuple[str, dict]]:
     """Spawn a subprocess to iterate section entries (original implementation)."""
     binary_path = _get_binary_path()
     if not binary_path.exists():

@@ -87,7 +87,7 @@ class DiagnosticsCollector:
     def _detect_capabilities(self) -> None:
         """Detect available capabilities (Rust bridge, orjson, etc.)."""
         try:
-            from rust_bridge import PARSER_BINARY, _ORJSON_AVAILABLE
+            from rust_bridge import _ORJSON_AVAILABLE, PARSER_BINARY
 
             self.rust_bridge_available = PARSER_BINARY.exists()
             self.orjson_available = _ORJSON_AVAILABLE
@@ -264,9 +264,7 @@ def get_diagnostics() -> dict[str, Any]:
             "total_regex_ms": total_regex_ms,
             "extractor_count": len(collector.timings),
             "rust_extractor_count": sum(1 for t in collector.timings if t.used_rust),
-            "regex_extractor_count": sum(
-                1 for t in collector.timings if not t.used_rust
-            ),
+            "regex_extractor_count": sum(1 for t in collector.timings if not t.used_rust),
             "breakdown": [
                 {
                     "name": t.name,

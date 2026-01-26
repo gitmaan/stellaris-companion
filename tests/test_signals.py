@@ -7,29 +7,29 @@ from SaveExtractor for events and chronicle processing.
 import os
 import sys
 from unittest.mock import MagicMock
+
 import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.signals import (
-    build_snapshot_signals,
     SIGNALS_FORMAT_VERSION,
-    _extract_leader_signals,
-    _extract_war_signals,
-    _extract_diplomacy_signals,
-    _extract_technology_signals,
-    _extract_megastructures_signals,
-    _extract_crisis_signals,
-    _extract_fallen_empires_signals,
-    _extract_policies_signals,
-    _extract_edicts_signals,
-    _extract_galaxy_settings_signals,
-    _extract_systems_signals,
     _clean_war_name_part,
+    _extract_crisis_signals,
+    _extract_diplomacy_signals,
+    _extract_edicts_signals,
+    _extract_fallen_empires_signals,
+    _extract_galaxy_settings_signals,
+    _extract_leader_signals,
+    _extract_megastructures_signals,
+    _extract_policies_signals,
+    _extract_systems_signals,
+    _extract_technology_signals,
+    _extract_war_signals,
     _resolve_war_name_from_block,
+    build_snapshot_signals,
 )
-
 
 # --- Fixtures ---
 

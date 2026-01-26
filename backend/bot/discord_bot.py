@@ -7,13 +7,11 @@ Uses discord.py with app_commands for slash command support.
 """
 
 import asyncio
-import sys
 import logging
+import sys
 from pathlib import Path
-from typing import Optional
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 # Add project root to path for imports
@@ -102,12 +100,12 @@ class StellarisBot(commands.Bot):
         # Import and register commands
         from backend.bot.commands import (
             setup_ask,
-            setup_status,
             setup_briefing,
+            setup_chronicle,
             setup_end_session,
             setup_history,
-            setup_chronicle,
             setup_recap,
+            setup_status,
         )
 
         setup_ask(self)
@@ -145,9 +143,7 @@ class StellarisBot(commands.Bot):
 
         # Log status
         if self.companion.is_loaded:
-            logger.info(
-                f"Loaded save: {self.companion.metadata.get('name', 'Unknown')}"
-            )
+            logger.info(f"Loaded save: {self.companion.metadata.get('name', 'Unknown')}")
         else:
             logger.warning("No save file loaded")
 

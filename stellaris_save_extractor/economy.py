@@ -1,25 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
-import zipfile
-from datetime import datetime
-from pathlib import Path
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import (
-        extract_sections,
-        iter_section_entries,
-        ParserError,
-        _get_active_session,
-    )
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type for type hints
-    _get_active_session = lambda: None
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import _get_active_session
 
 logger = logging.getLogger(__name__)
 
@@ -253,23 +239,15 @@ class EconomyMixin:
                 species_id = key_data.get("species")
                 if species_id is not None:
                     species_id_str = str(species_id)
-                    species_name = species_names.get(
-                        species_id_str, f"Species_{species_id_str}"
-                    )
-                    species_counts[species_name] = (
-                        species_counts.get(species_name, 0) + pop_size
-                    )
+                    species_name = species_names.get(species_id_str, f"Species_{species_id_str}")
+                    species_counts[species_name] = species_counts.get(species_name, 0) + pop_size
 
                 # Extract category (job category: ruler, specialist, worker, slave, etc.)
                 category = key_data.get("category")
                 if category:
-                    job_category_counts[category] = (
-                        job_category_counts.get(category, 0) + pop_size
-                    )
+                    job_category_counts[category] = job_category_counts.get(category, 0) + pop_size
                     # Use category as stratum (they're equivalent in Stellaris)
-                    stratum_counts[category] = (
-                        stratum_counts.get(category, 0) + pop_size
-                    )
+                    stratum_counts[category] = stratum_counts.get(category, 0) + pop_size
 
             # Extract happiness (0.0 to 1.0 scale in save, convert to percentage)
             # Use weighted sum for efficiency instead of storing all values
@@ -326,9 +304,7 @@ class EconomyMixin:
         pop_groups_match = re.search(r"\npop_groups=\n\{", self.gamestate)
         if not pop_groups_match:
             # Fallback: try alternate format
-            pop_groups_match = re.search(
-                r"^pop_groups=\s*\{", self.gamestate, re.MULTILINE
-            )
+            pop_groups_match = re.search(r"^pop_groups=\s*\{", self.gamestate, re.MULTILINE)
             if not pop_groups_match:
                 result["error"] = "Could not find pop_groups section"
                 return result
@@ -407,24 +383,16 @@ class EconomyMixin:
                 species_match = re.search(r"species=(\d+)", key_block)
                 if species_match:
                     species_id = species_match.group(1)
-                    species_name = species_names.get(
-                        species_id, f"Species_{species_id}"
-                    )
-                    species_counts[species_name] = (
-                        species_counts.get(species_name, 0) + pop_size
-                    )
+                    species_name = species_names.get(species_id, f"Species_{species_id}")
+                    species_counts[species_name] = species_counts.get(species_name, 0) + pop_size
 
                 # Extract category (job category: ruler, specialist, worker, slave, etc.)
                 category_match = re.search(r'category="([^"]+)"', key_block)
                 if category_match:
                     category = category_match.group(1)
-                    job_category_counts[category] = (
-                        job_category_counts.get(category, 0) + pop_size
-                    )
+                    job_category_counts[category] = job_category_counts.get(category, 0) + pop_size
                     # Use category as stratum (they're equivalent in Stellaris)
-                    stratum_counts[category] = (
-                        stratum_counts.get(category, 0) + pop_size
-                    )
+                    stratum_counts[category] = stratum_counts.get(category, 0) + pop_size
 
             # Extract happiness (0.0 to 1.0 scale in save, convert to percentage)
             # Weight by pop size for accurate average
@@ -447,9 +415,7 @@ class EconomyMixin:
 
         # Calculate average happiness
         if happiness_values:
-            result["happiness_avg"] = round(
-                sum(happiness_values) / len(happiness_values), 1
-            )
+            result["happiness_avg"] = round(sum(happiness_values) / len(happiness_values), 1)
 
         return result
 
@@ -511,10 +477,8 @@ class EconomyMixin:
             if isinstance(resources, dict):
                 for resource in ALL_RESOURCES:
                     if resource in resources:
-                        try:
+                        with contextlib.suppress(ValueError, TypeError):
                             result["stockpiles"][resource] = float(resources[resource])
-                        except (ValueError, TypeError):
-                            pass
 
         # Extract budget data
         budget = player_data.get("budget", {})
@@ -566,9 +530,7 @@ class EconomyMixin:
         result["monthly_expenses"] = expenses_resources
 
         # Calculate net
-        for resource in set(
-            list(income_resources.keys()) + list(expenses_resources.keys())
-        ):
+        for resource in set(list(income_resources.keys()) + list(expenses_resources.keys())):
             income = income_resources.get(resource, 0)
             expense = expenses_resources.get(resource, 0)
             result["net_monthly"][resource] = round(income - expense, 2)
@@ -646,9 +608,7 @@ class EconomyMixin:
         )
 
         # Map access by ID list (id[i] -> access[i]).
-        ids = self._parse_number_list_block(
-            self._extract_braced_block(market, "id") or ""
-        )
+        ids = self._parse_number_list_block(self._extract_braced_block(market, "id") or "")
         access_flags = self._parse_number_list_block(
             self._extract_braced_block(market, "galactic_market_access") or ""
         )
@@ -696,16 +656,12 @@ class EconomyMixin:
                 "is_galactic": is_galactic,
                 "global_bought": int(global_bought.get(idx, 0)),
                 "global_sold": int(global_sold.get(idx, 0)),
-                "player_bought": (
-                    int(player_bought[idx]) if idx < len(player_bought) else 0
-                ),
+                "player_bought": (int(player_bought[idx]) if idx < len(player_bought) else 0),
                 "player_sold": int(player_sold[idx]) if idx < len(player_sold) else 0,
             }
 
         # Internal market per-country overrides (if present).
-        internal_block = (
-            self._extract_braced_block(market, "internal_market_fluctuations") or ""
-        )
+        internal_block = self._extract_braced_block(market, "internal_market_fluctuations") or ""
         if internal_block:
             # Find player's entry: country=<id> resources={ ... }
             m = re.search(
@@ -714,8 +670,8 @@ class EconomyMixin:
                 re.DOTALL,
             )
             if m:
-                result["internal_market_fluctuations"] = (
-                    self._parse_resource_amounts_block(m.group(1))
+                result["internal_market_fluctuations"] = self._parse_resource_amounts_block(
+                    m.group(1)
                 )
 
         # Rank by fluctuation if available.
@@ -726,9 +682,7 @@ class EconomyMixin:
         ]
         sortable = [(k, float(v)) for k, v in sortable if v is not None]
         sortable.sort(key=lambda kv: kv[1], reverse=True)
-        result["top_overpriced"] = [
-            {"resource": k, "fluctuation": v} for k, v in sortable[:top_n]
-        ]
+        result["top_overpriced"] = [{"resource": k, "fluctuation": v} for k, v in sortable[:top_n]]
         result["top_underpriced"] = [
             {"resource": k, "fluctuation": v}
             for k, v in sorted(sortable, key=lambda kv: kv[1])[:top_n]
@@ -765,9 +719,7 @@ class EconomyMixin:
             result["trade_policy"] = policy_match.group(1)
 
         # Conversions stored as trade_conversions={ energy=... unity=... trade=... consumer_goods=... }
-        conversions_block = (
-            self._extract_braced_block(country_content, "trade_conversions") or ""
-        )
+        conversions_block = self._extract_braced_block(country_content, "trade_conversions") or ""
         if conversions_block:
             inner = self._extract_block_inner(conversions_block)
             for k, v in re.findall(r"\b([a-z_]+)=([\d.-]+)", inner):
@@ -780,9 +732,7 @@ class EconomyMixin:
         budget_block = self._extract_braced_block(country_content, "budget") or ""
         if budget_block:
             income_block = self._extract_braced_block(budget_block, "income") or ""
-            trade_policy_block = (
-                self._extract_braced_block(income_block, "trade_policy") or ""
-            )
+            trade_policy_block = self._extract_braced_block(income_block, "trade_policy") or ""
             if trade_policy_block:
                 amounts = self._parse_resource_amounts_block(trade_policy_block)
                 result["trade_policy_income"] = amounts
@@ -798,13 +748,9 @@ class EconomyMixin:
         for sb in sb_list:
             modules = sb.get("modules", []) if isinstance(sb, dict) else []
             buildings = sb.get("buildings", []) if isinstance(sb, dict) else []
-            hub_count += sum(
-                1 for m in modules if isinstance(m, str) and "trading_hub" in m
-            )
+            hub_count += sum(1 for m in modules if isinstance(m, str) and "trading_hub" in m)
             offworld_count += sum(
-                1
-                for b in buildings
-                if isinstance(b, str) and "offworld_trading_company" in b
+                1 for b in buildings if isinstance(b, str) and "offworld_trading_company" in b
             )
         result["collection"]["trade_hub_modules"] = hub_count
         result["collection"]["offworld_trading_companies"] = offworld_count
@@ -991,9 +937,7 @@ class EconomyMixin:
             for m in candidates:
                 if m.start() < pos:
                     continue
-                depth += inner[pos : m.start()].count("{") - inner[
-                    pos : m.start()
-                ].count("}")
+                depth += inner[pos : m.start()].count("{") - inner[pos : m.start()].count("}")
                 pos = m.start()
                 if depth != 0:
                     continue

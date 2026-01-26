@@ -42,6 +42,7 @@ dev = [
 [tool.ruff]
 target-version = "py310"
 line-length = 100
+exclude = ["v1_test.py"]  # legacy script with Python 3.12 f-string syntax
 
 [tool.ruff.lint]
 select = [
@@ -55,13 +56,27 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
+    "E721",   # type comparison - isinstance() preferred but == works
+    "E731",   # lambda assignment - sometimes cleaner than def
+    "E741",   # ambiguous variable name (l, O, I) - common in loops
+    "B007",   # unused loop variable - often intentional (e.g., for i, x in enumerate)
     "B008",   # function call in default argument (common in FastAPI)
+    "B017",   # assert blind exception - acceptable in tests
+    "B904",   # raise from err - nice but not critical
+    "SIM102", # nested if statements - sometimes clearer than combined
+    "SIM105", # contextlib.suppress - try/except/pass is clearer
     "SIM108", # ternary operator (sometimes less readable)
+    "SIM117", # nested with statements - sometimes clearer
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B011"]  # assert False is fine in tests
-"experiments/*" = ["E", "W", "F"]  # experiment files are messy
+"experiments/*" = ["E", "W", "F", "B"]  # experiment files are messy
+"v1_*.py" = ["E402", "E", "W", "F"]  # legacy scripts - don't lint
+"v2_*.py" = ["E402"]  # top-level scripts load dotenv before imports
+"backend/*.py" = ["E402"]  # backend files modify sys.path before imports
+"backend/**/*.py" = ["E402"]  # all backend submodules
+"scripts/*" = ["E402", "F841"]  # scripts have flexible structure
 
 [tool.ruff.format]
 quote-style = "double"

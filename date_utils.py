@@ -10,7 +10,6 @@ Game start date is 2200.01.01 (day 0).
 from __future__ import annotations
 
 import re
-from typing import Tuple
 
 # Stellaris uses 360-day years
 DAYS_PER_YEAR = 360
@@ -19,7 +18,7 @@ MONTHS_PER_YEAR = 12
 GAME_START_YEAR = 2200
 
 
-def parse_date(date_str: str) -> Tuple[int, int, int] | None:
+def parse_date(date_str: str) -> tuple[int, int, int] | None:
     """Parse a Stellaris date string into (year, month, day).
 
     Args:
@@ -31,10 +30,10 @@ def parse_date(date_str: str) -> Tuple[int, int, int] | None:
     if not date_str:
         return None
 
-    match = re.match(r'^(\d{4})\.(\d{2})\.(\d{2})$', date_str.strip())
+    match = re.match(r"^(\d{4})\.(\d{2})\.(\d{2})$", date_str.strip())
     if not match:
         # Try alternate format YYYY.M.D
-        match = re.match(r'^(\d{4})\.(\d{1,2})\.(\d{1,2})$', date_str.strip())
+        match = re.match(r"^(\d{4})\.(\d{1,2})\.(\d{1,2})$", date_str.strip())
         if not match:
             return None
 
@@ -213,9 +212,7 @@ def is_valid_date(date_str: str) -> bool:
         return False
 
     year, month, day = parsed
-    return (year >= GAME_START_YEAR and
-            1 <= month <= MONTHS_PER_YEAR and
-            1 <= day <= DAYS_PER_MONTH)
+    return year >= GAME_START_YEAR and 1 <= month <= MONTHS_PER_YEAR and 1 <= day <= DAYS_PER_MONTH
 
 
 def compare_dates(date1: str, date2: str) -> int | None:

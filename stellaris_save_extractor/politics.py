@@ -1,17 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import iter_section_entries, ParserError, _get_active_session
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type for type hints
-    _get_active_session = lambda: None
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import _get_active_session
 
 logger = logging.getLogger(__name__)
 
@@ -156,24 +150,18 @@ class PoliticsMixin:
 
             sp = faction_data.get("support_percent")
             if sp is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     support_percent = float(sp)
-                except (ValueError, TypeError):
-                    pass
 
             spow = faction_data.get("support_power")
             if spow is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     support_power = float(spow)
-                except (ValueError, TypeError):
-                    pass
 
             appr = faction_data.get("faction_approval")
             if appr is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     approval = float(appr)
-                except (ValueError, TypeError):
-                    pass
 
             # Count members
             members = faction_data.get("members", [])
@@ -272,23 +260,15 @@ class PoliticsMixin:
                 {
                     "id": str(faction_id),
                     "country_id": player_id,
-                    "type": (
-                        faction_type_match.group(1) if faction_type_match else "unknown"
-                    ),
+                    "type": (faction_type_match.group(1) if faction_type_match else "unknown"),
                     "name": name,
                     "support_percent": (
-                        float(support_percent_match.group(1))
-                        if support_percent_match
-                        else 0.0
+                        float(support_percent_match.group(1)) if support_percent_match else 0.0
                     ),
                     "support_power": (
-                        float(support_power_match.group(1))
-                        if support_power_match
-                        else 0.0
+                        float(support_power_match.group(1)) if support_power_match else 0.0
                     ),
-                    "approval": (
-                        float(approval_match.group(1)) if approval_match else 0.0
-                    ),
+                    "approval": (float(approval_match.group(1)) if approval_match else 0.0),
                     "members_count": members_count,
                 }
             )

@@ -18,12 +18,11 @@ If no save file is specified, the bot will try to find the most recent save
 in the standard Stellaris save locations.
 """
 
+import logging
 import os
 import sys
-import asyncio
-import logging
-from pathlib import Path
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 # Add project root to path for imports
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -38,10 +37,10 @@ try:
 except ImportError:
     pass  # dotenv not installed, rely on environment variables
 
+from backend.bot.discord_bot import create_bot
 from backend.core.companion import Companion
 from backend.core.database import get_default_db
 from backend.core.save_watcher import SaveWatcher
-from backend.bot.discord_bot import create_bot
 
 
 def configure_logging() -> None:
@@ -166,9 +165,7 @@ def main():
     # Get notification channel
     notification_channel = get_notification_channel()
     if notification_channel:
-        logger.info(
-            f"Save notifications will be sent to channel: {notification_channel}"
-        )
+        logger.info(f"Save notifications will be sent to channel: {notification_channel}")
 
     # Initialize history database (Phase 3 foundation)
     try:
@@ -182,9 +179,7 @@ def main():
     try:
         companion = Companion(save_path=save_path)
         if companion.is_loaded:
-            logger.info(
-                f"Companion loaded: {companion.metadata.get('name', 'Unknown')}"
-            )
+            logger.info(f"Companion loaded: {companion.metadata.get('name', 'Unknown')}")
             logger.info(f"Personality: {companion.personality_summary}")
     except Exception as e:
         logger.error(f"Failed to initialize companion: {e}")

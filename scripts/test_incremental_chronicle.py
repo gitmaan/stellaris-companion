@@ -14,11 +14,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Load .env if exists
-env_path = Path(__file__).parent.parent / '.env'
+env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
     for line in env_path.read_text().splitlines():
-        if '=' in line and not line.startswith('#'):
-            key, value = line.split('=', 1)
+        if "=" in line and not line.startswith("#"):
+            key, value = line.split("=", 1)
             os.environ.setdefault(key.strip(), value.strip())
 
 
@@ -30,6 +30,7 @@ def main():
     # Step 1: Initialize database
     print("\n1. Initializing database...")
     from backend.core.database import GameDatabase
+
     db = GameDatabase()
     print(f"   Schema version: {db.get_schema_version()}")
 
@@ -45,18 +46,20 @@ def main():
     print("\n2. Available sessions:")
     sessions = db.get_sessions(limit=5)
     for s in sessions:
-        save_id = s.get('save_id', 'N/A')
-        event_count = db.get_event_count(s['id'])
-        print(f"   {s['id'][:8]}... | {s['empire_name']} | save_id={save_id[:16]}... | {event_count} events")
+        save_id = s.get("save_id", "N/A")
+        event_count = db.get_event_count(s["id"])
+        print(
+            f"   {s['id'][:8]}... | {s['empire_name']} | save_id={save_id[:16]}... | {event_count} events"
+        )
 
     if not sessions:
         print("   No sessions found!")
         return 1
 
     # Use session with most snapshots
-    session = max(sessions, key=lambda s: s.get('snapshot_count', 0))
-    session_id = session['id']
-    save_id = session.get('save_id')
+    session = max(sessions, key=lambda s: s.get("snapshot_count", 0))
+    session_id = session["id"]
+    save_id = session.get("save_id")
     print(f"\n3. Testing with: {session['empire_name']}")
     print(f"   Session ID: {session_id}")
     print(f"   Save ID: {save_id}")
@@ -67,7 +70,9 @@ def main():
     if save_id:
         # Test get_save_id_for_session
         retrieved_save_id = db.get_save_id_for_session(session_id)
-        print(f"   get_save_id_for_session: {retrieved_save_id[:16] if retrieved_save_id else 'None'}...")
+        print(
+            f"   get_save_id_for_session: {retrieved_save_id[:16] if retrieved_save_id else 'None'}..."
+        )
 
         # Test get_all_events_by_save_id
         all_events = db.get_all_events_by_save_id(save_id=save_id)
@@ -75,16 +80,19 @@ def main():
 
         # Test get_snapshot_range_for_save
         snapshot_range = db.get_snapshot_range_for_save(save_id)
-        print(f"   get_snapshot_range_for_save: {snapshot_range.get('first_game_date')} to {snapshot_range.get('last_game_date')}")
+        print(
+            f"   get_snapshot_range_for_save: {snapshot_range.get('first_game_date')} to {snapshot_range.get('last_game_date')}"
+        )
         print(f"   Snapshot count: {snapshot_range.get('snapshot_count')}")
     else:
         print("   SKIP: No save_id for this session")
 
     # Step 4: Test ChronicleGenerator without LLM
     print("\n5. Testing ChronicleGenerator structure...")
-    api_key = os.environ.get('GOOGLE_API_KEY')
+    api_key = os.environ.get("GOOGLE_API_KEY")
 
     from backend.core.chronicle import ChronicleGenerator
+
     generator = ChronicleGenerator(db=db, api_key=api_key or "dummy")
 
     # Test _load_chapters_data
@@ -119,10 +127,12 @@ def main():
         # Test data gathering without LLM
         try:
             data = generator._gather_session_data(session_id)
-            print(f"\n6. Gathered session data:")
+            print("\n6. Gathered session data:")
             print(f"   Events: {len(data['events'])}")
             print(f"   Date range: {data['first_date']} to {data['last_date']}")
-            print(f"   Empire: {data['briefing'].get('identity', {}).get('empire_name', 'Unknown')}")
+            print(
+                f"   Empire: {data['briefing'].get('identity', {}).get('empire_name', 'Unknown')}"
+            )
         except Exception as e:
             print(f"   Error gathering data: {e}")
             return 1
@@ -137,7 +147,7 @@ def main():
     try:
         result = generator.generate_chronicle(session_id=session_id, force_refresh=True)
 
-        print(f"\n   Response fields:")
+        print("\n   Response fields:")
         print(f"   - chapters: {len(result.get('chapters', []))} chapters")
         print(f"   - current_era: {'present' if result.get('current_era') else 'none'}")
         print(f"   - pending_chapters: {result.get('pending_chapters', 0)}")
@@ -147,26 +157,31 @@ def main():
         print(f"   - event_count: {result.get('event_count')}")
 
         # Show chapter details
-        if result.get('chapters'):
+        if result.get("chapters"):
             print("\n   Chapter details:")
-            for ch in result['chapters']:
-                stale = "⚠️ STALE" if ch.get('context_stale') else ""
-                print(f"   - Chapter {ch['number']}: {ch['title']} ({ch['start_date']} - {ch['end_date']}) {stale}")
+            for ch in result["chapters"]:
+                stale = "⚠️ STALE" if ch.get("context_stale") else ""
+                print(
+                    f"   - Chapter {ch['number']}: {ch['title']} ({ch['start_date']} - {ch['end_date']}) {stale}"
+                )
 
         # Show current era
-        if result.get('current_era'):
-            era = result['current_era']
-            print(f"\n   Current Era: {era.get('start_date')} - present ({era.get('events_covered')} events)")
+        if result.get("current_era"):
+            era = result["current_era"]
+            print(
+                f"\n   Current Era: {era.get('start_date')} - present ({era.get('events_covered')} events)"
+            )
             print(f"   Preview: {era.get('narrative', '')[:200]}...")
 
         # Save output
         output_path = Path(__file__).parent / "test_incremental_output.txt"
-        output_path.write_text(result.get('chronicle', ''))
+        output_path.write_text(result.get("chronicle", ""))
         print(f"\n   Saved full chronicle to: {output_path}")
 
     except Exception as e:
         print(f"   Error generating chronicle: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
@@ -182,5 +197,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

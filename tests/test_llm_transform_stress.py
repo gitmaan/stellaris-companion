@@ -8,9 +8,9 @@ Tests the same 14 scenarios as test_patch_awareness.py but using:
 """
 
 import os
+import re
 import sys
 import time
-import re
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -175,7 +175,7 @@ def run_test(client: genai.Client, test: dict, system_prompt: str) -> tuple[bool
                 system_instruction=system_prompt,
                 temperature=0.7,
                 max_output_tokens=800,
-            )
+            ),
         )
         text = response.text or ""
     except Exception as e:
@@ -216,12 +216,14 @@ def main():
             passed, violations, response = run_test(client, test, system_prompt)
             elapsed = time.time() - start
 
-            run_results.append({
-                "name": test["name"],
-                "passed": passed,
-                "violations": violations,
-                "time": elapsed,
-            })
+            run_results.append(
+                {
+                    "name": test["name"],
+                    "passed": passed,
+                    "violations": violations,
+                    "time": elapsed,
+                }
+            )
 
             status = "✓ PASS" if passed else "✗ FAIL"
             print(f"  {status}: {test['name']} ({elapsed:.1f}s)")
@@ -245,7 +247,9 @@ def main():
     print("\n### COMPARISON WITH FULL FRAMING APPROACH")
     print("-" * 50)
     print("Previous approach (regex + full framing): 42/42 (100%)")
-    print(f"This approach (LLM transform + minimal framing): {passed}/{total} ({100 * passed / total:.0f}%)")
+    print(
+        f"This approach (LLM transform + minimal framing): {passed}/{total} ({100 * passed / total:.0f}%)"
+    )
 
     if passed == total:
         print("\n✓ LLM Transform approach achieves same reliability with:")

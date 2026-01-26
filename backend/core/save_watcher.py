@@ -6,22 +6,22 @@ Watches the Stellaris save directory for new .sav files using watchdog.
 Notifies callbacks when saves are created or modified.
 """
 
-import sys
 import asyncio
 import logging
-from pathlib import Path
-from typing import Callable, Awaitable
+import sys
+from collections.abc import Awaitable, Callable
 from datetime import datetime
+from pathlib import Path
 
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 # Add project root to path for imports
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from save_loader import get_platform_save_paths, find_most_recent_save
+from save_loader import find_most_recent_save, get_platform_save_paths
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +81,7 @@ class SaveFileHandler(FileSystemEventHandler):
         # Call async callback if provided
         if self.on_save_detected_async and self.loop:
             try:
-                asyncio.run_coroutine_threadsafe(
-                    self.on_save_detected_async(path), self.loop
-                )
+                asyncio.run_coroutine_threadsafe(self.on_save_detected_async(path), self.loop)
             except Exception as e:
                 logger.error(f"Error scheduling async callback: {e}")
 

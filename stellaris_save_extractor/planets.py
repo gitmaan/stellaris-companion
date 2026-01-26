@@ -1,25 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
-import zipfile
-from datetime import datetime
-from pathlib import Path
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import (
-        extract_sections,
-        iter_section_entries,
-        ParserError,
-        _get_active_session,
-    )
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type for type hints
-    _get_active_session = lambda: None
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import ParserError, _get_active_session
 
 logger = logging.getLogger(__name__)
 
@@ -209,9 +195,7 @@ class PlanetsMixin:
                 planet_info["planet_modifier"] = pm.replace("pm_", "")
 
             # Extract timed modifiers
-            timed_mods = self._extract_timed_modifiers_rust(
-                planet.get("timed_modifier")
-            )
+            timed_mods = self._extract_timed_modifiers_rust(planet.get("timed_modifier"))
             if timed_mods:
                 planet_info["modifiers"] = timed_mods
 
@@ -346,9 +330,7 @@ class PlanetsMixin:
                 planet_id_int = int(planet_id)
                 pop_size = int(size)
                 if pop_size > 0:
-                    pop_by_planet[planet_id_int] = (
-                        pop_by_planet.get(planet_id_int, 0) + pop_size
-                    )
+                    pop_by_planet[planet_id_int] = pop_by_planet.get(planet_id_int, 0) + pop_size
             except (ValueError, TypeError):
                 continue
 
@@ -436,14 +418,18 @@ class PlanetsMixin:
                     }
 
             # Extract numeric fields
-            for key in ["index", "clues", "difficulty", "days_left",
-                        "last_excavator_country", "excavator_fleet"]:
+            for key in [
+                "index",
+                "clues",
+                "difficulty",
+                "days_left",
+                "last_excavator_country",
+                "excavator_fleet",
+            ]:
                 value = site.get(key)
                 if value is not None:
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         entry[key] = int(value)
-                    except (ValueError, TypeError):
-                        pass
 
             # Extract locked boolean
             locked = site.get("locked")
@@ -608,9 +594,7 @@ class PlanetsMixin:
 
             completed_block = extract_key_block(site_block, "completed") or ""
             if completed_block:
-                entry["completed_count"] = len(
-                    re.findall(r"\bcountry=(\d+)", completed_block)
-                )
+                entry["completed_count"] = len(re.findall(r"\bcountry=(\d+)", completed_block))
                 dates = re.findall(r'\bdate=\s*"(\d+\.\d+\.\d+)"', completed_block)
                 if dates:
                     entry["last_completed_date"] = dates[-1]
@@ -619,9 +603,7 @@ class PlanetsMixin:
             if events_block:
                 event_ids = re.findall(r'\bevent_id="([^"]+)"', events_block)
                 entry["events_count"] = len(event_ids)
-                entry["active_events_count"] = len(
-                    re.findall(r"\bexpired=no\b", events_block)
-                )
+                entry["active_events_count"] = len(re.findall(r"\bexpired=no\b", events_block))
 
             sites_found.append(entry)
             if len(sites_found) >= limit:

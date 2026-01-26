@@ -26,13 +26,11 @@ try:
     from google import genai
     from google.genai import types
 except ImportError:
-    raise ImportError(
-        "google-genai package not installed. Run: pip install google-genai"
-    )
+    raise ImportError("google-genai package not installed. Run: pip install google-genai")
 
-from save_extractor import SaveExtractor
-from personality import build_optimized_prompt, get_personality_summary
 from backend.core.conversation import ConversationManager
+from personality import build_optimized_prompt, get_personality_summary
+from save_extractor import SaveExtractor
 
 # Configure dedicated logger for companion performance metrics
 logger = logging.getLogger("stellaris.companion")
@@ -241,12 +239,8 @@ class Companion:
             # Build game context for version/DLC awareness
             game_context = self._build_game_context()
 
-            self.system_prompt = build_optimized_prompt(
-                self.identity, self.situation, game_context
-            )
-            self.personality_summary = get_personality_summary(
-                self.identity, self.situation
-            )
+            self.system_prompt = build_optimized_prompt(self.identity, self.situation, game_context)
+            self.personality_summary = get_personality_summary(self.identity, self.situation)
         except Exception as e:
             print(f"Warning: Failed to build personality ({e}), using fallback")
             self.system_prompt = FALLBACK_SYSTEM_PROMPT
@@ -391,9 +385,7 @@ class Companion:
         if prev_mil != curr_mil and prev_mil > 0:
             pct = ((curr_mil - prev_mil) / prev_mil) * 100
             sign = "+" if pct > 0 else ""
-            changes.append(
-                f"Military power: {prev_mil:,} -> {curr_mil:,} ({sign}{pct:.0f}%)"
-            )
+            changes.append(f"Military power: {prev_mil:,} -> {curr_mil:,} ({sign}{pct:.0f}%)")
 
         # Compare fleet count
         prev_fleets = prev.get("military", {}).get("fleet_count", 0)
@@ -409,9 +401,7 @@ class Companion:
         if prev_tech != curr_tech and prev_tech > 0:
             pct = ((curr_tech - prev_tech) / prev_tech) * 100
             sign = "+" if pct > 0 else ""
-            changes.append(
-                f"Tech power: {prev_tech:,} -> {curr_tech:,} ({sign}{pct:.0f}%)"
-            )
+            changes.append(f"Tech power: {prev_tech:,} -> {curr_tech:,} ({sign}{pct:.0f}%)")
 
         # Compare population
         prev_pop = prev.get("territory", {}).get("total_population", 0)
@@ -427,22 +417,16 @@ class Companion:
         if prev_colonies != curr_colonies:
             diff = curr_colonies - prev_colonies
             sign = "+" if diff > 0 else ""
-            changes.append(
-                f"Colonies: {prev_colonies} -> {curr_colonies} ({sign}{diff})"
-            )
+            changes.append(f"Colonies: {prev_colonies} -> {curr_colonies} ({sign}{diff})")
 
         # Check for new wars (compare war counts or detect new entries)
         prev_wars = prev.get("military", {}).get("active_wars", [])
         curr_wars = curr.get("military", {}).get("active_wars", [])
         prev_war_names = (
-            {w.get("name", "") for w in prev_wars}
-            if isinstance(prev_wars, list)
-            else set()
+            {w.get("name", "") for w in prev_wars} if isinstance(prev_wars, list) else set()
         )
         curr_war_names = (
-            {w.get("name", "") for w in curr_wars}
-            if isinstance(curr_wars, list)
-            else set()
+            {w.get("name", "") for w in curr_wars} if isinstance(curr_wars, list) else set()
         )
         new_wars = curr_war_names - prev_war_names
         for war_name in new_wars:
@@ -781,10 +765,7 @@ class Companion:
             parts = getattr(content, "parts", None)
             if not parts:
                 return False
-            for part in parts:
-                if hasattr(part, "function_call") and part.function_call:
-                    return True
-            return False
+            return any(hasattr(part, "function_call") and part.function_call for part in parts)
         except Exception:
             return False
 
@@ -831,9 +812,7 @@ class Companion:
             return "No save file loaded. Please load a save file first.", 0.0
 
         start_time = time.time()
-        truncated_question = (
-            user_message[:100] + "..." if len(user_message) > 100 else user_message
-        )
+        truncated_question = user_message[:100] + "..." if len(user_message) > 100 else user_message
 
         # Log request start
         logger.info(
@@ -879,9 +858,7 @@ class Companion:
 
             # Prepare message with optional context update note
             message_to_send = (
-                context_update_note + user_message
-                if context_update_note
-                else user_message
+                context_update_note + user_message if context_update_note else user_message
             )
 
             # Build per-message config with tools (cookbook pattern)
@@ -895,10 +872,8 @@ class Companion:
 
             # Only add AFC config if we have tools
             if tools:
-                message_config["automatic_function_calling"] = (
-                    types.AutomaticFunctionCallingConfig(
-                        maximum_remote_calls=8,
-                    )
+                message_config["automatic_function_calling"] = types.AutomaticFunctionCallingConfig(
+                    maximum_remote_calls=8,
                 )
 
             # Add thinking config if not dynamic
@@ -920,9 +895,7 @@ class Companion:
             )
 
             # Extract AFC statistics from history entries added by this request
-            total_calls, call_counts, payload_sizes, _, _ = self._extract_afc_stats(
-                history_before
-            )
+            total_calls, call_counts, payload_sizes, _, _ = self._extract_afc_stats(history_before)
             tools_used = list(call_counts.keys())
 
             # Extract text from response
@@ -943,7 +916,9 @@ class Companion:
                         "Try asking a more specific question, or use /status for a quick overview."
                     )
                 else:
-                    response_text = "I processed your request but couldn't generate a text response."
+                    response_text = (
+                        "I processed your request but couldn't generate a text response."
+                    )
 
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
@@ -1094,15 +1069,9 @@ class Companion:
         """Compute a stable-ish hash for deduping snapshots."""
         if not isinstance(briefing, dict):
             return None
-        meta = (
-            briefing.get("meta", {})
-            if isinstance(briefing.get("meta", {}), dict)
-            else {}
-        )
+        meta = briefing.get("meta", {}) if isinstance(briefing.get("meta", {}), dict) else {}
         military = (
-            briefing.get("military", {})
-            if isinstance(briefing.get("military", {}), dict)
-            else {}
+            briefing.get("military", {}) if isinstance(briefing.get("military", {}), dict) else {}
         )
         date = meta.get("date")
         empire_name = meta.get("empire_name") or meta.get("name")
@@ -1137,14 +1106,8 @@ class Companion:
             logger.error("precompute_failed")
             return
 
-        briefing_json = json.dumps(
-            briefing, ensure_ascii=False, separators=(",", ":"), default=str
-        )
-        meta = (
-            briefing.get("meta", {})
-            if isinstance(briefing.get("meta", {}), dict)
-            else {}
-        )
+        briefing_json = json.dumps(briefing, ensure_ascii=False, separators=(",", ":"), default=str)
+        meta = briefing.get("meta", {}) if isinstance(briefing.get("meta", {}), dict) else {}
         game_date = meta.get("date")
         save_hash = self._compute_save_hash_from_briefing(briefing)
 
@@ -1231,9 +1194,7 @@ class Companion:
                 if session_id:
                     json_text = db.get_latest_session_briefing_json(
                         session_id=session_id
-                    ) or db.get_latest_snapshot_full_briefing_json(
-                        session_id=session_id
-                    )
+                    ) or db.get_latest_snapshot_full_briefing_json(session_id=session_id)
                     if json_text:
                         try:
                             parsed = json.loads(json_text)
@@ -1259,9 +1220,7 @@ class Companion:
                 gd = None
                 if isinstance(parsed, dict):
                     meta = (
-                        parsed.get("meta", {})
-                        if isinstance(parsed.get("meta", {}), dict)
-                        else {}
+                        parsed.get("meta", {}) if isinstance(parsed.get("meta", {}), dict) else {}
                     )
                     gd = meta.get("date")
                 return json_text, (str(gd) if gd is not None else None)
@@ -1351,9 +1310,7 @@ class Companion:
                 max_output_tokens=4096,
             )
             if self._thinking_level != "dynamic":
-                cfg.thinking_config = types.ThinkingConfig(
-                    thinking_level=self._thinking_level
-                )
+                cfg.thinking_config = types.ThinkingConfig(thinking_level=self._thinking_level)
 
             response = self.client.models.generate_content(
                 model="gemini-3-flash-preview",
@@ -1501,9 +1458,7 @@ Be concise but insightful."""
             )
 
             # Extract text from response
-            response_text = (
-                response.text if response.text else "Could not generate briefing."
-            )
+            response_text = response.text if response.text else "Could not generate briefing."
 
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
@@ -1556,9 +1511,7 @@ Be concise but insightful."""
 
             return f"Error: {str(e)}", elapsed
 
-    def ask_simple(
-        self, question: str, history_context: str | None = None
-    ) -> tuple[str, float]:
+    def ask_simple(self, question: str, history_context: str | None = None) -> tuple[str, float]:
         """Ask a question using the 4 consolidated tools.
 
         Uses get_snapshot(), get_details(), search_save_file(), and get_empire_details().
@@ -1599,9 +1552,7 @@ Be concise but insightful."""
             # Use slim snapshot (summaries only, no truncated lists) to prevent hallucination.
             # Model must call get_details() for specific leader/planet/diplomacy info.
             snapshot_data = self.extractor.get_slim_briefing()
-            snapshot_json = json.dumps(
-                snapshot_data, separators=(",", ":"), default=str
-            )
+            snapshot_json = json.dumps(snapshot_data, separators=(",", ":"), default=str)
             snapshot_size = len(snapshot_json)
 
             user_prompt = (
@@ -1695,9 +1646,7 @@ Be concise but insightful."""
                     sorted(details_categories_seen),
                 )
                 tool_payloads = self._extract_new_tool_payloads(history_before)
-                tool_payload_json = json.dumps(
-                    tool_payloads, separators=(",", ":"), default=str
-                )
+                tool_payload_json = json.dumps(tool_payloads, separators=(",", ":"), default=str)
                 # Keep the finalization prompt bounded
                 if len(tool_payload_json) > 12000:
                     tool_payload_json = tool_payload_json[:12000] + "...TRUNCATED"
@@ -1739,9 +1688,7 @@ Be concise but insightful."""
                 # Log finish reason for debugging truncation issues
                 finish_reason = None
                 if direct_response.candidates:
-                    finish_reason = getattr(
-                        direct_response.candidates[0], "finish_reason", None
-                    )
+                    finish_reason = getattr(direct_response.candidates[0], "finish_reason", None)
                     if finish_reason and str(finish_reason) != "STOP":
                         logger.warning(
                             "ask_simple_finalize_finish_reason=%s (may indicate truncation)",
@@ -1755,9 +1702,7 @@ Be concise but insightful."""
 
                 # Warn if response seems truncated (ends mid-sentence)
                 if response_text and len(response_text) > 50:
-                    last_char = (
-                        response_text.rstrip()[-1] if response_text.rstrip() else ""
-                    )
+                    last_char = response_text.rstrip()[-1] if response_text.rstrip() else ""
                     if last_char not in ".!?\")']":
                         logger.warning(
                             "ask_simple_possible_truncation finish_reason=%s last_char='%s' response_len=%d",
@@ -1777,9 +1722,7 @@ Be concise but insightful."""
                 # Log finish reason for non-finalized responses too
                 finish_reason = None
                 if response.candidates:
-                    finish_reason = getattr(
-                        response.candidates[0], "finish_reason", None
-                    )
+                    finish_reason = getattr(response.candidates[0], "finish_reason", None)
                     if finish_reason and str(finish_reason) != "STOP":
                         logger.warning(
                             "ask_simple_afc_finish_reason=%s (may indicate truncation)",
@@ -1790,9 +1733,7 @@ Be concise but insightful."""
 
                 # Warn if response seems truncated
                 if response_text and len(response_text) > 50:
-                    last_char = (
-                        response_text.rstrip()[-1] if response_text.rstrip() else ""
-                    )
+                    last_char = response_text.rstrip()[-1] if response_text.rstrip() else ""
                     if last_char not in ".!?\")']":
                         logger.warning(
                             "ask_simple_possible_truncation finish_reason=%s last_char='%s' response_len=%d",

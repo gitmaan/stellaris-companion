@@ -78,10 +78,10 @@ def benchmark_extraction(save_path: str):
             "data": result,
         }
 
-        print(f"   {name:25} {elapsed*1000:6.0f}ms  {size_kb:6.1f} KB")
+        print(f"   {name:25} {elapsed * 1000:6.0f}ms  {size_kb:6.1f} KB")
 
     print(f"   {'─' * 40}")
-    print(f"   {'TOTAL':25} {total_extract_time*1000:6.0f}ms")
+    print(f"   {'TOTAL':25} {total_extract_time * 1000:6.0f}ms")
     print()
 
     # 3. Complete briefing (all at once, fresh extractor to avoid caching effects)
@@ -94,19 +94,19 @@ def benchmark_extraction(save_path: str):
 
     start = time.time()
     complete_briefing = {
-        'meta': extractor2.get_metadata(),
-        'identity': extractor2.get_empire_identity(),
-        'situation': extractor2.get_situation(),
-        'military': extractor2.get_player_status(),
-        'economy': extractor2.get_resources(),
-        'leaders': extractor2.get_leaders(),
-        'planets': extractor2.get_planets(),
-        'diplomacy': extractor2.get_diplomacy(),
-        'technology': extractor2.get_technology(),
-        'starbases': extractor2.get_starbases(),
-        'fleets': extractor2.get_fleets(),
-        'wars': extractor2.get_wars(),
-        'fallen_empires': extractor2.get_fallen_empires(),
+        "meta": extractor2.get_metadata(),
+        "identity": extractor2.get_empire_identity(),
+        "situation": extractor2.get_situation(),
+        "military": extractor2.get_player_status(),
+        "economy": extractor2.get_resources(),
+        "leaders": extractor2.get_leaders(),
+        "planets": extractor2.get_planets(),
+        "diplomacy": extractor2.get_diplomacy(),
+        "technology": extractor2.get_technology(),
+        "starbases": extractor2.get_starbases(),
+        "fleets": extractor2.get_fleets(),
+        "wars": extractor2.get_wars(),
+        "fallen_empires": extractor2.get_fallen_empires(),
     }
     extract_time = time.time() - start
 
@@ -130,24 +130,26 @@ def benchmark_extraction(save_path: str):
     start = time.time()
     extractor3 = SaveExtractor(save_path)
     complete_briefing = {
-        'meta': extractor3.get_metadata(),
-        'identity': extractor3.get_empire_identity(),
-        'situation': extractor3.get_situation(),
-        'military': extractor3.get_player_status(),
-        'economy': extractor3.get_resources(),
-        'leaders': extractor3.get_leaders(),
-        'planets': extractor3.get_planets(),
-        'diplomacy': extractor3.get_diplomacy(),
-        'technology': extractor3.get_technology(),
-        'starbases': extractor3.get_starbases(),
-        'fleets': extractor3.get_fleets(),
-        'wars': extractor3.get_wars(),
-        'fallen_empires': extractor3.get_fallen_empires(),
+        "meta": extractor3.get_metadata(),
+        "identity": extractor3.get_empire_identity(),
+        "situation": extractor3.get_situation(),
+        "military": extractor3.get_player_status(),
+        "economy": extractor3.get_resources(),
+        "leaders": extractor3.get_leaders(),
+        "planets": extractor3.get_planets(),
+        "diplomacy": extractor3.get_diplomacy(),
+        "technology": extractor3.get_technology(),
+        "starbases": extractor3.get_starbases(),
+        "fleets": extractor3.get_fleets(),
+        "wars": extractor3.get_wars(),
+        "fallen_empires": extractor3.get_fallen_empires(),
     }
     briefing_json = json.dumps(complete_briefing, indent=2, default=str)
     total_reload = time.time() - start
 
-    print(f"   Full reload + extract + serialize: {total_reload * 1000:.0f}ms ({total_reload:.2f}s)")
+    print(
+        f"   Full reload + extract + serialize: {total_reload * 1000:.0f}ms ({total_reload:.2f}s)"
+    )
     print()
 
     # 5. Summary

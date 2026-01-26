@@ -2,8 +2,8 @@
 """Validate migrated extraction against baseline."""
 
 import json
-import sys
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +37,7 @@ def deep_diff(old: Any, new: Any, path: str = "") -> list[str]:
     elif isinstance(old, list):
         if len(old) != len(new):
             diffs.append(f"{path}: list length changed from {len(old)} to {len(new)}")
-        for i, (o, n) in enumerate(zip(old, new)):
+        for i, (o, n) in enumerate(zip(old, new, strict=False)):
             diffs.extend(deep_diff(o, n, f"{path}[{i}]"))
     elif old != new:
         old_str = repr(old)[:50]
@@ -79,12 +79,13 @@ def validate_migration(method_name: str, save_path: str = None, update_baseline:
     except Exception as e:
         print(f"ERROR: Method failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
     # Serialize for comparison
     def json_serializer(obj):
-        if hasattr(obj, '__dict__'):
+        if hasattr(obj, "__dict__"):
             return obj.__dict__
         return str(obj)
 
@@ -128,8 +129,8 @@ def validate_migration(method_name: str, save_path: str = None, update_baseline:
         print(f"\n  ... and {len(diffs) - 20} more differences")
 
     if update_baseline and not regressions:
-        print(f"\n📝 Updating baseline (improvements only)...")
-        with open(baseline_file, 'w') as f:
+        print("\n📝 Updating baseline (improvements only)...")
+        with open(baseline_file, "w") as f:
             json.dump(result_json, f, indent=2, default=json_serializer)
         print(f"✅ Baseline updated: {baseline_file}")
         return True
@@ -138,7 +139,7 @@ def validate_migration(method_name: str, save_path: str = None, update_baseline:
         print(f"\n❌ FAILED: {len(regressions)} regressions found")
         sys.exit(1)
     else:
-        print(f"\n⚠️  Review improvements above. Use --update to accept them.")
+        print("\n⚠️  Review improvements above. Use --update to accept them.")
         return True
 
 

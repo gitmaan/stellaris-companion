@@ -1,25 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
-import zipfile
-from datetime import datetime
-from pathlib import Path
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import (
-        extract_sections,
-        iter_section_entries,
-        ParserError,
-        _get_active_session,
-    )
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type
-    _get_active_session = lambda: None
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import ParserError, _get_active_session
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +34,7 @@ class PlayerMixin:
 
         return None
 
-    def _parse_simple_string_list_block(
-        self, block: str, prefix: str | None = None
-    ) -> list[str]:
+    def _parse_simple_string_list_block(self, block: str, prefix: str | None = None) -> list[str]:
         """Parse a simple `{ "a" "b" }` or `{ a b }` block into a de-duped list."""
         if not block:
             return []
@@ -96,11 +80,7 @@ class PlayerMixin:
 
         data = session.extract_sections(["player"])
         player_list = data.get("player", [])
-        if (
-            player_list
-            and isinstance(player_list, list)
-            and len(player_list) > 0
-        ):
+        if player_list and isinstance(player_list, list) and len(player_list) > 0:
             country_id = player_list[0].get("country", "0")
             return int(country_id)
         return 0
@@ -166,17 +146,13 @@ class PlayerMixin:
                 value = player_country.get(key)
                 if value is not None:
                     # Values come as strings from jomini, convert to appropriate type
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         result[key] = float(value) if "." in str(value) else int(value)
-                    except (ValueError, TypeError):
-                        pass
 
             # Get OWNED fleets from fleets_manager
             fleets_mgr = player_country.get("fleets_manager", {})
             owned_fleets_data = (
-                fleets_mgr.get("owned_fleets", [])
-                if isinstance(fleets_mgr, dict)
-                else []
+                fleets_mgr.get("owned_fleets", []) if isinstance(fleets_mgr, dict) else []
             )
             owned_fleet_ids = []
             for entry in owned_fleets_data:
@@ -213,9 +189,7 @@ class PlayerMixin:
 
         # Separate habitats from planets (different pop capacities)
         habitats = [c for c in colonies if c.get("type", "").startswith("habitat")]
-        regular_planets = [
-            c for c in colonies if not c.get("type", "").startswith("habitat")
-        ]
+        regular_planets = [c for c in colonies if not c.get("type", "").startswith("habitat")]
 
         habitat_pops = sum(p.get("population", 0) for p in habitats)
         planet_pops = sum(p.get("population", 0) for p in regular_planets)
@@ -223,9 +197,7 @@ class PlayerMixin:
         result["colonies"] = {
             "total_count": len(colonies),
             "total_population": total_pops,
-            "avg_pops_per_colony": (
-                round(total_pops / len(colonies), 1) if colonies else 0
-            ),
+            "avg_pops_per_colony": (round(total_pops / len(colonies), 1) if colonies else 0),
             "_note": "These are colonized worlds with population, not all celestial bodies",
             # Breakdown by type for more accurate analysis
             "habitats": {
@@ -237,9 +209,7 @@ class PlayerMixin:
                 "count": len(regular_planets),
                 "population": planet_pops,
                 "avg_pops": (
-                    round(planet_pops / len(regular_planets), 1)
-                    if regular_planets
-                    else 0
+                    round(planet_pops / len(regular_planets), 1) if regular_planets else 0
                 ),
             },
         }
@@ -308,9 +278,7 @@ class PlayerMixin:
                 result["economy_power"] = float(economy_match.group(1))
 
             # Relation to player
-            opinion_match = re.search(
-                r"opinion\s*=\s*\{[^}]*base\s*=\s*([-\d.]+)", empire_data
-            )
+            opinion_match = re.search(r"opinion\s*=\s*\{[^}]*base\s*=\s*([-\d.]+)", empire_data)
             if opinion_match:
                 result["opinion"] = float(opinion_match.group(1))
 
@@ -356,9 +324,7 @@ class PlayerMixin:
             ethic = ethos.get("ethic", [])
             if isinstance(ethic, str):
                 ethic = [ethic]
-            result["ethics"] = [
-                e.replace("ethic_", "") for e in ethic if isinstance(e, str)
-            ]
+            result["ethics"] = [e.replace("ethic_", "") for e in ethic if isinstance(e, str)]
 
         # Extract government info
         gov = country.get("government", {})
@@ -373,11 +339,7 @@ class PlayerMixin:
 
             civics = gov.get("civics", [])
             if isinstance(civics, list):
-                result["civics"] = [
-                    c.replace("civic_", "")
-                    for c in civics
-                    if isinstance(c, str)
-                ]
+                result["civics"] = [c.replace("civic_", "") for c in civics if isinstance(c, str)]
 
         # Check for gestalt
         if "gestalt_consciousness" in result["ethics"]:
@@ -518,31 +480,23 @@ class PlayerMixin:
         # Extract metrics directly from parsed dict
         used = player_country.get("used_naval_capacity")
         if used is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["used"] = int(float(used))
-            except (ValueError, TypeError):
-                pass
 
         fleet_size = player_country.get("fleet_size")
         if fleet_size is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["fleet_size"] = int(fleet_size)
-            except (ValueError, TypeError):
-                pass
 
         starbase_cap = player_country.get("starbase_capacity")
         if starbase_cap is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["starbase_capacity"] = int(starbase_cap)
-            except (ValueError, TypeError):
-                pass
 
         used_starbase = player_country.get("used_starbase_capacity")
         if used_starbase is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["used_starbase_capacity"] = int(used_starbase)
-            except (ValueError, TypeError):
-                pass
 
         return result
 

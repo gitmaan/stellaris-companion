@@ -3,14 +3,8 @@ from __future__ import annotations
 import logging
 import re
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import extract_sections, iter_section_entries, ParserError
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type for type hints
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import iter_section_entries
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +24,7 @@ class SpeciesMixin:
               - count: Total number of species
               - player_species_id: The player's founder species ID
         """
-        # Try Rust parser first
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_species_full_rust()
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for species: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback to regex
-        return self._get_species_full_regex()
+        return self._get_species_full_rust()
 
     def _get_species_full_rust(self) -> dict:
         """Get species using Rust parser.
@@ -78,9 +58,7 @@ class SpeciesMixin:
         species_list = []
 
         # Iterate species using Rust parser
-        for species_id, species_data in iter_section_entries(
-            self.save_path, "species_db"
-        ):
+        for species_id, species_data in iter_section_entries(self.save_path, "species_db"):
             # Skip empty species entries
             if not species_data or len(species_data) < 2:
                 continue

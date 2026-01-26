@@ -13,7 +13,6 @@ and current game situation. The personality is derived from:
 6. Game version (patch-specific mechanics via patches/*.md)
 """
 
-import os
 import re
 from pathlib import Path
 
@@ -410,9 +409,9 @@ def build_personality_prompt_v2(identity: dict, situation: dict) -> str:
     prompt = f"""You are the strategic advisor to {empire_name}.
 
 EMPIRE IDENTITY (use this to shape your personality and voice):
-- Ethics: {', '.join(ethics) if ethics else 'unknown'}
+- Ethics: {", ".join(ethics) if ethics else "unknown"}
 - Authority: {authority}
-- Civics: {', '.join(civics) if civics else 'none'}
+- Civics: {", ".join(civics) if civics else "none"}
 - Species class: {species_class}
 - Gestalt consciousness: {is_gestalt} (Machine: {is_machine}, Hive Mind: {is_hive_mind})
 
@@ -510,7 +509,7 @@ def build_optimized_prompt(
     ethics = identity.get("ethics", [])
     authority = identity.get("authority", "democratic")
     civics = identity.get("civics", [])
-    is_gestalt = identity.get("is_gestalt", False)
+    identity.get("is_gestalt", False)
     is_machine = identity.get("is_machine", False)
     is_hive_mind = identity.get("is_hive_mind", False)
 

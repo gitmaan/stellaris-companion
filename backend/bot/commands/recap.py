@@ -25,9 +25,7 @@ logger = logging.getLogger(__name__)
 def setup(bot) -> None:
     """Register the /recap command with the bot."""
 
-    @bot.tree.command(
-        name="recap", description="Get a recap of your session's recent events"
-    )
+    @bot.tree.command(name="recap", description="Get a recap of your session's recent events")
     @app_commands.describe(
         style='Recap style: "summary" (fast) or "dramatic" (LLM-powered narrative)'
     )
@@ -37,9 +35,7 @@ def setup(bot) -> None:
             app_commands.Choice(name="Dramatic (LLM narrative)", value="dramatic"),
         ]
     )
-    async def recap_command(
-        interaction: discord.Interaction, style: str = "summary"
-    ) -> None:
+    async def recap_command(interaction: discord.Interaction, style: str = "summary") -> None:
         """Generate a recap for the current session."""
         if not bot.companion.is_loaded:
             await interaction.response.send_message(
@@ -61,16 +57,10 @@ def setup(bot) -> None:
 
                 # Get session ID for current campaign
                 briefing = getattr(bot.companion, "_current_snapshot", None) or {}
-                metrics = (
-                    extract_snapshot_metrics(briefing)
-                    if isinstance(briefing, dict)
-                    else {}
-                )
+                metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
 
                 campaign_id = None
-                if bot.companion.extractor and getattr(
-                    bot.companion.extractor, "gamestate", None
-                ):
+                if bot.companion.extractor and getattr(bot.companion.extractor, "gamestate", None):
                     campaign_id = extract_campaign_id_from_gamestate(
                         bot.companion.extractor.gamestate
                     )
@@ -82,11 +72,7 @@ def setup(bot) -> None:
                         if bot.companion.extractor
                         else None
                     ),
-                    empire_name=(
-                        metrics.get("empire_name")
-                        if isinstance(metrics, dict)
-                        else None
-                    ),
+                    empire_name=(metrics.get("empire_name") if isinstance(metrics, dict) else None),
                     save_path=(
                         bot.companion.save_path
                         if isinstance(bot.companion.save_path, Path)

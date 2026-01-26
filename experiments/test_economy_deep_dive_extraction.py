@@ -77,7 +77,13 @@ class TestEconomyDeepDiveExtraction(unittest.TestCase):
         data = self.extractor.get_trade_value()
 
         self.assertIsInstance(data, dict)
-        for key in ["trade_policy", "trade_conversions", "trade_policy_income", "trade_value", "collection"]:
+        for key in [
+            "trade_policy",
+            "trade_conversions",
+            "trade_policy_income",
+            "trade_value",
+            "collection",
+        ]:
             self.assertIn(key, data)
 
         # test_save.sav uses the trade league trade policy (observed in country policies).
@@ -113,7 +119,12 @@ class TestEconomyDeepDiveExtraction(unittest.TestCase):
         data = self.extractor.get_budget_breakdown()
 
         self.assertIsInstance(data, dict)
-        for key in ["by_resource", "tracked_resources", "income_source_count", "expense_source_count"]:
+        for key in [
+            "by_resource",
+            "tracked_resources",
+            "income_source_count",
+            "expense_source_count",
+        ]:
             self.assertIn(key, data)
 
         self.assertIsInstance(data["by_resource"], dict)
@@ -127,7 +138,13 @@ class TestEconomyDeepDiveExtraction(unittest.TestCase):
             self.assertIn(res, data["by_resource"])
             entry = data["by_resource"][res]
             self.assertIsInstance(entry, dict)
-            for required in ["income_total", "expenses_total", "net", "top_income_sources", "top_expense_sources"]:
+            for required in [
+                "income_total",
+                "expenses_total",
+                "net",
+                "top_income_sources",
+                "top_expense_sources",
+            ]:
                 self.assertIn(required, entry)
 
             self.assertIsInstance(entry["income_total"], (int, float))
@@ -151,4 +168,3 @@ class TestEconomyDeepDiveExtraction(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

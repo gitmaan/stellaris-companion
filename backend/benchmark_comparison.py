@@ -11,11 +11,10 @@ Measures: response time, tool calls, response length, quality
 """
 
 import json
-import os
 import sys
 import time
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Load environment variables from .env
 from dotenv import load_dotenv
@@ -52,7 +51,7 @@ def run_test(companion: Companion, question: str, method: str) -> dict:
     # Clear conversation for clean test
     companion.clear_conversation()
 
-    start = time.time()
+    time.time()
 
     if method == "old":
         # OLD approach: chat() with tools, model decides what to call
@@ -220,9 +219,7 @@ def generate_markdown_report(results: dict) -> str:
 
     avg_old_quality = sum(old_quality) / len(old_quality)
     avg_new_quality = sum(new_quality) / len(new_quality)
-    quality_change = (
-        (avg_new_quality - avg_old_quality) / max(avg_old_quality, 0.1)
-    ) * 100
+    quality_change = ((avg_new_quality - avg_old_quality) / max(avg_old_quality, 0.1)) * 100
     md.append(
         f"| Avg Quality Score | {avg_old_quality:.1f}/5 | {avg_new_quality:.1f}/5 | {quality_change:+.0f}% |"
     )
@@ -243,7 +240,7 @@ def generate_markdown_report(results: dict) -> str:
         old = results["old_approach"][i]
         new = results["new_approach"][i]
 
-        md.append(f"### Question {i+1}: {question}")
+        md.append(f"### Question {i + 1}: {question}")
         md.append("")
         md.append("| Metric | Old | New |")
         md.append("|--------|-----|-----|")
@@ -290,12 +287,8 @@ def generate_markdown_report(results: dict) -> str:
         f"- **Responses with numbers:** Old: {old_numbers}/{len(TEST_QUESTIONS)}, New: {new_numbers}/{len(TEST_QUESTIONS)}"
     )
 
-    old_substantial = sum(
-        1 for r in results["old_approach"] if r["quality"]["is_substantial"]
-    )
-    new_substantial = sum(
-        1 for r in results["new_approach"] if r["quality"]["is_substantial"]
-    )
+    old_substantial = sum(1 for r in results["old_approach"] if r["quality"]["is_substantial"])
+    new_substantial = sum(1 for r in results["new_approach"] if r["quality"]["is_substantial"])
     md.append(
         f"- **Substantial responses (>30 words):** Old: {old_substantial}/{len(TEST_QUESTIONS)}, New: {new_substantial}/{len(TEST_QUESTIONS)}"
     )
@@ -307,16 +300,12 @@ def generate_markdown_report(results: dict) -> str:
     md.append("")
 
     if avg_new_time < avg_old_time:
-        md.append(
-            f"- **Speed:** New approach is {time_improvement:.0f}% faster on average"
-        )
+        md.append(f"- **Speed:** New approach is {time_improvement:.0f}% faster on average")
     else:
         md.append(f"- **Speed:** Old approach was faster by {-time_improvement:.0f}%")
 
     if avg_new_tools < avg_old_tools:
-        md.append(
-            f"- **Efficiency:** New approach uses {tool_reduction:.0f}% fewer tool calls"
-        )
+        md.append(f"- **Efficiency:** New approach uses {tool_reduction:.0f}% fewer tool calls")
 
     if avg_new_quality >= avg_old_quality:
         md.append(

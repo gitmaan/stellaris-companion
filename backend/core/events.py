@@ -338,9 +338,7 @@ def compute_events(
         pct = _pct_change(prev_mil, curr_mil)
         delta = curr_mil - prev_mil
         # Only log if meaningful: >=15% and >=2000 absolute, or >=10000 absolute.
-        if (pct is not None and abs(pct) >= 0.15 and abs(delta) >= 2000) or abs(
-            delta
-        ) >= 10000:
+        if (pct is not None and abs(pct) >= 0.15 and abs(delta) >= 2000) or abs(delta) >= 10000:
             sign = "+" if delta > 0 else ""
             pct_text = f"{pct * 100:+.0f}%" if pct is not None else "n/a"
             events.append(
@@ -386,17 +384,9 @@ def compute_events(
                 )
             )
 
-    prev_colonies = _safe_int(
-        prev.get("territory", {}).get("colonies", {}).get("total_count")
-    )
-    curr_colonies = _safe_int(
-        curr.get("territory", {}).get("colonies", {}).get("total_count")
-    )
-    if (
-        prev_colonies is not None
-        and curr_colonies is not None
-        and prev_colonies != curr_colonies
-    ):
+    prev_colonies = _safe_int(prev.get("territory", {}).get("colonies", {}).get("total_count"))
+    curr_colonies = _safe_int(curr.get("territory", {}).get("colonies", {}).get("total_count"))
+    if prev_colonies is not None and curr_colonies is not None and prev_colonies != curr_colonies:
         diff = curr_colonies - prev_colonies
         sign = "+" if diff > 0 else ""
         events.append(
@@ -433,17 +423,9 @@ def compute_events(
             )
         )
 
-    prev_energy = _safe_float(
-        prev.get("economy", {}).get("net_monthly", {}).get("energy")
-    )
-    curr_energy = _safe_float(
-        curr.get("economy", {}).get("net_monthly", {}).get("energy")
-    )
-    if (
-        prev_energy is not None
-        and curr_energy is not None
-        and prev_energy != curr_energy
-    ):
+    prev_energy = _safe_float(prev.get("economy", {}).get("net_monthly", {}).get("energy"))
+    curr_energy = _safe_float(curr.get("economy", {}).get("net_monthly", {}).get("energy"))
+    if prev_energy is not None and curr_energy is not None and prev_energy != curr_energy:
         delta = curr_energy - prev_energy
         pct = _pct_change(prev_energy, curr_energy)
         if _sign_changed(prev_energy, curr_energy) or abs(delta) >= max(
@@ -465,17 +447,9 @@ def compute_events(
                 )
             )
 
-    prev_alloys = _safe_float(
-        prev.get("economy", {}).get("net_monthly", {}).get("alloys")
-    )
-    curr_alloys = _safe_float(
-        curr.get("economy", {}).get("net_monthly", {}).get("alloys")
-    )
-    if (
-        prev_alloys is not None
-        and curr_alloys is not None
-        and prev_alloys != curr_alloys
-    ):
+    prev_alloys = _safe_float(prev.get("economy", {}).get("net_monthly", {}).get("alloys"))
+    curr_alloys = _safe_float(curr.get("economy", {}).get("net_monthly", {}).get("alloys"))
+    if prev_alloys is not None and curr_alloys is not None and prev_alloys != curr_alloys:
         delta = curr_alloys - prev_alloys
         pct = _pct_change(prev_alloys, curr_alloys)
         if _sign_changed(prev_alloys, curr_alloys) or abs(delta) >= max(
@@ -509,9 +483,7 @@ def compute_events(
             continue
         delta = curr_val - prev_val
         pct = _pct_change(prev_val, curr_val)
-        if _sign_changed(prev_val, curr_val) or abs(delta) >= max(
-            min_abs, abs(prev_val) * 0.25
-        ):
+        if _sign_changed(prev_val, curr_val) or abs(delta) >= max(min_abs, abs(prev_val) * 0.25):
             events.append(
                 DetectedEvent(
                     event_type=f"{key}_net_change",
@@ -835,11 +807,7 @@ def compute_events(
     # System count changes (conquered/lost)
     prev_systems = _extract_system_count(prev)
     curr_systems = _extract_system_count(curr)
-    if (
-        prev_systems is not None
-        and curr_systems is not None
-        and prev_systems != curr_systems
-    ):
+    if prev_systems is not None and curr_systems is not None and prev_systems != curr_systems:
         diff = curr_systems - prev_systems
         if diff > 0:
             events.append(
@@ -1029,9 +997,7 @@ def compute_events(
         curr.get("history", {}).get("fallen_empires", {}).get("war_in_heaven", False)
     )
     if not prev_war_in_heaven and curr_war_in_heaven:
-        awakened_names = [
-            name for name, e in curr_fe.items() if e.get("status") == "awakened"
-        ]
+        awakened_names = [name for name, e in curr_fe.items() if e.get("status") == "awakened"]
         events.append(
             DetectedEvent(
                 event_type="war_in_heaven_started",

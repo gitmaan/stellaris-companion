@@ -18,12 +18,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
+
+from personality import build_optimized_prompt, build_personality_prompt_v2
 from save_extractor import SaveExtractor
-from personality import build_personality_prompt_v2, build_optimized_prompt
 
 MODEL = "gemini-3-flash-preview"
 
@@ -52,16 +54,16 @@ def build_snapshot(extractor) -> dict:
     """Build comprehensive snapshot."""
     snapshot = extractor.get_full_briefing()
     leaders = extractor.get_leaders()
-    snapshot['leadership']['leaders'] = leaders.get('leaders', [])
+    snapshot["leadership"]["leaders"] = leaders.get("leaders", [])
     tech = extractor.get_technology()
-    snapshot['current_research'] = tech.get('current_research', {}) or "None - idle"
+    snapshot["current_research"] = tech.get("current_research", {}) or "None - idle"
     return snapshot
 
 
 def run_single_test(client, extractor, system_prompt: str, snapshot: dict, question: str) -> dict:
     """Run a single test with tools available."""
 
-    snapshot_json = json.dumps(snapshot, separators=(',', ':'), default=str)
+    snapshot_json = json.dumps(snapshot, separators=(",", ":"), default=str)
     user_message = f"GAME STATE:\n```json\n{snapshot_json}\n```\n\n{question}"
 
     tools_used = []
@@ -96,11 +98,11 @@ def run_single_test(client, extractor, system_prompt: str, snapshot: dict, quest
     text = response.text if response.text else "[No response]"
 
     return {
-        'response': text,
-        'time': elapsed,
-        'words': len(text.split()),
-        'tools_used': len(tools_used),
-        'tools_list': tools_used,
+        "response": text,
+        "time": elapsed,
+        "words": len(text.split()),
+        "tools_used": len(tools_used),
+        "tools_list": tools_used,
     }
 
 
@@ -134,8 +136,8 @@ def main():
     print()
 
     prompts = {
-        'Production (v2)': production_prompt,
-        'Optimized': optimized_prompt,
+        "Production (v2)": production_prompt,
+        "Optimized": optimized_prompt,
     }
 
     client = genai.Client()
@@ -153,21 +155,22 @@ def main():
             print(f"  [{name}] ", end="", flush=True)
             try:
                 result = run_single_test(client, extractor, prompt, snapshot, question)
-                print(f"{result['time']:.1f}s, {result['words']} words, {result['tools_used']} tools")
-                results[name].append({
-                    'question': question,
-                    **result
-                })
+                print(
+                    f"{result['time']:.1f}s, {result['words']} words, {result['tools_used']} tools"
+                )
+                results[name].append({"question": question, **result})
             except Exception as e:
                 print(f"ERROR: {e}")
-                results[name].append({
-                    'question': question,
-                    'response': str(e),
-                    'time': 0,
-                    'words': 0,
-                    'tools_used': 0,
-                    'tools_list': [],
-                })
+                results[name].append(
+                    {
+                        "question": question,
+                        "response": str(e),
+                        "time": 0,
+                        "words": 0,
+                        "tools_used": 0,
+                        "tools_list": [],
+                    }
+                )
 
     # Generate report
     print("\n" + "=" * 80)
@@ -175,23 +178,25 @@ def main():
     print("=" * 80)
 
     for name in prompts:
-        avg_time = sum(r['time'] for r in results[name]) / len(results[name])
-        avg_words = sum(r['words'] for r in results[name]) / len(results[name])
-        total_tools = sum(r['tools_used'] for r in results[name])
-        print(f"{name}: {avg_time:.1f}s avg, {avg_words:.0f} words avg, {total_tools} total tool calls")
+        avg_time = sum(r["time"] for r in results[name]) / len(results[name])
+        avg_words = sum(r["words"] for r in results[name]) / len(results[name])
+        total_tools = sum(r["tools_used"] for r in results[name])
+        print(
+            f"{name}: {avg_time:.1f}s avg, {avg_words:.0f} words avg, {total_tools} total tool calls"
+        )
 
     # Write detailed report
     report = f"""# Optimized vs Production Comparison
 
-**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
+**Date:** {datetime.now().strftime("%Y-%m-%d %H:%M")}
 
 **Model:** {MODEL}
 
-**Empire:** {identity.get('empire_name')}
+**Empire:** {identity.get("empire_name")}
 
-**Ethics:** {', '.join(identity.get('ethics', []))}
+**Ethics:** {", ".join(identity.get("ethics", []))}
 
-**Authority:** {identity.get('authority')}
+**Authority:** {identity.get("authority")}
 
 ---
 
@@ -227,9 +232,9 @@ def main():
 """
 
     for name in prompts:
-        avg_time = sum(r['time'] for r in results[name]) / len(results[name])
-        avg_words = sum(r['words'] for r in results[name]) / len(results[name])
-        total_tools = sum(r['tools_used'] for r in results[name])
+        avg_time = sum(r["time"] for r in results[name]) / len(results[name])
+        avg_words = sum(r["words"] for r in results[name]) / len(results[name])
+        total_tools = sum(r["tools_used"] for r in results[name])
         report += f"| {name} | {avg_time:.1f}s | {avg_words:.0f} | {total_tools} |\n"
 
     report += "\n---\n\n## Full Responses\n\n"
@@ -238,7 +243,7 @@ def main():
         report += f"### Q{qi}: {question}\n\n"
 
         for name in prompts:
-            r = results[name][qi-1]
+            r = results[name][qi - 1]
             report += f"#### {name}\n\n"
             report += f"*{r['time']:.1f}s | {r['words']} words | {r['tools_used']} tools*\n\n"
             report += f"{r['response']}\n\n"

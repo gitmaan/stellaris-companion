@@ -6,15 +6,16 @@ Milestone 0: schema + migrations + safe initialization.
 
 from __future__ import annotations
 
+import contextlib
+import json
 import os
 import sqlite3
 import threading
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
-
-import json
+from typing import Any
 
 from backend.core.events import compute_events
 
@@ -85,9 +86,7 @@ class GameDatabase:
 
     def get_schema_version(self) -> int:
         with self._lock:
-            row = self._conn.execute(
-                "SELECT version FROM schema_version LIMIT 1;"
-            ).fetchone()
+            row = self._conn.execute("SELECT version FROM schema_version LIMIT 1;").fetchone()
             return int(row["version"]) if row else 0
 
     def _set_schema_version(self, version: int) -> None:
@@ -109,9 +108,7 @@ class GameDatabase:
                 );
                 """)
             # Ensure schema_version has a row (version 0) before migrations.
-            row = self._conn.execute(
-                "SELECT version FROM schema_version LIMIT 1;"
-            ).fetchone()
+            row = self._conn.execute("SELECT version FROM schema_version LIMIT 1;").fetchone()
             if row is None:
                 self._conn.execute(
                     "INSERT INTO schema_version (version, updated_at) VALUES (0, strftime('%s','now'));"
@@ -337,9 +334,7 @@ class GameDatabase:
                 (latest_briefing_json, last_game_date, session_id),
             )
 
-    def backfill_session_latest_briefing_from_snapshots(
-        self, *, session_id: str
-    ) -> bool:
+    def backfill_session_latest_briefing_from_snapshots(self, *, session_id: str) -> bool:
         """Populate sessions.latest_briefing_json from the newest snapshot full briefing (best-effort).
 
         This is used when upgrading older DBs that stored full_briefing_json on snapshot rows.
@@ -375,9 +370,7 @@ class GameDatabase:
             )
             return True
 
-    def backfill_latest_briefings_all_sessions(
-        self, *, limit_sessions: int = 500
-    ) -> int:
+    def backfill_latest_briefings_all_sessions(self, *, limit_sessions: int = 500) -> int:
         """Backfill sessions.latest_briefing_json for many sessions (best-effort)."""
         lim = max(1, min(int(limit_sessions), 5000))
         with self._lock:
@@ -804,9 +797,7 @@ class GameDatabase:
             ).fetchone()
             return dict(row) if row else None
 
-    def get_previous_snapshot_id(
-        self, *, session_id: str, before_snapshot_id: int
-    ) -> int | None:
+    def get_previous_snapshot_id(self, *, session_id: str, before_snapshot_id: int) -> int | None:
         with self._lock:
             row = self._conn.execute(
                 """
@@ -839,9 +830,7 @@ class GameDatabase:
                     game_date,
                     e["event_type"],
                     e["summary"],
-                    json.dumps(
-                        e.get("data") or {}, ensure_ascii=False, separators=(",", ":")
-                    ),
+                    json.dumps(e.get("data") or {}, ensure_ascii=False, separators=(",", ":")),
                 )
             )
         with self._lock:
@@ -876,9 +865,7 @@ class GameDatabase:
         if not prev_row or not curr_row:
             return 0
 
-        prev_state_json = prev_row.get("event_state_json") or prev_row.get(
-            "full_briefing_json"
-        )
+        prev_state_json = prev_row.get("event_state_json") or prev_row.get("full_briefing_json")
         if not isinstance(prev_state_json, str) or not prev_state_json:
             return 0
         try:
@@ -901,8 +888,7 @@ class GameDatabase:
             to_snapshot_id=int(snapshot_id),
         )
         payloads = [
-            {"event_type": e.event_type, "summary": e.summary, "data": e.data}
-            for e in detected
+            {"event_type": e.event_type, "summary": e.summary, "data": e.data} for e in detected
         ]
 
         return self.insert_events(
@@ -929,9 +915,7 @@ class GameDatabase:
             ).fetchone()
             return str(row["id"]) if row else None
 
-    def get_active_or_latest_session_id_for_save_path(
-        self, *, save_path: str
-    ) -> str | None:
+    def get_active_or_latest_session_id_for_save_path(self, *, save_path: str) -> str | None:
         """Best-effort lookup by last known save_path (useful on startup without parsing gamestate)."""
         if not save_path:
             return None
@@ -948,9 +932,7 @@ class GameDatabase:
             ).fetchone()
             return str(row["id"]) if row else None
 
-    def get_recent_events(
-        self, *, session_id: str, limit: int = 20
-    ) -> list[dict[str, Any]]:
+    def get_recent_events(self, *, session_id: str, limit: int = 20) -> list[dict[str, Any]]:
         lim = max(1, min(int(limit), 100))
         with self._lock:
             rows = self._conn.execute(
@@ -1355,28 +1337,20 @@ def get_default_db(db_path: str | Path | None = None) -> GameDatabase:
         # Best-effort background maintenance for older DBs.
         # Keeps startup fast while preventing unbounded full JSON accumulation.
         def _maintenance(db: GameDatabase) -> None:
-            try:
+            with contextlib.suppress(Exception):
                 db.backfill_latest_briefings_all_sessions(limit_sessions=500)
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 db.enforce_full_briefing_retention_all_sessions(
                     keep_recent=DEFAULT_KEEP_FULL_BRIEFINGS_RECENT, keep_first=True
                 )
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 db.maybe_checkpoint_wal()
-            except Exception:
-                pass
 
-        try:
+        with contextlib.suppress(Exception):
             threading.Thread(
                 target=_maintenance,
                 args=(_default_db,),
                 daemon=True,
                 name="db-maintenance",
             ).start()
-        except Exception:
-            pass
     return _default_db

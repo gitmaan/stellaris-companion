@@ -2,8 +2,8 @@
 """Capture baseline output from current extraction methods before migration."""
 
 import json
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add project root to path
@@ -30,7 +30,9 @@ def capture_baseline(method_name: str, save_path: str = None):
     # Get the method
     if not hasattr(ext, method_name):
         print(f"ERROR: Method not found: {method_name}")
-        print(f"Available methods: {[m for m in dir(ext) if m.startswith('get_') or m.startswith('extract_')]}")
+        print(
+            f"Available methods: {[m for m in dir(ext) if m.startswith('get_') or m.startswith('extract_')]}"
+        )
         sys.exit(1)
 
     method = getattr(ext, method_name)
@@ -46,11 +48,11 @@ def capture_baseline(method_name: str, save_path: str = None):
 
     def json_serializer(obj):
         """Handle non-serializable objects."""
-        if hasattr(obj, '__dict__'):
+        if hasattr(obj, "__dict__"):
             return obj.__dict__
         return str(obj)
 
-    with open(baseline_file, 'w') as f:
+    with open(baseline_file, "w") as f:
         json.dump(result, f, indent=2, default=json_serializer)
 
     print(f"✅ Baseline saved: {baseline_file}")
@@ -66,7 +68,7 @@ def capture_baseline(method_name: str, save_path: str = None):
 def list_methods():
     """List all extractable methods."""
     ext = SaveExtractor.__new__(SaveExtractor)
-    methods = [m for m in dir(ext) if m.startswith('get_') or m.startswith('extract_')]
+    methods = [m for m in dir(ext) if m.startswith("get_") or m.startswith("extract_")]
     print("Available methods:")
     for m in sorted(methods):
         print(f"  - {m}")

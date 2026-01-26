@@ -1,25 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
-import zipfile
-from datetime import datetime
-from pathlib import Path
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import (
-        extract_sections,
-        iter_section_entries,
-        ParserError,
-        _get_active_session,
-    )
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type
-    _get_active_session = lambda: None
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import ParserError, _get_active_session
 
 logger = logging.getLogger(__name__)
 
@@ -126,10 +112,8 @@ class DiplomacyMixin:
         if player_country and isinstance(player_country, dict):
             fed_val = player_country.get("federation")
             if fed_val and fed_val != "4294967295" and fed_val != 4294967295:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     federation_id = int(fed_val)
-                except (ValueError, TypeError):
-                    pass
 
         # For relations, use regex since Rust parser collapses duplicate 'relation' keys
         player_chunk = self._find_player_country_content(player_id)
@@ -224,9 +208,7 @@ class DiplomacyMixin:
 
             if "non_aggression_pact=yes" in rel_text:
                 relation_info["non_aggression_pact"] = True
-                non_aggression_pacts.append(
-                    {"id": target_country_id, "name": empire_name}
-                )
+                non_aggression_pacts.append({"id": target_country_id, "name": empire_name})
                 treaties.append(
                     {
                         "country_id": target_country_id,
@@ -248,9 +230,7 @@ class DiplomacyMixin:
 
             if "migration_treaty=yes" in rel_text or "migration_pact=yes" in rel_text:
                 relation_info["migration_treaty"] = True
-                migration_treaties.append(
-                    {"id": target_country_id, "name": empire_name}
-                )
+                migration_treaties.append({"id": target_country_id, "name": empire_name})
                 treaties.append(
                     {
                         "country_id": target_country_id,
@@ -328,15 +308,9 @@ class DiplomacyMixin:
         result["federation"] = federation_id
 
         # Summarize by opinion
-        positive_relations = len(
-            [r for r in relations_found if r.get("opinion", 0) > 0]
-        )
-        negative_relations = len(
-            [r for r in relations_found if r.get("opinion", 0) < 0]
-        )
-        neutral_relations = len(
-            [r for r in relations_found if r.get("opinion", 0) == 0]
-        )
+        positive_relations = len([r for r in relations_found if r.get("opinion", 0) > 0])
+        negative_relations = len([r for r in relations_found if r.get("opinion", 0) < 0])
+        neutral_relations = len([r for r in relations_found if r.get("opinion", 0) == 0])
 
         result["summary"] = {
             "positive": positive_relations,
@@ -411,16 +385,12 @@ class DiplomacyMixin:
         # Extract president (try 'leader' first, then 'president')
         leader = fed_entry.get("leader")
         if leader is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["president"] = int(leader)
-            except (ValueError, TypeError):
-                pass
         president = fed_entry.get("president")
         if president is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["president"] = int(president)
-            except (ValueError, TypeError):
-                pass
 
         # Extract members
         members = fed_entry.get("members")
@@ -448,9 +418,7 @@ class DiplomacyMixin:
             if exp is not None:
                 try:
                     exp_str = str(exp)
-                    result["experience"] = (
-                        float(exp_str) if "." in exp_str else int(exp_str)
-                    )
+                    result["experience"] = float(exp_str) if "." in exp_str else int(exp_str)
                 except (ValueError, TypeError):
                     pass
 
@@ -459,9 +427,7 @@ class DiplomacyMixin:
             if cohesion is not None:
                 try:
                     coh_str = str(cohesion)
-                    result["cohesion"] = (
-                        float(coh_str) if "." in coh_str else int(coh_str)
-                    )
+                    result["cohesion"] = float(coh_str) if "." in coh_str else int(coh_str)
                 except (ValueError, TypeError):
                     pass
 
@@ -470,10 +436,8 @@ class DiplomacyMixin:
             if level is None:
                 level = progression.get("level")
             if level is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     result["level"] = int(level)
-                except (ValueError, TypeError):
-                    pass
 
             # Laws
             laws = progression.get("laws")
@@ -499,9 +463,7 @@ class DiplomacyMixin:
         Raises:
             ParserError: If no Rust session is active
         """
-        return self._get_galactic_community_rust(
-            limit_members, limit_resolutions, limit_council
-        )
+        return self._get_galactic_community_rust(limit_members, limit_resolutions, limit_council)
 
     def _get_galactic_community_rust(
         self,
@@ -594,24 +556,18 @@ class DiplomacyMixin:
         # Extract scalar values from parsed dict
         voting = gc.get("voting")
         if voting is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["voting_resolution_id"] = int(voting)
-            except (ValueError, TypeError):
-                pass
 
         last = gc.get("last")
         if last is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["last_resolution_id"] = int(last)
-            except (ValueError, TypeError):
-                pass
 
         days = gc.get("days")
         if days is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["days_until_election"] = int(days)
-            except (ValueError, TypeError):
-                pass
 
         # String values
         community_formed = gc.get("community_formed")
@@ -625,10 +581,8 @@ class DiplomacyMixin:
         # Integer values
         council_positions = gc.get("council_positions")
         if council_positions is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 result["council_positions"] = int(council_positions)
-            except (ValueError, TypeError):
-                pass
 
         # Boolean value (stored as "yes"/"no" string)
         council_veto = gc.get("council_veto")
@@ -707,9 +661,7 @@ class DiplomacyMixin:
             ]:
                 val = term_data.get(bool_key)
                 if val is not None:
-                    terms[bool_key] = (
-                        (val == "yes") if isinstance(val, str) else bool(val)
-                    )
+                    terms[bool_key] = (val == "yes") if isinstance(val, str) else bool(val)
 
             # String fields
             for str_key in [
@@ -729,10 +681,8 @@ class DiplomacyMixin:
             # Forced initial loyalty
             fil = term_data.get("forced_initial_loyalty")
             if fil is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     terms["forced_initial_loyalty"] = int(fil)
-                except (ValueError, TypeError):
-                    pass
 
             # Discrete terms (list of {key, value} dicts)
             discrete_terms = term_data.get("discrete_terms")
@@ -793,11 +743,7 @@ class DiplomacyMixin:
 
             # Parse term_data
             term_data_dict = adata.get("term_data", {})
-            term_data = (
-                parse_terms_rust(term_data_dict)
-                if isinstance(term_data_dict, dict)
-                else {}
-            )
+            term_data = parse_terms_rust(term_data_dict) if isinstance(term_data_dict, dict) else {}
 
             # Parse subject_specialization
             specialization = None
@@ -818,9 +764,7 @@ class DiplomacyMixin:
                 "agreement_id": str(agreement_id),
                 "owner_id": owner_id,
                 "target_id": target_id,
-                "active_status": (
-                    active_status if isinstance(active_status, str) else None
-                ),
+                "active_status": (active_status if isinstance(active_status, str) else None),
                 "date_added": date_added if isinstance(date_added, str) else None,
                 "date_changed": date_changed if isinstance(date_changed, str) else None,
                 "preset": term_data.get("agreement_preset"),
@@ -835,21 +779,13 @@ class DiplomacyMixin:
                 subject_entries.append(entry)
 
         # Sort as in regex version
-        overlord_entries.sort(
-            key=lambda e: (e.get("preset") or "", e.get("target_id", 0))
-        )
-        subject_entries.sort(
-            key=lambda e: (e.get("preset") or "", e.get("owner_id", 0))
-        )
+        overlord_entries.sort(key=lambda e: (e.get("preset") or "", e.get("target_id", 0)))
+        subject_entries.sort(key=lambda e: (e.get("preset") or "", e.get("owner_id", 0)))
 
         result["as_overlord"]["count"] = len(overlord_entries)
-        result["as_overlord"]["subjects"] = overlord_entries[
-            : max(0, min(int(limit), 50))
-        ]
+        result["as_overlord"]["subjects"] = overlord_entries[: max(0, min(int(limit), 50))]
         result["as_subject"]["count"] = len(subject_entries)
-        result["as_subject"]["overlords"] = subject_entries[
-            : max(0, min(int(limit), 50))
-        ]
+        result["as_subject"]["overlords"] = subject_entries[: max(0, min(int(limit), 50))]
         result["count"] = result["as_overlord"]["count"] + result["as_subject"]["count"]
 
         return result
@@ -1082,18 +1018,14 @@ class DiplomacyMixin:
             if isinstance(target_data, dict):
                 target_id = target_data.get("id")
                 if target_id is not None:
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         entry["target_country_id"] = int(target_id)
-                    except (ValueError, TypeError):
-                        pass
 
             # Extract spy_network ID
             spy_network = op_data.get("spy_network")
             if spy_network is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     entry["spy_network_id"] = int(spy_network)
-                except (ValueError, TypeError):
-                    pass
 
             # Extract type
             op_type = op_data.get("type")
@@ -1104,10 +1036,8 @@ class DiplomacyMixin:
             for key in ["difficulty", "days_left", "info"]:
                 val = op_data.get(key)
                 if val is not None:
-                    try:
+                    with contextlib.suppress(ValueError, TypeError):
                         entry[key] = int(val)
-                    except (ValueError, TypeError):
-                        pass
 
             # Extract log entries
             log_data = op_data.get("log")
@@ -1126,10 +1056,8 @@ class DiplomacyMixin:
                     for log_key in ["roll", "skill", "info", "difficulty"]:
                         val = last_entry.get(log_key)
                         if val is not None:
-                            try:
+                            with contextlib.suppress(ValueError, TypeError):
                                 entry["last_log"][log_key] = int(val)
-                            except (ValueError, TypeError):
-                                pass
 
             operations_found.append(entry)
             if len(operations_found) >= limit:

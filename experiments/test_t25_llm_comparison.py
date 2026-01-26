@@ -16,13 +16,13 @@ import json
 import os
 import sys
 import time
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from save_loader import find_most_recent_save
 from backend.core.companion import Companion
+from save_loader import find_most_recent_save
 
 # Test questions - mix of simple and complex
 TEST_QUESTIONS = [
@@ -31,7 +31,6 @@ TEST_QUESTIONS = [
     ("How much energy am I making per month?", "simple"),
     ("What year is it?", "simple"),
     ("Who is my ruler?", "simple"),
-
     # Detail - SHOULD need tool calls (in T2.5)
     ("What traits does my ruler have?", "detail"),  # Actually in slim!
     ("List my top 3 admirals by level", "detail"),
@@ -134,15 +133,21 @@ def run_t25_slim(companion: Companion, question: str) -> TestResult:
 
 def print_comparison(t2_result: TestResult, t25_result: TestResult):
     """Print side-by-side comparison."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"Q: {t2_result.question}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     print(f"\n  {'T2 (Full Briefing)':<30} | {'T2.5 (Slim + Tools)':<30}")
-    print(f"  {'-'*30} | {'-'*30}")
-    print(f"  Latency: {t2_result.elapsed_ms:>6.0f}ms          | Latency: {t25_result.elapsed_ms:>6.0f}ms")
-    print(f"  Tool calls: {t2_result.tool_calls:<3}              | Tool calls: {t25_result.tool_calls:<3}")
-    print(f"  Tools: {t2_result.tools_used or 'none':<20} | Tools: {t25_result.tools_used or 'none'}")
+    print(f"  {'-' * 30} | {'-' * 30}")
+    print(
+        f"  Latency: {t2_result.elapsed_ms:>6.0f}ms          | Latency: {t25_result.elapsed_ms:>6.0f}ms"
+    )
+    print(
+        f"  Tool calls: {t2_result.tool_calls:<3}              | Tool calls: {t25_result.tool_calls:<3}"
+    )
+    print(
+        f"  Tools: {t2_result.tools_used or 'none':<20} | Tools: {t25_result.tools_used or 'none'}"
+    )
 
     # Verdict
     faster = "T2" if t2_result.elapsed_ms < t25_result.elapsed_ms else "T2.5"
@@ -215,9 +220,9 @@ def main():
         time.sleep(1)
 
     # Summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("SUMMARY")
-    print("="*70)
+    print("=" * 70)
 
     t2_total_ms = sum(r[0].elapsed_ms for r in results)
     t25_total_ms = sum(r[1].elapsed_ms for r in results)

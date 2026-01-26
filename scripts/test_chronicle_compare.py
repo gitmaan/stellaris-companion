@@ -6,8 +6,8 @@ Compare chronicle output WITH and WITHOUT Stellaris Invicta reference.
 import json
 import os
 import sqlite3
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -43,31 +43,32 @@ def get_db_connection():
 
 
 def get_session_data(conn, session_id: str) -> dict:
-    session = dict(conn.execute(
-        "SELECT * FROM sessions WHERE id = ?", (session_id,)
-    ).fetchone())
+    session = dict(conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone())
 
-    events = [dict(row) for row in conn.execute(
-        """SELECT event_type, game_date, summary
+    events = [
+        dict(row)
+        for row in conn.execute(
+            """SELECT event_type, game_date, summary
            FROM events WHERE session_id = ? ORDER BY game_date""",
-        (session_id,)
-    ).fetchall()]
+            (session_id,),
+        ).fetchall()
+    ]
 
-    briefing_json = session.get('latest_briefing_json')
+    briefing_json = session.get("latest_briefing_json")
     briefing = json.loads(briefing_json) if briefing_json else {}
 
     dates = conn.execute(
         """SELECT MIN(game_date) as first_date, MAX(game_date) as last_date
            FROM snapshots WHERE session_id = ?""",
-        (session_id,)
+        (session_id,),
     ).fetchone()
 
     return {
-        'session': session,
-        'events': events,
-        'briefing': briefing,
-        'first_date': dates['first_date'],
-        'last_date': dates['last_date'],
+        "session": session,
+        "events": events,
+        "briefing": briefing,
+        "first_date": dates["first_date"],
+        "last_date": dates["last_date"],
     }
 
 
@@ -75,7 +76,7 @@ def dedupe_events(events):
     seen = set()
     deduped = []
     for e in events:
-        key = (e['game_date'], e['event_type'], e['summary'])
+        key = (e["game_date"], e["event_type"], e["summary"])
         if key not in seen:
             seen.add(key)
             deduped.append(e)
@@ -86,7 +87,7 @@ def format_events_for_llm(events):
     events = dedupe_events(events)
     by_year = {}
     for e in events:
-        year = e['game_date'][:4] if e['game_date'] else 'Unknown'
+        year = e["game_date"][:4] if e["game_date"] else "Unknown"
         if year not in by_year:
             by_year[year] = []
         by_year[year].append(e)
@@ -95,10 +96,23 @@ def format_events_for_llm(events):
     for year in sorted(by_year.keys()):
         year_events = by_year[year]
         if len(year_events) > 10:
-            notable = [e for e in year_events if e['event_type'] in (
-                'war_started', 'war_ended', 'crisis_started', 'fallen_empire_awakened',
-                'war_in_heaven_started', 'federation_joined', 'alliance_formed',
-                'alliance_ended', 'colony_count_change', 'military_power_change')]
+            notable = [
+                e
+                for e in year_events
+                if e["event_type"]
+                in (
+                    "war_started",
+                    "war_ended",
+                    "crisis_started",
+                    "fallen_empire_awakened",
+                    "war_in_heaven_started",
+                    "federation_joined",
+                    "alliance_formed",
+                    "alliance_ended",
+                    "colony_count_change",
+                    "military_power_change",
+                )
+            ]
             lines.append(f"\n=== {year} ===")
             for e in notable:
                 lines.append(f"  * {e['summary']}")
@@ -106,50 +120,52 @@ def format_events_for_llm(events):
             lines.append(f"\n=== {year} ===")
             for e in year_events:
                 lines.append(f"  * {e['summary']}")
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def summarize_state(briefing):
-    identity = briefing.get('identity', {})
-    situation = briefing.get('situation', {})
-    military = briefing.get('military', {})
-    territory = briefing.get('territory', {})
-    endgame = briefing.get('endgame', {})
+    identity = briefing.get("identity", {})
+    situation = briefing.get("situation", {})
+    military = briefing.get("military", {})
+    territory = briefing.get("territory", {})
+    endgame = briefing.get("endgame", {})
 
     lines = [
-        f"=== CURRENT STATE ===",
+        "=== CURRENT STATE ===",
         f"Empire: {identity.get('empire_name', 'Unknown')}",
         f"Year: {situation.get('year', '?')}",
         f"Military Power: {military.get('military_power', 0):,.0f}",
         f"Colonies: {territory.get('colonies', {}).get('total_count', 0)}",
     ]
 
-    crisis = endgame.get('crisis', {})
-    if crisis.get('crisis_active'):
-        lines.append(f"CRISIS: {crisis.get('crisis_type', 'Unknown').title()} ({crisis.get('crisis_systems_count', 0)} systems)")
+    crisis = endgame.get("crisis", {})
+    if crisis.get("crisis_active"):
+        lines.append(
+            f"CRISIS: {crisis.get('crisis_type', 'Unknown').title()} ({crisis.get('crisis_systems_count', 0)} systems)"
+        )
 
-    fe = situation.get('fallen_empires', {})
-    if fe.get('awakened_count', 0) > 0:
+    fe = situation.get("fallen_empires", {})
+    if fe.get("awakened_count", 0) > 0:
         lines.append(f"Awakened Empires: {fe.get('awakened_count', 0)}")
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def build_prompt(data: dict, style_guide: str) -> str:
-    briefing = data['briefing']
-    identity = briefing.get('identity', {})
+    briefing = data["briefing"]
+    identity = briefing.get("identity", {})
 
-    empire_name = identity.get('empire_name', 'Unknown Empire')
-    ethics = ', '.join(identity.get('ethics', []))
-    authority = identity.get('authority', 'unknown')
-    civics = ', '.join(identity.get('civics', []))
+    empire_name = identity.get("empire_name", "Unknown Empire")
+    ethics = ", ".join(identity.get("ethics", []))
+    authority = identity.get("authority", "unknown")
+    civics = ", ".join(identity.get("civics", []))
 
-    if 'egalitarian' in ethics or 'fanatic_egalitarian' in ethics:
+    if "egalitarian" in ethics or "fanatic_egalitarian" in ethics:
         voice_note = "Write celebrating the triumph of the people. Emphasize collective achievement and democratic ideals."
     else:
         voice_note = "Write with epic gravitas befitting a galactic chronicle."
 
-    events_text = format_events_for_llm(data['events'])
+    events_text = format_events_for_llm(data["events"])
     state_text = summarize_state(briefing)
 
     prompt = f"""You are the Royal Chronicler of {empire_name}. Your task is to write the official historical chronicle of this empire.
@@ -170,7 +186,7 @@ You are NOT an advisor. You do NOT give recommendations or strategic advice. You
 {state_text}
 
 === COMPLETE EVENT HISTORY ===
-(From {data['first_date']} to {data['last_date']})
+(From {data["first_date"]} to {data["last_date"]})
 {events_text}
 
 === YOUR TASK ===
@@ -190,13 +206,13 @@ Begin the chronicle now.
 def call_gemini(prompt: str) -> str:
     from google import genai
 
-    api_key = os.environ.get('GOOGLE_API_KEY')
+    api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        env_path = Path(__file__).parent.parent / '.env'
+        env_path = Path(__file__).parent.parent / ".env"
         if env_path.exists():
             for line in env_path.read_text().splitlines():
-                if line.startswith('GOOGLE_API_KEY='):
-                    api_key = line.split('=', 1)[1].strip()
+                if line.startswith("GOOGLE_API_KEY="):
+                    api_key = line.split("=", 1)[1].strip()
                     break
 
     if not api_key:
@@ -204,9 +220,7 @@ def call_gemini(prompt: str) -> str:
 
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model=MODEL,
-        contents=prompt,
-        config={'temperature': 1.0, 'max_output_tokens': 4096}
+        model=MODEL, contents=prompt, config={"temperature": 1.0, "max_output_tokens": 4096}
     )
     return response.text
 
@@ -222,7 +236,7 @@ def main():
     sessions = conn.execute(
         """SELECT id, empire_name FROM sessions ORDER BY started_at DESC"""
     ).fetchall()
-    session_id = sessions[1]['id']  # Session 2
+    session_id = sessions[1]["id"]  # Session 2
 
     data = get_session_data(conn, session_id)
     print(f"\nUsing: {data['briefing']['identity']['empire_name']}")
@@ -267,5 +281,5 @@ def main():
     print("  - scripts/compare_WITHOUT_reference.txt")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

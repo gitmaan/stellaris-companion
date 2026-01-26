@@ -22,6 +22,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass  # dotenv not installed, rely on environment variables
@@ -29,27 +30,22 @@ except ImportError:
 from google import genai
 from google.genai import types
 
-from save_extractor import SaveExtractor
-from personality import build_optimized_prompt
 from backend.core.companion import Companion
+from personality import build_optimized_prompt
+from save_extractor import SaveExtractor
 
 # Test questions that cover different data needs
 TEST_QUESTIONS = [
     # Simple - should work with summary
     "What is my current military power?",
-
     # Needs leader details
     "Which of my admirals has the best traits for combat?",
-
     # Needs planet details
     "Which of my planets has the lowest stability and why?",
-
     # Needs diplomacy details
     "Who are my strongest allies and what treaties do we have?",
-
     # Needs fleet details
     "What is my largest fleet and how many ships does it have?",
-
     # Complex - needs multiple categories
     "Give me a strategic assessment: should I go to war right now?",
 ]
@@ -76,24 +72,26 @@ class OptionBCompanion:
         situation = self.extractor.get_situation()
         self.system_prompt = build_optimized_prompt(identity, situation)
 
-        print(f"[Option B] Complete briefing size: {self._briefing_size:,} bytes ({self._briefing_size // 1024} KB)")
+        print(
+            f"[Option B] Complete briefing size: {self._briefing_size:,} bytes ({self._briefing_size // 1024} KB)"
+        )
 
     def _get_complete_briefing(self) -> dict:
         """Get ALL data without truncation."""
         return {
-            'meta': self.extractor.get_metadata(),
-            'identity': self.extractor.get_empire_identity(),
-            'situation': self.extractor.get_situation(),
-            'military': self.extractor.get_player_status(),
-            'economy': self.extractor.get_resources(),
-            'leaders': self.extractor.get_leaders(),
-            'planets': self.extractor.get_planets(),
-            'diplomacy': self.extractor.get_diplomacy(),
-            'technology': self.extractor.get_technology(),
-            'starbases': self.extractor.get_starbases(),
-            'fleets': self.extractor.get_fleets(),
-            'wars': self.extractor.get_wars(),
-            'fallen_empires': self.extractor.get_fallen_empires(),
+            "meta": self.extractor.get_metadata(),
+            "identity": self.extractor.get_empire_identity(),
+            "situation": self.extractor.get_situation(),
+            "military": self.extractor.get_player_status(),
+            "economy": self.extractor.get_resources(),
+            "leaders": self.extractor.get_leaders(),
+            "planets": self.extractor.get_planets(),
+            "diplomacy": self.extractor.get_diplomacy(),
+            "technology": self.extractor.get_technology(),
+            "starbases": self.extractor.get_starbases(),
+            "fleets": self.extractor.get_fleets(),
+            "wars": self.extractor.get_wars(),
+            "fallen_empires": self.extractor.get_fallen_empires(),
         }
 
     def ask(self, question: str) -> tuple[str, float, dict]:
@@ -159,7 +157,7 @@ def run_benchmark(save_path: str):
     results = []
 
     for i, question in enumerate(TEST_QUESTIONS):
-        print(f"\n[Question {i+1}/{len(TEST_QUESTIONS)}]")
+        print(f"\n[Question {i + 1}/{len(TEST_QUESTIONS)}]")
         print(f"Q: {question}")
         print("-" * 40)
 
@@ -173,7 +171,9 @@ def run_benchmark(save_path: str):
                 "latency_ms": stats_b["latency_ms"],
                 "tool_calls": stats_b["tool_calls"],
                 "response_length": stats_b["response_length"],
-                "response_preview": response_b[:300] + "..." if len(response_b) > 300 else response_b,
+                "response_preview": response_b[:300] + "..."
+                if len(response_b) > 300
+                else response_b,
             }
             print(f"    Latency: {stats_b['latency_ms']:.0f}ms")
             print(f"    Tool calls: {stats_b['tool_calls']}")
@@ -193,7 +193,9 @@ def run_benchmark(save_path: str):
                 "tool_calls": stats_c["total_calls"],
                 "tools_used": stats_c["tools_used"],
                 "response_length": len(response_c),
-                "response_preview": response_c[:300] + "..." if len(response_c) > 300 else response_c,
+                "response_preview": response_c[:300] + "..."
+                if len(response_c) > 300
+                else response_c,
             }
             print(f"    Latency: {stats_c['wall_time_ms']:.0f}ms")
             print(f"    Tool calls: {stats_c['total_calls']} ({stats_c['tools_used']})")
@@ -213,9 +215,15 @@ def run_benchmark(save_path: str):
     print("SUMMARY")
     print("=" * 80)
 
-    option_b_latencies = [r["option_b"]["latency_ms"] for r in results if "latency_ms" in r.get("option_b", {})]
-    current_latencies = [r["current"]["latency_ms"] for r in results if "latency_ms" in r.get("current", {})]
-    current_tool_calls = [r["current"]["tool_calls"] for r in results if "tool_calls" in r.get("current", {})]
+    option_b_latencies = [
+        r["option_b"]["latency_ms"] for r in results if "latency_ms" in r.get("option_b", {})
+    ]
+    current_latencies = [
+        r["current"]["latency_ms"] for r in results if "latency_ms" in r.get("current", {})
+    ]
+    current_tool_calls = [
+        r["current"]["tool_calls"] for r in results if "tool_calls" in r.get("current", {})
+    ]
 
     if option_b_latencies:
         print(f"\nOption B (Full Pre-compute):")
@@ -234,20 +242,31 @@ def run_benchmark(save_path: str):
         print(f"  Max tool calls: {max(current_tool_calls)}")
 
     if option_b_latencies and current_latencies:
-        speedup = (sum(current_latencies) / len(current_latencies)) / (sum(option_b_latencies) / len(option_b_latencies))
+        speedup = (sum(current_latencies) / len(current_latencies)) / (
+            sum(option_b_latencies) / len(option_b_latencies)
+        )
         print(f"\nOption B is {speedup:.1f}x {'faster' if speedup > 1 else 'slower'} on average")
 
     # Save detailed results
     results_path = PROJECT_ROOT / "benchmark_option_b_results.json"
     with open(results_path, "w") as f:
-        json.dump({
-            "summary": {
-                "option_b_avg_ms": sum(option_b_latencies) / len(option_b_latencies) if option_b_latencies else None,
-                "current_avg_ms": sum(current_latencies) / len(current_latencies) if current_latencies else None,
-                "option_b_context_kb": option_b._briefing_size // 1024,
+        json.dump(
+            {
+                "summary": {
+                    "option_b_avg_ms": sum(option_b_latencies) / len(option_b_latencies)
+                    if option_b_latencies
+                    else None,
+                    "current_avg_ms": sum(current_latencies) / len(current_latencies)
+                    if current_latencies
+                    else None,
+                    "option_b_context_kb": option_b._briefing_size // 1024,
+                },
+                "results": results,
             },
-            "results": results,
-        }, f, indent=2, default=str)
+            f,
+            indent=2,
+            default=str,
+        )
     print(f"\nDetailed results saved to: {results_path}")
 
     return results

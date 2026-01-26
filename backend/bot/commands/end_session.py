@@ -13,13 +13,13 @@ from pathlib import Path
 import discord
 
 from backend.core.database import get_default_db
-from backend.core.reporting import build_session_report_text
 from backend.core.history import (
     compute_save_id,
     extract_campaign_id_from_gamestate,
     extract_snapshot_metrics,
     record_snapshot_from_companion,
 )
+from backend.core.reporting import build_session_report_text
 
 logger = logging.getLogger(__name__)
 
@@ -76,16 +76,10 @@ def setup(bot) -> None:
 
             # Compute save_id to find active session(s)
             briefing = getattr(bot.companion, "_current_snapshot", None) or {}
-            metrics = (
-                extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
-            )
+            metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
             campaign_id = None
-            if bot.companion.extractor and getattr(
-                bot.companion.extractor, "gamestate", None
-            ):
-                campaign_id = extract_campaign_id_from_gamestate(
-                    bot.companion.extractor.gamestate
-                )
+            if bot.companion.extractor and getattr(bot.companion.extractor, "gamestate", None):
+                campaign_id = extract_campaign_id_from_gamestate(bot.companion.extractor.gamestate)
             save_id = compute_save_id(
                 campaign_id=campaign_id,
                 player_id=(
@@ -93,13 +87,9 @@ def setup(bot) -> None:
                     if bot.companion.extractor
                     else None
                 ),
-                empire_name=(
-                    metrics.get("empire_name") if isinstance(metrics, dict) else None
-                ),
+                empire_name=(metrics.get("empire_name") if isinstance(metrics, dict) else None),
                 save_path=(
-                    bot.companion.save_path
-                    if isinstance(bot.companion.save_path, Path)
-                    else None
+                    bot.companion.save_path if isinstance(bot.companion.save_path, Path) else None
                 ),
             )
 
@@ -144,9 +134,7 @@ def setup(bot) -> None:
                     for chunk in _split_chunks(report, max_len=1900):
                         await interaction.followup.send(chunk)
             except Exception as e:
-                logger.warning(
-                    f"/end_session: failed to build/post session report: {e}"
-                )
+                logger.warning(f"/end_session: failed to build/post session report: {e}")
 
         except Exception as e:
             logger.error(f"Error in /end_session command: {e}")

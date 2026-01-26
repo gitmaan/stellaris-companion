@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import contextlib
 import logging
-from pathlib import Path
 
 # Rust bridge for fast Clausewitz parsing - session mode required
 from rust_bridge import ParserError, _get_active_session
@@ -51,17 +51,13 @@ class MilitaryMixin:
 
         # Clean up localization keys
         if fleet_name.startswith("shipclass_"):
-            fleet_name = (
-                fleet_name.replace("shipclass_", "").replace("_name", "").title()
-            )
+            fleet_name = fleet_name.replace("shipclass_", "").replace("_name", "").title()
         elif fleet_name.startswith("NAME_"):
             fleet_name = fleet_name.replace("NAME_", "").replace("_", " ")
         elif fleet_name.startswith("TRANS_"):
             fleet_name = "Transport Fleet"
         elif fleet_name.endswith("_FLEET"):
-            fleet_name = (
-                fleet_name.replace("_FLEET", "").replace("_", " ").title() + " Fleet"
-            )
+            fleet_name = fleet_name.replace("_FLEET", "").replace("_", " ").title() + " Fleet"
 
         return fleet_name
 
@@ -178,12 +174,8 @@ class MilitaryMixin:
             our_side = "attacker" if player_is_attacker else "defender"
 
             # Resolve country names
-            attacker_names = [
-                country_names.get(int(cid), f"Empire {cid}") for cid in attacker_ids
-            ]
-            defender_names = [
-                country_names.get(int(cid), f"Empire {cid}") for cid in defender_ids
-            ]
+            attacker_names = [country_names.get(int(cid), f"Empire {cid}") for cid in attacker_ids]
+            defender_names = [country_names.get(int(cid), f"Empire {cid}") for cid in defender_ids]
 
             # Calculate duration
             duration_days = None
@@ -284,15 +276,18 @@ class MilitaryMixin:
 
             # Check if our side was attacking or defending in this battle
             our_side_ids = set(attacker_ids) if player_is_attacker else set(defender_ids)
-            their_side_ids = set(defender_ids) if player_is_attacker else set(attacker_ids)
+            set(defender_ids) if player_is_attacker else set(attacker_ids)
 
             our_side_was_battle_attacker = bool(our_side_ids & battle_attacker_ids)
             our_side_was_battle_defender = bool(our_side_ids & battle_defender_ids)
 
             # Determine if we won this battle
-            if our_side_was_battle_attacker and attacker_victory:
-                stats["our_victories"] += 1
-            elif our_side_was_battle_defender and not attacker_victory:
+            if (
+                our_side_was_battle_attacker
+                and attacker_victory
+                or our_side_was_battle_defender
+                and not attacker_victory
+            ):
                 stats["our_victories"] += 1
             elif our_side_was_battle_attacker or our_side_was_battle_defender:
                 # We were involved but didn't win
@@ -301,14 +296,10 @@ class MilitaryMixin:
             # Extract losses
             attacker_losses = 0
             defender_losses = 0
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 attacker_losses = int(battle.get("attacker_losses", 0))
-            except (ValueError, TypeError):
-                pass
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 defender_losses = int(battle.get("defender_losses", 0))
-            except (ValueError, TypeError):
-                pass
 
             battle_type = battle.get("type", "ships")
 
@@ -542,9 +533,7 @@ class MilitaryMixin:
             name_block = fleet_data.get("name")
             name_value = self._resolve_fleet_name(name_block, fleet_id)
             if name_value and name_value.startswith("shipclass_"):
-                name_value = (
-                    name_value.replace("shipclass_", "").replace("_name", "").title()
-                )
+                name_value = name_value.replace("shipclass_", "").replace("_name", "").title()
 
             # Process ships in this fleet
             ships = fleet_data.get("ships", [])
@@ -685,31 +674,21 @@ class MilitaryMixin:
 
             # Extract modules
             modules_data = sb_data.get("modules", {})
-            modules = (
-                list(modules_data.values()) if isinstance(modules_data, dict) else []
-            )
+            modules = list(modules_data.values()) if isinstance(modules_data, dict) else []
             if modules:
                 starbase_info["modules"] = modules
 
             # Extract buildings
             buildings_data = sb_data.get("buildings", {})
-            buildings = (
-                list(buildings_data.values())
-                if isinstance(buildings_data, dict)
-                else []
-            )
+            buildings = list(buildings_data.values()) if isinstance(buildings_data, dict) else []
             if buildings:
                 starbase_info["buildings"] = buildings
 
             # Extract orbitals (defense platforms)
             orbitals_data = sb_data.get("orbitals", {})
-            orbital_ids = (
-                list(orbitals_data.values()) if isinstance(orbitals_data, dict) else []
-            )
+            orbital_ids = list(orbitals_data.values()) if isinstance(orbitals_data, dict) else []
             # Count non-null orbitals (4294967295 = empty slot)
-            defense_platform_count = sum(
-                1 for oid in orbital_ids if str(oid) != "4294967295"
-            )
+            defense_platform_count = sum(1 for oid in orbital_ids if str(oid) != "4294967295")
 
             # Calculate defense-specific fields
             defense_modules = [m for m in modules if m in DEFENSE_MODULES]
@@ -807,10 +786,8 @@ class MilitaryMixin:
             owner_val = entry.get("owner")
             owner = None
             if owner_val is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     owner = int(owner_val)
-                except (ValueError, TypeError):
-                    pass
 
             # Planet ID (4294967295 means null)
             planet_val = entry.get("planet")

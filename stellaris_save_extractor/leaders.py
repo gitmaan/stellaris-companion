@@ -110,9 +110,7 @@ class LeadersMixin:
                 leader_info["age"] = int(age)
 
             # Get traits from batch result
-            traits = (
-                trait_results[i].get("values", []) if i < len(trait_results) else []
-            )
+            traits = trait_results[i].get("values", []) if i < len(trait_results) else []
             if traits:
                 leader_info["traits"] = traits
 

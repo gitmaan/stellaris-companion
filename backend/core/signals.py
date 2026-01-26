@@ -10,8 +10,9 @@ See docs/OPTION_D_UNIFIED_HISTORY_EXTRACTION.md for architecture.
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime, timezone
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from save_extractor import SaveExtractor
@@ -20,9 +21,7 @@ if TYPE_CHECKING:
 SIGNALS_FORMAT_VERSION = 1
 
 
-def build_snapshot_signals(
-    *, extractor: "SaveExtractor", briefing: dict[str, Any]
-) -> dict[str, Any]:
+def build_snapshot_signals(*, extractor: SaveExtractor, briefing: dict[str, Any]) -> dict[str, Any]:
     """Build normalized signals payload from SaveExtractor.
 
     This is called in the ingestion worker subprocess where the Rust session
@@ -79,7 +78,7 @@ def build_snapshot_signals(
     return signals
 
 
-def _extract_leader_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_leader_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract normalized leader data with resolved names.
 
     Uses extractor.get_leaders() which handles name resolution via
@@ -343,13 +342,13 @@ def _resolve_war_name_from_block(name_block: Any) -> str | None:
             return " ".join(parts)
 
     # Return the key itself if it looks like a real name (not a localization key)
-    if key and not key.startswith("%") and not "_" in key[:4]:
+    if key and not key.startswith("%") and "_" not in key[:4]:
         return key
 
     return None
 
 
-def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_war_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract normalized war data for history diffing.
 
     Uses extractor.get_wars() which provides structured war data
@@ -387,7 +386,7 @@ def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     # Try to resolve placeholder names by accessing raw war data directly
     # This is done when Rust session is active
     try:
-        from rust_bridge import _get_active_session, iter_section_entries
+        from rust_bridge import _get_active_session
 
         session = _get_active_session()
         if session:
@@ -404,7 +403,7 @@ def _extract_war_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     }
 
 
-def _resolve_war_names_from_raw(extractor: "SaveExtractor", session) -> list[str]:
+def _resolve_war_names_from_raw(extractor: SaveExtractor, session) -> list[str]:
     """Resolve war names from raw war data using Rust session.
 
     Accesses war section directly to get full name blocks with variables,
@@ -467,7 +466,7 @@ def _resolve_war_names_from_raw(extractor: "SaveExtractor", session) -> list[str
         return []
 
 
-def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_diplomacy_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract normalized diplomacy data for history diffing.
 
     Uses extractor.get_diplomacy() which provides comprehensive diplomatic data
@@ -622,7 +621,7 @@ def _extract_diplomacy_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     }
 
 
-def _extract_technology_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_technology_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract normalized technology data for history diffing.
 
     Uses extractor.get_technology() which provides comprehensive tech data
@@ -683,7 +682,7 @@ def _extract_technology_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     }
 
 
-def _extract_megastructures_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_megastructures_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract normalized megastructures data for history diffing.
 
     Uses extractor.get_megastructures() which provides comprehensive megastructure data
@@ -780,7 +779,7 @@ def _extract_megastructures_signals(extractor: "SaveExtractor") -> dict[str, Any
     }
 
 
-def _extract_crisis_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_crisis_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract normalized crisis status for history diffing.
 
     Uses extractor.get_crisis_status() which provides comprehensive crisis data
@@ -828,10 +827,8 @@ def _extract_crisis_signals(extractor: "SaveExtractor") -> dict[str, Any]:
 
     player_kills = raw.get("player_crisis_kills")
     if player_kills:
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             result["player_crisis_kills"] = int(player_kills)
-        except (ValueError, TypeError):
-            pass
 
     # Include crisis country info for detailed reporting
     crisis_countries = raw.get("crisis_countries", [])
@@ -846,7 +843,7 @@ def _extract_crisis_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     return result
 
 
-def _extract_fallen_empires_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_fallen_empires_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract normalized fallen empires data for history diffing.
 
     Uses extractor.get_fallen_empires() which provides comprehensive data
@@ -896,10 +893,8 @@ def _extract_fallen_empires_signals(extractor: "SaveExtractor") -> dict[str, Any
         # Include military power if available
         mil_power = fe.get("military_power")
         if mil_power is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 entry["military_power"] = float(mil_power)
-            except (ValueError, TypeError):
-                pass
 
         # Include ethics if available
         ethics = fe.get("ethics")
@@ -913,10 +908,8 @@ def _extract_fallen_empires_signals(extractor: "SaveExtractor") -> dict[str, Any
         # Include country_id for detailed tracking (useful for events/narrative)
         cid = fe.get("country_id")
         if cid is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 entry["country_id"] = int(cid)
-            except (ValueError, TypeError):
-                pass
 
         normalized.append(entry)
 
@@ -950,7 +943,7 @@ def _extract_fallen_empires_signals(extractor: "SaveExtractor") -> dict[str, Any
     }
 
 
-def _extract_policies_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_policies_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract normalized policies data for history diffing.
 
     Uses Rust-parsed player country entry which contains active_policies
@@ -993,12 +986,7 @@ def _extract_policies_signals(extractor: "SaveExtractor") -> dict[str, Any]:
             continue
         policy_name = p.get("policy")
         selected = p.get("selected")
-        if (
-            policy_name
-            and selected
-            and isinstance(policy_name, str)
-            and isinstance(selected, str)
-        ):
+        if policy_name and selected and isinstance(policy_name, str) and isinstance(selected, str):
             policies[policy_name] = selected
 
     return {
@@ -1008,7 +996,7 @@ def _extract_policies_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     }
 
 
-def _extract_edicts_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_edicts_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract normalized edicts data for history diffing.
 
     Uses Rust-parsed player country entry which contains edicts
@@ -1063,7 +1051,7 @@ def _extract_edicts_signals(extractor: "SaveExtractor") -> dict[str, Any]:
     }
 
 
-def _extract_galaxy_settings_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_galaxy_settings_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract galaxy settings for milestone events and game phase detection.
 
     Uses Rust session extract_sections(['galaxy']) for fast parsed lookup.
@@ -1143,7 +1131,7 @@ def _extract_galaxy_settings_rust(session) -> dict[str, Any]:
         return {}
 
 
-def _extract_systems_signals(extractor: "SaveExtractor") -> dict[str, Any]:
+def _extract_systems_signals(extractor: SaveExtractor) -> dict[str, Any]:
     """Extract systems count for the player empire.
 
     Uses extractor.get_starbases() which is already Rust-backed.

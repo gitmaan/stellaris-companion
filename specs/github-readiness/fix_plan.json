@@ -147,14 +147,14 @@
       "id": "GHR-012",
       "title": "Add basic tests for events.py",
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "criteria": [
         "test -f tests/test_events.py",
         "grep -q 'def test_' tests/test_events.py",
         "grep -q 'compute_events' tests/test_events.py",
         "python3 -m pytest tests/test_events.py -v --tb=short 2>&1 | grep -q 'passed'"
       ],
-      "notes": "At minimum test compute_events with mock snapshots"
+      "notes": "Created 92 tests covering compute_events and all 21 helper functions (_safe_int, _safe_float, _pct_change, _sign_changed, _normalize_federation, _extract_war_names, _extract_player_leaders, _get_leader_name, _extract_empire_names, _get_empire_name, _extract_diplomacy_sets, _parse_year, _extract_galaxy_settings, _extract_tech_list, _extract_system_count, _extract_policies, _extract_edicts, _extract_megastructures, _extract_crisis, _extract_fallen_empires). Tests all 30+ event types including military, economy, diplomacy, wars, leaders, technology, milestones, megastructures, crisis, and fallen empires."
     }
   ],
   "patterns": [
@@ -202,6 +202,11 @@
       "id": "GHR-P009",
       "learned": "2026-01-26",
       "description": "For signals.py tests, use mock SaveExtractor instead of requiring Rust session or real test saves. Mock each extractor method (get_leaders, get_wars, etc.) to return expected structures. Tests should verify return structure without hitting actual save files."
+    },
+    {
+      "id": "GHR-P010",
+      "learned": "2026-01-26",
+      "description": "For events.py tests, use fixtures for base_prev_snapshot and base_curr_snapshot with all required nested structures (meta, military, territory, technology, economy, diplomacy, history). Tests modify specific fields to trigger individual event types. No mocking needed since compute_events works on pure dict data."
     }
   ]
 }

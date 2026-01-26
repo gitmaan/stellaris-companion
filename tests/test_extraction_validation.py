@@ -5,20 +5,19 @@ testing both positive cases (valid data passes) and negative cases
 (invalid data is caught).
 """
 
-import pytest
 import os
 import sys
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from stellaris_save_extractor.validation import ExtractionValidator, ValidationResult
 
-
 # Path to test save fixture
 TEST_SAVE_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    'test_save.sav'
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "test_save.sav"
 )
 
 
@@ -61,10 +60,7 @@ class TestValidationResult:
         """Issues can include details and fix suggestions."""
         result = ValidationResult(valid=True)
         result.add_issue(
-            "test_check",
-            "Test message",
-            details={"key": "value"},
-            fix_suggestion="Try this fix"
+            "test_check", "Test message", details={"key": "value"}, fix_suggestion="Try this fix"
         )
 
         issue = result.issues[0]
@@ -160,10 +156,12 @@ class TestExtractionValidator:
 
         # Check that participant validation was performed
         # (issues would mention "participant" if there's a problem)
-        participant_issues = [i for i in result.issues if 'participant' in i.get('check', '').lower()]
+        participant_issues = [
+            i for i in result.issues if "participant" in i.get("check", "").lower()
+        ]
         # We expect either no issues (valid) or properly formatted issues
         for issue in participant_issues:
-            assert 'message' in issue
+            assert "message" in issue
 
     def test_validate_fleets_returns_result(self, validator):
         """validate_fleets() returns a ValidationResult."""
@@ -184,10 +182,10 @@ class TestExtractionValidator:
         result = validator.validate_fleets()
 
         # Look for categorization issues
-        cat_issues = [i for i in result.issues if 'categorization' in i.get('check', '').lower()]
+        cat_issues = [i for i in result.issues if "categorization" in i.get("check", "").lower()]
         # If found, they should be properly structured
         for issue in cat_issues:
-            assert 'fleet_id' in issue.get('details', {}) or 'message' in issue
+            assert "fleet_id" in issue.get("details", {}) or "message" in issue
 
     def test_validate_diplomacy_returns_result(self, validator):
         """validate_diplomacy() returns a ValidationResult."""
@@ -208,9 +206,9 @@ class TestExtractionValidator:
         result = validator.validate_diplomacy()
 
         # Opinion range warnings should be properly formatted if present
-        opinion_warnings = [w for w in result.warnings if 'opinion' in w.get('check', '').lower()]
+        opinion_warnings = [w for w in result.warnings if "opinion" in w.get("check", "").lower()]
         for warning in opinion_warnings:
-            assert 'country_id' in warning.get('details', {}) or 'message' in warning
+            assert "country_id" in warning.get("details", {}) or "message" in warning
 
     def test_validate_resources_returns_result(self, validator):
         """validate_resources() returns a ValidationResult."""
@@ -224,47 +222,47 @@ class TestExtractionValidator:
         result = validator.validate_resources()
 
         # Look for stockpile invariant issues
-        stockpile_issues = [i for i in result.issues if 'stockpile' in i.get('check', '').lower()]
+        stockpile_issues = [i for i in result.issues if "stockpile" in i.get("check", "").lower()]
         # Test save should have valid (non-negative) stockpiles
         # If there are issues, they should be properly formatted
         for issue in stockpile_issues:
-            assert 'resource' in issue.get('details', {})
+            assert "resource" in issue.get("details", {})
 
     def test_validate_resources_checks_budget_math(self, validator):
         """validate_resources() validates income - expense = net."""
         result = validator.validate_resources()
 
         # Budget math issues should be properly structured
-        math_issues = [i for i in result.issues if 'budget_math' in i.get('check', '').lower()]
+        math_issues = [i for i in result.issues if "budget_math" in i.get("check", "").lower()]
         for issue in math_issues:
-            details = issue.get('details', {})
-            assert 'resource' in details or 'message' in issue
+            details = issue.get("details", {})
+            assert "resource" in details or "message" in issue
 
     def test_validate_all_returns_comprehensive_report(self, validator):
         """validate_all() returns a complete report with all validations."""
         report = validator.validate_all()
 
         assert isinstance(report, dict)
-        assert 'overall_valid' in report
-        assert 'wars' in report
-        assert 'fleets' in report
-        assert 'diplomacy' in report
-        assert 'resources' in report
-        assert 'summary' in report
+        assert "overall_valid" in report
+        assert "wars" in report
+        assert "fleets" in report
+        assert "diplomacy" in report
+        assert "resources" in report
+        assert "summary" in report
 
     def test_validate_all_summary_stats(self, validator):
         """validate_all() summary has correct statistics."""
         report = validator.validate_all()
 
-        summary = report['summary']
-        assert 'total_issues' in summary
-        assert 'total_warnings' in summary
-        assert 'total_checks_passed' in summary
-        assert 'total_checks_failed' in summary
-        assert 'pass_rate' in summary
+        summary = report["summary"]
+        assert "total_issues" in summary
+        assert "total_warnings" in summary
+        assert "total_checks_passed" in summary
+        assert "total_checks_failed" in summary
+        assert "pass_rate" in summary
 
         # Pass rate should be a percentage
-        assert 0 <= summary['pass_rate'] <= 100
+        assert 0 <= summary["pass_rate"] <= 100
 
     def test_validate_all_aggregates_validity(self, validator):
         """validate_all() overall_valid reflects all domain validations."""
@@ -272,13 +270,13 @@ class TestExtractionValidator:
 
         # Overall valid should be True only if all domains are valid
         all_valid = (
-            report['wars']['valid'] and
-            report['fleets']['valid'] and
-            report['diplomacy']['valid'] and
-            report['resources']['valid']
+            report["wars"]["valid"]
+            and report["fleets"]["valid"]
+            and report["diplomacy"]["valid"]
+            and report["resources"]["valid"]
         )
 
-        assert report['overall_valid'] == all_valid
+        assert report["overall_valid"] == all_valid
 
 
 class TestValidatorEdgeCases:
@@ -313,12 +311,15 @@ class TestValidatorEdgeCases:
 
         # If no wars exist, this should not be an error
         wars_data = validator.extractor.get_wars()
-        if not wars_data.get('wars'):
+        if not wars_data.get("wars"):
             # No wars - should still be valid (or only have warnings)
-            war_related_issues = [i for i in result.issues if 'war' in i.get('check', '').lower()]
+            war_related_issues = [i for i in result.issues if "war" in i.get("check", "").lower()]
             # Missing wars is not itself an issue (peace time is valid)
             for issue in war_related_issues:
-                assert issue.get('check') != 'completeness' or 'war section' in issue.get('message', '').lower()
+                assert (
+                    issue.get("check") != "completeness"
+                    or "war section" in issue.get("message", "").lower()
+                )
 
 
 class TestValidatorAccuracy:
@@ -329,11 +330,13 @@ class TestValidatorAccuracy:
         result = validator.validate_resources()
 
         # Check that essential resource validation ran
-        essential_warnings = [w for w in result.warnings if 'essential' in w.get('check', '').lower()]
+        essential_warnings = [
+            w for w in result.warnings if "essential" in w.get("check", "").lower()
+        ]
         # If test save has all essentials, this should be empty
         # If not, warnings should have proper structure
         for warning in essential_warnings:
-            assert 'resource' in warning.get('details', {})
+            assert "resource" in warning.get("details", {})
 
     def test_validates_fleet_military_power(self, validator):
         """Validator checks military power invariants."""
@@ -341,21 +344,22 @@ class TestValidatorAccuracy:
 
         # Military power checks should have been run
         mp_checks = [
-            i for i in result.issues + result.warnings
-            if 'military_power' in i.get('check', '').lower()
+            i
+            for i in result.issues + result.warnings
+            if "military_power" in i.get("check", "").lower()
         ]
         # Issues should be properly structured
         for check in mp_checks:
-            assert 'message' in check
+            assert "message" in check
 
     def test_federation_cross_reference(self, validator):
         """Validator checks federation membership consistency."""
         result = validator.validate_diplomacy()
 
         # Federation checks should be properly structured
-        fed_issues = [i for i in result.issues if 'federation' in i.get('check', '').lower()]
+        fed_issues = [i for i in result.issues if "federation" in i.get("check", "").lower()]
         for issue in fed_issues:
-            assert 'federation_id' in issue.get('details', {}) or 'message' in issue
+            assert "federation_id" in issue.get("details", {}) or "message" in issue
 
 
 class TestValidatorPerformance:
@@ -377,13 +381,14 @@ class TestValidatorPerformance:
         result = validator.validate_fleets()
 
         # Check if sampling warning was issued for large fleet counts
-        sampling_warnings = [w for w in result.warnings if 'sampl' in w.get('check', '').lower()]
+        sampling_warnings = [w for w in result.warnings if "sampl" in w.get("check", "").lower()]
         # If fleet count is large and sampling was used, verify warning format
         for warning in sampling_warnings:
-            assert 'message' in warning
+            assert "message" in warning
 
 
 # Additional integration tests
+
 
 class TestValidatorIntegration:
     """Integration tests verifying validator works with real extraction."""
@@ -394,12 +399,12 @@ class TestValidatorIntegration:
         result = validator.validate_wars()
 
         # If wars exist, checks should have been performed
-        if wars.get('wars'):
+        if wars.get("wars"):
             assert result.checks_passed + result.checks_failed > 0
 
     def test_fleets_validation_matches_extraction(self, validator):
         """Fleet validation results align with actual extraction data."""
-        fleets = validator.extractor.get_fleets()
+        validator.extractor.get_fleets()
         result = validator.validate_fleets()
 
         # Validation should have run checks
@@ -411,7 +416,7 @@ class TestValidatorIntegration:
         result = validator.validate_diplomacy()
 
         # If relations exist, checks should have been performed
-        if diplomacy.get('relations'):
+        if diplomacy.get("relations"):
             assert result.checks_passed + result.checks_failed > 0
 
     def test_resources_validation_matches_extraction(self, validator):
@@ -420,9 +425,9 @@ class TestValidatorIntegration:
         result = validator.validate_resources()
 
         # Stockpiles should trigger validation checks
-        if resources.get('stockpiles'):
+        if resources.get("stockpiles"):
             assert result.checks_passed + result.checks_failed > 0
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

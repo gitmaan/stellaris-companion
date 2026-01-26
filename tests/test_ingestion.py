@@ -2,25 +2,26 @@
 
 import os
 import sys
-import time
 import threading
-import pytest
+import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.ingestion import IngestionManager, IngestionStatus
-from backend.core.ingestion_worker import WorkerJob, run_worker_job, _build_t1_status
-
+from backend.core.ingestion_worker import WorkerJob, _build_t1_status, run_worker_job
 
 # --- Fixtures ---
+
 
 @pytest.fixture
 def test_save_path():
     """Return path to test save file."""
-    path = Path(__file__).parent.parent / 'test_save.sav'
+    path = Path(__file__).parent.parent / "test_save.sav"
     if not path.exists():
         pytest.skip(f"Test save file not found at {path}")
     return path
@@ -43,6 +44,7 @@ def mock_db():
 
 
 # --- IngestionStatus Tests ---
+
 
 class TestIngestionStatus:
     """Tests for the IngestionStatus dataclass."""
@@ -85,6 +87,7 @@ class TestIngestionStatus:
 
 
 # --- IngestionManager Tests ---
+
 
 class TestIngestionManager:
     """Tests for IngestionManager initialization and basic operations."""
@@ -147,6 +150,7 @@ class TestIngestionManager:
 
 
 # --- Worker Tests ---
+
 
 class TestIngestionWorker:
     """Tests for the ingestion worker functions."""
@@ -237,6 +241,7 @@ class TestIngestionWorker:
 
 # --- Integration Tests ---
 
+
 class TestIngestionIntegration:
     """Integration tests for the full ingestion pipeline."""
 
@@ -286,5 +291,5 @@ class TestIngestionIntegration:
         assert extractor._gamestate is not None
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

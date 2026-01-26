@@ -128,9 +128,7 @@ class TechnologyMixin:
                         elif resource == "engineering_research":
                             research_totals["engineering"] += value
 
-            result["research_speed"] = {
-                cat: round(val, 2) for cat, val in research_totals.items()
-            }
+            result["research_speed"] = {cat: round(val, 2) for cat, val in research_totals.items()}
 
         # Extract repeatable technologies and their levels
         repeatable_techs = [t for t in technologies if t.startswith("tech_repeatable_")]

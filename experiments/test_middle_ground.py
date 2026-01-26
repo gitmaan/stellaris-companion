@@ -15,10 +15,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
+
 from save_extractor import SaveExtractor
 
 TEST_QUESTIONS = [
@@ -32,31 +34,31 @@ TEST_QUESTIONS = [
 def build_middle_ground_system_prompt(identity: dict, situation: dict) -> str:
     """Middle ground: Full personality guidance, minimal tool redundancy."""
 
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = identity.get('ethics', [])
-    authority = identity.get('authority', 'unknown')
-    civics = identity.get('civics', [])
-    is_gestalt = identity.get('is_gestalt', False)
-    is_machine = identity.get('is_machine', False)
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = identity.get("ethics", [])
+    authority = identity.get("authority", "unknown")
+    civics = identity.get("civics", [])
+    is_gestalt = identity.get("is_gestalt", False)
+    is_machine = identity.get("is_machine", False)
 
-    year = situation.get('year', 2200)
-    game_phase = situation.get('game_phase', 'early')
-    at_war = situation.get('at_war', False)
-    war_count = situation.get('war_count', 0)
-    economy = situation.get('economy', {})
-    deficits = economy.get('resources_in_deficit', 0)
-    contact_count = situation.get('contact_count', 0)
+    year = situation.get("year", 2200)
+    game_phase = situation.get("game_phase", "early")
+    at_war = situation.get("at_war", False)
+    war_count = situation.get("war_count", 0)
+    economy = situation.get("economy", {})
+    deficits = economy.get("resources_in_deficit", 0)
+    contact_count = situation.get("contact_count", 0)
 
     # Keep full personality section but streamline
     prompt = f"""You are the strategic advisor to {empire_name}.
 
 EMPIRE IDENTITY:
-- Ethics: {', '.join(ethics) if ethics else 'unknown'}
+- Ethics: {", ".join(ethics) if ethics else "unknown"}
 - Authority: {authority}
-- Civics: {', '.join(civics) if civics else 'none'}
+- Civics: {", ".join(civics) if civics else "none"}
 - Gestalt: {is_gestalt} (Machine: {is_machine})
 
-SITUATION: Year {year} ({game_phase}), {'AT WAR' if at_war else 'at peace'}, {deficits} deficits, {contact_count} known empires.
+SITUATION: Year {year} ({game_phase}), {"AT WAR" if at_war else "at peace"}, {deficits} deficits, {contact_count} known empires.
 
 PERSONALITY (critical - stay in character):
 Your ethics define your worldview:
@@ -90,23 +92,23 @@ The game state is pre-loaded in the user message. Tools available only for edge 
 
 def build_middle_ground_user_prompt(snapshot_json: str, question: str) -> str:
     """Simplified user prompt - no redundant rules."""
-    return (
-        f"GAME STATE:\n```json\n{snapshot_json}\n```\n\n"
-        f"{question}"
-    )
+    return f"GAME STATE:\n```json\n{snapshot_json}\n```\n\n{question}"
 
 
 def run_current_version(question: str) -> tuple[str, float, int]:
     """Run the current production version."""
     from core.companion import Companion
+
     companion = Companion(save_path="test_save.sav")
     companion.clear_conversation()
     response, elapsed = companion.ask_simple(question)
     stats = companion.get_call_stats()
-    return response, elapsed, stats.get('total_calls', 0)
+    return response, elapsed, stats.get("total_calls", 0)
 
 
-def run_middle_ground(extractor, client, identity, situation, question: str) -> tuple[str, float, int]:
+def run_middle_ground(
+    extractor, client, identity, situation, question: str
+) -> tuple[str, float, int]:
     """Run the middle ground version."""
 
     system_prompt = build_middle_ground_system_prompt(identity, situation)
@@ -151,10 +153,10 @@ def run_middle_ground(extractor, client, identity, situation, question: str) -> 
     elapsed = time.time() - start
 
     tool_calls = 0
-    if hasattr(response, 'automatic_function_calling_history'):
+    if hasattr(response, "automatic_function_calling_history"):
         for item in response.automatic_function_calling_history:
-            if hasattr(item, 'parts'):
-                tool_calls += sum(1 for p in item.parts if hasattr(p, 'function_call'))
+            if hasattr(item, "parts"):
+                tool_calls += sum(1 for p in item.parts if hasattr(p, "function_call"))
 
     return response.text, elapsed, tool_calls
 
@@ -185,6 +187,7 @@ def main():
 
     # For comparison, show current prompt size
     from core.companion import Companion
+
     temp_companion = Companion(save_path="test_save.sav")
     print(f"[Current production prompt: {len(temp_companion.system_prompt)} chars]")
     print()
@@ -210,21 +213,23 @@ def main():
         print(f"Time: {mg_time:.1f}s | Tools: {mg_tools} | Words: {len(mg_response.split())}")
         print(f"Response:\n{mg_response[:500]}...")
 
-        results.append({
-            "question": question,
-            "current": {
-                "time": curr_time,
-                "tools": curr_tools,
-                "response": curr_response,
-                "word_count": len(curr_response.split()),
-            },
-            "middle_ground": {
-                "time": mg_time,
-                "tools": mg_tools,
-                "response": mg_response,
-                "word_count": len(mg_response.split()),
+        results.append(
+            {
+                "question": question,
+                "current": {
+                    "time": curr_time,
+                    "tools": curr_tools,
+                    "response": curr_response,
+                    "word_count": len(curr_response.split()),
+                },
+                "middle_ground": {
+                    "time": mg_time,
+                    "tools": mg_tools,
+                    "response": mg_response,
+                    "word_count": len(mg_response.split()),
+                },
             }
-        })
+        )
 
         print()
 
@@ -237,39 +242,53 @@ def main():
     print("-" * 70)
 
     for r in results:
-        q = r['question'][:33]
-        print(f"{q:<35} {r['current']['time']:>7.1f}s {r['middle_ground']['time']:>7.1f}s "
-              f"{r['current']['tools']:>6} {r['middle_ground']['tools']:>6} "
-              f"{r['current']['word_count']:>6} {r['middle_ground']['word_count']:>6}")
+        q = r["question"][:33]
+        print(
+            f"{q:<35} {r['current']['time']:>7.1f}s {r['middle_ground']['time']:>7.1f}s "
+            f"{r['current']['tools']:>6} {r['middle_ground']['tools']:>6} "
+            f"{r['current']['word_count']:>6} {r['middle_ground']['word_count']:>6}"
+        )
 
     # Averages
-    avg_curr_time = sum(r['current']['time'] for r in results) / len(results)
-    avg_mg_time = sum(r['middle_ground']['time'] for r in results) / len(results)
-    avg_curr_tools = sum(r['current']['tools'] for r in results) / len(results)
-    avg_mg_tools = sum(r['middle_ground']['tools'] for r in results) / len(results)
-    avg_curr_words = sum(r['current']['word_count'] for r in results) / len(results)
-    avg_mg_words = sum(r['middle_ground']['word_count'] for r in results) / len(results)
+    avg_curr_time = sum(r["current"]["time"] for r in results) / len(results)
+    avg_mg_time = sum(r["middle_ground"]["time"] for r in results) / len(results)
+    avg_curr_tools = sum(r["current"]["tools"] for r in results) / len(results)
+    avg_mg_tools = sum(r["middle_ground"]["tools"] for r in results) / len(results)
+    avg_curr_words = sum(r["current"]["word_count"] for r in results) / len(results)
+    avg_mg_words = sum(r["middle_ground"]["word_count"] for r in results) / len(results)
 
     print("-" * 70)
-    print(f"{'AVERAGE':<35} {avg_curr_time:>7.1f}s {avg_mg_time:>7.1f}s "
-          f"{avg_curr_tools:>6.1f} {avg_mg_tools:>6.1f} "
-          f"{avg_curr_words:>6.0f} {avg_mg_words:>6.0f}")
+    print(
+        f"{'AVERAGE':<35} {avg_curr_time:>7.1f}s {avg_mg_time:>7.1f}s "
+        f"{avg_curr_tools:>6.1f} {avg_mg_tools:>6.1f} "
+        f"{avg_curr_words:>6.0f} {avg_mg_words:>6.0f}"
+    )
 
     speedup = (avg_curr_time - avg_mg_time) / avg_curr_time * 100
-    print(f"\nMiddle ground is {speedup:.0f}% faster" if speedup > 0 else f"\nCurrent is {-speedup:.0f}% faster")
+    print(
+        f"\nMiddle ground is {speedup:.0f}% faster"
+        if speedup > 0
+        else f"\nCurrent is {-speedup:.0f}% faster"
+    )
 
     # Save results
-    Path("middle_ground_results.json").write_text(json.dumps({
-        "summary": {
-            "current_avg_time": avg_curr_time,
-            "mg_avg_time": avg_mg_time,
-            "current_avg_tools": avg_curr_tools,
-            "mg_avg_tools": avg_mg_tools,
-            "current_avg_words": avg_curr_words,
-            "mg_avg_words": avg_mg_words,
-        },
-        "results": results,
-    }, indent=2, default=str))
+    Path("middle_ground_results.json").write_text(
+        json.dumps(
+            {
+                "summary": {
+                    "current_avg_time": avg_curr_time,
+                    "mg_avg_time": avg_mg_time,
+                    "current_avg_tools": avg_curr_tools,
+                    "mg_avg_tools": avg_mg_tools,
+                    "current_avg_words": avg_curr_words,
+                    "mg_avg_words": avg_mg_words,
+                },
+                "results": results,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print("\nDetailed results saved to middle_ground_results.json")
 
 

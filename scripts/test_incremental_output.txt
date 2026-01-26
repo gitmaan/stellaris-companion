@@ -1,0 +1,16 @@
+### CHAPTER 1: CHAPTER 1
+**2223.01.01 – 2273.01.01**
+
+[Generation error: Unterminated string starting at: line 3 column 16 (char 54)]
+
+### CHAPTER 2: CHAPTER 2
+**2273.01.01 – 2323.01.01**
+
+[Generation error: Unterminated string starting at: line 3 column 16 (char 52)]
+
+### THE CURRENT ERA
+**2323.01.01 – Present**
+
+The era of the mid-23rd century has been defined by a breathtaking surge in the collective strength and unity of the United Nations of Earth. Through the shared labor and unyielding spirit of the citizenry, our borders have expanded to embrace twelve vibrant colony worlds, now knit together by a grand network of Relay Bypasses—a testament to human ingenuity and our commitment to an interconnected future. This is a time where the democratic ideal has truly transcended Earth, bringing together a diverse assembly of leaders and specialists from across the stars to serve the common good. From the stabilization of our once-volatile energy markets to the flourishing of a surplus-rich economy, the prosperity of the many has replaced the scarcity of the few.
+
+Beyond our shores, the UNE has emerged as a cornerstone of galactic stability, leading the formation of a grand Federation based on mutual respect and shared progress. Our military power, now a formidable shield of over two hundred thousand strong, stands not as a tool of tyranny, but as the guarantor of peace for every free soul within our reach. As we look toward the horizon,

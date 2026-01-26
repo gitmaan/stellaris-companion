@@ -22,12 +22,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
-from save_extractor import SaveExtractor
+
 from personality import build_optimized_prompt
+from save_extractor import SaveExtractor
 
 MODEL = "gemini-3-flash-preview"
 
@@ -35,16 +37,12 @@ MODEL = "gemini-3-flash-preview"
 STRESS_QUESTIONS = [
     # Leader-specific (snapshot only has counts, not details)
     "What traits does Admiral Manon have and how much experience?",
-
     # Planet-specific (snapshot has top 10 summary, not buildings)
     "What buildings are currently on Earth?",
-
     # Technology-specific (snapshot doesn't include tech tree)
     "What specific technologies am I currently researching?",
-
     # Fleet-specific (snapshot has power, not composition)
     "What ship types make up my main fleet?",
-
     # Diplomacy-specific (snapshot has counts, not details)
     "What are the specific opinion modifiers with empire ID 1?",
 ]
@@ -71,7 +69,7 @@ def build_snapshot(extractor) -> dict:
 def run_test(client, extractor, system_prompt: str, snapshot: dict, question: str) -> dict:
     """Run a single test, tracking tool usage."""
 
-    snapshot_json = json.dumps(snapshot, separators=(',', ':'), default=str)
+    snapshot_json = json.dumps(snapshot, separators=(",", ":"), default=str)
     user_message = f"GAME STATE:\n```json\n{snapshot_json}\n```\n\n{question}"
 
     tools_used = []
@@ -108,19 +106,30 @@ def run_test(client, extractor, system_prompt: str, snapshot: dict, question: st
     text = response.text if response.text else "[No text response]"
 
     # Check if model admitted not knowing
-    admitted_unknown = any(phrase in text.lower() for phrase in [
-        "don't have", "do not have", "not available", "cannot find",
-        "need to", "would need", "i'll need", "let me check",
-        "unknown", "not in the data", "not included"
-    ])
+    admitted_unknown = any(
+        phrase in text.lower()
+        for phrase in [
+            "don't have",
+            "do not have",
+            "not available",
+            "cannot find",
+            "need to",
+            "would need",
+            "i'll need",
+            "let me check",
+            "unknown",
+            "not in the data",
+            "not included",
+        ]
+    )
 
     return {
-        'response': text,
-        'time': elapsed,
-        'words': len(text.split()),
-        'tools_used': tools_used,
-        'tool_count': len(tools_used),
-        'admitted_unknown': admitted_unknown,
+        "response": text,
+        "time": elapsed,
+        "words": len(text.split()),
+        "tools_used": tools_used,
+        "tool_count": len(tools_used),
+        "admitted_unknown": admitted_unknown,
     }
 
 
@@ -162,40 +171,43 @@ def main():
         try:
             result = run_test(client, extractor, system_prompt, snapshot, question)
 
-            status = "✅ USED TOOLS" if result['tool_count'] > 0 else (
-                "⚠️ ADMITTED UNKNOWN" if result['admitted_unknown'] else "❌ MADE UP DATA?"
+            status = (
+                "✅ USED TOOLS"
+                if result["tool_count"] > 0
+                else ("⚠️ ADMITTED UNKNOWN" if result["admitted_unknown"] else "❌ MADE UP DATA?")
             )
 
             print(f"  {status}")
-            print(f"  Time: {result['time']:.1f}s | Words: {result['words']} | Tools: {result['tool_count']}")
-            if result['tools_used']:
+            print(
+                f"  Time: {result['time']:.1f}s | Words: {result['words']} | Tools: {result['tool_count']}"
+            )
+            if result["tools_used"]:
                 print(f"  Tool calls: {result['tools_used']}")
 
-            results.append({
-                'question': question,
-                **result
-            })
+            results.append({"question": question, **result})
 
         except Exception as e:
             print(f"  ERROR: {e}")
-            results.append({
-                'question': question,
-                'response': str(e),
-                'time': 0,
-                'words': 0,
-                'tools_used': [],
-                'tool_count': 0,
-                'admitted_unknown': False,
-            })
+            results.append(
+                {
+                    "question": question,
+                    "response": str(e),
+                    "time": 0,
+                    "words": 0,
+                    "tools_used": [],
+                    "tool_count": 0,
+                    "admitted_unknown": False,
+                }
+            )
 
     # Summary
     print("\n" + "=" * 80)
     print("SUMMARY")
     print("=" * 80)
 
-    used_tools = sum(1 for r in results if r['tool_count'] > 0)
-    admitted_unknown = sum(1 for r in results if r['admitted_unknown'] and r['tool_count'] == 0)
-    made_up = sum(1 for r in results if r['tool_count'] == 0 and not r['admitted_unknown'])
+    used_tools = sum(1 for r in results if r["tool_count"] > 0)
+    admitted_unknown = sum(1 for r in results if r["admitted_unknown"] and r["tool_count"] == 0)
+    made_up = sum(1 for r in results if r["tool_count"] == 0 and not r["admitted_unknown"])
 
     print(f"✅ Used tools when needed: {used_tools}/{len(results)}")
     print(f"⚠️ Admitted unknown (acceptable): {admitted_unknown}/{len(results)}")
@@ -204,7 +216,7 @@ def main():
     # Write report
     report = f"""# Tool Usage Stress Test
 
-**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
+**Date:** {datetime.now().strftime("%Y-%m-%d %H:%M")}
 
 **Model:** {MODEL}
 
@@ -227,18 +239,20 @@ def main():
 """
 
     for r in results:
-        status = "✅ USED TOOLS" if r['tool_count'] > 0 else (
-            "⚠️ ADMITTED UNKNOWN" if r['admitted_unknown'] else "❌ CHECK FOR HALLUCINATION"
+        status = (
+            "✅ USED TOOLS"
+            if r["tool_count"] > 0
+            else ("⚠️ ADMITTED UNKNOWN" if r["admitted_unknown"] else "❌ CHECK FOR HALLUCINATION")
         )
 
-        report += f"""### Q: {r['question']}
+        report += f"""### Q: {r["question"]}
 
 **Status:** {status}
 
-**Time:** {r['time']:.1f}s | **Words:** {r['words']} | **Tool calls:** {r['tool_count']}
+**Time:** {r["time"]:.1f}s | **Words:** {r["words"]} | **Tool calls:** {r["tool_count"]}
 
 """
-        if r['tools_used']:
+        if r["tools_used"]:
             report += f"**Tools:** {', '.join(r['tools_used'])}\n\n"
 
         report += f"**Response:**\n\n{r['response']}\n\n---\n\n"

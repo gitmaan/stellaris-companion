@@ -85,12 +85,12 @@ def print_stats(stats: dict):
     print(f"  Total tool calls:  {stats['total_calls']}")
     print(f"  Tools used:        {', '.join(stats['tools_used']) or 'None'}")
     print(
-        f"  Wall time:         {stats['wall_time_ms']:.1f} ms ({stats['wall_time_ms']/1000:.2f} s)"
+        f"  Wall time:         {stats['wall_time_ms']:.1f} ms ({stats['wall_time_ms'] / 1000:.2f} s)"
     )
     print(f"  Response length:   {stats['response_length']} chars")
 
     if stats.get("payload_sizes"):
-        print(f"  Payload sizes:")
+        print("  Payload sizes:")
         for tool, size in stats["payload_sizes"].items():
             print(f"    - {tool}: {size:,} bytes")
         print(f"  Total payload:     {sum(stats['payload_sizes'].values()):,} bytes")
@@ -104,17 +104,14 @@ def print_stats(stats: dict):
 def main():
     """Run the logging test."""
     # Setup logging
-    logger = setup_logging()
+    setup_logging()
 
     # Get save path from args or use placeholder
     if len(sys.argv) > 1:
         save_path = sys.argv[1]
     else:
         # Default test path - update this to your actual save file location
-        save_path = (
-            Path.home()
-            / "Documents/Paradox Interactive/Stellaris/save games/test/test.sav"
-        )
+        save_path = Path.home() / "Documents/Paradox Interactive/Stellaris/save games/test/test.sav"
         print(f"No save path provided. Using default: {save_path}")
         print("Usage: python test_logging.py <path_to_save_file>")
         print()
@@ -157,7 +154,7 @@ def main():
         if stats["wall_time_ms"] < 8000:
             print("PASS: Response time within target (< 8s)")
         else:
-            print(f"WARNING: Response time exceeded target (> 8s)")
+            print("WARNING: Response time exceeded target (> 8s)")
 
         # Test 2: Briefing (more complex)
         print("\n" + "=" * 50)
@@ -180,7 +177,7 @@ def main():
         if stats["wall_time_ms"] < 12000:
             print("PASS: Briefing time within target (< 12s)")
         else:
-            print(f"WARNING: Briefing time exceeded target (> 12s)")
+            print("WARNING: Briefing time exceeded target (> 12s)")
 
         return 0
 

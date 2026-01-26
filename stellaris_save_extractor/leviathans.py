@@ -3,15 +3,8 @@ from __future__ import annotations
 import logging
 import re
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import iter_section_entries, _get_active_session, ParserError
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type for type hints
-    _get_active_session = lambda: None  # Fallback
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import _get_active_session
 
 logger = logging.getLogger(__name__)
 
@@ -367,16 +360,12 @@ class LeviathansMixin:
 
         if leviathan_type == "automated_dreadnought":
             # Can be captured instead of destroyed
-            if re.search(
-                r"dreadnought_captured|owns_dreadnought", self.gamestate, re.IGNORECASE
-            ):
+            if re.search(r"dreadnought_captured|owns_dreadnought", self.gamestate, re.IGNORECASE):
                 return True
 
         if leviathan_type == "enigmatic_fortress":
             # Fortress is "solved" not defeated
-            if re.search(
-                r"fortress_solved|enigmatic_cache", self.gamestate, re.IGNORECASE
-            ):
+            if re.search(r"fortress_solved|enigmatic_cache", self.gamestate, re.IGNORECASE):
                 return True
 
         return False
@@ -468,9 +457,7 @@ class LeviathansMixin:
         ]
 
         alive_names = [l["name"] for l in major_guardians if l["status"] == "alive"]
-        defeated_names = [
-            l["name"] for l in major_guardians if l["status"] == "defeated"
-        ]
+        defeated_names = [l["name"] for l in major_guardians if l["status"] == "defeated"]
 
         return {
             "major_guardians_alive": alive_names,

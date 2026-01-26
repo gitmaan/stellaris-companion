@@ -15,22 +15,23 @@ Usage:
 """
 
 import json
-import time
 import sys
-from pathlib import Path
+import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 # Add project root
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from save_loader import find_most_recent_save
 from save_extractor import SaveExtractor
+from save_loader import find_most_recent_save
 
 
 @dataclass
 class TestQuestion:
     """A test question with expected behavior."""
+
     question: str
     category: str  # "simple", "detail", "search", "empire"
     expected_tool_calls: int  # 0 = should answer from summary alone
@@ -45,83 +46,81 @@ TEST_QUESTIONS = [
         question="What is my military power?",
         category="simple",
         expected_tool_calls=0,
-        description="Basic metric in summary"
+        description="Basic metric in summary",
     ),
     TestQuestion(
         question="How many colonies do I have?",
         category="simple",
         expected_tool_calls=0,
-        description="Basic count in summary"
+        description="Basic count in summary",
     ),
     TestQuestion(
         question="What year is it in my game?",
         category="simple",
         expected_tool_calls=0,
-        description="Meta info in summary"
+        description="Meta info in summary",
     ),
     TestQuestion(
         question="Am I at war?",
         category="simple",
         expected_tool_calls=0,
-        description="War status in summary"
+        description="War status in summary",
     ),
     TestQuestion(
         question="What's my energy income?",
         category="simple",
         expected_tool_calls=0,
-        description="Resource summary"
+        description="Resource summary",
     ),
     TestQuestion(
         question="How many fleets do I have?",
         category="simple",
         expected_tool_calls=0,
-        description="Fleet count in summary"
+        description="Fleet count in summary",
     ),
-
     # DETAIL - Should require 1 tool call to get specific data
     TestQuestion(
         question="What traits does my best admiral have?",
         category="detail",
         expected_tool_calls=1,
         expected_sections=["leaders"],
-        description="Needs leader details"
+        description="Needs leader details",
     ),
     TestQuestion(
         question="What buildings are on my capital?",
         category="detail",
         expected_tool_calls=1,
         expected_sections=["planets"],
-        description="Needs planet details"
+        description="Needs planet details",
     ),
     TestQuestion(
         question="What modules are on my starbases?",
         category="detail",
         expected_tool_calls=1,
         expected_sections=["starbases"],
-        description="Needs starbase details"
+        description="Needs starbase details",
     ),
     TestQuestion(
         question="What technologies am I currently researching?",
         category="detail",
         expected_tool_calls=1,
         expected_sections=["technology"],
-        description="Needs tech details"
+        description="Needs tech details",
     ),
     TestQuestion(
         question="What are my relations with each empire?",
         category="detail",
         expected_tool_calls=1,
         expected_sections=["diplomacy"],
-        description="Needs diplomacy details"
+        description="Needs diplomacy details",
     ),
-
     # COMPLEX - Might need multiple sections
     TestQuestion(
         question="Give me a full economic breakdown with planet contributions",
         category="complex",
         expected_tool_calls=2,
         expected_sections=["economy", "planets"],
-        description="Needs economy + planets"
+        description="Needs economy + planets",
     ),
 ]
 
@@ -251,14 +250,14 @@ def print_report(size_comparison: dict, coverage: dict, question_analysis: list[
         if key != "coverage_score":
             status = "✓" if value else "✗"
             print(f"   {status} {key}: {value}")
-    print(f"\n   Coverage score: {coverage['coverage_score']*100:.0f}%")
+    print(f"\n   Coverage score: {coverage['coverage_score'] * 100:.0f}%")
 
     print("\n## QUESTION ANALYSIS")
     print("\n   SIMPLE questions (should need 0 tool calls):")
     simple_qs = [q for q in question_analysis if q["category"] == "simple"]
     for q in simple_qs:
         answerable = "✓" if q["likely_answerable_from_slim"] else "✗"
-        print(f"   {answerable} \"{q['question'][:50]}...\"")
+        print(f'   {answerable} "{q["question"][:50]}..."')
         if q["matched_keywords"]:
             print(f"      Matched: {q['matched_keywords']}")
 
@@ -268,7 +267,7 @@ def print_report(size_comparison: dict, coverage: dict, question_analysis: list[
     print("\n   DETAIL questions (should need 1+ tool calls):")
     detail_qs = [q for q in question_analysis if q["category"] in ["detail", "complex"]]
     for q in detail_qs:
-        print(f"   → \"{q['question'][:50]}...\"")
+        print(f'   → "{q["question"][:50]}..."')
         print(f"      Expected tools: {q['expected_tool_calls']}")
 
     print("\n## RECOMMENDATION")
@@ -276,7 +275,9 @@ def print_report(size_comparison: dict, coverage: dict, question_analysis: list[
         print("   ✓ T2.5 looks VIABLE")
         print("   - Slim briefing covers most simple question needs")
         print("   - Tool calls would only be needed for detail questions")
-        print(f"   - Potential token savings: ~{size_comparison['reduction_percent']}% for simple questions")
+        print(
+            f"   - Potential token savings: ~{size_comparison['reduction_percent']}% for simple questions"
+        )
     else:
         print("   ✗ T2.5 may need work")
         print("   - Slim briefing missing key data for simple questions")
@@ -312,8 +313,7 @@ def main():
 
     # Analyze each question
     question_analysis = [
-        check_question_answerable_from_slim(q, slim_briefing)
-        for q in TEST_QUESTIONS
+        check_question_answerable_from_slim(q, slim_briefing) for q in TEST_QUESTIONS
     ]
 
     # Print report

@@ -8,6 +8,7 @@ Uses Gemini with tool access to provide intelligent responses.
 
 import asyncio
 import logging
+
 import discord
 from discord import app_commands
 

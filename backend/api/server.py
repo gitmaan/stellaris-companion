@@ -7,6 +7,7 @@ the Python backend. All endpoints require Bearer token authentication.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import threading
 import time
@@ -185,10 +186,8 @@ def create_app() -> FastAPI:
                     detail={"error": "No save file loaded", "retry_after_ms": 2000},
                 )
             if not health.get("precompute_ready", False):
-                try:
+                with contextlib.suppress(Exception):
                     ingestion.request_t2_on_demand()
-                except Exception:
-                    pass
                 raise HTTPException(
                     status_code=503,
                     detail={"error": "Briefing not ready yet", "retry_after_ms": 2000},
@@ -290,14 +289,10 @@ def create_app() -> FastAPI:
                 "economy_power": status_data.get("economy_power", 0),
             },
             "colonies": (
-                colonies_data.get("total_count", 0)
-                if isinstance(colonies_data, dict)
-                else 0
+                colonies_data.get("total_count", 0) if isinstance(colonies_data, dict) else 0
             ),
             "pops": (
-                colonies_data.get("total_population", 0)
-                if isinstance(colonies_data, dict)
-                else 0
+                colonies_data.get("total_population", 0) if isinstance(colonies_data, dict) else 0
             ),
             "active_wars": [
                 {
@@ -382,10 +377,8 @@ def create_app() -> FastAPI:
             data_json = event.get("data_json")
             data = {}
             if data_json:
-                try:
+                with contextlib.suppress(Exception):
                     data = json_module.loads(data_json)
-                except Exception:
-                    pass
 
             events.append(
                 {
@@ -432,9 +425,7 @@ def create_app() -> FastAPI:
                     status_code=400,
                     detail={"error": "No active session - briefing not ready yet"},
                 )
-            t2_meta = (
-                status.get("t2_meta") if isinstance(status.get("t2_meta"), dict) else {}
-            )
+            t2_meta = status.get("t2_meta") if isinstance(status.get("t2_meta"), dict) else {}
             campaign_id = t2_meta.get("campaign_id")
             player_id = t2_meta.get("player_id")
             empire_name = t2_meta.get("empire_name")
@@ -570,9 +561,7 @@ def create_app() -> FastAPI:
         # Prevent request storms from spawning concurrent LLM calls.
         # Chronicle generation can be network-intensive; serialize per-save.
         save_id = (
-            db.get_save_id_for_session(body.session_id)
-            or session.get("save_id")
-            or body.session_id
+            db.get_save_id_for_session(body.session_id) or session.get("save_id") or body.session_id
         )
         with _chronicle_in_flight_lock:
             if save_id in _chronicle_in_flight:

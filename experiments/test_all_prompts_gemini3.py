@@ -27,10 +27,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
+
 from save_extractor import SaveExtractor
 
 # THE CORRECT MODEL
@@ -47,30 +49,30 @@ TEST_QUESTIONS = [
 
 # Known empire localization keys
 EMPIRE_LOC_KEYS = {
-    'EMPIRE_DESIGN_orbis': 'United Nations of Earth',
-    'EMPIRE_DESIGN_humans1': 'Commonwealth of Man',
-    'EMPIRE_DESIGN_humans2': 'Terran Hegemony',
-    'PRESCRIPTED_empire_name_orbis': 'United Nations of Earth',
+    "EMPIRE_DESIGN_orbis": "United Nations of Earth",
+    "EMPIRE_DESIGN_humans1": "Commonwealth of Man",
+    "EMPIRE_DESIGN_humans2": "Terran Hegemony",
+    "PRESCRIPTED_empire_name_orbis": "United Nations of Earth",
 }
 
 
 def get_empire_name_by_id(extractor, empire_id: int) -> str:
     """Resolve an empire ID to its display name."""
     gamestate = extractor.gamestate
-    country_match = re.search(r'^country=\s*\{', gamestate, re.MULTILINE)
+    country_match = re.search(r"^country=\s*\{", gamestate, re.MULTILINE)
     if not country_match:
         return f"Empire {empire_id}"
 
     start = country_match.start()
-    pattern = rf'\n\t{empire_id}=\s*\{{'
-    id_match = re.search(pattern, gamestate[start:start + 10000000])
+    pattern = rf"\n\t{empire_id}=\s*\{{"
+    id_match = re.search(pattern, gamestate[start : start + 10000000])
     if not id_match:
         return f"Empire {empire_id}"
 
     chunk_start = start + id_match.start()
-    chunk = gamestate[chunk_start:chunk_start + 8000]
+    chunk = gamestate[chunk_start : chunk_start + 8000]
 
-    name_match = re.search(r'name=\s*\{[^}]*key=\"([^\"]+)\"', chunk)
+    name_match = re.search(r"name=\s*\{[^}]*key=\"([^\"]+)\"", chunk)
     if not name_match:
         return f"Empire {empire_id}"
 
@@ -78,16 +80,20 @@ def get_empire_name_by_id(extractor, empire_id: int) -> str:
     if name_key in EMPIRE_LOC_KEYS:
         return EMPIRE_LOC_KEYS[name_key]
 
-    if '%' in name_key:
-        name_block_match = re.search(r'name=\s*\{([^}]+variables[^}]+\}[^}]+)\}', chunk, re.DOTALL)
+    if "%" in name_key:
+        name_block_match = re.search(r"name=\s*\{([^}]+variables[^}]+\}[^}]+)\}", chunk, re.DOTALL)
         if name_block_match:
             name_block = name_block_match.group(1)
-            adj_match = re.search(r'key=\"adjective\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"', name_block, re.DOTALL)
+            adj_match = re.search(
+                r"key=\"adjective\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"", name_block, re.DOTALL
+            )
             adjective = ""
             if adj_match:
                 adj_key = adj_match.group(1)
-                adjective = adj_key.replace('SPEC_', '').replace('_', ' ')
-            suffix_match = re.search(r'key=\"1\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"', name_block, re.DOTALL)
+                adjective = adj_key.replace("SPEC_", "").replace("_", " ")
+            suffix_match = re.search(
+                r"key=\"1\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"", name_block, re.DOTALL
+            )
             suffix = ""
             if suffix_match:
                 suffix = suffix_match.group(1)
@@ -96,7 +102,9 @@ def get_empire_name_by_id(extractor, empire_id: int) -> str:
             elif adjective:
                 return adjective
 
-    clean_name = name_key.replace('EMPIRE_DESIGN_', '').replace('PRESCRIPTED_', '').replace('_', ' ').title()
+    clean_name = (
+        name_key.replace("EMPIRE_DESIGN_", "").replace("PRESCRIPTED_", "").replace("_", " ").title()
+    )
     return clean_name if clean_name else f"Empire {empire_id}"
 
 
@@ -106,38 +114,36 @@ def build_comprehensive_snapshot(extractor) -> dict:
 
     # Add ALL leaders
     all_leaders = extractor.get_leaders()
-    snapshot['leadership']['leaders'] = all_leaders.get('leaders', [])
-    snapshot['leadership']['count'] = len(all_leaders.get('leaders', []))
+    snapshot["leadership"]["leaders"] = all_leaders.get("leaders", [])
+    snapshot["leadership"]["count"] = len(all_leaders.get("leaders", []))
 
     # Detailed diplomacy with resolved names
     detailed_diplo = extractor.get_diplomacy()
     relations = []
-    for r in detailed_diplo.get('relations', [])[:20]:
-        cid = r.get('country_id')
+    for r in detailed_diplo.get("relations", [])[:20]:
+        cid = r.get("country_id")
         if cid is not None:
-            r['empire_name'] = get_empire_name_by_id(extractor, cid)
+            r["empire_name"] = get_empire_name_by_id(extractor, cid)
         relations.append(r)
-    snapshot['diplomacy']['relations'] = relations
+    snapshot["diplomacy"]["relations"] = relations
 
     # Resolve ally names
-    ally_ids = snapshot['diplomacy'].get('allies', [])
-    snapshot['diplomacy']['allies_named'] = [
-        {'id': aid, 'name': get_empire_name_by_id(extractor, aid)}
-        for aid in ally_ids
+    ally_ids = snapshot["diplomacy"].get("allies", [])
+    snapshot["diplomacy"]["allies_named"] = [
+        {"id": aid, "name": get_empire_name_by_id(extractor, aid)} for aid in ally_ids
     ]
 
     # Resolve rival names
-    rival_ids = snapshot['diplomacy'].get('rivals', [])
-    snapshot['diplomacy']['rivals_named'] = [
-        {'id': rid, 'name': get_empire_name_by_id(extractor, rid)}
-        for rid in rival_ids
+    rival_ids = snapshot["diplomacy"].get("rivals", [])
+    snapshot["diplomacy"]["rivals_named"] = [
+        {"id": rid, "name": get_empire_name_by_id(extractor, rid)} for rid in rival_ids
     ]
 
     # Current research
     tech = extractor.get_technology()
-    snapshot['current_research'] = tech.get('current_research', {})
-    if not snapshot['current_research']:
-        snapshot['current_research'] = "None - research slots are idle"
+    snapshot["current_research"] = tech.get("current_research", {})
+    if not snapshot["current_research"]:
+        snapshot["current_research"] = "None - research slots are idle"
 
     return snapshot
 
@@ -146,26 +152,27 @@ def build_comprehensive_snapshot(extractor) -> dict:
 # PROMPT BUILDERS
 # =============================================================================
 
+
 def build_clean_prompt(identity: dict, situation: dict) -> str:
     """1. Clean/Minimal prompt (~600 chars)"""
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = identity.get('ethics', [])
-    authority = identity.get('authority', 'unknown')
-    civics = identity.get('civics', [])
-    year = situation.get('year', 2200)
-    game_phase = situation.get('game_phase', 'early')
-    at_war = situation.get('at_war', False)
-    economy = situation.get('economy', {})
-    deficits = economy.get('resources_in_deficit', 0)
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = identity.get("ethics", [])
+    authority = identity.get("authority", "unknown")
+    civics = identity.get("civics", [])
+    year = situation.get("year", 2200)
+    game_phase = situation.get("game_phase", "early")
+    at_war = situation.get("at_war", False)
+    economy = situation.get("economy", {})
+    deficits = economy.get("resources_in_deficit", 0)
 
     return f"""You are the strategic advisor to {empire_name}.
 
 YOUR PERSONALITY:
-You embody {', '.join(ethics)} values with {authority} governance.
-Civics: {', '.join(civics) if civics else 'none'}.
+You embody {", ".join(ethics)} values with {authority} governance.
+Civics: {", ".join(civics) if civics else "none"}.
 Address the ruler as "President" (democratic authority). Be collegial, passionate about liberty and citizen welfare.
 
-CURRENT SITUATION: Year {year} ({game_phase} game), {'AT WAR' if at_war else 'at peace'}, {deficits} resource deficits.
+CURRENT SITUATION: Year {year} ({game_phase} game), {"AT WAR" if at_war else "at peace"}, {deficits} resource deficits.
 
 RULES:
 1. All facts and numbers MUST come from the provided game state data - never guess.
@@ -175,28 +182,28 @@ RULES:
 
 def build_middle_ground_prompt(identity: dict, situation: dict) -> str:
     """2. Middle Ground prompt (~1700 chars) - Full personality + strategic depth"""
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = identity.get('ethics', [])
-    authority = identity.get('authority', 'unknown')
-    civics = identity.get('civics', [])
-    is_gestalt = identity.get('is_gestalt', False)
-    is_machine = identity.get('is_machine', False)
-    year = situation.get('year', 2200)
-    game_phase = situation.get('game_phase', 'early')
-    at_war = situation.get('at_war', False)
-    economy = situation.get('economy', {})
-    deficits = economy.get('resources_in_deficit', 0)
-    contact_count = situation.get('contact_count', 0)
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = identity.get("ethics", [])
+    authority = identity.get("authority", "unknown")
+    civics = identity.get("civics", [])
+    is_gestalt = identity.get("is_gestalt", False)
+    is_machine = identity.get("is_machine", False)
+    year = situation.get("year", 2200)
+    game_phase = situation.get("game_phase", "early")
+    at_war = situation.get("at_war", False)
+    economy = situation.get("economy", {})
+    deficits = economy.get("resources_in_deficit", 0)
+    contact_count = situation.get("contact_count", 0)
 
     return f"""You are the strategic advisor to {empire_name}.
 
 EMPIRE IDENTITY:
-- Ethics: {', '.join(ethics) if ethics else 'unknown'}
+- Ethics: {", ".join(ethics) if ethics else "unknown"}
 - Authority: {authority}
-- Civics: {', '.join(civics) if civics else 'none'}
+- Civics: {", ".join(civics) if civics else "none"}
 - Gestalt: {is_gestalt} (Machine: {is_machine})
 
-SITUATION: Year {year} ({game_phase}), {'AT WAR' if at_war else 'at peace'}, {deficits} deficits, {contact_count} known empires.
+SITUATION: Year {year} ({game_phase}), {"AT WAR" if at_war else "at peace"}, {deficits} deficits, {contact_count} known empires.
 
 PERSONALITY (critical - stay in character):
 Your ethics define your worldview:
@@ -228,28 +235,28 @@ The game state is pre-loaded in the user message. Tools available only for edge 
 
 def build_enhanced_prompt(identity: dict, situation: dict) -> str:
     """3. Enhanced prompt (~1500 chars) - Personality + strong tool instructions"""
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = identity.get('ethics', [])
-    authority = identity.get('authority', 'unknown')
-    civics = identity.get('civics', [])
-    is_gestalt = identity.get('is_gestalt', False)
-    is_machine = identity.get('is_machine', False)
-    year = situation.get('year', 2200)
-    game_phase = situation.get('game_phase', 'early')
-    at_war = situation.get('at_war', False)
-    economy = situation.get('economy', {})
-    deficits = economy.get('resources_in_deficit', 0)
-    contact_count = situation.get('contact_count', 0)
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = identity.get("ethics", [])
+    authority = identity.get("authority", "unknown")
+    civics = identity.get("civics", [])
+    is_gestalt = identity.get("is_gestalt", False)
+    is_machine = identity.get("is_machine", False)
+    year = situation.get("year", 2200)
+    game_phase = situation.get("game_phase", "early")
+    at_war = situation.get("at_war", False)
+    economy = situation.get("economy", {})
+    deficits = economy.get("resources_in_deficit", 0)
+    contact_count = situation.get("contact_count", 0)
 
     return f"""You are the strategic advisor to {empire_name}.
 
 EMPIRE IDENTITY:
-- Ethics: {', '.join(ethics) if ethics else 'unknown'}
+- Ethics: {", ".join(ethics) if ethics else "unknown"}
 - Authority: {authority}
-- Civics: {', '.join(civics) if civics else 'none'}
+- Civics: {", ".join(civics) if civics else "none"}
 - Gestalt: {is_gestalt} (Machine: {is_machine})
 
-SITUATION: Year {year} ({game_phase}), {'AT WAR' if at_war else 'at peace'}, {deficits} deficits, {contact_count} known empires.
+SITUATION: Year {year} ({game_phase}), {"AT WAR" if at_war else "at peace"}, {deficits} deficits, {contact_count} known empires.
 
 PERSONALITY (critical - stay in character):
 Your ethics define your worldview:
@@ -288,7 +295,7 @@ def build_production_data_tools_prompt(base_prompt: str) -> str:
     """4. Production + DATA/TOOLS - Replace tools section with custom one"""
     tools_marker = "TOOLS: You have access to tools"
     if tools_marker in base_prompt:
-        prompt = base_prompt[:base_prompt.index(tools_marker)]
+        prompt = base_prompt[: base_prompt.index(tools_marker)]
     else:
         prompt = base_prompt
 
@@ -332,9 +339,10 @@ def build_production_ask_mode_prompt(base_prompt: str) -> str:
 # TEST RUNNER
 # =============================================================================
 
+
 def run_prompt_test(client, extractor, system_prompt: str, snapshot: dict, question: str) -> dict:
     """Run a single test with given prompt."""
-    snapshot_json = json.dumps(snapshot, separators=(',', ':'), default=str)
+    snapshot_json = json.dumps(snapshot, separators=(",", ":"), default=str)
     user_prompt = f"GAME STATE:\n```json\n{snapshot_json}\n```\n\n{question}"
 
     tools_used = []
@@ -379,6 +387,7 @@ def run_prompt_test(client, extractor, system_prompt: str, snapshot: dict, quest
 def run_production_version(question: str) -> dict:
     """Run production companion for comparison."""
     from core.companion import Companion
+
     companion = Companion(save_path="test_save.sav")
     companion.clear_conversation()
 
@@ -389,8 +398,8 @@ def run_production_version(question: str) -> dict:
     return {
         "response": response,
         "time": elapsed,
-        "tools": stats.get('total_calls', 0),
-        "tools_list": stats.get('tools_used', []),
+        "tools": stats.get("total_calls", 0),
+        "tools_list": stats.get("tools_used", []),
         "words": len(response.split()),
     }
 
@@ -408,6 +417,7 @@ def main():
 
     # Get production system prompt
     from core.companion import Companion
+
     temp_companion = Companion(save_path="test_save.sav")
     production_base_prompt = temp_companion.system_prompt
 
@@ -441,7 +451,7 @@ def main():
 
     # Run tests
     for qi, question in enumerate(TEST_QUESTIONS, 1):
-        print(f"\n{'='*90}")
+        print(f"\n{'=' * 90}")
         print(f"Q{qi}/{len(TEST_QUESTIONS)}: {question}")
         print("=" * 90)
 
@@ -449,11 +459,22 @@ def main():
         print(f"\n[0_Production] ", end="", flush=True)
         try:
             prod_result = run_production_version(question)
-            print(f"{prod_result['time']:.1f}s, {prod_result['words']} words, {prod_result['tools']} tools")
+            print(
+                f"{prod_result['time']:.1f}s, {prod_result['words']} words, {prod_result['tools']} tools"
+            )
             all_results["0_Production"].append({"question": question, **prod_result})
         except Exception as e:
             print(f"ERROR: {e}")
-            all_results["0_Production"].append({"question": question, "response": str(e), "time": 0, "tools": 0, "tools_list": [], "words": 0})
+            all_results["0_Production"].append(
+                {
+                    "question": question,
+                    "response": str(e),
+                    "time": 0,
+                    "tools": 0,
+                    "tools_list": [],
+                    "words": 0,
+                }
+            )
 
         # Run each prompt variant
         for name, prompt in prompts.items():
@@ -464,7 +485,16 @@ def main():
                 all_results[name].append({"question": question, **result})
             except Exception as e:
                 print(f"ERROR: {e}")
-                all_results[name].append({"question": question, "response": str(e), "time": 0, "tools": 0, "tools_list": [], "words": 0})
+                all_results[name].append(
+                    {
+                        "question": question,
+                        "response": str(e),
+                        "time": 0,
+                        "tools": 0,
+                        "tools_list": [],
+                        "words": 0,
+                    }
+                )
 
     # Generate markdown report
     generate_markdown_report(all_results, prompts, production_base_prompt)
@@ -493,11 +523,11 @@ def generate_markdown_report(all_results: dict, prompts: dict, production_base_p
 
     for name in ["0_Production"] + list(prompts.keys()):
         results = all_results[name]
-        valid = [r for r in results if r['time'] > 0]
+        valid = [r for r in results if r["time"] > 0]
         if valid:
-            avg_time = sum(r['time'] for r in valid) / len(valid)
-            avg_words = sum(r['words'] for r in valid) / len(valid)
-            avg_tools = sum(r['tools'] for r in valid) / len(valid)
+            avg_time = sum(r["time"] for r in valid) / len(valid)
+            avg_words = sum(r["words"] for r in valid) / len(valid)
+            avg_tools = sum(r["tools"] for r in valid) / len(valid)
         else:
             avg_time = avg_words = avg_tools = 0
 
@@ -512,7 +542,7 @@ def generate_markdown_report(all_results: dict, prompts: dict, production_base_p
     md.append("\n\n## Per-Question Results")
 
     for qi, question in enumerate(TEST_QUESTIONS):
-        md.append(f"\n### Q{qi+1}: {question}")
+        md.append(f"\n### Q{qi + 1}: {question}")
         md.append("\n| Prompt | Time | Words | Tools |")
         md.append("|--------|------|-------|-------|")
 
@@ -524,12 +554,14 @@ def generate_markdown_report(all_results: dict, prompts: dict, production_base_p
     md.append("\n\n## Full Responses")
 
     for qi, question in enumerate(TEST_QUESTIONS):
-        md.append(f"\n\n---\n### Q{qi+1}: {question}\n")
+        md.append(f"\n\n---\n### Q{qi + 1}: {question}\n")
 
         for name in ["0_Production"] + list(prompts.keys()):
             r = all_results[name][qi]
             md.append(f"\n#### {name}")
-            md.append(f"\n*Time: {r['time']:.1f}s | Words: {r['words']} | Tools: {r['tools']} {r.get('tools_list', [])}*\n")
+            md.append(
+                f"\n*Time: {r['time']:.1f}s | Words: {r['words']} | Tools: {r['tools']} {r.get('tools_list', [])}*\n"
+            )
             md.append(f"\n{r['response']}\n")
 
     # Prompt definitions

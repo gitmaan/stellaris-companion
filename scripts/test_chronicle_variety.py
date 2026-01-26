@@ -12,9 +12,9 @@ import json
 import os
 import re
 import sqlite3
+import sys
 from collections import Counter
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -39,31 +39,32 @@ def get_db_connection():
 
 
 def get_session_data(conn, session_id: str) -> dict:
-    session = dict(conn.execute(
-        "SELECT * FROM sessions WHERE id = ?", (session_id,)
-    ).fetchone())
+    session = dict(conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone())
 
-    events = [dict(row) for row in conn.execute(
-        """SELECT event_type, game_date, summary
+    events = [
+        dict(row)
+        for row in conn.execute(
+            """SELECT event_type, game_date, summary
            FROM events WHERE session_id = ? ORDER BY game_date""",
-        (session_id,)
-    ).fetchall()]
+            (session_id,),
+        ).fetchall()
+    ]
 
-    briefing_json = session.get('latest_briefing_json')
+    briefing_json = session.get("latest_briefing_json")
     briefing = json.loads(briefing_json) if briefing_json else {}
 
     dates = conn.execute(
         """SELECT MIN(game_date) as first_date, MAX(game_date) as last_date
            FROM snapshots WHERE session_id = ?""",
-        (session_id,)
+        (session_id,),
     ).fetchone()
 
     return {
-        'session': session,
-        'events': events,
-        'briefing': briefing,
-        'first_date': dates['first_date'],
-        'last_date': dates['last_date'],
+        "session": session,
+        "events": events,
+        "briefing": briefing,
+        "first_date": dates["first_date"],
+        "last_date": dates["last_date"],
     }
 
 
@@ -71,7 +72,7 @@ def dedupe_events(events):
     seen = set()
     deduped = []
     for e in events:
-        key = (e['game_date'], e['event_type'], e['summary'])
+        key = (e["game_date"], e["event_type"], e["summary"])
         if key not in seen:
             seen.add(key)
             deduped.append(e)
@@ -82,7 +83,7 @@ def format_events_for_llm(events):
     events = dedupe_events(events)
     by_year = {}
     for e in events:
-        year = e['game_date'][:4] if e['game_date'] else 'Unknown'
+        year = e["game_date"][:4] if e["game_date"] else "Unknown"
         if year not in by_year:
             by_year[year] = []
         by_year[year].append(e)
@@ -91,10 +92,23 @@ def format_events_for_llm(events):
     for year in sorted(by_year.keys()):
         year_events = by_year[year]
         if len(year_events) > 10:
-            notable = [e for e in year_events if e['event_type'] in (
-                'war_started', 'war_ended', 'crisis_started', 'fallen_empire_awakened',
-                'war_in_heaven_started', 'federation_joined', 'alliance_formed',
-                'alliance_ended', 'colony_count_change', 'military_power_change')]
+            notable = [
+                e
+                for e in year_events
+                if e["event_type"]
+                in (
+                    "war_started",
+                    "war_ended",
+                    "crisis_started",
+                    "fallen_empire_awakened",
+                    "war_in_heaven_started",
+                    "federation_joined",
+                    "alliance_formed",
+                    "alliance_ended",
+                    "colony_count_change",
+                    "military_power_change",
+                )
+            ]
             lines.append(f"\n=== {year} ===")
             for e in notable:
                 lines.append(f"  * {e['summary']}")
@@ -102,54 +116,56 @@ def format_events_for_llm(events):
             lines.append(f"\n=== {year} ===")
             for e in year_events:
                 lines.append(f"  * {e['summary']}")
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def summarize_state(briefing):
-    identity = briefing.get('identity', {})
-    situation = briefing.get('situation', {})
-    military = briefing.get('military', {})
-    territory = briefing.get('territory', {})
-    endgame = briefing.get('endgame', {})
+    identity = briefing.get("identity", {})
+    situation = briefing.get("situation", {})
+    military = briefing.get("military", {})
+    territory = briefing.get("territory", {})
+    endgame = briefing.get("endgame", {})
 
     lines = [
-        f"=== CURRENT STATE ===",
+        "=== CURRENT STATE ===",
         f"Empire: {identity.get('empire_name', 'Unknown')}",
         f"Year: {situation.get('year', '?')}",
         f"Military Power: {military.get('military_power', 0):,.0f}",
         f"Colonies: {territory.get('colonies', {}).get('total_count', 0)}",
     ]
 
-    crisis = endgame.get('crisis', {})
-    if crisis.get('crisis_active'):
-        lines.append(f"CRISIS: {crisis.get('crisis_type', 'Unknown').title()} ({crisis.get('crisis_systems_count', 0)} systems)")
+    crisis = endgame.get("crisis", {})
+    if crisis.get("crisis_active"):
+        lines.append(
+            f"CRISIS: {crisis.get('crisis_type', 'Unknown').title()} ({crisis.get('crisis_systems_count', 0)} systems)"
+        )
 
-    fe = situation.get('fallen_empires', {})
-    if fe.get('awakened_count', 0) > 0:
+    fe = situation.get("fallen_empires", {})
+    if fe.get("awakened_count", 0) > 0:
         lines.append(f"Awakened Empires: {fe.get('awakened_count', 0)}")
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def build_prompt(data: dict) -> str:
-    briefing = data['briefing']
-    identity = briefing.get('identity', {})
+    briefing = data["briefing"]
+    identity = briefing.get("identity", {})
 
-    empire_name = identity.get('empire_name', 'Unknown Empire')
-    ethics = ', '.join(identity.get('ethics', []))
-    authority = identity.get('authority', 'unknown')
-    civics = ', '.join(identity.get('civics', []))
+    empire_name = identity.get("empire_name", "Unknown Empire")
+    ethics = ", ".join(identity.get("ethics", []))
+    authority = identity.get("authority", "unknown")
+    civics = ", ".join(identity.get("civics", []))
 
-    if 'egalitarian' in ethics or 'fanatic_egalitarian' in ethics:
+    if "egalitarian" in ethics or "fanatic_egalitarian" in ethics:
         voice_note = "Write celebrating the triumph of the people. Emphasize collective achievement and democratic ideals."
-    elif 'authoritarian' in ethics or 'fanatic_authoritarian' in ethics:
+    elif "authoritarian" in ethics or "fanatic_authoritarian" in ethics:
         voice_note = "Write with imperial grandeur. Emphasize the glory and order of the state."
-    elif 'militarist' in ethics or 'fanatic_militarist' in ethics:
+    elif "militarist" in ethics or "fanatic_militarist" in ethics:
         voice_note = "Write with martial pride. Emphasize battles, conquests, and military honor."
     else:
         voice_note = "Write with epic gravitas befitting a galactic chronicle."
 
-    events_text = format_events_for_llm(data['events'])
+    events_text = format_events_for_llm(data["events"])
     state_text = summarize_state(briefing)
 
     prompt = f"""You are the Royal Chronicler of {empire_name}. Your task is to write the official historical chronicle of this empire.
@@ -170,7 +186,7 @@ You are NOT an advisor. You do NOT give recommendations or strategic advice. You
 {state_text}
 
 === COMPLETE EVENT HISTORY ===
-(From {data['first_date']} to {data['last_date']})
+(From {data["first_date"]} to {data["last_date"]})
 {events_text}
 
 === YOUR TASK ===
@@ -190,13 +206,13 @@ Begin the chronicle now.
 def call_gemini(prompt: str) -> str:
     from google import genai
 
-    api_key = os.environ.get('GOOGLE_API_KEY')
+    api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        env_path = Path(__file__).parent.parent / '.env'
+        env_path = Path(__file__).parent.parent / ".env"
         if env_path.exists():
             for line in env_path.read_text().splitlines():
-                if line.startswith('GOOGLE_API_KEY='):
-                    api_key = line.split('=', 1)[1].strip()
+                if line.startswith("GOOGLE_API_KEY="):
+                    api_key = line.split("=", 1)[1].strip()
                     break
 
     if not api_key:
@@ -204,9 +220,7 @@ def call_gemini(prompt: str) -> str:
 
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model=MODEL,
-        contents=prompt,
-        config={'temperature': 1.0, 'max_output_tokens': 4096}
+        model=MODEL, contents=prompt, config={"temperature": 1.0, "max_output_tokens": 4096}
     )
     return response.text
 
@@ -215,15 +229,15 @@ def extract_chapter_titles(output: str) -> list:
     """Extract chapter titles from output."""
     # Match patterns like "CHAPTER I:", "Chapter 1:", "### CHAPTER I", etc.
     patterns = [
-        r'(?:###?\s*)?(?:CHAPTER|Chapter)\s+[IVX0-9]+[:\s]+([^\n*]+)',
-        r'\*\*CHAPTER\s+[IVX0-9]+[:\s]+([^\n*]+)\*\*',
-        r'####?\s*CHAPTER\s+[IVX0-9]+[:\s]+([^\n*]+)',
+        r"(?:###?\s*)?(?:CHAPTER|Chapter)\s+[IVX0-9]+[:\s]+([^\n*]+)",
+        r"\*\*CHAPTER\s+[IVX0-9]+[:\s]+([^\n*]+)\*\*",
+        r"####?\s*CHAPTER\s+[IVX0-9]+[:\s]+([^\n*]+)",
     ]
 
     titles = []
     for pattern in patterns:
         matches = re.findall(pattern, output, re.IGNORECASE)
-        titles.extend([m.strip().strip('*').strip() for m in matches])
+        titles.extend([m.strip().strip("*").strip() for m in matches])
 
     return titles[:6]  # Max 6 chapters
 
@@ -277,11 +291,11 @@ def analyze_variety(outputs: list) -> dict:
     overused_phrases = {p: c for p, c in phrase_counts.items() if c >= len(outputs)}
 
     return {
-        'unique_titles': len(set(all_titles)),
-        'total_titles': len(all_titles),
-        'repeated_titles': repeated_titles,
-        'phrase_counts': dict(phrase_counts),
-        'overused_phrases': overused_phrases,
+        "unique_titles": len(set(all_titles)),
+        "total_titles": len(all_titles),
+        "repeated_titles": repeated_titles,
+        "phrase_counts": dict(phrase_counts),
+        "overused_phrases": overused_phrases,
     }
 
 
@@ -297,33 +311,33 @@ def main():
         """SELECT id, empire_name FROM sessions ORDER BY started_at DESC"""
     ).fetchall()
 
-    print(f"\nAvailable sessions:")
+    print("\nAvailable sessions:")
     for i, s in enumerate(sessions):
-        print(f"  {i+1}. {s['empire_name']}")
+        print(f"  {i + 1}. {s['empire_name']}")
 
     # Test 1: Run 3x on Session 2 (War in Heaven)
     print("\n" + "=" * 70)
     print("TEST 1: REPETITION CHECK - Same session, 3 runs")
     print("=" * 70)
 
-    session_id = sessions[1]['id']  # Session 2
+    session_id = sessions[1]["id"]  # Session 2
     data = get_session_data(conn, session_id)
     print(f"\nUsing: {data['briefing']['identity']['empire_name']}")
 
     outputs = []
     for i in range(3):
-        print(f"\n--- Run {i+1}/3 ---")
+        print(f"\n--- Run {i + 1}/3 ---")
         prompt = build_prompt(data)
         output = call_gemini(prompt)
         outputs.append(output)
 
         titles = extract_chapter_titles(output)
-        print(f"Chapter titles:")
+        print("Chapter titles:")
         for t in titles:
             print(f"  - {t}")
 
         # Save output
-        Path(__file__).parent.joinpath(f"variety_session2_run{i+1}.txt").write_text(output)
+        Path(__file__).parent.joinpath(f"variety_session2_run{i + 1}.txt").write_text(output)
 
     # Analyze variety
     print("\n" + "-" * 40)
@@ -333,15 +347,15 @@ def main():
     analysis = analyze_variety(outputs)
     print(f"Unique chapter titles: {analysis['unique_titles']} / {analysis['total_titles']}")
 
-    if analysis['repeated_titles']:
-        print(f"\n⚠️  REPEATED TITLES (appear in multiple runs):")
-        for title, count in analysis['repeated_titles'].items():
+    if analysis["repeated_titles"]:
+        print("\n⚠️  REPEATED TITLES (appear in multiple runs):")
+        for title, count in analysis["repeated_titles"].items():
             print(f"  - '{title}' ({count}x)")
     else:
         print("\n✅ No repeated chapter titles across runs")
 
-    print(f"\nPhrase usage across all 3 outputs:")
-    for phrase, count in sorted(analysis['phrase_counts'].items(), key=lambda x: -x[1]):
+    print("\nPhrase usage across all 3 outputs:")
+    for phrase, count in sorted(analysis["phrase_counts"].items(), key=lambda x: -x[1]):
         indicator = "⚠️" if count >= 3 else "  "
         print(f"  {indicator} '{phrase}': {count}x")
 
@@ -350,7 +364,7 @@ def main():
     print("TEST 2: CROSS-SESSION CHECK - Different data, different output?")
     print("=" * 70)
 
-    session1_id = sessions[0]['id']  # Session 1
+    session1_id = sessions[0]["id"]  # Session 1
     data1 = get_session_data(conn, session1_id)
     print(f"\nSession 1: {data1['briefing']['identity']['empire_name']}")
     print(f"Events: {len(data1['events'])}, Range: {data1['first_date']} → {data1['last_date']}")
@@ -359,7 +373,7 @@ def main():
     output1 = call_gemini(prompt1)
 
     titles1 = extract_chapter_titles(output1)
-    print(f"\nSession 1 Chapter Titles:")
+    print("\nSession 1 Chapter Titles:")
     for t in titles1:
         print(f"  - {t}")
 
@@ -378,7 +392,7 @@ def main():
 
     overlap = session1_titles.intersection(session2_titles)
     if overlap:
-        print(f"⚠️  OVERLAPPING TITLES between sessions:")
+        print("⚠️  OVERLAPPING TITLES between sessions:")
         for t in overlap:
             print(f"  - '{t}'")
     else:
@@ -396,14 +410,14 @@ Files saved:
   - scripts/variety_session1.txt
 
 Key Findings:
-  - Unique titles in Session 2 (3 runs): {analysis['unique_titles']}/{analysis['total_titles']}
-  - Repeated titles: {len(analysis['repeated_titles'])}
+  - Unique titles in Session 2 (3 runs): {analysis["unique_titles"]}/{analysis["total_titles"]}
+  - Repeated titles: {len(analysis["repeated_titles"])}
   - Cross-session title overlap: {len(overlap)}
-  - Phrases used 3+ times: {len([p for p,c in analysis['phrase_counts'].items() if c >= 3])}
+  - Phrases used 3+ times: {len([p for p, c in analysis["phrase_counts"].items() if c >= 3])}
 """)
 
     conn.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

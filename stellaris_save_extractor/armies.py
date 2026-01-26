@@ -3,15 +3,8 @@ from __future__ import annotations
 import logging
 import re
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import iter_section_entries, ParserError, _get_active_session
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type for type hints
-    _get_active_session = lambda: None
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import _get_active_session
 
 logger = logging.getLogger(__name__)
 

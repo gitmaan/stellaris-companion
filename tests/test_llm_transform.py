@@ -11,9 +11,9 @@ Then tests each with the advisor to see which produces better responses.
 """
 
 import os
+import re
 import sys
 import time
-import re
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -35,18 +35,21 @@ Life-Seeded: Planet has improved rare resource features.
 Synthetic Fertility: The Identity repository output has been decreased by 25%, while its upkeep has been increased by 20%.
 """
 
+
 # Regex normalization (current approach)
 def regex_normalize(text: str) -> str:
     """Current regex-based normalization."""
-    text = re.sub(r'\bno longer\b', 'does not', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bnow\s+', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'reduced from \S+ to (\S+)', r'is \1', text, flags=re.IGNORECASE)
-    text = re.sub(r'increased from \S+ to (\S+)', r'is \1', text, flags=re.IGNORECASE)
-    text = re.sub(r'has been reduced from \S+ to (\S+)', r'is \1', text, flags=re.IGNORECASE)
-    text = re.sub(r'has been increased from \S+ to (\S+)', r'is \1', text, flags=re.IGNORECASE)
-    text = re.sub(r'was changed to', 'is', text, flags=re.IGNORECASE)
-    text = re.sub(r'has been (?:reduced|increased) to', 'is', text, flags=re.IGNORECASE)
-    text = re.sub(r'has been (?:decreased|increased) by', 'is adjusted by', text, flags=re.IGNORECASE)
+    text = re.sub(r"\bno longer\b", "does not", text, flags=re.IGNORECASE)
+    text = re.sub(r"\bnow\s+", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"reduced from \S+ to (\S+)", r"is \1", text, flags=re.IGNORECASE)
+    text = re.sub(r"increased from \S+ to (\S+)", r"is \1", text, flags=re.IGNORECASE)
+    text = re.sub(r"has been reduced from \S+ to (\S+)", r"is \1", text, flags=re.IGNORECASE)
+    text = re.sub(r"has been increased from \S+ to (\S+)", r"is \1", text, flags=re.IGNORECASE)
+    text = re.sub(r"was changed to", "is", text, flags=re.IGNORECASE)
+    text = re.sub(r"has been (?:reduced|increased) to", "is", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"has been (?:decreased|increased) by", "is adjusted by", text, flags=re.IGNORECASE
+    )
     return text
 
 
@@ -90,16 +93,13 @@ def llm_transform(text: str, client: genai.Client) -> str:
         config=types.GenerateContentConfig(
             temperature=0.3,  # Low temp for consistent output
             max_output_tokens=1500,
-        )
+        ),
     )
     return response.text
 
 
 def test_advisor_response(
-    patch_context: str,
-    question: str,
-    client: genai.Client,
-    use_minimal_framing: bool = False
+    patch_context: str, question: str, client: genai.Client, use_minimal_framing: bool = False
 ) -> tuple[str, list[str]]:
     """Test advisor response with given patch context.
 
@@ -143,7 +143,7 @@ Mechanics:
             system_instruction=system_prompt,
             temperature=0.7,
             max_output_tokens=800,
-        )
+        ),
     )
 
     text = response.text or ""
@@ -151,7 +151,10 @@ Mechanics:
     # Check for violations
     violations = []
     bad_patterns = [
-        (r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)", "no longer [verb]"),
+        (
+            r"no longer (provide|give|grant|boost|has|have|offer|work|function|apply)",
+            "no longer [verb]",
+        ),
         (r"used to (provide|give|be)", "used to [verb]"),
         (r"was changed", "was changed"),
         (r"since (the )?(patch|update)", "since patch"),
@@ -259,7 +262,9 @@ def main():
 
     for approach, data in results.items():
         pass_rate = (data["tests"] - data["violations"]) / data["tests"] * 100
-        print(f"{approach}: {data['tests'] - data['violations']}/{data['tests']} passed ({pass_rate:.0f}%)")
+        print(
+            f"{approach}: {data['tests'] - data['violations']}/{data['tests']} passed ({pass_rate:.0f}%)"
+        )
 
     print("\n### RECOMMENDATION")
     print("-" * 50)

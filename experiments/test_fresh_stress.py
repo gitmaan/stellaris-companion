@@ -17,18 +17,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import os
+
 # Load .env manually
 env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
-    for line in env_path.read_text().split('\n'):
-        if '=' in line and not line.startswith('#'):
-            key, val = line.split('=', 1)
+    for line in env_path.read_text().split("\n"):
+        if "=" in line and not line.startswith("#"):
+            key, val = line.split("=", 1)
             os.environ[key.strip()] = val.strip()
 
 from google import genai
 from google.genai import types
-from save_extractor import SaveExtractor
+
 from personality import build_optimized_prompt
+from save_extractor import SaveExtractor
 
 MODEL = "gemini-3-flash-preview"
 
@@ -37,12 +39,10 @@ STRESS_QUESTIONS = [
     # SHOULD be in snapshot now (after fixes)
     ("What buildings are on Earth?", "snapshot_has_buildings"),
     ("What am I currently researching?", "snapshot_has_tech"),
-
     # Should NOT be in snapshot - requires tools
     ("What traits does my highest level admiral have?", "needs_leader_details"),
     ("What are the opinion modifiers with my closest ally?", "needs_diplomacy_details"),
     ("What ship designs do I have?", "needs_fleet_details"),
-
     # Edge cases - may or may not be in snapshot
     ("What is the population breakdown by species?", "might_need_details"),
     ("What starbases have shipyards?", "needs_starbase_details"),
@@ -65,7 +65,7 @@ def find_save_file() -> Path:
 def run_test(client, extractor, system_prompt: str, snapshot: dict, question: str) -> dict:
     """Run a single test, tracking tool usage."""
 
-    snapshot_json = json.dumps(snapshot, separators=(',', ':'), default=str)
+    snapshot_json = json.dumps(snapshot, separators=(",", ":"), default=str)
 
     user_message = f"""CURRENT_GAME_STATE (use this for facts):
 ```json
@@ -113,19 +113,31 @@ RULES:
     text = response.text if response.text else "[No text response]"
 
     # Check if model admitted not knowing
-    admitted_unknown = any(phrase in text.lower() for phrase in [
-        "don't have", "do not have", "not available", "cannot find",
-        "need to", "would need", "i'll need", "let me check",
-        "unknown", "not in the data", "not included", "not listed"
-    ])
+    admitted_unknown = any(
+        phrase in text.lower()
+        for phrase in [
+            "don't have",
+            "do not have",
+            "not available",
+            "cannot find",
+            "need to",
+            "would need",
+            "i'll need",
+            "let me check",
+            "unknown",
+            "not in the data",
+            "not included",
+            "not listed",
+        ]
+    )
 
     return {
-        'response': text,
-        'time': elapsed,
-        'words': len(text.split()),
-        'tools_used': tools_used,
-        'tool_count': len(tools_used),
-        'admitted_unknown': admitted_unknown,
+        "response": text,
+        "time": elapsed,
+        "words": len(text.split()),
+        "tools_used": tools_used,
+        "tool_count": len(tools_used),
+        "admitted_unknown": admitted_unknown,
     }
 
 
@@ -145,7 +157,7 @@ def main():
 
     # Get snapshot
     snapshot = extractor.get_full_briefing()
-    snapshot_json = json.dumps(snapshot, separators=(',', ':'), default=str)
+    snapshot_json = json.dumps(snapshot, separators=(",", ":"), default=str)
 
     print(f"Empire: {identity.get('empire_name')}")
     print(f"Snapshot size: {len(snapshot_json):,} chars")
@@ -155,14 +167,14 @@ def main():
     print(f"Leaders in snapshot: {len(snapshot.get('leadership', {}).get('leaders', []))}")
     print(f"Planets in snapshot: {len(snapshot.get('territory', {}).get('top_colonies', []))}")
 
-    tech = snapshot.get('technology', {})
-    current_research = tech.get('current_research', {})
+    tech = snapshot.get("technology", {})
+    current_research = tech.get("current_research", {})
     print(f"Current research: {list(current_research.keys())}")
 
     # Check if buildings are in planets
-    planets = snapshot.get('territory', {}).get('top_colonies', [])
+    planets = snapshot.get("territory", {}).get("top_colonies", [])
     if planets:
-        earth = next((p for p in planets if p.get('name') == 'Earth'), None)
+        earth = next((p for p in planets if p.get("name") == "Earth"), None)
         if earth:
             print(f"Earth buildings: {earth.get('buildings', 'NOT PRESENT')}")
 
@@ -186,9 +198,9 @@ def main():
             result = run_test(client, extractor, system_prompt, snapshot, question)
 
             # Determine status
-            if result['tool_count'] > 0:
+            if result["tool_count"] > 0:
                 status = "✅ USED TOOLS"
-            elif result['admitted_unknown']:
+            elif result["admitted_unknown"]:
                 status = "⚠️ ADMITTED UNKNOWN"
             elif category.startswith("snapshot_has"):
                 status = "✅ ANSWERED FROM SNAPSHOT"
@@ -196,47 +208,46 @@ def main():
                 status = "❌ CHECK FOR HALLUCINATION"
 
             print(f"  {status}")
-            print(f"  Time: {result['time']:.1f}s | Words: {result['words']} | Tools: {result['tool_count']}")
-            if result['tools_used']:
+            print(
+                f"  Time: {result['time']:.1f}s | Words: {result['words']} | Tools: {result['tool_count']}"
+            )
+            if result["tools_used"]:
                 print(f"  Tool calls: {result['tools_used']}")
 
             # Show response preview
-            preview = result['response'][:200].replace('\n', ' ')
-            if len(result['response']) > 200:
+            preview = result["response"][:200].replace("\n", " ")
+            if len(result["response"]) > 200:
                 preview += "..."
             print(f"  Preview: {preview}")
 
-            results.append({
-                'question': question,
-                'category': category,
-                'status': status,
-                **result
-            })
+            results.append({"question": question, "category": category, "status": status, **result})
 
         except Exception as e:
             print(f"  ERROR: {e}")
-            results.append({
-                'question': question,
-                'category': category,
-                'status': "ERROR",
-                'response': str(e),
-                'time': 0,
-                'words': 0,
-                'tools_used': [],
-                'tool_count': 0,
-                'admitted_unknown': False,
-            })
+            results.append(
+                {
+                    "question": question,
+                    "category": category,
+                    "status": "ERROR",
+                    "response": str(e),
+                    "time": 0,
+                    "words": 0,
+                    "tools_used": [],
+                    "tool_count": 0,
+                    "admitted_unknown": False,
+                }
+            )
 
     # Summary
     print("\n" + "=" * 80)
     print("SUMMARY")
     print("=" * 80)
 
-    used_tools = sum(1 for r in results if r['tool_count'] > 0)
-    from_snapshot = sum(1 for r in results if "SNAPSHOT" in r['status'])
-    admitted_unknown = sum(1 for r in results if "ADMITTED" in r['status'])
-    possible_hallucination = sum(1 for r in results if "HALLUCINATION" in r['status'])
-    errors = sum(1 for r in results if "ERROR" in r['status'])
+    used_tools = sum(1 for r in results if r["tool_count"] > 0)
+    from_snapshot = sum(1 for r in results if "SNAPSHOT" in r["status"])
+    admitted_unknown = sum(1 for r in results if "ADMITTED" in r["status"])
+    possible_hallucination = sum(1 for r in results if "HALLUCINATION" in r["status"])
+    errors = sum(1 for r in results if "ERROR" in r["status"])
 
     print(f"✅ Used tools correctly: {used_tools}/{len(results)}")
     print(f"✅ Answered from snapshot: {from_snapshot}/{len(results)}")
@@ -248,7 +259,7 @@ def main():
     # Write report
     report = f"""# Fresh Stress Test Results
 
-**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
+**Date:** {datetime.now().strftime("%Y-%m-%d %H:%M")}
 
 **Model:** {MODEL}
 
@@ -269,10 +280,10 @@ def main():
 
 ## Snapshot Contents
 
-- Leaders: {len(snapshot.get('leadership', {}).get('leaders', []))} (truncated)
-- Planets: {len(snapshot.get('territory', {}).get('top_colonies', []))} (top 10)
+- Leaders: {len(snapshot.get("leadership", {}).get("leaders", []))} (truncated)
+- Planets: {len(snapshot.get("territory", {}).get("top_colonies", []))} (top 10)
 - Current research: {list(current_research.keys())}
-- Buildings in Earth: {earth.get('buildings', 'N/A') if earth else 'N/A'}
+- Buildings in Earth: {earth.get("buildings", "N/A") if earth else "N/A"}
 
 ---
 
@@ -281,14 +292,14 @@ def main():
 """
 
     for r in results:
-        report += f"""### Q: {r['question']}
+        report += f"""### Q: {r["question"]}
 
-**Category:** {r['category']}
-**Status:** {r['status']}
-**Time:** {r['time']:.1f}s | **Words:** {r['words']} | **Tool calls:** {r['tool_count']}
+**Category:** {r["category"]}
+**Status:** {r["status"]}
+**Time:** {r["time"]:.1f}s | **Words:** {r["words"]} | **Tool calls:** {r["tool_count"]}
 
 """
-        if r['tools_used']:
+        if r["tools_used"]:
             report += f"**Tools:** {', '.join(r['tools_used'])}\n\n"
 
         report += f"**Response:**\n\n{r['response']}\n\n---\n\n"

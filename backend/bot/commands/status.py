@@ -8,8 +8,8 @@ This is a quick reference that doesn't require an LLM call.
 
 import asyncio
 import logging
+
 import discord
-from discord import app_commands
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ def setup(bot) -> None:
             if allies:
                 diplo_text += f"Allies: {len(allies)}\n"
             if federation:
-                diplo_text += f"Federation: Yes"
+                diplo_text += "Federation: Yes"
 
             embed.add_field(name="Diplomacy", value=diplo_text, inline=True)
 

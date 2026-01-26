@@ -2,6 +2,7 @@
 
 import os
 import sys
+
 import pytest
 
 # Add parent directory to path for imports
@@ -13,9 +14,7 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
 
 
 @pytest.fixture(scope="session")
@@ -27,7 +26,7 @@ def project_root():
 @pytest.fixture(scope="session")
 def test_save_path(project_root):
     """Return path to test save file, skip if not found."""
-    path = os.path.join(project_root, 'test_save.sav')
+    path = os.path.join(project_root, "test_save.sav")
     if not os.path.exists(path):
         pytest.skip(f"Test save file not found at {path}")
     return path
@@ -37,6 +36,7 @@ def test_save_path(project_root):
 def extractor(test_save_path):
     """Create a SaveExtractor instance for the test save (session-scoped for performance)."""
     from stellaris_save_extractor.extractor import SaveExtractor
+
     return SaveExtractor(test_save_path)
 
 
@@ -44,4 +44,5 @@ def extractor(test_save_path):
 def validator(test_save_path):
     """Create an ExtractionValidator instance for the test save (session-scoped)."""
     from stellaris_save_extractor.validation import ExtractionValidator
+
     return ExtractionValidator(test_save_path)

@@ -15,27 +15,30 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
-from save_extractor import SaveExtractor
+
 from personality import build_optimized_prompt
+from save_extractor import SaveExtractor
 
 MODEL = "gemini-3-flash-preview"
 
 # Empire name resolution
 EMPIRE_LOC_KEYS = {
-    'EMPIRE_DESIGN_orbis': 'United Nations of Earth',
-    'EMPIRE_DESIGN_humans1': 'Commonwealth of Man',
-    'PRESCRIPTED_empire_name_orbis': 'United Nations of Earth',
+    "EMPIRE_DESIGN_orbis": "United Nations of Earth",
+    "EMPIRE_DESIGN_humans1": "Commonwealth of Man",
+    "PRESCRIPTED_empire_name_orbis": "United Nations of Earth",
 }
 
 
 def find_save_file() -> Path:
     """Find the most recent Stellaris save file."""
     save_dirs = [
-        Path.home() / "Library/Application Support/Steam/steamapps/compatdata/281990/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Stellaris/save games",
+        Path.home()
+        / "Library/Application Support/Steam/steamapps/compatdata/281990/pfx/drive_c/users/steamuser/Documents/Paradox Interactive/Stellaris/save games",
         Path.home() / "Documents/Paradox Interactive/Stellaris/save games",
         Path.home() / ".local/share/Paradox Interactive/Stellaris/save games",
     ]
@@ -52,23 +55,25 @@ def find_save_file() -> Path:
 def get_empire_name_by_id(extractor, empire_id: int) -> str:
     """Resolve empire ID to name."""
     gamestate = extractor.gamestate
-    country_match = re.search(r'^country=\s*\{', gamestate, re.MULTILINE)
+    country_match = re.search(r"^country=\s*\{", gamestate, re.MULTILINE)
     if not country_match:
         return f"Empire {empire_id}"
     start = country_match.start()
-    pattern = rf'\n\t{empire_id}=\s*\{{'
-    id_match = re.search(pattern, gamestate[start:start + 10000000])
+    pattern = rf"\n\t{empire_id}=\s*\{{"
+    id_match = re.search(pattern, gamestate[start : start + 10000000])
     if not id_match:
         return f"Empire {empire_id}"
     chunk_start = start + id_match.start()
-    chunk = gamestate[chunk_start:chunk_start + 8000]
-    name_match = re.search(r'name=\s*\{[^}]*key=\"([^\"]+)\"', chunk)
+    chunk = gamestate[chunk_start : chunk_start + 8000]
+    name_match = re.search(r"name=\s*\{[^}]*key=\"([^\"]+)\"", chunk)
     if not name_match:
         return f"Empire {empire_id}"
     name_key = name_match.group(1)
     if name_key in EMPIRE_LOC_KEYS:
         return EMPIRE_LOC_KEYS[name_key]
-    clean_name = name_key.replace('EMPIRE_DESIGN_', '').replace('PRESCRIPTED_', '').replace('_', ' ').title()
+    clean_name = (
+        name_key.replace("EMPIRE_DESIGN_", "").replace("PRESCRIPTED_", "").replace("_", " ").title()
+    )
     return clean_name if clean_name else f"Empire {empire_id}"
 
 
@@ -76,22 +81,24 @@ def build_comprehensive_snapshot(extractor) -> dict:
     """Build comprehensive snapshot with resolved names."""
     snapshot = extractor.get_full_briefing()
     all_leaders = extractor.get_leaders()
-    snapshot['leadership']['leaders'] = all_leaders.get('leaders', [])
-    snapshot['leadership']['count'] = len(all_leaders.get('leaders', []))
+    snapshot["leadership"]["leaders"] = all_leaders.get("leaders", [])
+    snapshot["leadership"]["count"] = len(all_leaders.get("leaders", []))
     detailed_diplo = extractor.get_diplomacy()
     relations = []
-    for r in detailed_diplo.get('relations', [])[:20]:
-        cid = r.get('country_id')
+    for r in detailed_diplo.get("relations", [])[:20]:
+        cid = r.get("country_id")
         if cid is not None:
-            r['empire_name'] = get_empire_name_by_id(extractor, cid)
+            r["empire_name"] = get_empire_name_by_id(extractor, cid)
         relations.append(r)
-    snapshot['diplomacy']['relations'] = relations
-    snapshot['diplomacy']['allies_named'] = [
-        {'id': aid, 'name': get_empire_name_by_id(extractor, aid)}
-        for aid in snapshot['diplomacy'].get('allies', [])
+    snapshot["diplomacy"]["relations"] = relations
+    snapshot["diplomacy"]["allies_named"] = [
+        {"id": aid, "name": get_empire_name_by_id(extractor, aid)}
+        for aid in snapshot["diplomacy"].get("allies", [])
     ]
     tech = extractor.get_technology()
-    snapshot['current_research'] = tech.get('current_research', {}) or "None - research slots are idle"
+    snapshot["current_research"] = (
+        tech.get("current_research", {}) or "None - research slots are idle"
+    )
     return snapshot
 
 
@@ -134,8 +141,8 @@ def run_test():
     # Test questions - mix of specific and broad
     questions = [
         "What's the state of my empire?",  # Broad strategic
-        "Who should I be worried about?",   # Diplomatic/threat assessment
-        "What should I focus on next?",     # Strategic advice
+        "Who should I be worried about?",  # Diplomatic/threat assessment
+        "What should I focus on next?",  # Strategic advice
     ]
 
     results = []
@@ -156,7 +163,7 @@ QUESTION: {q}"""
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 temperature=0.8,
-            )
+            ),
         )
         elapsed = time.time() - start
 
@@ -165,25 +172,27 @@ QUESTION: {q}"""
 
         print(f"   {elapsed:.1f}s, {word_count} words")
 
-        results.append({
-            'question': q,
-            'response': text,
-            'time': elapsed,
-            'words': word_count,
-        })
+        results.append(
+            {
+                "question": q,
+                "response": text,
+                "time": elapsed,
+                "words": word_count,
+            }
+        )
 
     # Write results to MD file
     output = f"""# Optimized Prompt Test Results
 
-**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
+**Date:** {datetime.now().strftime("%Y-%m-%d %H:%M")}
 
-**Empire:** {identity.get('empire_name')}
+**Empire:** {identity.get("empire_name")}
 
-**Ethics:** {', '.join(identity.get('ethics', []))}
+**Ethics:** {", ".join(identity.get("ethics", []))}
 
-**Authority:** {identity.get('authority')}
+**Authority:** {identity.get("authority")}
 
-**Civics:** {', '.join(identity.get('civics', []))}
+**Civics:** {", ".join(identity.get("civics", []))}
 
 ---
 
@@ -200,11 +209,11 @@ QUESTION: {q}"""
 """
 
     for r in results:
-        output += f"""### Q: {r['question']}
+        output += f"""### Q: {r["question"]}
 
-*{r['time']:.1f}s | {r['words']} words*
+*{r["time"]:.1f}s | {r["words"]} words*
 
-{r['response']}
+{r["response"]}
 
 ---
 

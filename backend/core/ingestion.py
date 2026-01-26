@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import json
 import logging
 import threading
 import time
@@ -8,11 +10,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-import json
-
+from backend.core.database import DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
 from backend.core.history import record_snapshot_from_briefing
 from backend.core.ingestion_worker import WorkerJob, run_worker_job
-from backend.core.database import DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +85,7 @@ class IngestionManager:
 
         self._lock = threading.RLock()
         self._wakeup = threading.Event()
-        self._thread = threading.Thread(
-            target=self._run, daemon=True, name="ingestion-manager"
-        )
+        self._thread = threading.Thread(target=self._run, daemon=True, name="ingestion-manager")
         self._started = False
 
         self._request_id = 0
@@ -114,9 +112,7 @@ class IngestionManager:
         if db is not None:
             try:
                 payload["db"] = db.get_db_stats()
-                payload["db"][
-                    "keep_full_briefings_recent"
-                ] = DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
+                payload["db"]["keep_full_briefings_recent"] = DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
                 payload["db"]["keep_full_briefings_first"] = True
             except Exception:
                 payload["db"] = {
@@ -156,10 +152,8 @@ class IngestionManager:
             }
         db = self._db
         if db is not None:
-            try:
+            with contextlib.suppress(Exception):
                 payload["ingestion"]["db"] = db.get_db_stats()
-            except Exception:
-                pass
 
         # Add empire_type for themed UI messages
         try:
@@ -179,9 +173,7 @@ class IngestionManager:
     def get_latest_t1_status(self) -> dict[str, Any] | None:
         with self._lock:
             return (
-                dict(self._status.t1_status)
-                if isinstance(self._status.t1_status, dict)
-                else None
+                dict(self._status.t1_status) if isinstance(self._status.t1_status, dict) else None
             )
 
     def notify_save(self, save_path: Path) -> None:
@@ -201,10 +193,8 @@ class IngestionManager:
             self._status.t2_updated_at = None
             self._force_t2 = False
             self._cancel_active_worker_locked()
-            try:
+            with contextlib.suppress(Exception):
                 self._companion.mark_precompute_stale()
-            except Exception:
-                pass
             self._wakeup.set()
 
     def request_t2_on_demand(self) -> None:
@@ -214,9 +204,7 @@ class IngestionManager:
 
     # --- internals ---
 
-    def _set_stage_locked(
-        self, stage: IngestionStage, detail: str | None = None
-    ) -> None:
+    def _set_stage_locked(self, stage: IngestionStage, detail: str | None = None) -> None:
         self._status.stage = stage
         self._status.stage_detail = detail
         self._status.updated_at = time.time()
@@ -305,7 +293,6 @@ class IngestionManager:
             with self._lock:
                 request_id = self._request_id
                 pending = self._status.pending_save_path
-                force_t2 = self._force_t2
 
             if not pending:
                 with self._lock:
@@ -316,9 +303,7 @@ class IngestionManager:
             save_path = Path(pending)
 
             with self._lock:
-                self._set_stage_locked(
-                    "waiting_for_stable_save", "waiting for file stability"
-                )
+                self._set_stage_locked("waiting_for_stable_save", "waiting for file stability")
 
             stable_start = time.time()
             if not self._wait_for_stable_save(save_path, request_id=request_id):
@@ -361,9 +346,7 @@ class IngestionManager:
             t1 = self._run_worker_tier("t1", save_path=save_path, request_id=request_id)
             if t1 is None:
                 continue
-            logger.info(
-                "[TIMING] T1 worker complete: %.1fms", (time.time() - t1_start) * 1000
-            )
+            logger.info("[TIMING] T1 worker complete: %.1fms", (time.time() - t1_start) * 1000)
 
             with self._lock:
                 if request_id != self._request_id:
@@ -384,9 +367,7 @@ class IngestionManager:
             t2 = self._run_worker_tier("t2", save_path=save_path, request_id=request_id)
             if t2 is None:
                 continue
-            logger.info(
-                "[TIMING] T2 worker complete: %.1fms", (time.time() - t2_start) * 1000
-            )
+            logger.info("[TIMING] T2 worker complete: %.1fms", (time.time() - t2_start) * 1000)
 
             briefing_json = t2.get("briefing_json")
             t2_meta = t2.get("meta")
@@ -405,9 +386,7 @@ class IngestionManager:
             with self._lock:
                 if request_id != self._request_id:
                     continue
-                self._set_stage_locked(
-                    "persisting", "saving snapshot and activating cache"
-                )
+                self._set_stage_locked("persisting", "saving snapshot and activating cache")
 
             # Persist + activate cache (main process only).
             persist_start = time.time()
@@ -423,9 +402,7 @@ class IngestionManager:
                     )
             except Exception as e:
                 logger.warning("snapshot_persist_failed error=%s", e)
-            logger.info(
-                "[TIMING] DB persist: %.1fms", (time.time() - persist_start) * 1000
-            )
+            logger.info("[TIMING] DB persist: %.1fms", (time.time() - persist_start) * 1000)
 
             activate_start = time.time()
             try:
@@ -451,19 +428,13 @@ class IngestionManager:
                 if request_id != self._request_id:
                     continue
                 self._status.t2_ready = True
-                self._status.t2_meta = (
-                    dict(t2_meta) if isinstance(t2_meta, dict) else {}
-                )
-                self._status.t2_game_date = (
-                    str(game_date) if game_date is not None else None
-                )
+                self._status.t2_meta = dict(t2_meta) if isinstance(t2_meta, dict) else {}
+                self._status.t2_game_date = str(game_date) if game_date is not None else None
                 self._status.t2_updated_at = time.time()
                 self._status.t2_last_duration_ms = (
                     float(duration_ms) if duration_ms is not None else None
                 )
-                self._status.t2_last_save_hash = (
-                    save_hash if isinstance(save_hash, str) else None
-                )
+                self._status.t2_last_save_hash = save_hash if isinstance(save_hash, str) else None
                 self._status.last_error = None
                 self._set_stage_locked("ready", "complete briefing ready")
                 logger.info("[TIMING] T2 complete - status now 'ready'")
@@ -513,7 +484,5 @@ class IngestionManager:
                 self._status.worker_pid = int(result["worker_pid"])
                 self._status.worker_tier = tier
 
-        payload = (
-            result.get("payload") if isinstance(result.get("payload"), dict) else None
-        )
+        payload = result.get("payload") if isinstance(result.get("payload"), dict) else None
         return payload or {}

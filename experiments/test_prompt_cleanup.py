@@ -16,12 +16,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Load environment variables
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
-from save_extractor import SaveExtractor
+
 from personality import get_personality_summary
+from save_extractor import SaveExtractor
 
 # Test questions
 TEST_QUESTIONS = [
@@ -35,26 +37,26 @@ TEST_QUESTIONS = [
 def build_clean_system_prompt(identity: dict, situation: dict) -> str:
     """Build a cleaner, less redundant system prompt."""
 
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = identity.get('ethics', [])
-    authority = identity.get('authority', 'unknown')
-    civics = identity.get('civics', [])
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = identity.get("ethics", [])
+    authority = identity.get("authority", "unknown")
+    civics = identity.get("civics", [])
 
-    year = situation.get('year', 2200)
-    game_phase = situation.get('game_phase', 'early')
-    at_war = situation.get('at_war', False)
-    economy = situation.get('economy', {})
-    deficits = economy.get('resources_in_deficit', 0)
+    year = situation.get("year", 2200)
+    game_phase = situation.get("game_phase", "early")
+    at_war = situation.get("at_war", False)
+    economy = situation.get("economy", {})
+    deficits = economy.get("resources_in_deficit", 0)
 
     # Build concise prompt
     prompt = f"""You are the strategic advisor to {empire_name}.
 
 YOUR PERSONALITY:
-You embody {', '.join(ethics)} values with {authority} governance.
-Civics: {', '.join(civics) if civics else 'none'}.
+You embody {", ".join(ethics)} values with {authority} governance.
+Civics: {", ".join(civics) if civics else "none"}.
 Address the ruler as "President" (democratic authority). Be collegial, passionate about liberty and citizen welfare.
 
-CURRENT SITUATION: Year {year} ({game_phase} game), {'AT WAR' if at_war else 'at peace'}, {deficits} resource deficits.
+CURRENT SITUATION: Year {year} ({game_phase} game), {"AT WAR" if at_war else "at peace"}, {deficits} resource deficits.
 
 RULES:
 1. All facts and numbers MUST come from the provided game state data - never guess.
@@ -67,26 +69,26 @@ RULES:
 def build_clean_user_prompt(snapshot_json: str, question: str) -> str:
     """Build a cleaner user prompt without redundant rules."""
 
-    return (
-        f"GAME STATE:\n```json\n{snapshot_json}\n```\n\n"
-        f"QUESTION: {question}"
-    )
+    return f"GAME STATE:\n```json\n{snapshot_json}\n```\n\nQUESTION: {question}"
 
 
 def run_current_version(extractor, client, question: str) -> tuple[str, float, int]:
     """Run the current verbose version."""
 
     from core.companion import Companion
+
     companion = Companion(save_path="test_save.sav")
     companion.clear_conversation()
 
     response, elapsed = companion.ask_simple(question)
     stats = companion.get_call_stats()
 
-    return response, elapsed, stats.get('total_calls', 0)
+    return response, elapsed, stats.get("total_calls", 0)
 
 
-def run_clean_version(extractor, client, identity, situation, question: str) -> tuple[str, float, int]:
+def run_clean_version(
+    extractor, client, identity, situation, question: str
+) -> tuple[str, float, int]:
     """Run the cleaned-up version."""
 
     # Build clean prompts
@@ -134,10 +136,10 @@ def run_clean_version(extractor, client, identity, situation, question: str) -> 
 
     # Count tool calls from response
     tool_calls = 0
-    if hasattr(response, 'automatic_function_calling_history'):
+    if hasattr(response, "automatic_function_calling_history"):
         for item in response.automatic_function_calling_history:
-            if hasattr(item, 'parts'):
-                tool_calls += sum(1 for p in item.parts if hasattr(p, 'function_call'))
+            if hasattr(item, "parts"):
+                tool_calls += sum(1 for p in item.parts if hasattr(p, "function_call"))
 
     return response.text, elapsed, tool_calls
 
@@ -186,21 +188,23 @@ def main():
         print(f"Time: {clean_time:.1f}s | Tools: {clean_tools}")
         print(f"Response preview: {clean_response[:300]}...")
 
-        results.append({
-            "question": question,
-            "current": {
-                "time": curr_time,
-                "tools": curr_tools,
-                "response": curr_response,
-                "word_count": len(curr_response.split()),
-            },
-            "clean": {
-                "time": clean_time,
-                "tools": clean_tools,
-                "response": clean_response,
-                "word_count": len(clean_response.split()),
+        results.append(
+            {
+                "question": question,
+                "current": {
+                    "time": curr_time,
+                    "tools": curr_tools,
+                    "response": curr_response,
+                    "word_count": len(curr_response.split()),
+                },
+                "clean": {
+                    "time": clean_time,
+                    "tools": clean_tools,
+                    "response": clean_response,
+                    "word_count": len(clean_response.split()),
+                },
             }
-        })
+        )
 
         print()
 
@@ -208,21 +212,27 @@ def main():
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)
-    print(f"{'Question':<40} {'Curr Time':>10} {'Clean Time':>10} {'Curr Tools':>10} {'Clean Tools':>10}")
+    print(
+        f"{'Question':<40} {'Curr Time':>10} {'Clean Time':>10} {'Curr Tools':>10} {'Clean Tools':>10}"
+    )
     print("-" * 70)
 
     for r in results:
-        q = r['question'][:38]
-        print(f"{q:<40} {r['current']['time']:>9.1f}s {r['clean']['time']:>9.1f}s {r['current']['tools']:>10} {r['clean']['tools']:>10}")
+        q = r["question"][:38]
+        print(
+            f"{q:<40} {r['current']['time']:>9.1f}s {r['clean']['time']:>9.1f}s {r['current']['tools']:>10} {r['clean']['tools']:>10}"
+        )
 
     # Averages
-    avg_curr_time = sum(r['current']['time'] for r in results) / len(results)
-    avg_clean_time = sum(r['clean']['time'] for r in results) / len(results)
-    avg_curr_tools = sum(r['current']['tools'] for r in results) / len(results)
-    avg_clean_tools = sum(r['clean']['tools'] for r in results) / len(results)
+    avg_curr_time = sum(r["current"]["time"] for r in results) / len(results)
+    avg_clean_time = sum(r["clean"]["time"] for r in results) / len(results)
+    avg_curr_tools = sum(r["current"]["tools"] for r in results) / len(results)
+    avg_clean_tools = sum(r["clean"]["tools"] for r in results) / len(results)
 
     print("-" * 70)
-    print(f"{'AVERAGE':<40} {avg_curr_time:>9.1f}s {avg_clean_time:>9.1f}s {avg_curr_tools:>10.1f} {avg_clean_tools:>10.1f}")
+    print(
+        f"{'AVERAGE':<40} {avg_curr_time:>9.1f}s {avg_clean_time:>9.1f}s {avg_curr_tools:>10.1f} {avg_clean_tools:>10.1f}"
+    )
 
     # Save detailed results
     output = {

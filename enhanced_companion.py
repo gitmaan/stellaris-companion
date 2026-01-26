@@ -36,10 +36,10 @@ class EnhancedCompanion:
 
     # Known Stellaris empire localization keys
     EMPIRE_LOC_KEYS = {
-        'EMPIRE_DESIGN_orbis': 'United Nations of Earth',
-        'EMPIRE_DESIGN_humans1': 'Commonwealth of Man',
-        'EMPIRE_DESIGN_humans2': 'Terran Hegemony',
-        'PRESCRIPTED_empire_name_orbis': 'United Nations of Earth',
+        "EMPIRE_DESIGN_orbis": "United Nations of Earth",
+        "EMPIRE_DESIGN_humans1": "Commonwealth of Man",
+        "EMPIRE_DESIGN_humans2": "Terran Hegemony",
+        "PRESCRIPTED_empire_name_orbis": "United Nations of Earth",
     }
 
     def __init__(self, save_path: str):
@@ -56,11 +56,13 @@ class EnhancedCompanion:
 
         # Import extractor and companion for their functionality
         import sys
+
         sys.path.insert(0, str(Path(__file__).parent / "backend"))
         sys.path.insert(0, str(Path(__file__).parent))
 
-        from save_extractor import SaveExtractor
         from core.companion import Companion
+
+        from save_extractor import SaveExtractor
 
         self.extractor = SaveExtractor(save_path)
 
@@ -73,7 +75,7 @@ class EnhancedCompanion:
 
         # Build comprehensive snapshot once
         self.snapshot = self._build_comprehensive_snapshot()
-        self.snapshot_json = json.dumps(self.snapshot, separators=(',', ':'), default=str)
+        self.snapshot_json = json.dumps(self.snapshot, separators=(",", ":"), default=str)
 
     def _build_system_prompt(self) -> str:
         """
@@ -99,23 +101,23 @@ class EnhancedCompanion:
         gamestate = self.extractor.gamestate
 
         # Find country section
-        country_match = re.search(r'^country=\s*\{', gamestate, re.MULTILINE)
+        country_match = re.search(r"^country=\s*\{", gamestate, re.MULTILINE)
         if not country_match:
             return f"Empire {empire_id}"
 
         start = country_match.start()
 
         # Find specific empire entry
-        pattern = rf'\n\t{empire_id}=\s*\{{'
-        id_match = re.search(pattern, gamestate[start:start + 10000000])
+        pattern = rf"\n\t{empire_id}=\s*\{{"
+        id_match = re.search(pattern, gamestate[start : start + 10000000])
         if not id_match:
             return f"Empire {empire_id}"
 
         chunk_start = start + id_match.start()
-        chunk = gamestate[chunk_start:chunk_start + 8000]
+        chunk = gamestate[chunk_start : chunk_start + 8000]
 
         # Try to get name key
-        name_match = re.search(r'name=\s*\{[^}]*key=\"([^\"]+)\"', chunk)
+        name_match = re.search(r"name=\s*\{[^}]*key=\"([^\"]+)\"", chunk)
         if not name_match:
             return f"Empire {empire_id}"
 
@@ -126,28 +128,25 @@ class EnhancedCompanion:
             return self.EMPIRE_LOC_KEYS[name_key]
 
         # Handle procedural names (%ADJECTIVE%, etc.)
-        if '%' in name_key:
+        if "%" in name_key:
             name_block_match = re.search(
-                r'name=\s*\{([^}]+variables[^}]+\}[^}]+)\}',
-                chunk, re.DOTALL
+                r"name=\s*\{([^}]+variables[^}]+\}[^}]+)\}", chunk, re.DOTALL
             )
             if name_block_match:
                 name_block = name_block_match.group(1)
 
                 # Find adjective value
                 adj_match = re.search(
-                    r'key=\"adjective\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"',
-                    name_block, re.DOTALL
+                    r"key=\"adjective\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"", name_block, re.DOTALL
                 )
                 adjective = ""
                 if adj_match:
                     adj_key = adj_match.group(1)
-                    adjective = adj_key.replace('SPEC_', '').replace('_', ' ')
+                    adjective = adj_key.replace("SPEC_", "").replace("_", " ")
 
                 # Find suffix
                 suffix_match = re.search(
-                    r'key=\"1\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"',
-                    name_block, re.DOTALL
+                    r"key=\"1\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"", name_block, re.DOTALL
                 )
                 suffix = ""
                 if suffix_match:
@@ -159,8 +158,8 @@ class EnhancedCompanion:
                     return adjective
 
         # Fallback - clean up the key
-        clean_name = name_key.replace('EMPIRE_DESIGN_', '').replace('PRESCRIPTED_', '')
-        clean_name = clean_name.replace('_', ' ').title()
+        clean_name = name_key.replace("EMPIRE_DESIGN_", "").replace("PRESCRIPTED_", "")
+        clean_name = clean_name.replace("_", " ").title()
         return clean_name if clean_name else f"Empire {empire_id}"
 
     def _build_comprehensive_snapshot(self) -> dict:
@@ -176,39 +175,37 @@ class EnhancedCompanion:
 
         # Add ALL leaders (not just the truncated 15)
         all_leaders = self.extractor.get_leaders()
-        snapshot['leadership']['leaders'] = all_leaders.get('leaders', [])
-        snapshot['leadership']['count'] = len(all_leaders.get('leaders', []))
+        snapshot["leadership"]["leaders"] = all_leaders.get("leaders", [])
+        snapshot["leadership"]["count"] = len(all_leaders.get("leaders", []))
 
         # Add detailed diplomacy with resolved names
         detailed_diplo = self.extractor.get_diplomacy()
         relations = []
-        for r in detailed_diplo.get('relations', [])[:20]:
-            cid = r.get('country_id')
+        for r in detailed_diplo.get("relations", [])[:20]:
+            cid = r.get("country_id")
             if cid is not None:
-                r['empire_name'] = self._get_empire_name_by_id(cid)
+                r["empire_name"] = self._get_empire_name_by_id(cid)
             relations.append(r)
-        snapshot['diplomacy']['relations'] = relations
-        snapshot['diplomacy']['treaties'] = detailed_diplo.get('treaties', [])
+        snapshot["diplomacy"]["relations"] = relations
+        snapshot["diplomacy"]["treaties"] = detailed_diplo.get("treaties", [])
 
         # Resolve ally names
-        ally_ids = snapshot['diplomacy'].get('allies', [])
-        snapshot['diplomacy']['allies_named'] = [
-            {'id': aid, 'name': self._get_empire_name_by_id(aid)}
-            for aid in ally_ids
+        ally_ids = snapshot["diplomacy"].get("allies", [])
+        snapshot["diplomacy"]["allies_named"] = [
+            {"id": aid, "name": self._get_empire_name_by_id(aid)} for aid in ally_ids
         ]
 
         # Resolve rival names
-        rival_ids = snapshot['diplomacy'].get('rivals', [])
-        snapshot['diplomacy']['rivals_named'] = [
-            {'id': rid, 'name': self._get_empire_name_by_id(rid)}
-            for rid in rival_ids
+        rival_ids = snapshot["diplomacy"].get("rivals", [])
+        snapshot["diplomacy"]["rivals_named"] = [
+            {"id": rid, "name": self._get_empire_name_by_id(rid)} for rid in rival_ids
         ]
 
         # Add current research explicitly
         tech = self.extractor.get_technology()
-        snapshot['current_research'] = tech.get('current_research', {})
-        if not snapshot['current_research']:
-            snapshot['current_research'] = "None - research slots are idle"
+        snapshot["current_research"] = tech.get("current_research", {})
+        if not snapshot["current_research"]:
+            snapshot["current_research"] = "None - research slots are idle"
 
         return snapshot
 
@@ -265,16 +262,18 @@ class EnhancedCompanion:
     def refresh_snapshot(self):
         """Rebuild the snapshot (call after save file changes)."""
         self.snapshot = self._build_comprehensive_snapshot()
-        self.snapshot_json = json.dumps(self.snapshot, separators=(',', ':'), default=str)
+        self.snapshot_json = json.dumps(self.snapshot, separators=(",", ":"), default=str)
 
 
 # =============================================================================
 # TEST / COMPARISON CODE
 # =============================================================================
 
+
 def run_comparison():
     """Run a comparison between production and enhanced versions."""
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent / "backend"))
     from core.companion import Companion
 
@@ -308,42 +307,44 @@ def run_comparison():
         # Run enhanced
         enh_response, enh_time = enhanced.ask(q)
 
-        print(f"Production: {prod_time:.1f}s, {len(prod_response.split())} words, {prod_stats.get('total_calls', 0)} tools")
+        print(
+            f"Production: {prod_time:.1f}s, {len(prod_response.split())} words, {prod_stats.get('total_calls', 0)} tools"
+        )
         print(f"Enhanced:   {enh_time:.1f}s, {len(enh_response.split())} words")
 
-        results.append({
-            'question': q,
-            'production': {
-                'time': prod_time,
-                'words': len(prod_response.split()),
-                'tools': prod_stats.get('total_calls', 0),
-                'response': prod_response,
-            },
-            'enhanced': {
-                'time': enh_time,
-                'words': len(enh_response.split()),
-                'response': enh_response,
+        results.append(
+            {
+                "question": q,
+                "production": {
+                    "time": prod_time,
+                    "words": len(prod_response.split()),
+                    "tools": prod_stats.get("total_calls", 0),
+                    "response": prod_response,
+                },
+                "enhanced": {
+                    "time": enh_time,
+                    "words": len(enh_response.split()),
+                    "response": enh_response,
+                },
             }
-        })
+        )
 
     # Summary
     print("\n" + "=" * 80)
     print("SUMMARY")
     print("=" * 80)
 
-    prod_avg_time = sum(r['production']['time'] for r in results) / len(results)
-    enh_avg_time = sum(r['enhanced']['time'] for r in results) / len(results)
-    prod_avg_words = sum(r['production']['words'] for r in results) / len(results)
-    enh_avg_words = sum(r['enhanced']['words'] for r in results) / len(results)
+    prod_avg_time = sum(r["production"]["time"] for r in results) / len(results)
+    enh_avg_time = sum(r["enhanced"]["time"] for r in results) / len(results)
+    prod_avg_words = sum(r["production"]["words"] for r in results) / len(results)
+    enh_avg_words = sum(r["enhanced"]["words"] for r in results) / len(results)
 
     print(f"Avg Time:  Production {prod_avg_time:.1f}s | Enhanced {enh_avg_time:.1f}s")
     print(f"Speedup:   {((prod_avg_time - enh_avg_time) / prod_avg_time * 100):.0f}% faster")
     print(f"Avg Words: Production {prod_avg_words:.0f} | Enhanced {enh_avg_words:.0f}")
 
     # Save results
-    Path("enhanced_comparison_results.json").write_text(
-        json.dumps(results, indent=2, default=str)
-    )
+    Path("enhanced_comparison_results.json").write_text(json.dumps(results, indent=2, default=str))
     print("\nResults saved to enhanced_comparison_results.json")
 
     return results

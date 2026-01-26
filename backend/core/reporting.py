@@ -95,15 +95,9 @@ def _extract_report_metrics(briefing: dict[str, Any]) -> dict[str, Any]:
     tech = briefing.get("technology", {}) if isinstance(briefing, dict) else {}
     dip = briefing.get("diplomacy", {}) if isinstance(briefing, dict) else {}
 
-    net = (
-        economy.get("net_monthly", {})
-        if isinstance(economy.get("net_monthly", {}), dict)
-        else {}
-    )
+    net = economy.get("net_monthly", {}) if isinstance(economy.get("net_monthly", {}), dict) else {}
     colonies = (
-        territory.get("colonies", {})
-        if isinstance(territory.get("colonies", {}), dict)
-        else {}
+        territory.get("colonies", {}) if isinstance(territory.get("colonies", {}), dict) else {}
     )
 
     federation = dip.get("federation")
@@ -171,9 +165,7 @@ def build_session_report_text(
         first_row.get("full_briefing_json") or first_row.get("event_state_json"), str
     ):
         try:
-            first_payload = first_row.get("full_briefing_json") or first_row.get(
-                "event_state_json"
-            )
+            first_payload = first_row.get("full_briefing_json") or first_row.get("event_state_json")
             first_metrics = _extract_report_metrics(json.loads(first_payload))
         except Exception:
             first_metrics = {}
@@ -194,18 +186,12 @@ def build_session_report_text(
         last_row.get("full_briefing_json") or last_row.get("event_state_json"), str
     ):
         try:
-            last_payload = last_row.get("full_briefing_json") or last_row.get(
-                "event_state_json"
-            )
+            last_payload = last_row.get("full_briefing_json") or last_row.get("event_state_json")
             last_metrics = _extract_report_metrics(json.loads(last_payload))
         except Exception:
             last_metrics = {}
 
-    empire = (
-        last_metrics.get("empire_name")
-        or first_metrics.get("empire_name")
-        or "Unknown Empire"
-    )
+    empire = last_metrics.get("empire_name") or first_metrics.get("empire_name") or "Unknown Empire"
     header = f"Session report — {empire}"
     if first_date and last_date:
         header += f"\nIn-game: {first_date} → {last_date}"

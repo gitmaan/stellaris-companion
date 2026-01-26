@@ -12,10 +12,10 @@ Tests a snapshot that contains ONLY complete data:
 Forces tool usage for any detail questions.
 """
 
-import os
 import json
-import time
+import os
 import sys
+import time
 from pathlib import Path
 
 # Add project root to path for imports
@@ -26,15 +26,16 @@ sys.stdout.reconfigure(line_buffering=True)
 # Load .env
 env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
-    for line in env_path.read_text().split('\n'):
-        if '=' in line and not line.startswith('#'):
-            key, val = line.split('=', 1)
+    for line in env_path.read_text().split("\n"):
+        if "=" in line and not line.startswith("#"):
+            key, val = line.split("=", 1)
             os.environ[key.strip()] = val.strip()
 
 from google import genai
 from google.genai import types
-from save_extractor import SaveExtractor
+
 from personality import build_optimized_prompt
+from save_extractor import SaveExtractor
 
 MODEL = "gemini-3-flash-preview"
 
@@ -56,74 +57,80 @@ def get_slim_briefing(extractor) -> dict:
     technology = extractor.get_technology()
 
     # Find capital planet (usually first/Earth)
-    all_planets = planets.get('planets', [])
+    all_planets = planets.get("planets", [])
     capital = all_planets[0] if all_planets else {}
 
     # Find ruler (usually first leader or specific class)
-    all_leaders = leaders.get('leaders', [])
-    ruler = next((l for l in all_leaders if l.get('class') == 'official'),
-                 all_leaders[0] if all_leaders else {})
+    all_leaders = leaders.get("leaders", [])
+    ruler = next(
+        (l for l in all_leaders if l.get("class") == "official"),
+        all_leaders[0] if all_leaders else {},
+    )
 
     return {
-        'meta': {
-            'empire_name': player.get('empire_name'),
-            'date': player.get('date'),
+        "meta": {
+            "empire_name": player.get("empire_name"),
+            "date": player.get("date"),
         },
-        'military': {
-            'power': player.get('military_power'),
-            'fleet_count': player.get('fleet_count'),
-            'fleet_size': player.get('fleet_size'),
+        "military": {
+            "power": player.get("military_power"),
+            "fleet_count": player.get("fleet_count"),
+            "fleet_size": player.get("fleet_size"),
         },
-        'economy': {
-            'power': player.get('economy_power'),
-            'tech_power': player.get('tech_power'),
-            'net_monthly': resources.get('net_monthly', {}),
+        "economy": {
+            "power": player.get("economy_power"),
+            "tech_power": player.get("tech_power"),
+            "net_monthly": resources.get("net_monthly", {}),
         },
-        'territory': {
-            'total_colonies': player.get('colonies', {}).get('total', 0),
-            'by_type': planets.get('by_type', {}),
+        "territory": {
+            "total_colonies": player.get("colonies", {}).get("total", 0),
+            "by_type": planets.get("by_type", {}),
             # HEADLINE: Just capital, not all planets
-            'capital': {
-                'name': capital.get('name'),
-                'type': capital.get('type'),
-                'population': capital.get('population'),
-                'stability': capital.get('stability'),
-            } if capital else None,
+            "capital": {
+                "name": capital.get("name"),
+                "type": capital.get("type"),
+                "population": capital.get("population"),
+                "stability": capital.get("stability"),
+            }
+            if capital
+            else None,
         },
-        'leadership': {
-            'total_count': leaders.get('count'),
-            'by_class': leaders.get('by_class', {}),
+        "leadership": {
+            "total_count": leaders.get("count"),
+            "by_class": leaders.get("by_class", {}),
             # HEADLINE: Just ruler, not all leaders
-            'ruler': {
-                'name': ruler.get('name'),
-                'class': ruler.get('class'),
-                'level': ruler.get('level'),
-                'traits': ruler.get('traits', []),
-            } if ruler else None,
+            "ruler": {
+                "name": ruler.get("name"),
+                "class": ruler.get("class"),
+                "level": ruler.get("level"),
+                "traits": ruler.get("traits", []),
+            }
+            if ruler
+            else None,
             # NO leaders list - forces tool use
         },
-        'diplomacy': {
-            'contact_count': diplomacy.get('relation_count'),
-            'ally_count': len(diplomacy.get('allies', [])),
-            'rival_count': len(diplomacy.get('rivals', [])),
-            'federation': diplomacy.get('federation'),
+        "diplomacy": {
+            "contact_count": diplomacy.get("relation_count"),
+            "ally_count": len(diplomacy.get("allies", [])),
+            "rival_count": len(diplomacy.get("rivals", [])),
+            "federation": diplomacy.get("federation"),
             # NO relations list - forces tool use
         },
-        'defense': {
-            'starbase_count': starbases.get('count'),
-            'by_level': starbases.get('by_level', {}),
+        "defense": {
+            "starbase_count": starbases.get("count"),
+            "by_level": starbases.get("by_level", {}),
             # NO starbases list - forces tool use
         },
-        'technology': {
-            'current_research': technology.get('current_research', {}),
-            'tech_count': technology.get('tech_count', 0),
-            'by_category': technology.get('by_category', {}),
+        "technology": {
+            "current_research": technology.get("current_research", {}),
+            "tech_count": technology.get("tech_count", 0),
+            "by_category": technology.get("by_category", {}),
         },
         # Explicit guidance for the model
-        '_meta': {
-            'snapshot_type': 'slim',
-            'note': 'This snapshot contains SUMMARIES only. For details about specific leaders, planets, starbases, or diplomacy, call get_details().',
-        }
+        "_meta": {
+            "snapshot_type": "slim",
+            "note": "This snapshot contains SUMMARIES only. For details about specific leaders, planets, starbases, or diplomacy, call get_details().",
+        },
     }
 
 
@@ -152,8 +159,8 @@ def main():
     slim_snapshot = get_slim_briefing(ext)
     current_snapshot = get_current_briefing(ext)
 
-    slim_json = json.dumps(slim_snapshot, separators=(',', ':'), default=str)
-    current_json = json.dumps(current_snapshot, separators=(',', ':'), default=str)
+    slim_json = json.dumps(slim_snapshot, separators=(",", ":"), default=str)
+    current_json = json.dumps(current_snapshot, separators=(",", ":"), default=str)
 
     print(f"\nSnapshot Sizes:")
     print(f"  Slim (Option A): {len(slim_json):,} chars")
@@ -164,8 +171,12 @@ def main():
     print(f"\n=== SLIM SNAPSHOT STRUCTURE ===")
     print(f"Capital: {slim_snapshot['territory']['capital']}")
     print(f"Ruler: {slim_snapshot['leadership']['ruler']}")
-    print(f"Leaders list: {'NOT INCLUDED' if 'leaders' not in slim_snapshot['leadership'] else 'included'}")
-    print(f"Planets list: {'NOT INCLUDED' if 'top_colonies' not in slim_snapshot['territory'] else 'included'}")
+    print(
+        f"Leaders list: {'NOT INCLUDED' if 'leaders' not in slim_snapshot['leadership'] else 'included'}"
+    )
+    print(
+        f"Planets list: {'NOT INCLUDED' if 'top_colonies' not in slim_snapshot['territory'] else 'included'}"
+    )
 
     # Ground truth from save file
     print(f"\n=== GROUND TRUTH (from save file) ===")
@@ -173,9 +184,9 @@ def main():
     all_planets = ext.get_planets()
 
     # Find actual highest level admiral
-    admirals = [l for l in all_leaders.get('leaders', []) if l.get('class') == 'commander']
+    admirals = [l for l in all_leaders.get("leaders", []) if l.get("class") == "commander"]
     if admirals:
-        best_admiral = max(admirals, key=lambda x: x.get('level', 0))
+        best_admiral = max(admirals, key=lambda x: x.get("level", 0))
         print(f"Highest Admiral: {best_admiral.get('name')} (Level {best_admiral.get('level')})")
         print(f"  Traits: {best_admiral.get('traits', [])}")
 
@@ -188,7 +199,6 @@ def main():
         ("What is my military power?", "SNAPSHOT"),
         ("How many colonies do I have?", "SNAPSHOT"),
         ("What am I researching in physics?", "SNAPSHOT"),
-
         # MUST use tools (no data in slim snapshot)
         ("Who is my highest level admiral and what traits do they have?", "TOOLS_REQUIRED"),
         ("List all my scientists", "TOOLS_REQUIRED"),
@@ -271,34 +281,38 @@ This snapshot contains SUMMARIES only. For details about specific leaders, plane
 
             # Check for hallucination on admiral question
             if "admiral" in question.lower() and not tools_used:
-                if best_admiral and best_admiral.get('name') in text:
+                if best_admiral and best_admiral.get("name") in text:
                     print(f"  ⚠️ Found correct admiral name without tools - suspicious!")
-                elif any(name in text for name in ['Yi', 'Rodrig', 'ViT', 'Sakura']):
+                elif any(name in text for name in ["Yi", "Rodrig", "ViT", "Sakura"]):
                     print(f"  ❌ HALLUCINATED - mentioned wrong admiral (not highest level)")
 
             # Preview
-            preview = text[:200].replace('\n', ' ')
+            preview = text[:200].replace("\n", " ")
             print(f"  Response: {preview}...")
 
-            results.append({
-                'question': question,
-                'expected': expected,
-                'status': status,
-                'tools': tools_used.copy(),
-                'time': elapsed,
-                'response': text,
-            })
+            results.append(
+                {
+                    "question": question,
+                    "expected": expected,
+                    "status": status,
+                    "tools": tools_used.copy(),
+                    "time": elapsed,
+                    "response": text,
+                }
+            )
 
         except Exception as e:
             print(f"  ERROR: {e}")
-            results.append({
-                'question': question,
-                'expected': expected,
-                'status': 'ERROR',
-                'tools': [],
-                'time': 0,
-                'response': str(e),
-            })
+            results.append(
+                {
+                    "question": question,
+                    "expected": expected,
+                    "status": "ERROR",
+                    "tools": [],
+                    "time": 0,
+                    "response": str(e),
+                }
+            )
 
         sys.stdout.flush()
 
@@ -307,11 +321,11 @@ This snapshot contains SUMMARIES only. For details about specific leaders, plane
     print("SUMMARY")
     print("=" * 70)
 
-    correct = sum(1 for r in results if '✅' in r['status'])
-    tools_when_needed = sum(1 for r in results if 'CORRECTLY USED TOOLS' in r['status'])
-    snapshot_when_ok = sum(1 for r in results if 'CORRECTLY USED SNAPSHOT' in r['status'])
-    missed = sum(1 for r in results if 'SHOULD HAVE' in r['status'])
-    unnecessary = sum(1 for r in results if 'unnecessary' in r['status'])
+    correct = sum(1 for r in results if "✅" in r["status"])
+    tools_when_needed = sum(1 for r in results if "CORRECTLY USED TOOLS" in r["status"])
+    snapshot_when_ok = sum(1 for r in results if "CORRECTLY USED SNAPSHOT" in r["status"])
+    missed = sum(1 for r in results if "SHOULD HAVE" in r["status"])
+    unnecessary = sum(1 for r in results if "unnecessary" in r["status"])
 
     print(f"✅ Correct behavior: {correct}/{len(results)}")
     print(f"   - From snapshot when available: {snapshot_when_ok}")
@@ -319,22 +333,22 @@ This snapshot contains SUMMARIES only. For details about specific leaders, plane
     print(f"❌ Should have used tools: {missed}")
     print(f"⚠️ Unnecessary tool calls: {unnecessary}")
 
-    avg_time = sum(r['time'] for r in results) / len(results)
-    total_tools = sum(len(r['tools']) for r in results)
+    avg_time = sum(r["time"] for r in results) / len(results)
+    total_tools = sum(len(r["tools"]) for r in results)
     print(f"\nPerformance:")
     print(f"  Average time: {avg_time:.1f}s")
     print(f"  Total tool calls: {total_tools}")
 
     # Save results
     output = {
-        'snapshot_type': 'slim',
-        'snapshot_size': len(slim_json),
-        'results': results,
-        'ground_truth': {
-            'highest_admiral': best_admiral if admirals else None,
-            'total_leaders': all_leaders.get('count'),
-            'total_planets': len(all_planets.get('planets', [])),
-        }
+        "snapshot_type": "slim",
+        "snapshot_size": len(slim_json),
+        "results": results,
+        "ground_truth": {
+            "highest_admiral": best_admiral if admirals else None,
+            "total_leaders": all_leaders.get("count"),
+            "total_planets": len(all_planets.get("planets", [])),
+        },
     }
     Path("option_a_results.json").write_text(json.dumps(output, indent=2, default=str))
     print(f"\nResults saved to option_a_results.json")

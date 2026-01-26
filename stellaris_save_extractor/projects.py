@@ -3,15 +3,8 @@ from __future__ import annotations
 import logging
 import re
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import iter_section_entries, ParserError, _get_active_session
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type for type hints
-    _get_active_session = lambda: None
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import _get_active_session
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +114,7 @@ class ProjectsMixin:
             result["active_count"] = len(active_projects)
 
             if active_projects:
-                days_list = [
-                    p["days_left"] for p in active_projects if p.get("days_left")
-                ]
+                days_list = [p["days_left"] for p in active_projects if p.get("days_left")]
                 if days_list:
                     result["soonest_completion"] = min(days_list)
 
@@ -201,12 +192,9 @@ class ProjectsMixin:
 
         # Count artifact-related entries (numbered stages like yuht_2, yuht_6)
         artifact_count = 0
-        for flag_key in flags.keys():
+        for flag_key in flags:
             # Match pattern: precursor_N where N is a digit
-            if (
-                flag_key.startswith(f"{precursor}_")
-                and flag_key[len(precursor) + 1 :].isdigit()
-            ):
+            if flag_key.startswith(f"{precursor}_") and flag_key[len(precursor) + 1 :].isdigit():
                 artifact_count += 1
 
         if artifact_count > 0:
@@ -335,9 +323,7 @@ class ProjectsMixin:
         chains = []
 
         # Find all completed_event_chain entries
-        for match in re.finditer(
-            r'\bcompleted_event_chain\s*=\s*"([^"]+)"', player_chunk
-        ):
+        for match in re.finditer(r'\bcompleted_event_chain\s*=\s*"([^"]+)"', player_chunk):
             chain_name = match.group(1)
             if chain_name and chain_name not in chains:
                 chains.append(chain_name)

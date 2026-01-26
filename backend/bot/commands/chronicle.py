@@ -30,9 +30,7 @@ def setup(bot) -> None:
         name="chronicle",
         description="Generate a dramatic chronicle of your empire's history",
     )
-    @app_commands.describe(
-        force_refresh="Generate a new chronicle even if one is cached"
-    )
+    @app_commands.describe(force_refresh="Generate a new chronicle even if one is cached")
     async def chronicle_command(
         interaction: discord.Interaction, force_refresh: bool = False
     ) -> None:
@@ -57,16 +55,10 @@ def setup(bot) -> None:
 
                 # Get session ID for current campaign
                 briefing = getattr(bot.companion, "_current_snapshot", None) or {}
-                metrics = (
-                    extract_snapshot_metrics(briefing)
-                    if isinstance(briefing, dict)
-                    else {}
-                )
+                metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
 
                 campaign_id = None
-                if bot.companion.extractor and getattr(
-                    bot.companion.extractor, "gamestate", None
-                ):
+                if bot.companion.extractor and getattr(bot.companion.extractor, "gamestate", None):
                     campaign_id = extract_campaign_id_from_gamestate(
                         bot.companion.extractor.gamestate
                     )
@@ -78,11 +70,7 @@ def setup(bot) -> None:
                         if bot.companion.extractor
                         else None
                     ),
-                    empire_name=(
-                        metrics.get("empire_name")
-                        if isinstance(metrics, dict)
-                        else None
-                    ),
+                    empire_name=(metrics.get("empire_name") if isinstance(metrics, dict) else None),
                     save_path=(
                         bot.companion.save_path
                         if isinstance(bot.companion.save_path, Path)

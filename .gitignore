@@ -47,6 +47,10 @@ node_modules/
 
 # Build outputs
 dist-python/
+stellaris-parser/target/
+
+# Benchmark results
+*_results.md
 
 # Generated benchmark/test results
 *_results.json
@@ -54,3 +58,4 @@ t25_*.json
 
 # Dev scripts (optional, remove if you want to track)
 dev.sh
+.ralph-logs/

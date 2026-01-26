@@ -1,17 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import iter_section_entries, ParserError, _get_active_session
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    ParserError = Exception  # Fallback type for type hints
-    _get_active_session = lambda: None  # Fallback for type hints
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import _get_active_session
 
 logger = logging.getLogger(__name__)
 
@@ -58,21 +52,7 @@ class EndgameMixin:
               - player_crisis_kills: Number of crisis ships/armies killed
               - crisis_systems: Count of systems flagged as crisis-controlled
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_crisis_status_rust()
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for crisis status: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback: regex-based parsing
-        return self._get_crisis_status_regex()
+        return self._get_crisis_status_rust()
 
     def _get_crisis_status_rust(self) -> dict:
         """Get crisis status using Rust parser.
@@ -161,10 +141,8 @@ class EndgameMixin:
             # Check for crisis_kills count
             crisis_kills = player_data.get("crisis_kills")
             if crisis_kills is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     result["player_crisis_kills"] = int(crisis_kills)
-                except (ValueError, TypeError):
-                    pass
 
         # Count crisis-controlled systems via count_keys (tree traversal)
         # This is faster than regex since we traverse the already-parsed JSON tree
@@ -207,9 +185,7 @@ class EndgameMixin:
         # Find crisis country IDs by scanning the country section
         country_section_start = self._find_country_section_start()
         if country_section_start != -1:
-            country_chunk = self.gamestate[
-                country_section_start : country_section_start + 50000000
-            ]
+            country_chunk = self.gamestate[country_section_start : country_section_start + 50000000]
 
             # Find countries with crisis types
             for match in re.finditer(r"\n\t(\d+)=\n\t\{", country_chunk):
@@ -312,21 +288,7 @@ class EndgameMixin:
               - lgate_opened: Whether L-Cluster has been accessed
               - player_activation_progress: Tech progress toward activation (0-100)
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_lgate_status_rust()
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for L-Gate status: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback: regex-based parsing
-        return self._get_lgate_status_regex()
+        return self._get_lgate_status_rust()
 
     def _get_lgate_status_rust(self) -> dict:
         """Get L-Gate status using Rust parser.
@@ -370,27 +332,21 @@ class EndgameMixin:
                 if isinstance(repeatables, dict):
                     clue_level = repeatables.get("tech_repeatable_lcluster_clue")
                     if clue_level is not None:
-                        try:
+                        with contextlib.suppress(ValueError, TypeError):
                             result["insights_collected"] = int(clue_level)
-                        except (ValueError, TypeError):
-                            pass
 
                 # Check for activation tech progress in tech_status.potential block
                 potential = tech_status.get("potential", {})
                 if isinstance(potential, dict):
                     activation_progress = potential.get("tech_lgate_activation")
                     if activation_progress is not None:
-                        try:
+                        with contextlib.suppress(ValueError, TypeError):
                             result["player_activation_progress"] = int(activation_progress)
-                        except (ValueError, TypeError):
-                            pass
 
         # Check if L-Gate has been opened using contains_tokens
-        lcluster_tokens = session.contains_tokens([
-            "lcluster_",
-            "l_cluster_opened",
-            "gray_tempest_country"
-        ])
+        lcluster_tokens = session.contains_tokens(
+            ["lcluster_", "l_cluster_opened", "gray_tempest_country"]
+        )
         lcluster_matches = lcluster_tokens.get("matches", {})
         if any(lcluster_matches.values()):
             result["lgate_opened"] = True
@@ -436,18 +392,14 @@ class EndgameMixin:
 
             # Check for activation tech progress
             # This appears in potential={} section as "tech_lgate_activation"="XX"
-            potential_match = re.search(
-                r'"tech_lgate_activation"="(\d+)"', player_chunk
-            )
+            potential_match = re.search(r'"tech_lgate_activation"="(\d+)"', player_chunk)
             if potential_match:
                 result["player_activation_progress"] = int(potential_match.group(1))
 
         # Check if L-Gate has been opened (look for L-Cluster access)
         # When opened, there will be bypass connections to the L-Cluster
         # Or we can check for gray_tempest/lcluster related flags
-        if re.search(
-            r"lcluster_|l_cluster_opened|gray_tempest_country", self.gamestate
-        ):
+        if re.search(r"lcluster_|l_cluster_opened|gray_tempest_country", self.gamestate):
             result["lgate_opened"] = True
 
         # Also check if player has the activation tech completed
@@ -456,9 +408,7 @@ class EndgameMixin:
                 tech_section = self._extract_braced_block(player_chunk, "technology")
                 if tech_section and '"tech_lgate_activation"' in tech_section:
                     # Check if it's in completed techs (not just potential)
-                    completed_block = self._extract_braced_block(
-                        tech_section, "completed"
-                    )
+                    completed_block = self._extract_braced_block(tech_section, "completed")
                     if completed_block and "tech_lgate_activation" in completed_block:
                         result["lgate_opened"] = True
 
@@ -478,21 +428,7 @@ class EndgameMixin:
               - menace_level: Current menace accumulated
               - crisis_level: Crisis ascension tier (0-5)
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_menace_rust()
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for menace: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback: regex-based parsing
-        return self._get_menace_regex()
+        return self._get_menace_rust()
 
     def _get_menace_rust(self) -> dict:
         """Get menace status using Rust parser.
@@ -533,18 +469,14 @@ class EndgameMixin:
             # Menace is stored in the country block
             menace = country_data.get("menace")
             if menace is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     result["menace_level"] = int(menace)
-                except (ValueError, TypeError):
-                    pass
 
             # Crisis level/tier
             crisis_level = country_data.get("crisis_level")
             if crisis_level is not None:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     result["crisis_level"] = int(crisis_level)
-                except (ValueError, TypeError):
-                    pass
 
         return result
 
@@ -602,21 +534,7 @@ class EndgameMixin:
               - khan_status: Current state (active, defeated, etc.)
               - khan_country_id: Country ID of the Khan's empire if active
         """
-        # Try Rust bridge first for faster parsing
-        if RUST_BRIDGE_AVAILABLE:
-            try:
-                return self._get_great_khan_rust()
-            except ParserError as e:
-                logger.warning(
-                    f"Rust parser failed for Great Khan: {e}, falling back to regex"
-                )
-            except Exception as e:
-                logger.warning(
-                    f"Unexpected error from Rust parser: {e}, falling back to regex"
-                )
-
-        # Fallback: regex-based parsing
-        return self._get_great_khan_regex()
+        return self._get_great_khan_rust()
 
     def _get_great_khan_rust(self) -> dict:
         """Get Great Khan status using Rust parser.
@@ -782,10 +700,7 @@ class EndgameMixin:
                     start = match.start()
                     block = country_chunk[start : start + 5000]
 
-                    if (
-                        'type="awakened_marauders"' in block
-                        or 'type="marauder_empire"' in block
-                    ):
+                    if 'type="awakened_marauders"' in block or 'type="marauder_empire"' in block:
                         result["khan_country_id"] = country_id
                         break
 

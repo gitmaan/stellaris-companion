@@ -8,8 +8,8 @@ This uses the Gemini LLM to provide comprehensive analysis.
 
 import asyncio
 import logging
+
 import discord
-from discord import app_commands
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +61,7 @@ def setup(bot) -> None:
                         await interaction.followup.send(chunk)
 
                 # Send timing as final message
-                await interaction.followup.send(
-                    f"*Briefing completed in {elapsed:.1f}s*"
-                )
+                await interaction.followup.send(f"*Briefing completed in {elapsed:.1f}s*")
 
             else:
                 # Truncate if necessary
@@ -73,9 +71,7 @@ def setup(bot) -> None:
                 footer = f"\n\n*Briefing generated in {elapsed:.1f}s*"
 
                 if len(response_text) + len(footer) > 2000:
-                    response_text = truncate_response(
-                        response_text, 2000 - len(footer) - 10
-                    )
+                    response_text = truncate_response(response_text, 2000 - len(footer) - 10)
 
                 await interaction.followup.send(response_text + footer)
 

@@ -14,11 +14,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Load .env if exists
-env_path = Path(__file__).parent.parent / '.env'
+env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
     for line in env_path.read_text().splitlines():
-        if '=' in line and not line.startswith('#'):
-            key, value = line.split('=', 1)
+        if "=" in line and not line.startswith("#"):
+            key, value = line.split("=", 1)
             os.environ.setdefault(key.strip(), value.strip())
 
 
@@ -30,6 +30,7 @@ def main():
     # Step 1: Initialize database (applies migration 3 if needed)
     print("\n1. Initializing database...")
     from backend.core.database import GameDatabase
+
     db = GameDatabase()
     print(f"   Schema version: {db.get_schema_version()}")
 
@@ -47,16 +48,18 @@ def main():
     print("\n2. Available sessions:")
     sessions = db.get_sessions(limit=5)
     for s in sessions:
-        event_count = db.get_event_count(s['id'])
-        print(f"   {s['id'][:8]}... | {s['empire_name']} | {event_count} events | {s['snapshot_count']} snapshots")
+        event_count = db.get_event_count(s["id"])
+        print(
+            f"   {s['id'][:8]}... | {s['empire_name']} | {event_count} events | {s['snapshot_count']} snapshots"
+        )
 
     if not sessions:
         print("   No sessions found!")
         return 1
 
     # Use session with most events
-    session = max(sessions, key=lambda s: s.get('snapshot_count', 0))
-    session_id = session['id']
+    session = max(sessions, key=lambda s: s.get("snapshot_count", 0))
+    session_id = session["id"]
     print(f"\n3. Testing with: {session['empire_name']} ({session['snapshot_count']} snapshots)")
 
     # Step 3: Test get_all_events (no 100 cap)
@@ -71,13 +74,14 @@ def main():
     # Step 4: Test ChronicleGenerator
     print("\n5. Testing ChronicleGenerator...")
 
-    api_key = os.environ.get('GOOGLE_API_KEY')
+    api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         print("   GOOGLE_API_KEY not set - skipping LLM call")
         print("   Set GOOGLE_API_KEY to test full generation")
 
         # Test data gathering without LLM
         from backend.core.chronicle import ChronicleGenerator
+
         generator = ChronicleGenerator(db=db, api_key="dummy")
 
         try:
@@ -86,7 +90,7 @@ def main():
             print(f"   Date range: {data['first_date']} to {data['last_date']}")
 
             prompt = generator._build_chronicler_prompt(data)
-            print(f"   Prompt built: {len(prompt):,} chars (~{len(prompt)//4:,} tokens)")
+            print(f"   Prompt built: {len(prompt):,} chars (~{len(prompt) // 4:,} tokens)")
 
             # Save prompt for inspection
             prompt_path = Path(__file__).parent / "test_chronicle_prompt_integration.txt"
@@ -100,15 +104,16 @@ def main():
 
     # Full test with LLM
     from backend.core.chronicle import ChronicleGenerator
+
     generator = ChronicleGenerator(db=db)
 
     print("   Generating chronicle (this may take 10-20 seconds)...")
     try:
         result = generator.generate_chronicle(session_id=session_id, force_refresh=True)
 
-        chronicle = result['chronicle']
-        cached = result['cached']
-        event_count = result['event_count']
+        chronicle = result["chronicle"]
+        cached = result["cached"]
+        event_count = result["event_count"]
 
         print(f"\n   Generated: {len(chronicle):,} chars")
         print(f"   Events used: {event_count}")
@@ -130,6 +135,7 @@ def main():
     except Exception as e:
         print(f"   Error generating chronicle: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
@@ -139,7 +145,7 @@ def main():
     result2 = generator.generate_chronicle(session_id=session_id, force_refresh=False)
     print(f"   Second call cached: {result2['cached']}")
 
-    if result2['cached']:
+    if result2["cached"]:
         print("   Cache working correctly!")
     else:
         print("   WARNING: Cache not working as expected")
@@ -151,7 +157,7 @@ def main():
         print(f"   Generated: {len(recap_result['recap']):,} chars")
         print(f"   Events: {recap_result['events_summarized']}")
         print("\n   Preview:")
-        print(recap_result['recap'][:500])
+        print(recap_result["recap"][:500])
     except Exception as e:
         print(f"   Error: {e}")
 
@@ -161,5 +167,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

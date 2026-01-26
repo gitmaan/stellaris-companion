@@ -1,27 +1,13 @@
 from __future__ import annotations
 
-import re
-import zipfile
-from datetime import datetime
-from pathlib import Path
-
-# Rust bridge for fast Clausewitz parsing
-try:
-    from rust_bridge import extract_sections, _get_active_session
-
-    RUST_BRIDGE_AVAILABLE = True
-except ImportError:
-    RUST_BRIDGE_AVAILABLE = False
-    extract_sections = None
-    _get_active_session = lambda: None
+# Rust bridge for Clausewitz parsing (required for session mode)
+from rust_bridge import _get_active_session
 
 
 class BriefingMixin:
     """Domain methods extracted from the original SaveExtractor."""
 
-    def search(
-        self, query: str, max_results: int = 5, context_chars: int = 500
-    ) -> dict:
+    def search(self, query: str, max_results: int = 5, context_chars: int = 500) -> dict:
         """Search the full gamestate for specific text.
 
         Args:
@@ -61,9 +47,7 @@ class BriefingMixin:
 
             # Get context
             context_start = max(0, pos - context_chars // 2)
-            context_end = min(
-                len(self.gamestate), pos + len(query) + context_chars // 2
-            )
+            context_end = min(len(self.gamestate), pos + len(query) + context_chars // 2)
 
             context = self.gamestate[context_start:context_end]
 
@@ -103,14 +87,14 @@ class BriefingMixin:
         colonies = player.get("colonies", {})
 
         summary = f"""Save File Summary:
-- Empire: {meta.get('name', 'Unknown')}
-- Date: {meta.get('date', 'Unknown')}
-- Version: {meta.get('version', 'Unknown')}
-- Colonies: {colonies.get('total_count', 'Unknown')} ({colonies.get('total_population', 0)} pops)
-- Fleets: {player.get('fleet_count', 'Unknown')}
-- Military Power: {player.get('military_power', 'Unknown')}
-- Economy Power: {player.get('economy_power', 'Unknown')}
-- Tech Power: {player.get('tech_power', 'Unknown')}
+- Empire: {meta.get("name", "Unknown")}
+- Date: {meta.get("date", "Unknown")}
+- Version: {meta.get("version", "Unknown")}
+- Colonies: {colonies.get("total_count", "Unknown")} ({colonies.get("total_population", 0)} pops)
+- Fleets: {player.get("fleet_count", "Unknown")}
+- Military Power: {player.get("military_power", "Unknown")}
+- Economy Power: {player.get("economy_power", "Unknown")}
+- Tech Power: {player.get("tech_power", "Unknown")}
 """
         return summary
 
@@ -164,25 +148,15 @@ class BriefingMixin:
                     "energy": resources.get("net_monthly", {}).get("energy"),
                     "minerals": resources.get("net_monthly", {}).get("minerals"),
                     "alloys": resources.get("net_monthly", {}).get("alloys"),
-                    "consumer_goods": resources.get("net_monthly", {}).get(
-                        "consumer_goods"
-                    ),
-                    "research_total": resources.get("summary", {}).get(
-                        "research_total"
-                    ),
+                    "consumer_goods": resources.get("net_monthly", {}).get("consumer_goods"),
+                    "research_total": resources.get("summary", {}).get("research_total"),
                 },
             },
             "territory": {
-                "celestial_bodies_in_territory": player_clean.get(
-                    "celestial_bodies_in_territory"
-                ),
-                "colonies": player_clean.get(
-                    "colonies", {}
-                ),  # Breakdown by habitats vs planets
+                "celestial_bodies_in_territory": player_clean.get("celestial_bodies_in_territory"),
+                "colonies": player_clean.get("colonies", {}),  # Breakdown by habitats vs planets
                 "planets_by_type": planets.get("by_type", {}),
-                "top_colonies": planets.get("planets", [])[
-                    :10
-                ],  # Top 10 colonies with details
+                "top_colonies": planets.get("planets", [])[:10],  # Top 10 colonies with details
             },
             "diplomacy": {
                 "relation_count": diplomacy.get("relation_count"),
@@ -341,18 +315,12 @@ class BriefingMixin:
                     "energy": resources.get("net_monthly", {}).get("energy"),
                     "minerals": resources.get("net_monthly", {}).get("minerals"),
                     "alloys": resources.get("net_monthly", {}).get("alloys"),
-                    "consumer_goods": resources.get("net_monthly", {}).get(
-                        "consumer_goods"
-                    ),
-                    "research_total": resources.get("summary", {}).get(
-                        "research_total"
-                    ),
+                    "consumer_goods": resources.get("net_monthly", {}).get("consumer_goods"),
+                    "research_total": resources.get("summary", {}).get("research_total"),
                 },
             },
             "territory": {
-                "celestial_bodies_in_territory": player_clean.get(
-                    "celestial_bodies_in_territory"
-                ),
+                "celestial_bodies_in_territory": player_clean.get("celestial_bodies_in_territory"),
                 "colonies": player_clean.get("colonies", {}),
                 "planets": planets,
                 "claims": claims,
@@ -556,9 +524,7 @@ class BriefingMixin:
                 if "sample_technologies" in data:
                     data["sample_technologies"] = data["sample_technologies"][:limit]
                 if "completed_technologies" in data:
-                    data["completed_technologies"] = data["completed_technologies"][
-                        :limit
-                    ]
+                    data["completed_technologies"] = data["completed_technologies"][:limit]
                 results[category] = data
                 continue
 
@@ -682,9 +648,7 @@ class BriefingMixin:
         result["crisis_active"] = crisis.get("crisis_active", False)
         if result["crisis_active"]:
             result["crisis_type"] = crisis.get("crisis_type")
-            result["player_is_crisis_fighter"] = crisis.get(
-                "player_is_crisis_fighter", False
-            )
+            result["player_is_crisis_fighter"] = crisis.get("player_is_crisis_fighter", False)
 
         # Check for Fallen Empires
         if fallen.get("total_count", 0) > 0:

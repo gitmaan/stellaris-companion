@@ -15,10 +15,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
+
 from save_extractor import SaveExtractor
 
 # Mix of simple and complex queries - some should need tools
@@ -26,11 +28,9 @@ TEST_QUESTIONS = [
     # Simple (snapshot should suffice)
     "What is my current military power?",
     "How many colonies do I have?",
-
     # Medium (might need details)
     "What is the state of my economy?",
     "Who are my allies?",
-
     # Complex (likely needs tools/search)
     "Tell me about my best admiral or general.",
     "What technologies am I currently researching?",
@@ -44,29 +44,29 @@ TEST_QUESTIONS = [
 def build_middle_ground_system_prompt(identity: dict, situation: dict) -> str:
     """Middle ground v2: personality + strategic depth, minimal redundancy."""
 
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = identity.get('ethics', [])
-    authority = identity.get('authority', 'unknown')
-    civics = identity.get('civics', [])
-    is_gestalt = identity.get('is_gestalt', False)
-    is_machine = identity.get('is_machine', False)
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = identity.get("ethics", [])
+    authority = identity.get("authority", "unknown")
+    civics = identity.get("civics", [])
+    is_gestalt = identity.get("is_gestalt", False)
+    is_machine = identity.get("is_machine", False)
 
-    year = situation.get('year', 2200)
-    game_phase = situation.get('game_phase', 'early')
-    at_war = situation.get('at_war', False)
-    economy = situation.get('economy', {})
-    deficits = economy.get('resources_in_deficit', 0)
-    contact_count = situation.get('contact_count', 0)
+    year = situation.get("year", 2200)
+    game_phase = situation.get("game_phase", "early")
+    at_war = situation.get("at_war", False)
+    economy = situation.get("economy", {})
+    deficits = economy.get("resources_in_deficit", 0)
+    contact_count = situation.get("contact_count", 0)
 
     prompt = f"""You are the strategic advisor to {empire_name}.
 
 EMPIRE IDENTITY:
-- Ethics: {', '.join(ethics) if ethics else 'unknown'}
+- Ethics: {", ".join(ethics) if ethics else "unknown"}
 - Authority: {authority}
-- Civics: {', '.join(civics) if civics else 'none'}
+- Civics: {", ".join(civics) if civics else "none"}
 - Gestalt: {is_gestalt} (Machine: {is_machine})
 
-SITUATION: Year {year} ({game_phase}), {'AT WAR' if at_war else 'at peace'}, {deficits} deficits, {contact_count} known empires.
+SITUATION: Year {year} ({game_phase}), {"AT WAR" if at_war else "at peace"}, {deficits} deficits, {contact_count} known empires.
 
 PERSONALITY (critical - stay in character):
 Your ethics define your worldview:
@@ -101,14 +101,17 @@ The game state is pre-loaded in the user message. If you need MORE DETAIL not in
 def run_current_version(question: str) -> tuple[str, float, int, list]:
     """Run the current production version."""
     from core.companion import Companion
+
     companion = Companion(save_path="test_save.sav")
     companion.clear_conversation()
     response, elapsed = companion.ask_simple(question)
     stats = companion.get_call_stats()
-    return response, elapsed, stats.get('total_calls', 0), stats.get('tools_used', [])
+    return response, elapsed, stats.get("total_calls", 0), stats.get("tools_used", [])
 
 
-def run_middle_ground(extractor, client, identity, situation, question: str) -> tuple[str, float, int, list]:
+def run_middle_ground(
+    extractor, client, identity, situation, question: str
+) -> tuple[str, float, int, list]:
     """Run the middle ground version."""
 
     system_prompt = build_middle_ground_system_prompt(identity, situation)
@@ -204,23 +207,25 @@ def main():
             print(f"ERROR: {e}")
             mg_response, mg_time, mg_tools, mg_tools_list = f"Error: {e}", 0, 0, []
 
-        results.append({
-            "question": question,
-            "current": {
-                "time": curr_time,
-                "tools": curr_tools,
-                "tools_list": curr_tools_list,
-                "response": curr_response,
-                "word_count": len(curr_response.split()),
-            },
-            "middle_ground": {
-                "time": mg_time,
-                "tools": mg_tools,
-                "tools_list": mg_tools_list,
-                "response": mg_response,
-                "word_count": len(mg_response.split()),
+        results.append(
+            {
+                "question": question,
+                "current": {
+                    "time": curr_time,
+                    "tools": curr_tools,
+                    "tools_list": curr_tools_list,
+                    "response": curr_response,
+                    "word_count": len(curr_response.split()),
+                },
+                "middle_ground": {
+                    "time": mg_time,
+                    "tools": mg_tools,
+                    "tools_list": mg_tools_list,
+                    "response": mg_response,
+                    "word_count": len(mg_response.split()),
+                },
             }
-        })
+        )
 
         print()
 
@@ -233,23 +238,27 @@ def main():
     print("-" * 80)
 
     for r in results:
-        q = r['question'][:43]
-        ct = f"{r['current']['time']:.1f}s" if r['current']['time'] > 0 else "ERR"
-        mt = f"{r['middle_ground']['time']:.1f}s" if r['middle_ground']['time'] > 0 else "ERR"
-        print(f"{q:<45} {ct:>6} {mt:>6} {r['current']['tools']:>8} {r['middle_ground']['tools']:>8}")
+        q = r["question"][:43]
+        ct = f"{r['current']['time']:.1f}s" if r["current"]["time"] > 0 else "ERR"
+        mt = f"{r['middle_ground']['time']:.1f}s" if r["middle_ground"]["time"] > 0 else "ERR"
+        print(
+            f"{q:<45} {ct:>6} {mt:>6} {r['current']['tools']:>8} {r['middle_ground']['tools']:>8}"
+        )
 
     # Averages
-    valid_curr = [r for r in results if r['current']['time'] > 0]
-    valid_mg = [r for r in results if r['middle_ground']['time'] > 0]
+    valid_curr = [r for r in results if r["current"]["time"] > 0]
+    valid_mg = [r for r in results if r["middle_ground"]["time"] > 0]
 
     if valid_curr and valid_mg:
-        avg_curr_time = sum(r['current']['time'] for r in valid_curr) / len(valid_curr)
-        avg_mg_time = sum(r['middle_ground']['time'] for r in valid_mg) / len(valid_mg)
-        avg_curr_tools = sum(r['current']['tools'] for r in valid_curr) / len(valid_curr)
-        avg_mg_tools = sum(r['middle_ground']['tools'] for r in valid_mg) / len(valid_mg)
+        avg_curr_time = sum(r["current"]["time"] for r in valid_curr) / len(valid_curr)
+        avg_mg_time = sum(r["middle_ground"]["time"] for r in valid_mg) / len(valid_mg)
+        avg_curr_tools = sum(r["current"]["tools"] for r in valid_curr) / len(valid_curr)
+        avg_mg_tools = sum(r["middle_ground"]["tools"] for r in valid_mg) / len(valid_mg)
 
         print("-" * 80)
-        print(f"{'AVERAGE':<45} {avg_curr_time:>5.1f}s {avg_mg_time:>5.1f}s {avg_curr_tools:>8.1f} {avg_mg_tools:>8.1f}")
+        print(
+            f"{'AVERAGE':<45} {avg_curr_time:>5.1f}s {avg_mg_time:>5.1f}s {avg_curr_tools:>8.1f} {avg_mg_tools:>8.1f}"
+        )
 
         # Tool usage breakdown
         print("\n" + "=" * 80)
@@ -258,20 +267,26 @@ def main():
 
         print("\nCurrent (Production):")
         for r in results:
-            if r['current']['tools'] > 0:
+            if r["current"]["tools"] > 0:
                 print(f"  Q: {r['question'][:50]}")
                 print(f"     Tools: {r['current']['tools_list']}")
 
         print("\nMiddle Ground v2:")
         for r in results:
-            if r['middle_ground']['tools'] > 0:
+            if r["middle_ground"]["tools"] > 0:
                 print(f"  Q: {r['question'][:50]}")
                 print(f"     Tools: {r['middle_ground']['tools_list']}")
 
     # Save results
-    Path("tool_usage_results.json").write_text(json.dumps({
-        "results": results,
-    }, indent=2, default=str))
+    Path("tool_usage_results.json").write_text(
+        json.dumps(
+            {
+                "results": results,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     print("\nDetailed results saved to tool_usage_results.json")
 
 

@@ -8,10 +8,10 @@ from pathlib import Path
 
 # Rust bridge for Clausewitz parsing (required for session mode)
 from rust_bridge import (
-    extract_sections,
-    iter_section_entries,
     ParserError,
     _get_active_session,
+    extract_sections,
+    iter_section_entries,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,12 +39,8 @@ class SaveExtractorBase:
         self._building_types = None  # Lazy-loaded building ID→type map
         self._country_names = None  # Lazy-loaded country ID→name map
         self._player_status_cache = None  # Cached player status (expensive to compute)
-        self._player_country_entry_cache = (
-            None  # Cached player country from Rust get_entry
-        )
-        self._player_country_content_cache = (
-            None  # Cached player country string content
-        )
+        self._player_country_entry_cache = None  # Cached player country from Rust get_entry
+        self._player_country_content_cache = None  # Cached player country string content
 
     def close(self) -> None:
         """Release large in-memory state (best-effort)."""
@@ -121,17 +117,15 @@ class SaveExtractorBase:
 
     def _load_meta(self) -> None:
         """Extract meta from the save file (cheap, used for Tier 0 status)."""
-        with zipfile.ZipFile(self.save_path, "r") as z:
-            with z.open("meta") as raw:
-                with io.TextIOWrapper(raw, encoding="utf-8", errors="replace") as text:
-                    self._meta = text.read()
+        with zipfile.ZipFile(self.save_path, "r") as z, z.open("meta") as raw:
+            with io.TextIOWrapper(raw, encoding="utf-8", errors="replace") as text:
+                self._meta = text.read()
 
     def _load_gamestate(self) -> None:
         """Extract the full gamestate from the save file (expensive)."""
-        with zipfile.ZipFile(self.save_path, "r") as z:
-            with z.open("gamestate") as raw:
-                with io.TextIOWrapper(raw, encoding="utf-8", errors="replace") as text:
-                    self._gamestate = text.read()
+        with zipfile.ZipFile(self.save_path, "r") as z, z.open("gamestate") as raw:
+            with io.TextIOWrapper(raw, encoding="utf-8", errors="replace") as text:
+                self._gamestate = text.read()
 
     def _get_section_bounds(self, section_name: str) -> tuple[int, int] | None:
         """Get cached (start, end) bounds for a top-level section."""
@@ -407,9 +401,7 @@ class SaveExtractorBase:
         if not fleets_mgr_match:
             return owned_fleet_ids
 
-        content = player_content[
-            fleets_mgr_match.start() : fleets_mgr_match.start() + 50000
-        ]
+        content = player_content[fleets_mgr_match.start() : fleets_mgr_match.start() + 50000]
         for m in re.finditer(r"fleet=(\d+)", content):
             owned_fleet_ids.add(m.group(1))
 
@@ -519,9 +511,7 @@ class SaveExtractorBase:
 
         country_names = {}
 
-        for country_id_str, country_data in iter_section_entries(
-            self.save_path, "country"
-        ):
+        for country_id_str, country_data in iter_section_entries(self.save_path, "country"):
             if not isinstance(country_data, dict):
                 continue
 
@@ -545,9 +535,7 @@ class SaveExtractorBase:
                     country_names[country_id] = readable
                 elif key:
                     # Localization key - convert to readable name
-                    country_names[country_id] = self._localization_key_to_readable_name(
-                        key
-                    )
+                    country_names[country_id] = self._localization_key_to_readable_name(key)
 
         self._country_names = country_names
         return self._country_names
@@ -665,9 +653,7 @@ class SaveExtractorBase:
 
         return result.replace("_", " ").title()
 
-    def _analyze_player_fleets(
-        self, fleet_ids: list[str], max_to_analyze: int = 1500
-    ) -> dict:
+    def _analyze_player_fleets(self, fleet_ids: list[str], max_to_analyze: int = 1500) -> dict:
         """Analyze player's fleet IDs using Rust session get_entries.
 
         This distinguishes between:
@@ -724,9 +710,7 @@ class SaveExtractorBase:
 
             # Get ship count from ships list/dict
             ships = fleet.get("ships", [])
-            if isinstance(ships, list):
-                ship_count = len(ships)
-            elif isinstance(ships, dict):
+            if isinstance(ships, (list, dict)):
                 ship_count = len(ships)
             else:
                 ship_count = 0
@@ -764,9 +748,7 @@ class SaveExtractorBase:
             result["starbase_count"] = int(result["starbase_count"] * ratio)
             result["military_fleet_count"] = int(result["military_fleet_count"] * ratio)
             result["civilian_fleet_count"] = int(result["civilian_fleet_count"] * ratio)
-            result["_note"] = (
-                f"Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs"
-            )
+            result["_note"] = f"Estimated from {max_to_analyze} of {len(fleet_ids)} fleet IDs"
 
         return result
 
@@ -799,17 +781,13 @@ class SaveExtractorBase:
 
         # Clean up localization keys
         if fleet_name.startswith("shipclass_"):
-            fleet_name = (
-                fleet_name.replace("shipclass_", "").replace("_name", "").title()
-            )
+            fleet_name = fleet_name.replace("shipclass_", "").replace("_name", "").title()
         elif fleet_name.startswith("NAME_"):
             fleet_name = fleet_name.replace("NAME_", "").replace("_", " ")
         elif fleet_name.startswith("TRANS_"):
             fleet_name = "Transport Fleet"
         elif fleet_name.endswith("_FLEET"):
-            fleet_name = (
-                fleet_name.replace("_FLEET", "").replace("_", " ").title() + " Fleet"
-            )
+            fleet_name = fleet_name.replace("_FLEET", "").replace("_", " ").title() + " Fleet"
 
         return fleet_name
 

@@ -1,0 +1,229 @@
+You are the Royal Chronicler of United Nations of Earth 2. Your task is to write the official historical chronicle of this empire.
+
+=== EMPIRE IDENTITY ===
+Name: United Nations of Earth 2
+Ethics: fanatic_egalitarian, xenophile
+Authority: democratic
+Civics: beacon_of_liberty, idealistic_foundation, meritocracy
+
+=== CHRONICLER'S VOICE ===
+Write celebrating the triumph of the people. Emphasize collective achievement and democratic ideals.
+
+You are NOT an advisor. You do NOT give recommendations or strategic advice. You are a HISTORIAN writing for future generations. Write in past tense for completed events, present tense only for the current crisis.
+
+=== STYLE GUIDE ===
+- Write like the Templin Institute's "Stellaris Invicta" series: epic, dramatic, cinematic
+- Each chapter should read like the opening crawl of a space opera
+- Use vivid language: "The stars themselves trembled" not "There was a big war"
+- Name specific dates when dramatic (e.g., "On the first day of 2350, the sky burned")
+- When leader names are missing or show as placeholders, use titles instead ("The Grand Admiral", "A brilliant scientist")
+- DO NOT fabricate events - only reference what appears in the event log
+- DO NOT give advice or recommendations - you are a chronicler, not an advisor
+
+=== CURRENT STATE ===
+Empire: United Nations of Earth 2
+Year: 2509
+Military Power: 344,441
+Colonies: 30
+CRISIS: Prethoryn (52 systems)
+Awakened Empires: 2
+
+=== COMPLETE EVENT HISTORY ===
+(From 2475.01.01 to 2509.07.01)
+
+=== 2475 ===
+  * Energy net: +640.5 → +1055.0 (+414.5)
+  * Megastructure started: Gateway Restored
+  * Megastructure started: Hyper Relay Restored
+  * Megastructure started: Hyper Relay
+  * Megastructure started: Habitat Major Orbital
+  * Megastructure started: Habitat Minor Orbital
+  * Minerals net: -20.9 → -58.2 (-37.3)
+
+=== 2476 ===
+  * Minerals net: -58.2 → +0.8 (+59.0)
+  * Treaty ended (embassy) with empire #16777220
+  * Energy net: +1026.4 → +274.8 (-751.6)
+  * Hired commander: REP1_CHR_HaskPorok (Lv5)
+  * Military power: 407,421 → 505,593 (+98,172, +24%)
+  * Minerals net: +0.8 → -31.1 (-31.9)
+
+=== 2477 ===
+  * Megastructure started: Hyper Relay
+  * Military power: 505,593 → 521,542 (+15,949, +3%)
+  * Minerals net: -31.1 → -9.9 (+21.2)
+  * Treaty ended (embassy) with empire #50331671
+  * Treaty ended (embassy) with empire #402653233
+  * Treaty ended (embassy) with empire #536870917
+
+=== 2478 ===
+  * Alliance ended with empire #1
+  * Alliance ended with empire #16777227
+  * Energy net: +212.4 → +337.8 (+125.4)
+  * Energy net: +337.8 → +1314.0 (+976.2)
+  * Hired commander: %LEADER_2% (Lv5)
+  * Leader removed: commander REP1_CHR_HaskPorok
+  * Military power: 524,687 → 453,313 (-71,374, -14%)
+
+=== 2479 ===
+  * Military power: 453,313 → 467,027 (+13,714, +3%)
+  * Minerals net: -11.5 → -73.1 (-61.6)
+  * Energy net: +1090.4 → +677.9 (-412.6)
+  * Hired envoy: %LEADER_2% (Lv1)
+  * Minerals net: -73.1 → -42.3 (+30.8)
+
+=== 2480 ===
+  * Hired scientist: %LEADER_2% (Lv4)
+  * Hired scientist: %LEADER_2% (Lv2)
+  * Hired official: %LEADER_2% (Lv1)
+  * Hired commander: REP1_CHR_HaskEkalim (Lv2)
+  * Leader removed: commander REP1_CHR_HaskSornas
+  * Leader removed: commander %LEADER_2%
+  * Leader removed: official %LEADER_2%
+  * Military power: 470,434 → 491,808 (+21,374, +5%)
+  * Military power: 491,808 → 463,104 (-28,704, -6%)
+  * Minerals net: -50.4 → +9.8 (+60.2)
+
+=== 2481 ===
+  * Megastructure started: Hyper Relay
+  * Military power: 463,104 → 513,609 (+50,505, +11%)
+  * Minerals net: +9.8 → -19.6 (-29.4)
+  * Military fleets: 7 → 3 (-4)
+  * Military power: 513,609 → 494,157 (-19,452, -4%)
+
+=== 2482 ===
+  * Alloys net: +643.9 → +942.8 (+298.8)
+  * Energy net: +531.7 → +2129.9 (+1598.2)
+  * Megastructure started: Hyper Relay
+  * Military power: 494,157 → 311,145 (-183,012, -37%)
+  * Energy net: +2129.9 → +1509.8 (-620.1)
+  * Military power: 311,145 → 342,805 (+31,660, +10%)
+  * Minerals net: -25.0 → -0.8 (+24.2)
+
+=== 2483 ===
+  * Leader removed: scientist %LEADER_2%
+  * Military power: 342,805 → 353,090 (+10,285, +3%)
+  * Minerals net: -0.8 → +7.5 (+8.2)
+  * Megastructure started: Habitat Minor Orbital
+  * Megastructure started: Habitat Major Orbital
+  * Minerals net: +7.5 → -19.5 (-26.9)
+
+=== 2484 ===
+  * Megastructure started: Habitat Major Orbital
+  * Military fleets: 4 → 2 (-2)
+  * Military power: 359,493 → 315,183 (-44,310, -12%)
+  * Minerals net: -19.5 → +62.0 (+81.5)
+  * Military power: 315,183 → 328,642 (+13,459, +4%)
+  * Minerals net: +62.0 → +41.4 (-20.6)
+
+=== 2485 ===
+  * Military power: 328,642 → 170,773 (-157,869, -48%)
+  * Military power: 170,773 → 183,551 (+12,778, +7%)
+  (Also: 4x leader_hired, 3x leader_removed)
+
+=== 2487 ===
+  * Military power: 202,875 → 216,103 (+13,228, +7%)
+
+=== 2488 ===
+  * Energy net: +229.6 → +160.8 (-68.8)
+  * Military power: 232,269 → 246,012 (+13,743, +6%)
+
+=== 2489 ===
+  * Energy net: +160.3 → +217.9 (+57.6)
+  * Military fleets: 4 → 6 (+2)
+  * Minerals net: -137.7 → -83.5 (+54.2)
+
+=== 2490 ===
+  * Military power: 256,936 → 267,395 (+10,459, +4%)
+  * Military power: 267,395 → 277,447 (+10,052, +4%)
+  (Also: 3x leader_hired, 3x leader_removed)
+
+=== 2491 ===
+  * Minerals net: -25.5 → -78.4 (-52.9)
+  * Fallen Empire awakened: Unknown Awakened Empire (Militant Isolationists) (11,495 power)
+  * Minerals net: -78.4 → -134.1 (-55.7)
+  * War in Heaven has begun! Two Awakened Empires are at war.
+
+=== 2492 ===
+  * Colonies: 32 → 31 (-1)
+  * Energy net: +143.6 → +97.7 (-45.8)
+  * Minerals net: -153.7 → -202.0 (-48.3)
+
+=== 2493 ===
+  * Energy net: +97.7 → +123.5 (+25.7)
+  * Energy net: +123.5 → +175.7 (+52.2)
+  * Military power: 302,910 → 322,042 (+19,132, +6%)
+
+=== 2494 ===
+  * Energy net: +175.7 → +245.2 (+69.6)
+  * Minerals net: -166.9 → -89.7 (+77.2)
+
+=== 2495 ===
+  * Hired scientist: %LEADER_2% (Lv2)
+  * Hired scientist: FUN4_CHR_Dabber (Lv2)
+  * Hired official: %LEADER_2% (Lv1)
+  * Leader removed: official %LEADER_2%
+  * Leader removed: commander %LEADER_2%
+  * Leader removed: scientist %LEADER_2%
+  * Military fleets: 7 → 4 (-3)
+  * Minerals net: -101.3 → -53.3 (+48.0)
+
+=== 2496 ===
+  * Colonies: 31 → 32 (+1)
+  * Military fleets: 6 → 4 (-2)
+
+=== 2497 ===
+  * Leader removed: official %LEADER_2%
+  * Colonies: 32 → 31 (-1)
+  * Military fleets: 5 → 8 (+3)
+  * Minerals net: -40.5 → +10.4 (+50.9)
+
+=== 2498 ===
+  * Colonies: 31 → 32 (+1)
+  * Military fleets: 8 → 5 (-3)
+  * Military power: 369,563 → 381,265 (+11,702, +3%)
+
+=== 2499 ===
+  * Military fleets: 4 → 6 (+2)
+
+=== 2500 ===
+  * Energy net: +453.4 → +620.6 (+167.2)
+  * Hired scientist: %LEADER_2% (Lv2)
+  * Hired commander: %LEADER_2% (Lv2)
+  * Hired scientist: ART2_CHR_Kul-Inul (Lv2)
+  * Hired scientist: ART2_CHR_Kul-Pox (Lv3)
+  * Leader removed: scientist %LEADER_2%
+  * Leader removed: scientist FUN4_CHR_Dabber
+  * Leader removed: official %LEADER_2%
+
+=== 2507 ===
+  * Colonies: 32 → 30 (-2)
+  * Military power: 385,202 → 440,784 (+55,582, +14%)
+  * War in Heaven has begun! Two Awakened Empires are at war.
+  (Also: 4x leader_hired, 4x leader_removed)
+
+=== 2508 ===
+  * Colonies: 30 → 29 (-1)
+  * Energy net: +211.7 → +86.9 (-124.8)
+  * Military fleets: 5 → 7 (+2)
+  * Military power: 446,400 → 385,159 (-61,241, -14%)
+  * Colonies: 29 → 30 (+1)
+  * Energy net: +86.9 → +884.5 (+797.6)
+  * Leader removed: commander %LEADER_2%
+  * Military power: 385,159 → 314,247 (-70,912, -18%)
+  * Minerals net: +106.7 → +41.6 (-65.2)
+
+=== 2509 ===
+  * Military power: 314,247 → 338,561 (+24,314, +8%)
+
+=== YOUR TASK ===
+
+Write a chronicle divided into 4-6 chapters. For each chapter:
+
+1. **Chapter Title**: A dramatic, thematic name (e.g., "The Long Night", "Fire and Stars", "The Reckoning")
+2. **Date Range**: The years this chapter covers (use actual dates from events)
+3. **Narrative**: 2-4 paragraphs of dramatic prose describing this era
+
+End with a brief "The Story Continues..." section about the current situation.
+
+Begin the chronicle now.

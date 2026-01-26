@@ -14,11 +14,11 @@ Usage:
 If no path provided, will search Steam Cloud sync locations.
 """
 
-import zipfile
 import os
 import sys
-from pathlib import Path
+import zipfile
 from datetime import datetime
+from pathlib import Path
 
 try:
     from google import genai

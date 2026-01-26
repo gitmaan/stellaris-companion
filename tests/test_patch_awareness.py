@@ -14,13 +14,11 @@ Usage:
 """
 
 import argparse
-import json
 import os
 import re
 import sys
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 import requests
 
@@ -39,6 +37,7 @@ except ImportError:
 # Patch Notes Fetching
 # =============================================================================
 
+
 def fetch_steam_patch_notes(count: int = 10) -> list[dict]:
     """Fetch recent patch notes from Steam API."""
     url = f"https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=281990&count={count}&maxlength=0"
@@ -50,7 +49,7 @@ def fetch_steam_patch_notes(count: int = 10) -> list[dict]:
 
 def strip_bbcode(text: str) -> str:
     """Remove BBCode tags from text."""
-    return re.sub(r'\[.*?\]', '', text)
+    return re.sub(r"\[.*?\]", "", text)
 
 
 def extract_balance_section(content: str) -> str:
@@ -59,9 +58,9 @@ def extract_balance_section(content: str) -> str:
 
     # Try to find Balance section
     balance_match = re.search(
-        r'Balance\s*(.*?)(?=Bugfix|Bug\s*fix|Performance|Stability|AI\b|UI\b|Modding|$)',
+        r"Balance\s*(.*?)(?=Bugfix|Bug\s*fix|Performance|Stability|AI\b|UI\b|Modding|$)",
         clean,
-        re.IGNORECASE | re.DOTALL
+        re.IGNORECASE | re.DOTALL,
     )
 
     if balance_match:
@@ -75,9 +74,9 @@ def extract_features_section(content: str) -> str:
     clean = strip_bbcode(content)
 
     features_match = re.search(
-        r'Features?\s*(.*?)(?=Balance|Bugfix|Bug\s*fix|Improvements?|$)',
+        r"Features?\s*(.*?)(?=Balance|Bugfix|Bug\s*fix|Improvements?|$)",
         clean,
-        re.IGNORECASE | re.DOTALL
+        re.IGNORECASE | re.DOTALL,
     )
 
     if features_match:
@@ -97,11 +96,13 @@ def get_latest_patch_notes() -> tuple[str, str, str]:
     for item in items:
         title = item.get("title", "")
         # Look for release notes
-        if "release notes" in title.lower() or ("update" in title.lower() and "patch" in title.lower()):
+        if "release notes" in title.lower() or (
+            "update" in title.lower() and "patch" in title.lower()
+        ):
             content = item.get("contents", "")
 
             # Extract version from title
-            version_match = re.search(r'(\d+\.\d+(?:\.\d+)?)', title)
+            version_match = re.search(r"(\d+\.\d+(?:\.\d+)?)", title)
             version = version_match.group(1) if version_match else "unknown"
 
             balance = extract_balance_section(content)
@@ -117,9 +118,11 @@ def get_latest_patch_notes() -> tuple[str, str, str]:
 # Test Framework
 # =============================================================================
 
+
 @dataclass
 class TestCase:
     """A test case for patch awareness."""
+
     name: str
     question: str
     patch_relevant_info: str  # The specific patch info that's relevant
@@ -148,7 +151,7 @@ TEST_CASES = [
         good_patterns=[
             r"gaia",
             r"pop(ulation)? growth",
-        ]
+        ],
     ),
     TestCase(
         name="clone_army_balance",
@@ -166,7 +169,7 @@ TEST_CASES = [
             r"upkeep",
             r"food|mineral",
             r"clone",
-        ]
+        ],
     ),
     TestCase(
         name="subterranean_origin",
@@ -184,7 +187,7 @@ TEST_CASES = [
             r"10%",
             r"district",
             r"cave.?dweller",
-        ]
+        ],
     ),
     TestCase(
         name="overtuned_traits",
@@ -202,7 +205,7 @@ TEST_CASES = [
             r"pop(ulation)? growth",
             r"trade.?off|downside|cost",
             r"overtuned",
-        ]
+        ],
     ),
     TestCase(
         name="general_strategy_no_patch",
@@ -219,7 +222,7 @@ TEST_CASES = [
         good_patterns=[
             r"expand|colony|colonize",
             r"starbase|outpost",
-        ]
+        ],
     ),
     # Edge case: Direct question about mechanic that changed
     TestCase(
@@ -238,7 +241,7 @@ TEST_CASES = [
         good_patterns=[
             r"(not|don't|doesn't).*pop(ulation)? growth",
             r"gaia",
-        ]
+        ],
     ),
     # Edge case: Asking about specific numbers
     TestCase(
@@ -254,7 +257,7 @@ TEST_CASES = [
         good_patterns=[
             r"15%",
             r"pop(ulation)? growth",
-        ]
+        ],
     ),
     # Edge case: Comparative question
     TestCase(
@@ -272,7 +275,7 @@ TEST_CASES = [
         good_patterns=[
             r"ecumenopolis|ring.?world",
             r"production|research|unity",
-        ]
+        ],
     ),
     # ==========================================================================
     # OVER-INJECTION TESTS
@@ -296,7 +299,7 @@ TEST_CASES = [
             r"prethoryn|scourge",
             r"fleet|ship|corvette|battleship|cruiser",
             r"armor|hull|strike craft",
-        ]
+        ],
     ),
     TestCase(
         name="unrelated_diplomacy_question",
@@ -313,7 +316,7 @@ TEST_CASES = [
             r"envoy|embassy|relation",
             r"treaty|agreement|pact",
             r"opinion|trust",
-        ]
+        ],
     ),
     TestCase(
         name="unrelated_early_game",
@@ -322,8 +325,8 @@ TEST_CASES = [
         expected_behavior="Should give general early game advice without forcing in late-game Ecumenopolis info",
         bad_patterns=[
             r"ecumenopolis",  # Too early to mention
-            r"clone army",   # Origin-specific
-            r"overtuned",    # Trait-specific
+            r"clone army",  # Origin-specific
+            r"overtuned",  # Trait-specific
             r"\bpatch\b",
         ],
         good_patterns=[
@@ -331,7 +334,7 @@ TEST_CASES = [
             r"expand|colony|colonize|system|border",
             r"research|tech|unity|tradition",
             r"diplo|neighbor|contact",
-        ]
+        ],
     ),
     TestCase(
         name="lore_question",
@@ -348,7 +351,7 @@ TEST_CASES = [
         good_patterns=[
             r"prethoryn|scourge",
             r"galaxy|dimension|flee|hunt|consume",
-        ]
+        ],
     ),
     # ==========================================================================
     # PROPORTIONALITY TESTS
@@ -368,7 +371,7 @@ TEST_CASES = [
             r"diplomacy|federation|ally",
             r"xenophile",
             r"migration|treaty|agreement",
-        ]
+        ],
     ),
     # ==========================================================================
     # AMALGAMATED PATCHES TEST
@@ -396,7 +399,7 @@ TEST_CASES = [
         good_patterns=[
             r"gaia|gene clinic|robot",
             r"pop(ulation)? (growth|assembly)",
-        ]
+        ],
     ),
 ]
 
@@ -421,24 +424,26 @@ def amalgamate_patches(patches: list[dict]) -> str:
     lines = []
 
     # Process patches in reverse order (newest first)
-    for patch in sorted(patches, key=lambda p: p.get('version', ''), reverse=True):
-        version = patch.get('version', 'unknown')
-        balance = patch.get('balance', '')
-        features = patch.get('features', '')
+    for patch in sorted(patches, key=lambda p: p.get("version", ""), reverse=True):
+        patch.get("version", "unknown")
+        balance = patch.get("balance", "")
+        patch.get("features", "")
 
         # Extract individual balance changes
-        for line in balance.split('\n'):
+        for line in balance.split("\n"):
             line = line.strip()
             if not line or len(line) < 10:
                 continue
 
             # Skip bug fixes
-            if any(skip in line.lower() for skip in ['fixed', 'fix ', 'bug', 'crash', 'tooltip', 'ui ']):
+            if any(
+                skip in line.lower() for skip in ["fixed", "fix ", "bug", "crash", "tooltip", "ui "]
+            ):
                 continue
 
             # Extract mechanic identifier (first few words)
             words = line.split()[:3]
-            mechanic_key = ' '.join(words).lower()
+            mechanic_key = " ".join(words).lower()
 
             # Only keep first occurrence (newest)
             if mechanic_key not in seen_mechanics:
@@ -446,7 +451,7 @@ def amalgamate_patches(patches: list[dict]) -> str:
                 lines.append(f"- {line}")
 
     # Limit total size
-    result = '\n'.join(lines[:30])  # Max 30 lines
+    result = "\n".join(lines[:30])  # Max 30 lines
 
     # Normalize language
     result = normalize_patch_language(result)
@@ -466,22 +471,22 @@ def normalize_patch_language(text: str) -> str:
     import re
 
     # "no longer provides" -> "does not provide"
-    text = re.sub(r'\bno longer\b', 'does not', text, flags=re.IGNORECASE)
+    text = re.sub(r"\bno longer\b", "does not", text, flags=re.IGNORECASE)
 
     # "now provides" -> "provides"
-    text = re.sub(r'\bnow\s+', '', text, flags=re.IGNORECASE)
+    text = re.sub(r"\bnow\s+", "", text, flags=re.IGNORECASE)
 
     # "reduced from X to Y" -> "is Y"
-    text = re.sub(r'reduced from \S+ to (\S+)', r'is \1', text, flags=re.IGNORECASE)
+    text = re.sub(r"reduced from \S+ to (\S+)", r"is \1", text, flags=re.IGNORECASE)
 
     # "increased from X to Y" -> "is Y"
-    text = re.sub(r'increased from \S+ to (\S+)', r'is \1', text, flags=re.IGNORECASE)
+    text = re.sub(r"increased from \S+ to (\S+)", r"is \1", text, flags=re.IGNORECASE)
 
     # "was changed to" -> "is"
-    text = re.sub(r'was changed to', 'is', text, flags=re.IGNORECASE)
+    text = re.sub(r"was changed to", "is", text, flags=re.IGNORECASE)
 
     # "has been reduced/increased to" -> "is"
-    text = re.sub(r'has been (?:reduced|increased) to', 'is', text, flags=re.IGNORECASE)
+    text = re.sub(r"has been (?:reduced|increased) to", "is", text, flags=re.IGNORECASE)
 
     return text
 
@@ -541,24 +546,18 @@ Mechanics for this version:
     return base_prompt + game_context
 
 
-def run_test(
-    client: genai.Client,
-    test: TestCase,
-    patch_notes: str,
-    verbose: bool = False
-) -> dict:
+def run_test(client: genai.Client, test: TestCase, patch_notes: str, verbose: bool = False) -> dict:
     """Run a single test case."""
 
     # Build prompt with relevant patch info
     system_prompt = build_test_system_prompt(
-        patch_corrections=test.patch_relevant_info,
-        version="4.2"
+        patch_corrections=test.patch_relevant_info, version="4.2"
     )
 
     if verbose:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"TEST: {test.name}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Question: {test.question}")
         print(f"Patch info: {test.patch_relevant_info[:100]}...")
 
@@ -572,7 +571,7 @@ def run_test(
                 system_instruction=system_prompt,
                 temperature=0.7,  # Slightly lower for more consistent testing
                 max_output_tokens=1024,
-            )
+            ),
         )
         response_text = response.text or ""
         elapsed = time.time() - start
@@ -613,7 +612,7 @@ def run_test(
     passed = len(bad_matches) == 0
 
     if verbose:
-        print(f"\nResults:")
+        print("\nResults:")
         print(f"  Bad patterns found: {len(bad_matches)}")
         for pattern, matches in bad_matches:
             print(f"    ❌ '{pattern}' -> {matches}")
@@ -632,11 +631,7 @@ def run_test(
     }
 
 
-def run_comparison_test(
-    client: genai.Client,
-    test: TestCase,
-    verbose: bool = False
-) -> dict:
+def run_comparison_test(client: genai.Client, test: TestCase, verbose: bool = False) -> dict:
     """Run a test with and without patch context to compare behavior."""
 
     # Without patch context
@@ -644,19 +639,21 @@ def run_comparison_test(
 
     # With patch context
     system_prompt_with_patch = build_test_system_prompt(
-        patch_corrections=test.patch_relevant_info,
-        version="4.2"
+        patch_corrections=test.patch_relevant_info, version="4.2"
     )
 
     if verbose:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"COMPARISON TEST: {test.name}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Question: {test.question}")
 
     results = {}
 
-    for label, prompt in [("without_patch", system_prompt_no_patch), ("with_patch", system_prompt_with_patch)]:
+    for label, prompt in [
+        ("without_patch", system_prompt_no_patch),
+        ("with_patch", system_prompt_with_patch),
+    ]:
         try:
             response = client.models.generate_content(
                 model="gemini-3-flash-preview",
@@ -665,16 +662,16 @@ def run_comparison_test(
                     system_instruction=prompt,
                     temperature=0.7,
                     max_output_tokens=1024,
-                )
+                ),
             )
             results[label] = response.text or ""
         except Exception as e:
             results[label] = f"ERROR: {e}"
 
     if verbose:
-        print(f"\n--- WITHOUT patch context ---")
+        print("\n--- WITHOUT patch context ---")
         print(results["without_patch"][:500])
-        print(f"\n--- WITH patch context ---")
+        print("\n--- WITH patch context ---")
         print(results["with_patch"][:500])
 
     return results
@@ -684,11 +681,14 @@ def run_comparison_test(
 # Main
 # =============================================================================
 
+
 def main():
     parser = argparse.ArgumentParser(description="Test patch notes awareness")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show full responses")
     parser.add_argument("--test-name", "-t", type=str, help="Run specific test by name")
-    parser.add_argument("--compare", "-c", action="store_true", help="Run comparison tests (with/without patch)")
+    parser.add_argument(
+        "--compare", "-c", action="store_true", help="Run comparison tests (with/without patch)"
+    )
     parser.add_argument("--fetch-only", action="store_true", help="Only fetch and show patch notes")
     parser.add_argument("--runs", "-n", type=int, default=1, help="Number of runs per test")
     args = parser.parse_args()
@@ -756,8 +756,8 @@ def main():
         # Summary
         passed = sum(1 for r in all_results if r["passed"])
         total = len(all_results)
-        print(f"\n{'='*60}")
-        print(f"SUMMARY: {passed}/{total} passed ({100*passed/total:.0f}%)")
+        print(f"\n{'=' * 60}")
+        print(f"SUMMARY: {passed}/{total} passed ({100 * passed / total:.0f}%)")
         print("=" * 60)
 
         if passed < total:

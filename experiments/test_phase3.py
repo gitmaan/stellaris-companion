@@ -21,22 +21,25 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # Load .env
 env_path = PROJECT_ROOT / ".env"
 if env_path.exists():
-    for line in env_path.read_text().split('\n'):
-        if '=' in line and not line.startswith('#'):
-            key, val = line.split('=', 1)
+    for line in env_path.read_text().split("\n"):
+        if "=" in line and not line.startswith("#"):
+            key, val = line.split("=", 1)
             os.environ.setdefault(key.strip(), val.strip())
 
-from backend.core.database import GameDatabase
 from backend.core.companion import Companion
+from backend.core.database import GameDatabase
 from backend.core.history import (
-    record_snapshot_from_companion,
     compute_save_id,
     extract_campaign_id_from_gamestate,
     extract_snapshot_metrics,
+    record_snapshot_from_companion,
 )
 
 # Test configuration
-SAVE_DIR = Path.home() / "Documents/Paradox Interactive/Stellaris/save games/unitednationsofearth2_-629118313"
+SAVE_DIR = (
+    Path.home()
+    / "Documents/Paradox Interactive/Stellaris/save games/unitednationsofearth2_-629118313"
+)
 TEST_DB_PATH = PROJECT_ROOT / "test_phase3.db"
 
 SAVE_FILES = [
@@ -49,9 +52,9 @@ SAVE_FILES = [
 
 
 def print_header(text: str) -> None:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  {text}")
-    print('='*60)
+    print("=" * 60)
 
 
 def print_section(text: str) -> None:
@@ -97,7 +100,7 @@ def test_phase3():
 
     for i, save_file in enumerate(SAVE_FILES):
         save_path = SAVE_DIR / save_file
-        print(f"\n[{i+1}/{len(SAVE_FILES)}] Loading: {save_file}")
+        print(f"\n[{i + 1}/{len(SAVE_FILES)}] Loading: {save_file}")
 
         try:
             # Load save with Companion
@@ -117,8 +120,12 @@ def test_phase3():
                 db=db,
                 save_path=save_path,
                 save_hash=getattr(companion, "_save_hash", None),
-                gamestate=getattr(companion.extractor, "gamestate", None) if companion.extractor else None,
-                player_id=companion.extractor.get_player_empire_id() if companion.extractor else None,
+                gamestate=getattr(companion.extractor, "gamestate", None)
+                if companion.extractor
+                else None,
+                player_id=companion.extractor.get_player_empire_id()
+                if companion.extractor
+                else None,
                 briefing=getattr(companion, "_current_snapshot", None) or companion.get_snapshot(),
             )
 
@@ -172,8 +179,10 @@ def test_phase3():
         FROM snapshots
         ORDER BY id
     """)
-    print(f"  {'Date':<12} {'Military':>10} {'Colonies':>10} {'Energy':>10} {'Alloys':>10} {'Wars':>6}")
-    print(f"  {'-'*12} {'-'*10} {'-'*10} {'-'*10} {'-'*10} {'-'*6}")
+    print(
+        f"  {'Date':<12} {'Military':>10} {'Colonies':>10} {'Energy':>10} {'Alloys':>10} {'Wars':>6}"
+    )
+    print(f"  {'-' * 12} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 6}")
     for row in cursor.fetchall():
         date, mil, col, energy, alloys, wars = row
         mil_str = f"{mil:,}" if mil else "n/a"
@@ -181,7 +190,9 @@ def test_phase3():
         energy_str = f"{energy:+.1f}" if energy is not None else "n/a"
         alloys_str = f"{alloys:+.1f}" if alloys is not None else "n/a"
         wars_str = str(wars) if wars is not None else "n/a"
-        print(f"  {date:<12} {mil_str:>10} {col_str:>10} {energy_str:>10} {alloys_str:>10} {wars_str:>6}")
+        print(
+            f"  {date:<12} {mil_str:>10} {col_str:>10} {energy_str:>10} {alloys_str:>10} {wars_str:>6}"
+        )
 
     # Show events
     print_section("Generated Events")
@@ -224,7 +235,7 @@ def test_phase3():
     # Test history_context module
     print_section("Testing History Context Builder")
     try:
-        from backend.core.history_context import should_include_history, build_history_context
+        from backend.core.history_context import build_history_context, should_include_history
 
         test_questions = [
             "What changed since last save?",
@@ -240,7 +251,9 @@ def test_phase3():
         # Build actual history context
         if row:
             # We need save_id to test build_history_context
-            cursor = db._conn.execute("SELECT save_id FROM sessions WHERE id = ?", (test_session_id,))
+            cursor = db._conn.execute(
+                "SELECT save_id FROM sessions WHERE id = ?", (test_session_id,)
+            )
             save_id_row = cursor.fetchone()
             if save_id_row:
                 ctx = build_history_context(
@@ -255,9 +268,9 @@ def test_phase3():
                 if ctx:
                     print(f"\nHistory context ({len(ctx)} chars):")
                     # Show first few lines
-                    for line in ctx.split('\n')[:10]:
+                    for line in ctx.split("\n")[:10]:
                         print(f"  {line}")
-                    if ctx.count('\n') > 10:
+                    if ctx.count("\n") > 10:
                         print(f"  ... ({ctx.count(chr(10)) - 10} more lines)")
                 else:
                     print("\n  (No history context generated)")

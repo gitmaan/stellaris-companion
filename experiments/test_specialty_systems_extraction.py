@@ -114,7 +114,14 @@ class TestSpecialtySystemsExtraction(unittest.TestCase):
                 self.assertIsInstance(site["location"]["type"], int)
                 self.assertIsInstance(site["location"]["id"], int)
 
-            for optional_int in ["index", "clues", "difficulty", "days_left", "last_excavator_country", "excavator_fleet"]:
+            for optional_int in [
+                "index",
+                "clues",
+                "difficulty",
+                "days_left",
+                "last_excavator_country",
+                "excavator_fleet",
+            ]:
                 if site[optional_int] is not None:
                     self.assertIsInstance(site[optional_int], int)
 
@@ -131,7 +138,13 @@ class TestSpecialtySystemsExtraction(unittest.TestCase):
         data = self.extractor.get_relics()
 
         self.assertIsInstance(data, dict)
-        for key in ["relics", "count", "last_activated_relic", "last_received_relic", "activation_cooldown_days"]:
+        for key in [
+            "relics",
+            "count",
+            "last_activated_relic",
+            "last_received_relic",
+            "activation_cooldown_days",
+        ]:
             self.assertIn(key, data)
 
         self.assertIsInstance(data["relics"], list)
@@ -151,4 +164,3 @@ class TestSpecialtySystemsExtraction(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

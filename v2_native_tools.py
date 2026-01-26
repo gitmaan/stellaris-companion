@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass  # dotenv not installed, rely on environment variables
@@ -42,6 +43,7 @@ def main():
     else:
         # Try to find most recent save
         from save_loader import find_most_recent_save
+
         save_path = find_most_recent_save()
         if save_path is None:
             print("\nNo save file specified and no saves found.")
@@ -54,13 +56,13 @@ def main():
     print(f"\nLoading save file: {save_path}")
     companion = Companion(save_path)
 
-    print(f"\nSave loaded:")
+    print("\nSave loaded:")
     print(f"  Empire: {companion.metadata.get('name', 'Unknown')}")
     print(f"  Date: {companion.metadata.get('date', 'Unknown')}")
     print(f"  Version: {companion.metadata.get('version', 'Unknown')}")
 
     # Display personality info
-    print(f"\nCompanion Personality:")
+    print("\nCompanion Personality:")
     print(f"  {companion.personality_summary}")
 
     print("\n" + "=" * 60)
@@ -78,49 +80,53 @@ def main():
         if not user_input:
             continue
 
-        if user_input.lower() == '/quit':
+        if user_input.lower() == "/quit":
             print("Goodbye!")
             break
 
-        if user_input.lower() == '/clear':
+        if user_input.lower() == "/clear":
             companion.clear_conversation()
             print("Conversation cleared.\n")
             continue
 
-        if user_input.lower() == '/reload':
+        if user_input.lower() == "/reload":
             print("Reloading save file...")
             identity_changed = companion.reload_save()
             companion.clear_conversation()  # Reset chat session on reload
-            print(f"Save reloaded: {companion.metadata.get('name')} | {companion.metadata.get('date')}")
+            print(
+                f"Save reloaded: {companion.metadata.get('name')} | {companion.metadata.get('date')}"
+            )
             print(f"Personality: {companion.personality_summary}")
             if identity_changed:
                 print("Note: Empire identity has changed! Personality updated.")
             print()
             continue
 
-        if user_input.lower() == '/personality':
-            print(f"\nCurrent Personality:")
+        if user_input.lower() == "/personality":
+            print("\nCurrent Personality:")
             print(f"  {companion.personality_summary}")
-            print(f"\nIdentity:")
+            print("\nIdentity:")
             print(f"  Ethics: {companion.identity.get('ethics', [])}")
             print(f"  Authority: {companion.identity.get('authority', 'Unknown')}")
             print(f"  Civics: {companion.identity.get('civics', [])}")
             print(f"  Species: {companion.identity.get('species_class', 'Unknown')}")
-            if companion.identity.get('is_gestalt'):
-                gestalt_type = 'Machine Intelligence' if companion.identity.get('is_machine') else 'Hive Mind'
+            if companion.identity.get("is_gestalt"):
+                gestalt_type = (
+                    "Machine Intelligence" if companion.identity.get("is_machine") else "Hive Mind"
+                )
                 print(f"  Gestalt: {gestalt_type}")
-            print(f"\nSituation:")
+            print("\nSituation:")
             print(f"  Game Phase: {companion.situation.get('game_phase', 'Unknown')}")
             print(f"  Year: {companion.situation.get('year', 'Unknown')}")
             print(f"  At War: {companion.situation.get('at_war', False)}")
-            economy = companion.situation.get('economy', {})
-            deficits = economy.get('resources_in_deficit', 0)
+            economy = companion.situation.get("economy", {})
+            deficits = economy.get("resources_in_deficit", 0)
             print(f"  Economy: {deficits} resources in deficit")
             print(f"  Contacts: {companion.situation.get('contact_count', 0)}")
             print()
             continue
 
-        if user_input.lower() == '/prompt':
+        if user_input.lower() == "/prompt":
             print("\n" + "=" * 40)
             print("SYSTEM PROMPT")
             print("=" * 40)
@@ -128,10 +134,10 @@ def main():
             print("=" * 40 + "\n")
             continue
 
-        if user_input.lower().startswith('/thinking'):
+        if user_input.lower().startswith("/thinking"):
             parts = user_input.split()
             if len(parts) < 2:
-                current = getattr(companion, '_thinking_level', 'dynamic')
+                current = getattr(companion, "_thinking_level", "dynamic")
                 print(f"\nCurrent thinking level: {current}")
                 print("Usage: /thinking <level>")
                 print("Levels: dynamic, minimal, low, medium, high")

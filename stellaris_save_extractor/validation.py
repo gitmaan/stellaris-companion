@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass
@@ -51,7 +50,7 @@ class ValidationResult:
         """Record a passed check."""
         self.checks_passed += 1
 
-    def merge(self, other: "ValidationResult"):
+    def merge(self, other: ValidationResult):
         """Merge another result into this one."""
         self.issues.extend(other.issues)
         self.warnings.extend(other.warnings)
@@ -173,9 +172,7 @@ class ExtractionValidator:
             if att_end > att_start:
                 # Find inner blocks and extract country IDs
                 att_block = block[attackers_match.start() : att_end + 100]
-                attackers = [
-                    int(m.group(1)) for m in re.finditer(r"\bcountry=(\d+)", att_block)
-                ]
+                attackers = [int(m.group(1)) for m in re.finditer(r"\bcountry=(\d+)", att_block)]
 
         # Extract defenders
         defenders = []
@@ -185,9 +182,7 @@ class ExtractionValidator:
             def_end = block.find("}", def_start)
             if def_end > def_start:
                 def_block = block[defenders_match.start() : def_end + 100]
-                defenders = [
-                    int(m.group(1)) for m in re.finditer(r"\bcountry=(\d+)", def_block)
-                ]
+                defenders = [int(m.group(1)) for m in re.finditer(r"\bcountry=(\d+)", def_block)]
 
         return attackers, defenders
 
@@ -310,9 +305,15 @@ class ExtractionValidator:
             war_name = war.get("name", "Unknown")
 
             # All battle stat values should be non-negative integers
-            for stat_name in ["total_battles", "our_victories", "their_victories",
-                              "our_ship_losses", "their_ship_losses",
-                              "our_army_losses", "their_army_losses"]:
+            for stat_name in [
+                "total_battles",
+                "our_victories",
+                "their_victories",
+                "our_ship_losses",
+                "their_ship_losses",
+                "our_army_losses",
+                "their_army_losses",
+            ]:
                 stat_value = battle_stats.get(stat_name, 0)
                 if not isinstance(stat_value, int) or stat_value < 0:
                     result.add_issue(
@@ -332,7 +333,12 @@ class ExtractionValidator:
                 result.add_issue(
                     "battle_stats_invariant",
                     f"Victories ({our_wins}+{their_wins}) exceed total battles ({total}) in '{war_name}'",
-                    details={"war": war_name, "total": total, "our_wins": our_wins, "their_wins": their_wins},
+                    details={
+                        "war": war_name,
+                        "total": total,
+                        "our_wins": our_wins,
+                        "their_wins": their_wins,
+                    },
                     fix_suggestion="Check battle victory counting logic",
                 )
             else:
@@ -381,7 +387,7 @@ class ExtractionValidator:
                     result.add_pass()
 
         # Check 6: Country ID validity for participants
-        valid_country_ids = set(country_names.keys())
+        set(country_names.keys())
         for war in wars:
             participants = war.get("participants", {})
             war_name = war.get("name", "Unknown")
@@ -456,8 +462,8 @@ class ExtractionValidator:
         # Check 1: Triangulation - owned_fleets count vs extraction
         total_owned = len(owned_fleet_ids)
         extracted_military = extracted.get("military_fleet_count", 0)
-        extracted_civilian = extracted.get("civilian_fleet_count", 0)
-        extracted_starbases = extracted.get("starbases", {}).get("total", 0)
+        extracted.get("civilian_fleet_count", 0)
+        extracted.get("starbases", {}).get("total", 0)
 
         # The sum should roughly match (some fleets may be uncategorized)
         if total_owned > 0:
@@ -824,9 +830,7 @@ class ExtractionValidator:
 
         # Check 4: Budget math validation (income - expense = net)
         all_resources = (
-            set(monthly_income.keys())
-            | set(monthly_expenses.keys())
-            | set(net_monthly.keys())
+            set(monthly_income.keys()) | set(monthly_expenses.keys()) | set(net_monthly.keys())
         )
 
         for resource in all_resources:

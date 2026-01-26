@@ -53,9 +53,7 @@ def _build_t1_status(*, extractor: SaveExtractor) -> dict[str, Any]:
         else {}
     )
     colonies_data = (
-        player.get("colonies", {})
-        if isinstance(player.get("colonies", {}), dict)
-        else {}
+        player.get("colonies", {}) if isinstance(player.get("colonies", {}), dict) else {}
     )
 
     status_data.update(
@@ -78,9 +76,7 @@ def _build_t1_status(*, extractor: SaveExtractor) -> dict[str, Any]:
                     "attackers": war.get("attackers", []),
                     "defenders": war.get("defenders", []),
                 }
-                for war in (
-                    wars_data.get("wars", []) if isinstance(wars_data, dict) else []
-                )
+                for war in (wars_data.get("wars", []) if isinstance(wars_data, dict) else [])
             ],
         }
     )
@@ -88,11 +84,11 @@ def _build_t1_status(*, extractor: SaveExtractor) -> dict[str, Any]:
     return status_data
 
 
-def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
+def _process_main(job: WorkerJob, out_q: mp.Queue[dict[str, Any]]) -> None:
     import sys
 
     def log_timing(label: str, elapsed: float) -> None:
-        print(f"[TIMING] {label}: {elapsed*1000:.1f}ms", file=sys.stderr, flush=True)
+        print(f"[TIMING] {label}: {elapsed * 1000:.1f}ms", file=sys.stderr, flush=True)
 
     started = time.time()
     timings: dict[str, float] = {}
@@ -188,12 +184,8 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
             payload = {
                 "briefing_json": briefing_json,
                 "meta": meta if isinstance(meta, dict) else {},
-                "identity": (
-                    briefing.get("identity") if isinstance(briefing, dict) else None
-                ),
-                "situation": (
-                    briefing.get("situation") if isinstance(briefing, dict) else None
-                ),
+                "identity": (briefing.get("identity") if isinstance(briefing, dict) else None),
+                "situation": (briefing.get("situation") if isinstance(briefing, dict) else None),
                 "save_hash": (
                     _compute_save_hash_from_briefing(briefing)
                     if isinstance(briefing, dict)
@@ -208,9 +200,9 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
             log_timing("TOTAL (t2)", timings["total"])
 
             # Print timing summary
-            print(f"\n[TIMING SUMMARY]", file=sys.stderr, flush=True)
+            print("\n[TIMING SUMMARY]", file=sys.stderr, flush=True)
             for k, v in sorted(timings.items(), key=lambda x: -x[1]):
-                print(f"  {k}: {v*1000:.1f}ms", file=sys.stderr, flush=True)
+                print(f"  {k}: {v * 1000:.1f}ms", file=sys.stderr, flush=True)
             print("", file=sys.stderr, flush=True)
 
             out_q.put({"ok": True, "payload": payload, "worker_pid": os.getpid()})
@@ -220,9 +212,7 @@ def _process_main(job: WorkerJob, out_q: "mp.Queue[dict[str, Any]]") -> None:
             ctx.__exit__(None, None, None)
             log_timing("Rust session close", time.time() - t0)
 
-        out_q.put(
-            {"ok": False, "error": f"Unknown tier: {tier}", "worker_pid": os.getpid()}
-        )
+        out_q.put({"ok": False, "error": f"Unknown tier: {tier}", "worker_pid": os.getpid()})
     except Exception as e:
         import traceback
 
@@ -240,7 +230,7 @@ def run_worker_job(*, job: WorkerJob, cancel_event: Any) -> WorkerResult:
     Cancellation is process-based (terminate/kill), so stale work stops consuming CPU/RAM.
     """
     ctx = mp.get_context("spawn")
-    q: "mp.Queue[dict[str, Any]]" = ctx.Queue(maxsize=1)
+    q: mp.Queue[dict[str, Any]] = ctx.Queue(maxsize=1)
     proc = ctx.Process(target=_process_main, args=(job, q), daemon=True)
     proc.start()
 
@@ -248,10 +238,7 @@ def run_worker_job(*, job: WorkerJob, cancel_event: Any) -> WorkerResult:
 
     try:
         while True:
-            if (
-                cancel_event is not None
-                and getattr(cancel_event, "is_set", lambda: False)()
-            ):
+            if cancel_event is not None and getattr(cancel_event, "is_set", lambda: False)():
                 try:
                     if proc.is_alive():
                         proc.terminate()

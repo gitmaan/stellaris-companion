@@ -18,10 +18,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
+
 from save_extractor import SaveExtractor
 
 TEST_QUESTIONS = [
@@ -40,21 +42,21 @@ def get_empire_name_by_id(extractor, empire_id: int) -> str:
     gamestate = extractor.gamestate
 
     # Find country section
-    country_match = re.search(r'^country=\s*\{', gamestate, re.MULTILINE)
+    country_match = re.search(r"^country=\s*\{", gamestate, re.MULTILINE)
     if not country_match:
         return f"Empire {empire_id}"
 
     start = country_match.start()
 
     # Look for the specific country ID entry
-    pattern = rf'\n\t{empire_id}=\s*\{{'
-    id_match = re.search(pattern, gamestate[start:start + 5000000])
+    pattern = rf"\n\t{empire_id}=\s*\{{"
+    id_match = re.search(pattern, gamestate[start : start + 5000000])
     if not id_match:
         return f"Empire {empire_id}"
 
     # Extract a chunk and find the name
     chunk_start = start + id_match.start()
-    chunk = gamestate[chunk_start:chunk_start + 5000]
+    chunk = gamestate[chunk_start : chunk_start + 5000]
 
     name_match = re.search(r'name="([^"]+)"', chunk)
     if name_match:
@@ -70,21 +72,21 @@ def build_enhanced_snapshot(extractor) -> dict:
     snapshot = extractor.get_full_briefing()
 
     # Resolve ally IDs to names
-    ally_ids = snapshot.get('diplomacy', {}).get('allies', [])
+    ally_ids = snapshot.get("diplomacy", {}).get("allies", [])
     ally_names = []
     for aid in ally_ids:
         name = get_empire_name_by_id(extractor, aid)
         ally_names.append({"id": aid, "name": name})
 
     # Update diplomacy with resolved names
-    if 'diplomacy' in snapshot:
-        snapshot['diplomacy']['allies_resolved'] = ally_names
+    if "diplomacy" in snapshot:
+        snapshot["diplomacy"]["allies_resolved"] = ally_names
 
     # Add current research (even if empty, be explicit)
     tech = extractor.get_technology()
-    snapshot['current_research'] = tech.get('current_research', {})
-    if not snapshot['current_research']:
-        snapshot['current_research'] = "None - research slots are idle"
+    snapshot["current_research"] = tech.get("current_research", {})
+    if not snapshot["current_research"]:
+        snapshot["current_research"] = "None - research slots are idle"
 
     return snapshot
 
@@ -92,29 +94,29 @@ def build_enhanced_snapshot(extractor) -> dict:
 def build_enhanced_system_prompt(identity: dict, situation: dict) -> str:
     """Enhanced prompt with stronger tool instructions."""
 
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = identity.get('ethics', [])
-    authority = identity.get('authority', 'unknown')
-    civics = identity.get('civics', [])
-    is_gestalt = identity.get('is_gestalt', False)
-    is_machine = identity.get('is_machine', False)
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = identity.get("ethics", [])
+    authority = identity.get("authority", "unknown")
+    civics = identity.get("civics", [])
+    is_gestalt = identity.get("is_gestalt", False)
+    is_machine = identity.get("is_machine", False)
 
-    year = situation.get('year', 2200)
-    game_phase = situation.get('game_phase', 'early')
-    at_war = situation.get('at_war', False)
-    economy = situation.get('economy', {})
-    deficits = economy.get('resources_in_deficit', 0)
-    contact_count = situation.get('contact_count', 0)
+    year = situation.get("year", 2200)
+    game_phase = situation.get("game_phase", "early")
+    at_war = situation.get("at_war", False)
+    economy = situation.get("economy", {})
+    deficits = economy.get("resources_in_deficit", 0)
+    contact_count = situation.get("contact_count", 0)
 
     prompt = f"""You are the strategic advisor to {empire_name}.
 
 EMPIRE IDENTITY:
-- Ethics: {', '.join(ethics) if ethics else 'unknown'}
+- Ethics: {", ".join(ethics) if ethics else "unknown"}
 - Authority: {authority}
-- Civics: {', '.join(civics) if civics else 'none'}
+- Civics: {", ".join(civics) if civics else "none"}
 - Gestalt: {is_gestalt} (Machine: {is_machine})
 
-SITUATION: Year {year} ({game_phase}), {'AT WAR' if at_war else 'at peace'}, {deficits} deficits, {contact_count} known empires.
+SITUATION: Year {year} ({game_phase}), {"AT WAR" if at_war else "at peace"}, {deficits} deficits, {contact_count} known empires.
 
 PERSONALITY (critical - stay in character):
 Your ethics define your worldview:
@@ -154,14 +156,17 @@ ACCURACY: All numbers from data only. Say "unknown" if truly missing."""
 def run_current_version(question: str) -> tuple[str, float, int, list]:
     """Run the current production version."""
     from core.companion import Companion
+
     companion = Companion(save_path="test_save.sav")
     companion.clear_conversation()
     response, elapsed = companion.ask_simple(question)
     stats = companion.get_call_stats()
-    return response, elapsed, stats.get('total_calls', 0), stats.get('tools_used', [])
+    return response, elapsed, stats.get("total_calls", 0), stats.get("tools_used", [])
 
 
-def run_enhanced_version(extractor, client, identity, situation, question: str) -> tuple[str, float, int, list]:
+def run_enhanced_version(
+    extractor, client, identity, situation, question: str
+) -> tuple[str, float, int, list]:
     """Run enhanced version with better snapshot and stronger tool instructions."""
 
     system_prompt = build_enhanced_system_prompt(identity, situation)
@@ -260,48 +265,56 @@ def main():
             print(f"ERROR: {e}")
             enh_response, enh_time, enh_tools, enh_tools_list = str(e), 0, 0, []
 
-        results.append({
-            "question": question,
-            "current": {
-                "time": curr_time,
-                "tools": curr_tools,
-                "tools_list": curr_tools_list,
-                "response": curr_response,
-                "words": len(curr_response.split()),
-            },
-            "enhanced": {
-                "time": enh_time,
-                "tools": enh_tools,
-                "tools_list": enh_tools_list,
-                "response": enh_response,
-                "words": len(enh_response.split()),
+        results.append(
+            {
+                "question": question,
+                "current": {
+                    "time": curr_time,
+                    "tools": curr_tools,
+                    "tools_list": curr_tools_list,
+                    "response": curr_response,
+                    "words": len(curr_response.split()),
+                },
+                "enhanced": {
+                    "time": enh_time,
+                    "tools": enh_tools,
+                    "tools_list": enh_tools_list,
+                    "response": enh_response,
+                    "words": len(enh_response.split()),
+                },
             }
-        })
+        )
         print()
 
     # Summary
     print("=" * 80)
     print("SUMMARY")
     print("=" * 80)
-    print(f"{'Question':<42} {'Curr':>7} {'Enh':>7} {'C.Tools':>7} {'E.Tools':>7} {'C.Words':>7} {'E.Words':>7}")
+    print(
+        f"{'Question':<42} {'Curr':>7} {'Enh':>7} {'C.Tools':>7} {'E.Tools':>7} {'C.Words':>7} {'E.Words':>7}"
+    )
     print("-" * 80)
 
     for r in results:
-        q = r['question'][:40]
-        ct = f"{r['current']['time']:.1f}s" if r['current']['time'] else "ERR"
-        et = f"{r['enhanced']['time']:.1f}s" if r['enhanced']['time'] else "ERR"
-        print(f"{q:<42} {ct:>7} {et:>7} {r['current']['tools']:>7} {r['enhanced']['tools']:>7} {r['current']['words']:>7} {r['enhanced']['words']:>7}")
+        q = r["question"][:40]
+        ct = f"{r['current']['time']:.1f}s" if r["current"]["time"] else "ERR"
+        et = f"{r['enhanced']['time']:.1f}s" if r["enhanced"]["time"] else "ERR"
+        print(
+            f"{q:<42} {ct:>7} {et:>7} {r['current']['tools']:>7} {r['enhanced']['tools']:>7} {r['current']['words']:>7} {r['enhanced']['words']:>7}"
+        )
 
     # Averages
-    valid = [r for r in results if r['current']['time'] and r['enhanced']['time']]
+    valid = [r for r in results if r["current"]["time"] and r["enhanced"]["time"]]
     if valid:
-        avg_ct = sum(r['current']['time'] for r in valid) / len(valid)
-        avg_et = sum(r['enhanced']['time'] for r in valid) / len(valid)
-        avg_c_tools = sum(r['current']['tools'] for r in valid) / len(valid)
-        avg_e_tools = sum(r['enhanced']['tools'] for r in valid) / len(valid)
+        avg_ct = sum(r["current"]["time"] for r in valid) / len(valid)
+        avg_et = sum(r["enhanced"]["time"] for r in valid) / len(valid)
+        avg_c_tools = sum(r["current"]["tools"] for r in valid) / len(valid)
+        avg_e_tools = sum(r["enhanced"]["tools"] for r in valid) / len(valid)
 
         print("-" * 80)
-        print(f"{'AVERAGE':<42} {avg_ct:>6.1f}s {avg_et:>6.1f}s {avg_c_tools:>7.1f} {avg_e_tools:>7.1f}")
+        print(
+            f"{'AVERAGE':<42} {avg_ct:>6.1f}s {avg_et:>6.1f}s {avg_c_tools:>7.1f} {avg_e_tools:>7.1f}"
+        )
 
         if avg_ct > avg_et:
             print(f"\nEnhanced is {((avg_ct - avg_et) / avg_ct * 100):.0f}% faster")
@@ -317,7 +330,9 @@ def main():
 
     print("\nEnhanced:")
     for r in results:
-        print(f"  {r['question'][:45]}: {r['enhanced']['tools']} tools {r['enhanced']['tools_list']}")
+        print(
+            f"  {r['question'][:45]}: {r['enhanced']['tools']} tools {r['enhanced']['tools_list']}"
+        )
 
     # Save results
     Path("enhanced_results.json").write_text(json.dumps(results, indent=2, default=str))

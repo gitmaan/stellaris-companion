@@ -28,13 +28,13 @@ except ImportError:
 
 from save_extractor import SaveExtractor
 
-
 # Global extractor instance (tools need access)
 _extractor: SaveExtractor = None
 
 
 # === Tool Functions ===
 # ADK wraps these automatically based on docstrings and type hints
+
 
 def get_player_status() -> dict:
     """Get the player's current empire status including military power, economy, tech, planets, and fleet count.
@@ -116,9 +116,9 @@ class StellarisAdvisorADK:
             description="Strategic advisor for Stellaris gameplay",
             instruction=f"""You are a Stellaris strategic advisor. You have access to tools that can query the player's save file.
 
-Current save: {self.metadata.get('name', 'Unknown')}
-Date: {self.metadata.get('date', 'Unknown')}
-Version: {self.metadata.get('version', 'Unknown')}
+Current save: {self.metadata.get("name", "Unknown")}
+Date: {self.metadata.get("date", "Unknown")}
+Version: {self.metadata.get("version", "Unknown")}
 
 Your role:
 - Answer questions about the game state using the tools provided
@@ -171,10 +171,7 @@ Always use tools to get current data rather than guessing. If you need specific 
 
             # Run the agent - use run_async for async iteration
             # new_message must be a types.Content object
-            content = types.Content(
-                role="user",
-                parts=[types.Part(text=user_message)]
-            )
+            content = types.Content(role="user", parts=[types.Part(text=user_message)])
             response = self.runner.run_async(
                 user_id="player",
                 session_id=self.session.id,
@@ -184,10 +181,10 @@ Always use tools to get current data rather than guessing. If you need specific 
             # Extract the response text
             response_text = ""
             async for event in response:
-                if hasattr(event, 'content') and event.content:
-                    if hasattr(event.content, 'parts'):
+                if hasattr(event, "content") and event.content:
+                    if hasattr(event.content, "parts"):
                         for part in event.content.parts:
-                            if hasattr(part, 'text') and part.text:
+                            if hasattr(part, "text") and part.text:
                                 response_text += part.text
 
             elapsed = time.time() - start_time
@@ -239,7 +236,7 @@ async def main_async():
     print(f"\nLoading save file: {save_path}")
     advisor = StellarisAdvisorADK(save_path)
 
-    print(f"\nSave loaded:")
+    print("\nSave loaded:")
     print(f"  Empire: {advisor.metadata.get('name', 'Unknown')}")
     print(f"  Date: {advisor.metadata.get('date', 'Unknown')}")
     print(f"  Version: {advisor.metadata.get('version', 'Unknown')}")
@@ -258,11 +255,11 @@ async def main_async():
         if not user_input:
             continue
 
-        if user_input.lower() == '/quit':
+        if user_input.lower() == "/quit":
             print("Goodbye!")
             break
 
-        if user_input.lower() == '/clear':
+        if user_input.lower() == "/clear":
             await advisor.clear_session_async()
             print("Conversation cleared.\n")
             continue

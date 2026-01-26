@@ -11,20 +11,21 @@ Key question: Can we use a truly universal prompt that works for ANY empire?
 
 import json
 import re
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
-
-import sys
 
 # Add project root to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 from google import genai
 from google.genai import types
+
 from save_extractor import SaveExtractor
 
 MODEL = "gemini-3-flash-preview"
@@ -39,44 +40,52 @@ TEST_QUESTIONS = [
 
 # Empire name resolution
 EMPIRE_LOC_KEYS = {
-    'EMPIRE_DESIGN_orbis': 'United Nations of Earth',
-    'EMPIRE_DESIGN_humans1': 'Commonwealth of Man',
-    'PRESCRIPTED_empire_name_orbis': 'United Nations of Earth',
+    "EMPIRE_DESIGN_orbis": "United Nations of Earth",
+    "EMPIRE_DESIGN_humans1": "Commonwealth of Man",
+    "PRESCRIPTED_empire_name_orbis": "United Nations of Earth",
 }
 
 
 def get_empire_name_by_id(extractor, empire_id: int) -> str:
     """Resolve empire ID to name."""
     gamestate = extractor.gamestate
-    country_match = re.search(r'^country=\s*\{', gamestate, re.MULTILINE)
+    country_match = re.search(r"^country=\s*\{", gamestate, re.MULTILINE)
     if not country_match:
         return f"Empire {empire_id}"
     start = country_match.start()
-    pattern = rf'\n\t{empire_id}=\s*\{{'
-    id_match = re.search(pattern, gamestate[start:start + 10000000])
+    pattern = rf"\n\t{empire_id}=\s*\{{"
+    id_match = re.search(pattern, gamestate[start : start + 10000000])
     if not id_match:
         return f"Empire {empire_id}"
     chunk_start = start + id_match.start()
-    chunk = gamestate[chunk_start:chunk_start + 8000]
-    name_match = re.search(r'name=\s*\{[^}]*key=\"([^\"]+)\"', chunk)
+    chunk = gamestate[chunk_start : chunk_start + 8000]
+    name_match = re.search(r"name=\s*\{[^}]*key=\"([^\"]+)\"", chunk)
     if not name_match:
         return f"Empire {empire_id}"
     name_key = name_match.group(1)
     if name_key in EMPIRE_LOC_KEYS:
         return EMPIRE_LOC_KEYS[name_key]
-    if '%' in name_key:
-        name_block_match = re.search(r'name=\s*\{([^}]+variables[^}]+\}[^}]+)\}', chunk, re.DOTALL)
+    if "%" in name_key:
+        name_block_match = re.search(r"name=\s*\{([^}]+variables[^}]+\}[^}]+)\}", chunk, re.DOTALL)
         if name_block_match:
             name_block = name_block_match.group(1)
-            adj_match = re.search(r'key=\"adjective\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"', name_block, re.DOTALL)
-            adjective = adj_match.group(1).replace('SPEC_', '').replace('_', ' ') if adj_match else ""
-            suffix_match = re.search(r'key=\"1\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"', name_block, re.DOTALL)
+            adj_match = re.search(
+                r"key=\"adjective\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"", name_block, re.DOTALL
+            )
+            adjective = (
+                adj_match.group(1).replace("SPEC_", "").replace("_", " ") if adj_match else ""
+            )
+            suffix_match = re.search(
+                r"key=\"1\"[^}]*value=\s*\{[^}]*key=\"([^\"]+)\"", name_block, re.DOTALL
+            )
             suffix = suffix_match.group(1) if suffix_match else ""
             if adjective and suffix:
                 return f"{adjective} {suffix}"
             elif adjective:
                 return adjective
-    clean_name = name_key.replace('EMPIRE_DESIGN_', '').replace('PRESCRIPTED_', '').replace('_', ' ').title()
+    clean_name = (
+        name_key.replace("EMPIRE_DESIGN_", "").replace("PRESCRIPTED_", "").replace("_", " ").title()
+    )
     return clean_name if clean_name else f"Empire {empire_id}"
 
 
@@ -84,26 +93,28 @@ def build_comprehensive_snapshot(extractor) -> dict:
     """Build comprehensive snapshot with resolved names."""
     snapshot = extractor.get_full_briefing()
     all_leaders = extractor.get_leaders()
-    snapshot['leadership']['leaders'] = all_leaders.get('leaders', [])
-    snapshot['leadership']['count'] = len(all_leaders.get('leaders', []))
+    snapshot["leadership"]["leaders"] = all_leaders.get("leaders", [])
+    snapshot["leadership"]["count"] = len(all_leaders.get("leaders", []))
     detailed_diplo = extractor.get_diplomacy()
     relations = []
-    for r in detailed_diplo.get('relations', [])[:20]:
-        cid = r.get('country_id')
+    for r in detailed_diplo.get("relations", [])[:20]:
+        cid = r.get("country_id")
         if cid is not None:
-            r['empire_name'] = get_empire_name_by_id(extractor, cid)
+            r["empire_name"] = get_empire_name_by_id(extractor, cid)
         relations.append(r)
-    snapshot['diplomacy']['relations'] = relations
-    snapshot['diplomacy']['allies_named'] = [
-        {'id': aid, 'name': get_empire_name_by_id(extractor, aid)}
-        for aid in snapshot['diplomacy'].get('allies', [])
+    snapshot["diplomacy"]["relations"] = relations
+    snapshot["diplomacy"]["allies_named"] = [
+        {"id": aid, "name": get_empire_name_by_id(extractor, aid)}
+        for aid in snapshot["diplomacy"].get("allies", [])
     ]
-    snapshot['diplomacy']['rivals_named'] = [
-        {'id': rid, 'name': get_empire_name_by_id(extractor, rid)}
-        for rid in snapshot['diplomacy'].get('rivals', [])
+    snapshot["diplomacy"]["rivals_named"] = [
+        {"id": rid, "name": get_empire_name_by_id(extractor, rid)}
+        for rid in snapshot["diplomacy"].get("rivals", [])
     ]
     tech = extractor.get_technology()
-    snapshot['current_research'] = tech.get('current_research', {}) or "None - research slots are idle"
+    snapshot["current_research"] = (
+        tech.get("current_research", {}) or "None - research slots are idle"
+    )
     return snapshot
 
 
@@ -111,38 +122,40 @@ def build_comprehensive_snapshot(extractor) -> dict:
 # DYNAMIC PROMPT HELPERS
 # =============================================================================
 
+
 def get_address_style(authority: str, ethics: list) -> str:
     """Generate address style based on authority type."""
     # Check for gestalt first (overrides authority)
-    if 'gestalt_consciousness' in ethics or 'machine_intelligence' in ethics:
-        if 'machine_intelligence' in ethics:
-            return 'Use cold logic and probabilities. No emotion.'
+    if "gestalt_consciousness" in ethics or "machine_intelligence" in ethics:
+        if "machine_intelligence" in ethics:
+            return "Use cold logic and probabilities. No emotion."
         return 'Use "we" not "I" - you ARE the collective consciousness.'
 
     # Standard authority-based address
     styles = {
-        'democratic': 'Address as "President"',
-        'imperial': 'Address as "Your Majesty"',
-        'dictatorial': 'Address as "Supreme Leader"',
-        'oligarchic': 'Address as "Director"',
-        'corporate': 'Address as "CEO"',
+        "democratic": 'Address as "President"',
+        "imperial": 'Address as "Your Majesty"',
+        "dictatorial": 'Address as "Supreme Leader"',
+        "oligarchic": 'Address as "Director"',
+        "corporate": 'Address as "CEO"',
     }
-    return styles.get(authority, 'Address the ruler formally')
+    return styles.get(authority, "Address the ruler formally")
 
 
 # =============================================================================
 # PROMPT VARIANTS
 # =============================================================================
 
+
 def build_trust_model_prompt(identity: dict) -> str:
     """
     1. TrustModel (~250 chars)
     Zero personality guidance - trust the model knows Stellaris
     """
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = ', '.join(identity.get('ethics', []))
-    authority = identity.get('authority', 'unknown')
-    civics = ', '.join(identity.get('civics', [])) or 'none'
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = ", ".join(identity.get("ethics", []))
+    authority = identity.get("authority", "unknown")
+    civics = ", ".join(identity.get("civics", [])) or "none"
 
     return f"""You are the strategic advisor to {empire_name}.
 Ethics: {ethics}. Authority: {authority}. Civics: {civics}.
@@ -155,10 +168,10 @@ def build_strategic_only_dynamic_prompt(identity: dict) -> str:
     2. StrategicOnly_Dynamic (~380 chars)
     Strategic depth instruction, no personality guidance
     """
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = ', '.join(identity.get('ethics', []))
-    authority = identity.get('authority', 'unknown')
-    civics = ', '.join(identity.get('civics', [])) or 'none'
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = ", ".join(identity.get("ethics", []))
+    authority = identity.get("authority", "unknown")
+    civics = ", ".join(identity.get("civics", [])) or "none"
 
     return f"""You are the strategic advisor to {empire_name}.
 Ethics: {ethics}. Authority: {authority}. Civics: {civics}.
@@ -176,11 +189,11 @@ def build_minimal_strategic_dynamic_prompt(identity: dict) -> str:
     3. MinimalStrategic_Dynamic (~480 chars)
     Identity + strategic depth - NO hardcoded address style (trust the model)
     """
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = identity.get('ethics', [])
-    ethics_str = ', '.join(ethics)
-    authority = identity.get('authority', 'unknown')
-    civics = ', '.join(identity.get('civics', [])) or 'none'
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = identity.get("ethics", [])
+    ethics_str = ", ".join(ethics)
+    authority = identity.get("authority", "unknown")
+    civics = ", ".join(identity.get("civics", [])) or "none"
 
     # NO hardcoded address style - trust the model to infer from authority
     return f"""You are the strategic advisor to {empire_name}.
@@ -202,16 +215,16 @@ def build_immersive_advisor_prompt(identity: dict, situation: dict) -> str:
     Tells the model to USE its Stellaris knowledge without explaining it.
     This is the "lean into the model's knowledge" approach.
     """
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = ', '.join(identity.get('ethics', []))
-    authority = identity.get('authority', 'unknown')
-    civics = ', '.join(identity.get('civics', [])) or 'none'
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = ", ".join(identity.get("ethics", []))
+    authority = identity.get("authority", "unknown")
+    civics = ", ".join(identity.get("civics", [])) or "none"
 
-    year = situation.get('year', 2200)
-    game_phase = situation.get('game_phase', 'early')
-    deficits = situation.get('economy', {}).get('resources_in_deficit', 0)
-    at_war = situation.get('at_war', False)
-    contact_count = situation.get('contact_count', 0)
+    year = situation.get("year", 2200)
+    game_phase = situation.get("game_phase", "early")
+    deficits = situation.get("economy", {}).get("resources_in_deficit", 0)
+    at_war = situation.get("at_war", False)
+    contact_count = situation.get("contact_count", 0)
 
     return f"""You are the strategic advisor to {empire_name}.
 
@@ -231,28 +244,28 @@ def build_middle_ground_prompt(identity: dict, situation: dict) -> str:
     4. MiddleGround (1631 chars)
     Full personality guidance - baseline comparison
     """
-    empire_name = identity.get('empire_name', 'the Empire')
-    ethics = identity.get('ethics', [])
-    authority = identity.get('authority', 'unknown')
-    civics = identity.get('civics', [])
-    is_gestalt = identity.get('is_gestalt', False)
-    is_machine = identity.get('is_machine', False)
-    year = situation.get('year', 2200)
-    game_phase = situation.get('game_phase', 'early')
-    at_war = situation.get('at_war', False)
-    economy = situation.get('economy', {})
-    deficits = economy.get('resources_in_deficit', 0)
-    contact_count = situation.get('contact_count', 0)
+    empire_name = identity.get("empire_name", "the Empire")
+    ethics = identity.get("ethics", [])
+    authority = identity.get("authority", "unknown")
+    civics = identity.get("civics", [])
+    is_gestalt = identity.get("is_gestalt", False)
+    is_machine = identity.get("is_machine", False)
+    year = situation.get("year", 2200)
+    game_phase = situation.get("game_phase", "early")
+    at_war = situation.get("at_war", False)
+    economy = situation.get("economy", {})
+    deficits = economy.get("resources_in_deficit", 0)
+    contact_count = situation.get("contact_count", 0)
 
     return f"""You are the strategic advisor to {empire_name}.
 
 EMPIRE IDENTITY:
-- Ethics: {', '.join(ethics) if ethics else 'unknown'}
+- Ethics: {", ".join(ethics) if ethics else "unknown"}
 - Authority: {authority}
-- Civics: {', '.join(civics) if civics else 'none'}
+- Civics: {", ".join(civics) if civics else "none"}
 - Gestalt: {is_gestalt} (Machine: {is_machine})
 
-SITUATION: Year {year} ({game_phase}), {'AT WAR' if at_war else 'at peace'}, {deficits} deficits, {contact_count} known empires.
+SITUATION: Year {year} ({game_phase}), {"AT WAR" if at_war else "at peace"}, {deficits} deficits, {contact_count} known empires.
 
 PERSONALITY (critical - stay in character):
 Your ethics define your worldview:
@@ -286,9 +299,10 @@ The game state is pre-loaded in the user message. Tools available only for edge 
 # TEST RUNNER
 # =============================================================================
 
+
 def run_test(client, extractor, system_prompt: str, snapshot: dict, question: str) -> dict:
     """Run single test."""
-    snapshot_json = json.dumps(snapshot, separators=(',', ':'), default=str)
+    snapshot_json = json.dumps(snapshot, separators=(",", ":"), default=str)
     user_prompt = f"GAME STATE:\n```json\n{snapshot_json}\n```\n\n{question}"
 
     tools_used = []
@@ -339,9 +353,13 @@ def analyze_personality(response: str, identity: dict) -> dict:
         "mentions_liberty": any(w in text for w in ["liberty", "freedom", "free"]),
         "mentions_beacon": "beacon" in text,
         "mentions_meritocracy": any(w in text for w in ["merit", "excellence", "best"]),
-        "proactive_warnings": any(w in text for w in ["deficit", "warning", "concern", "issue", "problem"]),
-        "gives_recommendations": any(w in text for w in ["recommend", "suggest", "should", "advise"]),
-        "uses_numbers": bool(re.search(r'\d{3,}', response)),  # Has significant numbers
+        "proactive_warnings": any(
+            w in text for w in ["deficit", "warning", "concern", "issue", "problem"]
+        ),
+        "gives_recommendations": any(
+            w in text for w in ["recommend", "suggest", "should", "advise"]
+        ),
+        "uses_numbers": bool(re.search(r"\d{3,}", response)),  # Has significant numbers
     }
 
     score = sum(checks.values())
@@ -419,30 +437,32 @@ def main():
             print(f"  [{name}] ", end="", flush=True)
             try:
                 result = run_test(client, extractor, prompt, snapshot, question)
-                personality = analyze_personality(result['response'], identity)
-                print(f"{result['time']:.1f}s, {result['words']} words, personality: {personality['score']}/{personality['max_score']}")
+                personality = analyze_personality(result["response"], identity)
+                print(
+                    f"{result['time']:.1f}s, {result['words']} words, personality: {personality['score']}/{personality['max_score']}"
+                )
 
                 all_results[name].append({"question": question, **result})
                 personality_scores[name].append(personality)
             except Exception as e:
                 print(f"ERROR: {e}")
-                all_results[name].append({
-                    "question": question,
-                    "response": str(e),
-                    "time": 0,
-                    "tools": 0,
-                    "tools_list": [],
-                    "words": 0
-                })
+                all_results[name].append(
+                    {
+                        "question": question,
+                        "response": str(e),
+                        "time": 0,
+                        "tools": 0,
+                        "tools_list": [],
+                        "words": 0,
+                    }
+                )
                 personality_scores[name].append({"checks": {}, "score": 0, "max_score": 7})
 
     # Generate report
     generate_report(all_results, prompts, personality_scores, identity)
 
     # Save raw results
-    Path("final_showdown_results.json").write_text(
-        json.dumps(all_results, indent=2, default=str)
-    )
+    Path("final_showdown_results.json").write_text(json.dumps(all_results, indent=2, default=str))
     print("\n\nRaw results: final_showdown_results.json")
     print("Full report: FINAL_SHOWDOWN.md")
 
@@ -466,32 +486,45 @@ def generate_report(all_results: dict, prompts: dict, personality_scores: dict, 
     for name in prompts:
         results = all_results[name]
         scores = personality_scores[name]
-        valid = [r for r in results if r['time'] > 0]
+        valid = [r for r in results if r["time"] > 0]
         if valid:
-            avg_time = sum(r['time'] for r in valid) / len(valid)
-            avg_words = sum(r['words'] for r in valid) / len(valid)
-            avg_personality = sum(s['score'] for s in scores) / len(scores)
-            max_personality = scores[0]['max_score'] if scores else 7
+            avg_time = sum(r["time"] for r in valid) / len(valid)
+            avg_words = sum(r["words"] for r in valid) / len(valid)
+            avg_personality = sum(s["score"] for s in scores) / len(scores)
+            max_personality = scores[0]["max_score"] if scores else 7
         else:
             avg_time = avg_words = avg_personality = 0
             max_personality = 7
         size = len(prompts[name])
-        md.append(f"| {name} | {size} | {avg_time:.1f}s | {avg_words:.0f} | {avg_personality:.1f}/{max_personality} |")
+        md.append(
+            f"| {name} | {size} | {avg_time:.1f}s | {avg_words:.0f} | {avg_personality:.1f}/{max_personality} |"
+        )
 
     # Personality breakdown
     md.append("\n\n## Personality Analysis")
     md.append("\nDoes each prompt produce responses with correct personality markers?")
-    md.append("\n| Check | 1_TrustModel | 2_StrategicOnly | 3_MinimalDynamic | 4_ImmersiveAdvisor | 5_MiddleGround |")
-    md.append("|-------|--------------|-----------------|------------------|-------------------|----------------|")
+    md.append(
+        "\n| Check | 1_TrustModel | 2_StrategicOnly | 3_MinimalDynamic | 4_ImmersiveAdvisor | 5_MiddleGround |"
+    )
+    md.append(
+        "|-------|--------------|-----------------|------------------|-------------------|----------------|"
+    )
 
-    check_names = ["uses_president", "mentions_liberty", "mentions_beacon",
-                   "mentions_meritocracy", "proactive_warnings", "gives_recommendations", "uses_numbers"]
+    check_names = [
+        "uses_president",
+        "mentions_liberty",
+        "mentions_beacon",
+        "mentions_meritocracy",
+        "proactive_warnings",
+        "gives_recommendations",
+        "uses_numbers",
+    ]
 
     for check in check_names:
         row = f"| {check} |"
         for name in prompts:
             scores = personality_scores[name]
-            count = sum(1 for s in scores if s['checks'].get(check, False))
+            count = sum(1 for s in scores if s["checks"].get(check, False))
             total = len(scores)
             row += f" {count}/{total} |"
         md.append(row)
@@ -500,26 +533,30 @@ def generate_report(all_results: dict, prompts: dict, personality_scores: dict, 
     md.append("\n\n## Per-Question Results")
 
     for qi, question in enumerate(TEST_QUESTIONS):
-        md.append(f"\n### Q{qi+1}: {question}")
+        md.append(f"\n### Q{qi + 1}: {question}")
         md.append("\n| Prompt | Time | Words | Personality |")
         md.append("|--------|------|-------|-------------|")
 
         for name in prompts:
             r = all_results[name][qi]
             p = personality_scores[name][qi]
-            md.append(f"| {name} | {r['time']:.1f}s | {r['words']} | {p['score']}/{p['max_score']} |")
+            md.append(
+                f"| {name} | {r['time']:.1f}s | {r['words']} | {p['score']}/{p['max_score']} |"
+            )
 
     # Full responses
     md.append("\n\n## Full Responses")
 
     for qi, question in enumerate(TEST_QUESTIONS):
-        md.append(f"\n\n---\n### Q{qi+1}: {question}\n")
+        md.append(f"\n\n---\n### Q{qi + 1}: {question}\n")
 
         for name in prompts:
             r = all_results[name][qi]
             p = personality_scores[name][qi]
             md.append(f"\n#### {name}")
-            md.append(f"\n*Time: {r['time']:.1f}s | Words: {r['words']} | Personality: {p['score']}/{p['max_score']}*")
+            md.append(
+                f"\n*Time: {r['time']:.1f}s | Words: {r['words']} | Personality: {p['score']}/{p['max_score']}*"
+            )
             md.append(f"\n*Checks: {p['checks']}*\n")
             md.append(f"\n{r['response']}\n")
 
@@ -532,10 +569,18 @@ def generate_report(all_results: dict, prompts: dict, personality_scores: dict, 
 
     # Conclusions
     md.append("\n\n---\n## Key Questions Answered\n")
-    md.append("\n1. **Can the model infer address style from `authority: democratic`?** (Check: uses_president)")
-    md.append("\n2. **Can the model show egalitarian personality without explicit instructions?** (Checks: mentions_liberty, mentions_beacon)")
-    md.append("\n3. **Is STRATEGIC DEPTH the only instruction that matters?** (Checks: proactive_warnings, gives_recommendations)")
-    md.append("\n4. **Does 'You know Stellaris deeply' work as a meta-instruction?** (Compare ImmersiveAdvisor)")
+    md.append(
+        "\n1. **Can the model infer address style from `authority: democratic`?** (Check: uses_president)"
+    )
+    md.append(
+        "\n2. **Can the model show egalitarian personality without explicit instructions?** (Checks: mentions_liberty, mentions_beacon)"
+    )
+    md.append(
+        "\n3. **Is STRATEGIC DEPTH the only instruction that matters?** (Checks: proactive_warnings, gives_recommendations)"
+    )
+    md.append(
+        "\n4. **Does 'You know Stellaris deeply' work as a meta-instruction?** (Compare ImmersiveAdvisor)"
+    )
     md.append("\n5. **What is the minimum viable prompt for production use?**")
 
     Path("FINAL_SHOWDOWN.md").write_text("\n".join(md))

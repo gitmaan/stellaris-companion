@@ -35,9 +35,7 @@ def setup(bot) -> None:
         description="Show recent changes (derived events) for the current campaign/session",
     )
     @app_commands.describe(limit="How many events to show (default 10, max 25)")
-    async def history_command(
-        interaction: discord.Interaction, limit: int = 10
-    ) -> None:
+    async def history_command(interaction: discord.Interaction, limit: int = 10) -> None:
         if not bot.companion.is_loaded:
             await interaction.response.send_message(
                 "No save file is currently loaded, so there is no history to show yet.",
@@ -53,16 +51,10 @@ def setup(bot) -> None:
                 db = get_default_db()
 
                 briefing = getattr(bot.companion, "_current_snapshot", None) or {}
-                metrics = (
-                    extract_snapshot_metrics(briefing)
-                    if isinstance(briefing, dict)
-                    else {}
-                )
+                metrics = extract_snapshot_metrics(briefing) if isinstance(briefing, dict) else {}
 
                 campaign_id = None
-                if bot.companion.extractor and getattr(
-                    bot.companion.extractor, "gamestate", None
-                ):
+                if bot.companion.extractor and getattr(bot.companion.extractor, "gamestate", None):
                     campaign_id = extract_campaign_id_from_gamestate(
                         bot.companion.extractor.gamestate
                     )
@@ -74,11 +66,7 @@ def setup(bot) -> None:
                         if bot.companion.extractor
                         else None
                     ),
-                    empire_name=(
-                        metrics.get("empire_name")
-                        if isinstance(metrics, dict)
-                        else None
-                    ),
+                    empire_name=(metrics.get("empire_name") if isinstance(metrics, dict) else None),
                     save_path=(
                         bot.companion.save_path
                         if isinstance(bot.companion.save_path, Path)
@@ -90,24 +78,17 @@ def setup(bot) -> None:
                 if not session_id:
                     return None, None, None
 
-                events = db.get_recent_events(
-                    session_id=session_id, limit=min(max(limit, 1), 25)
-                )
+                events = db.get_recent_events(session_id=session_id, limit=min(max(limit, 1), 25))
                 stats = db.get_session_snapshot_stats(session_id)
                 return session_id, events, stats
 
             session_id, events, stats = await asyncio.to_thread(_fetch_history_data)
 
             if not session_id:
-                await interaction.followup.send(
-                    "No sessions found yet for this campaign."
-                )
+                await interaction.followup.send("No sessions found yet for this campaign.")
                 return
 
-            header = (
-                f"Session `{session_id}`\n"
-                f"Snapshots: {stats.get('snapshot_count', 0)}"
-            )
+            header = f"Session `{session_id}`\nSnapshots: {stats.get('snapshot_count', 0)}"
             first_date = stats.get("first_game_date")
             last_date = stats.get("last_game_date")
             if first_date and last_date:
@@ -145,8 +126,6 @@ def setup(bot) -> None:
 
         except Exception as e:
             logger.error(f"Error in /history command: {e}")
-            await interaction.followup.send(
-                f"An error occurred while retrieving history: {str(e)}"
-            )
+            await interaction.followup.send(f"An error occurred while retrieving history: {str(e)}")
 
     logger.info("/history command registered")

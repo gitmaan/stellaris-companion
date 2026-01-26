@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import re
-import zipfile
 from datetime import datetime
-from pathlib import Path
 
 # All known major Stellaris DLCs (for detecting what's missing)
 # Updated for Stellaris 4.x - add new DLCs as they release
@@ -53,9 +51,7 @@ class MetadataMixin:
         result = {
             "file_path": str(self.save_path),
             "file_size_mb": self.save_path.stat().st_size / (1024 * 1024),
-            "modified": datetime.fromtimestamp(
-                self.save_path.stat().st_mtime
-            ).isoformat(),
+            "modified": datetime.fromtimestamp(self.save_path.stat().st_mtime).isoformat(),
             "gamestate_loaded": getattr(self, "_gamestate", None) is not None,
         }
         if getattr(self, "_gamestate", None) is not None:

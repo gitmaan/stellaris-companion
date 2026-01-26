@@ -71,9 +71,7 @@ def build_history_context(
     lines.append("HISTORY (current campaign/session):")
     lines.append(f"- session_id: {session_id}")
     if stats.get("first_game_date") and stats.get("last_game_date"):
-        lines.append(
-            f"- date_range: {stats['first_game_date']} → {stats['last_game_date']}"
-        )
+        lines.append(f"- date_range: {stats['first_game_date']} → {stats['last_game_date']}")
     lines.append(f"- snapshots: {stats.get('snapshot_count', 0)}")
 
     if events:
