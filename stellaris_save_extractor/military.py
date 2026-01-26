@@ -70,9 +70,14 @@ class MilitaryMixin:
 
         Returns:
             Dict with detailed war information including:
-            - wars: List of detailed war objects with name, dates, exhaustion, participants
+            - wars: List of detailed war objects with name, dates, participants, battle stats
             - player_at_war: Boolean indicating if player is at war
             - active_war_count: Number of wars the player is in
+
+        Note: War exhaustion is intentionally NOT included in the default output.
+        The game calculates exhaustion using factors (attrition, modifiers) not fully
+        stored in the save file, so displayed values would be inaccurate and potentially
+        misleading. Battle statistics are provided instead as accurate indicators.
 
         Requires Rust session mode to be active.
         """
@@ -161,19 +166,6 @@ class MilitaryMixin:
             # Extract start date
             start_date = war_data.get("start_date")
 
-            # Extract exhaustion values (war-level totals)
-            # Values are stored as 0-1 decimals, multiply by 100 for percentage
-            attacker_exhaustion_str = war_data.get("attacker_war_exhaustion", "0")
-            defender_exhaustion_str = war_data.get("defender_war_exhaustion", "0")
-            try:
-                attacker_exhaustion = float(attacker_exhaustion_str) * 100
-            except (ValueError, TypeError):
-                attacker_exhaustion = 0.0
-            try:
-                defender_exhaustion = float(defender_exhaustion_str) * 100
-            except (ValueError, TypeError):
-                defender_exhaustion = 0.0
-
             # Extract war goal
             war_goal_block = war_data.get("attacker_war_goal", {})
             war_goal = (
@@ -184,12 +176,6 @@ class MilitaryMixin:
 
             # Build war info
             our_side = "attacker" if player_is_attacker else "defender"
-            our_exhaustion = (
-                attacker_exhaustion if player_is_attacker else defender_exhaustion
-            )
-            their_exhaustion = (
-                defender_exhaustion if player_is_attacker else attacker_exhaustion
-            )
 
             # Resolve country names
             attacker_names = [
@@ -204,18 +190,25 @@ class MilitaryMixin:
             if start_date and current_date:
                 duration_days = days_between(start_date, current_date)
 
+            # Extract battle statistics from battles block
+            battle_stats = self._extract_battle_stats(
+                war_data.get("battles", []),
+                player_is_attacker,
+                attacker_ids,
+                defender_ids,
+            )
+
             war_info = {
                 "name": war_name,
                 "start_date": start_date,
                 "duration_days": duration_days,
                 "our_side": our_side,
-                "our_exhaustion": round(our_exhaustion, 1),
-                "their_exhaustion": round(their_exhaustion, 1),
                 "participants": {
                     "attackers": attacker_names,
                     "defenders": defender_names,
                 },
                 "war_goal": war_goal,
+                "battle_stats": battle_stats,
                 "status": "in_progress",  # All wars in the war section are active
             }
 
@@ -226,6 +219,118 @@ class MilitaryMixin:
         result["player_at_war"] = len(result["wars"]) > 0
 
         return result
+
+    def _extract_battle_stats(
+        self,
+        battles: list,
+        player_is_attacker: bool,
+        attacker_ids: list[str],
+        defender_ids: list[str],
+    ) -> dict:
+        """Extract battle statistics from the battles block.
+
+        Args:
+            battles: List of battle records from war data
+            player_is_attacker: True if player is on attacker side
+            attacker_ids: List of attacker country IDs
+            defender_ids: List of defender country IDs
+
+        Returns:
+            Dict with battle statistics:
+            - total_battles: Total number of battles
+            - our_victories: Battles won by our side
+            - their_victories: Battles won by their side
+            - our_ship_losses: Ships lost by our side
+            - their_ship_losses: Ships lost by their side
+            - our_army_losses: Armies lost by our side
+            - their_army_losses: Armies lost by their side
+        """
+        stats = {
+            "total_battles": 0,
+            "our_victories": 0,
+            "their_victories": 0,
+            "our_ship_losses": 0,
+            "their_ship_losses": 0,
+            "our_army_losses": 0,
+            "their_army_losses": 0,
+        }
+
+        if not isinstance(battles, list):
+            return stats
+
+        for battle in battles:
+            if not isinstance(battle, dict):
+                continue
+
+            stats["total_battles"] += 1
+
+            # Determine battle outcome
+            # attacker_victory=yes means the battle's attackers won (not war attackers)
+            # We need to check who was attacking in THIS battle
+            battle_attackers = battle.get("attackers", [])
+            battle_defenders = battle.get("defenders", [])
+            attacker_victory = battle.get("attacker_victory") == "yes"
+
+            # Convert to string sets for comparison
+            if isinstance(battle_attackers, list):
+                battle_attacker_ids = {str(a) for a in battle_attackers}
+            else:
+                battle_attacker_ids = {str(battle_attackers)} if battle_attackers else set()
+
+            if isinstance(battle_defenders, list):
+                battle_defender_ids = {str(d) for d in battle_defenders}
+            else:
+                battle_defender_ids = {str(battle_defenders)} if battle_defenders else set()
+
+            # Check if our side was attacking or defending in this battle
+            our_side_ids = set(attacker_ids) if player_is_attacker else set(defender_ids)
+            their_side_ids = set(defender_ids) if player_is_attacker else set(attacker_ids)
+
+            our_side_was_battle_attacker = bool(our_side_ids & battle_attacker_ids)
+            our_side_was_battle_defender = bool(our_side_ids & battle_defender_ids)
+
+            # Determine if we won this battle
+            if our_side_was_battle_attacker and attacker_victory:
+                stats["our_victories"] += 1
+            elif our_side_was_battle_defender and not attacker_victory:
+                stats["our_victories"] += 1
+            elif our_side_was_battle_attacker or our_side_was_battle_defender:
+                # We were involved but didn't win
+                stats["their_victories"] += 1
+
+            # Extract losses
+            attacker_losses = 0
+            defender_losses = 0
+            try:
+                attacker_losses = int(battle.get("attacker_losses", 0))
+            except (ValueError, TypeError):
+                pass
+            try:
+                defender_losses = int(battle.get("defender_losses", 0))
+            except (ValueError, TypeError):
+                pass
+
+            battle_type = battle.get("type", "ships")
+
+            # Assign losses to our side vs their side
+            if our_side_was_battle_attacker:
+                our_losses = attacker_losses
+                their_losses = defender_losses
+            elif our_side_was_battle_defender:
+                our_losses = defender_losses
+                their_losses = attacker_losses
+            else:
+                # Battle between other participants, skip loss counting
+                continue
+
+            if battle_type == "armies":
+                stats["our_army_losses"] += our_losses
+                stats["their_army_losses"] += their_losses
+            else:  # ships or other
+                stats["our_ship_losses"] += our_losses
+                stats["their_ship_losses"] += their_losses
+
+        return stats
 
     def get_fleets(self) -> dict:
         """Get player's fleet information with proper categorization.

@@ -194,7 +194,16 @@ class ExtractionValidator:
     def _get_raw_war_exhaustion(
         self, war_section: str, war_id: int
     ) -> tuple[float | None, float | None]:
-        """Extract war exhaustion values from raw war block."""
+        """Extract raw war exhaustion values from raw war block.
+
+        DEPRECATED: This method extracts raw exhaustion values from the save file,
+        but these values do NOT match the in-game UI. The game calculates total
+        war exhaustion using additional factors (time-based attrition, empire
+        modifiers) that are not stored in the save. The raw values represent
+        only battle-based exhaustion and can give misleading results.
+
+        This method is kept for debugging purposes only.
+        """
         pattern = rf"\n\t{war_id}=\n\t\{{"
         match = re.search(pattern, war_section)
         if not match:
@@ -295,28 +304,36 @@ class ExtractionValidator:
         else:
             result.add_pass()
 
-        # Check 3: Exhaustion invariants (0-100)
+        # Check 3: Battle stats invariants (non-negative values)
         for war in wars:
-            our_ex = war.get("our_exhaustion", 0)
-            their_ex = war.get("their_exhaustion", 0)
+            battle_stats = war.get("battle_stats", {})
             war_name = war.get("name", "Unknown")
 
-            if not (0 <= our_ex <= 100):
-                result.add_issue(
-                    "exhaustion_invariant",
-                    f"Our exhaustion {our_ex} outside [0, 100] in '{war_name}'",
-                    details={"war": war_name, "our_exhaustion": our_ex},
-                    fix_suggestion="Clamp exhaustion values to [0, 100] range",
-                )
-            else:
-                result.add_pass()
+            # All battle stat values should be non-negative integers
+            for stat_name in ["total_battles", "our_victories", "their_victories",
+                              "our_ship_losses", "their_ship_losses",
+                              "our_army_losses", "their_army_losses"]:
+                stat_value = battle_stats.get(stat_name, 0)
+                if not isinstance(stat_value, int) or stat_value < 0:
+                    result.add_issue(
+                        "battle_stats_invariant",
+                        f"Invalid {stat_name}={stat_value} in '{war_name}'",
+                        details={"war": war_name, stat_name: stat_value},
+                        fix_suggestion="Battle stats should be non-negative integers",
+                    )
+                else:
+                    result.add_pass()
 
-            if not (0 <= their_ex <= 100):
+            # Victories should not exceed total battles
+            total = battle_stats.get("total_battles", 0)
+            our_wins = battle_stats.get("our_victories", 0)
+            their_wins = battle_stats.get("their_victories", 0)
+            if our_wins + their_wins > total:
                 result.add_issue(
-                    "exhaustion_invariant",
-                    f"Their exhaustion {their_ex} outside [0, 100] in '{war_name}'",
-                    details={"war": war_name, "their_exhaustion": their_ex},
-                    fix_suggestion="Clamp exhaustion values to [0, 100] range",
+                    "battle_stats_invariant",
+                    f"Victories ({our_wins}+{their_wins}) exceed total battles ({total}) in '{war_name}'",
+                    details={"war": war_name, "total": total, "our_wins": our_wins, "their_wins": their_wins},
+                    fix_suggestion="Check battle victory counting logic",
                 )
             else:
                 result.add_pass()
