@@ -66,7 +66,7 @@ def main():
     print(f"  {companion.personality_summary}")
 
     print("\n" + "=" * 60)
-    print("Commands: /quit, /clear, /reload, /personality, /prompt, /thinking <level>")
+    print("Commands: /quit, /clear, /reload, /personality, /prompt, /thinking <level>, /feedback <message>")
     print("Thinking levels: dynamic (default), minimal, low, medium, high")
     print("=" * 60 + "\n")
 
@@ -153,6 +153,16 @@ def main():
                     print(f"Thinking level set to: {level}\n")
                 except ValueError as e:
                     print(f"Error: {e}\n")
+            continue
+
+        if user_input.lower().startswith("/feedback"):
+            feedback_text = user_input[len("/feedback") :].strip()
+            if feedback_text:
+                with open("feedback.log", "a") as f:
+                    f.write(f"[{companion.metadata.get('date')}] {feedback_text}\n")
+                print("Feedback submitted. Thank you!\n")
+            else:
+                print("Usage: /feedback <message>\n")
             continue
 
         # Get response using full tool mode for CLI (more granular tools)
