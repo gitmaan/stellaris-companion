@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg2v3" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#0f1a2e"/>
+      <stop offset="100%" stop-color="#060a14"/>
+    </radialGradient>
+    <radialGradient id="folderGlowV3" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00D4FF" stop-opacity="0.22"/>
+      <stop offset="40%" stop-color="#00D4FF" stop-opacity="0.09"/>
+      <stop offset="100%" stop-color="#00D4FF" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="folderClipV3">
+      <path d="M96 164 L96 364 C96 372 102 378 110 378 L402 378 C410 378 416 372 416 364 L416 184 C416 176 410 170 402 170 L272 170 L240 134 L110 134 C102 134 96 140 96 148 Z"/>
+    </clipPath>
+    <!-- Glow filter for folder outline -->
+    <filter id="folderGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="url(#bg2v3)"/>
+
+  <!-- Bloom glow behind folder (centered) -->
+  <ellipse cx="256" cy="256" rx="200" ry="140" fill="url(#folderGlowV3)"/>
+
+  <!-- Folder fill -->
+  <path d="M96 164 L96 364 C96 372 102 378 110 378 L402 378 C410 378 416 372 416 364 L416 184 C416 176 410 170 402 170 L272 170 L240 134 L110 134 C102 134 96 140 96 148 Z"
+        fill="#00D4FF" fill-opacity="0.10" stroke="none"/>
+  <!-- Folder stroke with glow -->
+  <path d="M96 164 L96 364 C96 372 102 378 110 378 L402 378 C410 378 416 372 416 364 L416 184 C416 176 410 170 402 170 L272 170 L240 134 L110 134 C102 134 96 140 96 148 Z"
+        fill="none" stroke="#00D4FF" stroke-width="4" stroke-linejoin="round" opacity="0.9" filter="url(#folderGlow)"/>
+
+  <!-- Star map inside folder (clipped) -->
+  <g clip-path="url(#folderClipV3)">
+    <!-- Dense background star field -->
+    <circle cx="120" cy="210" r="1" fill="#4FD1C5" opacity="0.15"/>
+    <circle cx="145" cy="355" r="1" fill="#00D4FF" opacity="0.12"/>
+    <circle cx="180" cy="195" r="1" fill="#4FD1C5" opacity="0.15"/>
+    <circle cx="210" cy="365" r="1" fill="#00D4FF" opacity="0.1"/>
+    <circle cx="250" cy="195" r="1.2" fill="#4FD1C5" opacity="0.12"/>
+    <circle cx="300" cy="360" r="1" fill="#00D4FF" opacity="0.1"/>
+    <circle cx="340" cy="195" r="1" fill="#4FD1C5" opacity="0.12"/>
+    <circle cx="375" cy="345" r="1" fill="#00D4FF" opacity="0.12"/>
+    <circle cx="395" cy="220" r="1" fill="#4FD1C5" opacity="0.1"/>
+    <circle cx="130" cy="275" r="0.8" fill="#00D4FF" opacity="0.1"/>
+    <circle cx="385" cy="275" r="0.8" fill="#4FD1C5" opacity="0.1"/>
+    <circle cx="160" cy="325" r="0.8" fill="#00D4FF" opacity="0.08"/>
+    <circle cx="310" cy="210" r="1" fill="#4FD1C5" opacity="0.1"/>
+    <circle cx="230" cy="340" r="0.8" fill="#00D4FF" opacity="0.08"/>
+    <circle cx="365" cy="310" r="0.8" fill="#4FD1C5" opacity="0.08"/>
+    <!-- Extra stars to fill top-left -->
+    <circle cx="135" cy="180" r="0.8" fill="#4FD1C5" opacity="0.1"/>
+    <circle cx="165" cy="155" r="0.7" fill="#00D4FF" opacity="0.08"/>
+    <circle cx="220" cy="180" r="0.9" fill="#4FD1C5" opacity="0.1"/>
+    <circle cx="290" cy="180" r="0.7" fill="#00D4FF" opacity="0.08"/>
+    <circle cx="350" cy="190" r="0.8" fill="#4FD1C5" opacity="0.08"/>
+    <!-- Extra stars to fill lower area -->
+    <circle cx="170" cy="350" r="0.7" fill="#4FD1C5" opacity="0.08"/>
+    <circle cx="320" cy="355" r="0.8" fill="#00D4FF" opacity="0.08"/>
+    <circle cx="260" cy="365" r="0.7" fill="#4FD1C5" opacity="0.06"/>
+    <circle cx="395" cy="340" r="0.7" fill="#00D4FF" opacity="0.06"/>
+
+    <!-- Main constellation - chevron/arrow shape pointing up-right -->
+    <!-- Constellation lines (behind dots) -->
+    <line x1="155" y1="315" x2="200" y2="265" stroke="#4FD1C5" stroke-width="1.5" opacity="0.35"/>
+    <line x1="200" y1="265" x2="260" y2="245" stroke="#4FD1C5" stroke-width="1.5" opacity="0.35"/>
+    <line x1="260" y1="245" x2="320" y2="260" stroke="#00D4FF" stroke-width="1.5" opacity="0.4"/>
+    <line x1="320" y1="260" x2="370" y2="235" stroke="#00D4FF" stroke-width="1.5" opacity="0.35"/>
+    <!-- Branch downward -->
+    <line x1="260" y1="245" x2="280" y2="305" stroke="#4FD1C5" stroke-width="1.5" opacity="0.3"/>
+    <line x1="280" y1="305" x2="340" y2="330" stroke="#4FD1C5" stroke-width="1.5" opacity="0.25"/>
+
+    <!-- Constellation star nodes - brighter, larger -->
+    <circle cx="155" cy="315" r="4" fill="#4FD1C5" opacity="0.8"/>
+    <circle cx="200" cy="265" r="4.5" fill="#00D4FF" opacity="0.9"/>
+    <!-- Brightest star + glow -->
+    <circle cx="260" cy="245" r="20" fill="#00D4FF" opacity="0.06"/>
+    <circle cx="260" cy="245" r="14" fill="#00D4FF" opacity="0.1"/>
+    <circle cx="260" cy="245" r="6" fill="#00D4FF" opacity="1"/>
+    <circle cx="320" cy="260" r="5" fill="#00D4FF" opacity="0.9"/>
+    <circle cx="370" cy="235" r="4" fill="#4FD1C5" opacity="0.7"/>
+    <circle cx="280" cy="305" r="3.5" fill="#4FD1C5" opacity="0.6"/>
+    <circle cx="340" cy="330" r="3" fill="#4FD1C5" opacity="0.5"/>
+  </g>
+</svg>

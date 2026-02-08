@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "announcements": [
+    {
+      "id": "launch-001",
+      "severity": "info",
+      "title": "Fresh off the shipyard",
+      "body": "This is a brand new release — ambitious plans, not enough resources. If something breaks, hit Report Issue in Settings so we can fix it before the Prethoryn arrive.",
+      "publishedAt": "2026-02-08T00:00:00Z"
+    }
+  ]
+}

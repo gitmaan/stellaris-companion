@@ -1,0 +1,65 @@
+# Environment variables (contains API keys)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Stellaris save files (large, user data)
+*.sav
+
+# Database
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Logs
+*.log
+
+# Node/Electron (future)
+node_modules/
+.electron/
+
+# Claude Code local settings
+.claude/
+CLAUDE.md
+
+# Build outputs
+dist-python/
+stellaris-parser/target/
+
+# Runtime binaries (distributed via releases, not repo)
+bin/stellaris-parser*
+!bin/.gitkeep
+
+# Benchmark results
+*_results.md
+
+# Generated benchmark/test results
+*_results.json
+t25_*.json
+
+# Dev scripts
+.ralph-logs/

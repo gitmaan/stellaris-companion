@@ -1,0 +1,43 @@
+{
+  "player_id": 0,
+  "empire_name": "United Nations of Earth 2",
+  "date": "2509.07.01",
+  "military_power": 344441.25781,
+  "economy_power": 34706.57403,
+  "tech_power": 33920.0,
+  "victory_rank": 5,
+  "fleet_size": 895,
+  "military_fleet_count": 10,
+  "military_ships": 127,
+  "fleet_count": 10,
+  "starbase_count": 26,
+  "outpost_count": 24,
+  "starbases": {
+    "citadels": 20,
+    "star_fortresses": 2,
+    "starholds": 1,
+    "starports": 3,
+    "outposts": 24,
+    "orbital_rings": 9,
+    "total_upgraded": 26,
+    "total_systems": 50,
+    "total": 60
+  },
+  "celestial_bodies_in_territory": 223,
+  "colonies": {
+    "total_count": 30,
+    "total_population": 161308,
+    "avg_pops_per_colony": 5376.9,
+    "_note": "These are colonized worlds with population, not all celestial bodies",
+    "habitats": {
+      "count": 16,
+      "population": 69438,
+      "avg_pops": 4339.9
+    },
+    "planets": {
+      "count": 14,
+      "population": 91870,
+      "avg_pops": 6562.1
+    }
+  }
+}

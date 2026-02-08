@@ -1,0 +1,39 @@
+# Stellaris Companion Discord Relay
+# Cloudflare Worker + Durable Objects for Discord integration
+#
+# This relay forwards Discord slash commands to the user's local Electron app
+# via WebSocket. All LLM processing stays local (user's Gemini API key).
+
+name = "stellaris-companion-relay"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+workers_dev = true
+
+routes = [
+  { pattern = "relay.galacticfilingcabinet.com", custom_domain = true }
+]
+
+# Durable Objects for per-user WebSocket sessions
+[durable_objects]
+bindings = [
+  { name = "USER_SESSIONS", class_name = "UserSession" }
+]
+
+# Durable Object migrations
+[[migrations]]
+tag = "v1"
+new_classes = ["UserSession"]
+
+# Environment variables (non-secret)
+[vars]
+DISCORD_APP_ID = "1460412463282524231"
+
+# Secrets (set via `wrangler secret put`):
+# - DISCORD_PUBLIC_KEY: For verifying Discord interaction signatures
+# - DISCORD_BOT_TOKEN: For sending follow-up messages (optional for basic /ask)
+# - RELAY_SIGNING_SECRET: For signing short-lived relay tokens
+
+# Development settings
+[dev]
+port = 8787
+local_protocol = "http"

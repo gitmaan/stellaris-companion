@@ -1,0 +1,689 @@
+{
+  "planets": [
+    {
+      "id": "3",
+      "name": "Earth",
+      "type": "continental",
+      "size": 18,
+      "population": 11106,
+      "stability": 100.0,
+      "amenities": 13020.1575,
+      "free_amenities": 2375.0625,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "private_security",
+        "private_research_initiative",
+        "industrial_subsidiary"
+      ],
+      "district_count": 4,
+      "last_building": "building_mine_generic",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "5",
+      "name": "Mars",
+      "type": "continental",
+      "size": 13,
+      "population": 5951,
+      "stability": 92.07278,
+      "amenities": 9442.19167,
+      "free_amenities": 3300.52667,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat"
+      ],
+      "district_count": 3,
+      "last_building": "building_executive_retreat",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "329",
+      "name": "Proxima Centauri b",
+      "type": "tropical",
+      "size": 20,
+      "population": 7454,
+      "stability": 94.41435,
+      "amenities": 15726.27,
+      "free_amenities": 7277.915,
+      "crime": 0.0,
+      "modifiers": [
+        {
+          "name": "tidal_locked",
+          "display_name": "Tidal Locked",
+          "days": -1,
+          "permanent": true
+        }
+      ],
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat"
+      ],
+      "district_count": 3,
+      "last_building": "building_executive_retreat",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "333",
+      "name": "Alpha Centauri 1",
+      "type": "continental",
+      "size": 13,
+      "population": 5904,
+      "stability": 97.4413,
+      "amenities": 11887.69312,
+      "free_amenities": 5987.09312,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "military_contractors",
+        "corporate_embassy",
+        "executive_retreat"
+      ],
+      "district_count": 4,
+      "last_building": "building_automation_urban_2",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "334",
+      "name": "Alpha Centauri 2",
+      "type": "gaia",
+      "size": 12,
+      "population": 2426,
+      "stability": 88.9858,
+      "amenities": 3038.1225,
+      "free_amenities": 547.1225,
+      "crime": 0.0,
+      "modifiers": [
+        {
+          "name": "terraformation_nucleus_side_effect",
+          "display_name": "Terraformation Nucleus Side Effect",
+          "days": -1,
+          "permanent": true
+        }
+      ],
+      "buildings": [
+        "commercial_forum"
+      ],
+      "district_count": 2,
+      "last_building": "building_commercial_forum",
+      "last_district": "district_farming"
+    },
+    {
+      "id": "472",
+      "name": "Sirius 1",
+      "type": "continental",
+      "size": 19,
+      "population": 8084,
+      "stability": 96.0387,
+      "amenities": 15209.57812,
+      "free_amenities": 7256.97062,
+      "crime": 0.0,
+      "planet_modifier": "wild_storms",
+      "modifiers": [
+        {
+          "name": "wild_storms",
+          "display_name": "Wild Storms",
+          "days": -1,
+          "permanent": true
+        }
+      ],
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_security"
+      ],
+      "district_count": 4,
+      "last_building": "building_hyper_entertainment_forum",
+      "last_district": "district_city"
+    },
+    {
+      "id": "1215",
+      "name": "Unity",
+      "type": "continental",
+      "size": 18,
+      "population": 8830,
+      "stability": 92.39256,
+      "amenities": 9858.84375,
+      "free_amenities": 806.87375,
+      "crime": 0.0,
+      "modifiers": [
+        {
+          "name": "mastery_of_nature",
+          "display_name": "Mastery Of Nature",
+          "days": -1,
+          "permanent": true
+        }
+      ],
+      "buildings": [
+        "corporate_embassy",
+        "executive_retreat",
+        "commercial_forum",
+        "industrial_subsidiary"
+      ],
+      "district_count": 4,
+      "last_building": "building_foundry_upkeep_1",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "1224",
+      "name": "StCaspar",
+      "type": "tundra",
+      "size": 18,
+      "population": 6589,
+      "stability": 86.10518,
+      "amenities": 12060.3,
+      "free_amenities": 3373.415,
+      "crime": 0.0,
+      "buildings": [
+        "corporate_embassy",
+        "executive_retreat",
+        "commercial_forum",
+        "private_research_initiative"
+      ],
+      "district_count": 3,
+      "last_building": "building_chemical_plant",
+      "last_district": "district_city"
+    },
+    {
+      "id": "1241",
+      "name": "Rhea",
+      "type": "continental",
+      "size": 19,
+      "population": 7041,
+      "stability": 94.157,
+      "amenities": 14733.27187,
+      "free_amenities": 8019.45687,
+      "crime": 0.0,
+      "buildings": [
+        "corporate_embassy",
+        "executive_retreat",
+        "commercial_forum",
+        "private_research_initiative"
+      ],
+      "district_count": 4,
+      "last_building": "building_robot_assembly_plant",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "1459",
+      "name": "Daranma 1",
+      "type": "continental",
+      "size": 14,
+      "population": 5454,
+      "stability": 99.13035,
+      "amenities": 10851.5925,
+      "free_amenities": 4956.71,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "private_security",
+        "corporate_embassy",
+        "executive_retreat"
+      ],
+      "district_count": 4,
+      "last_building": "building_planetary_shield_generator",
+      "last_district": "district_city"
+    },
+    {
+      "id": "1571",
+      "name": "Dradim 1",
+      "type": "ocean",
+      "size": 22,
+      "population": 8285,
+      "stability": 95.4432,
+      "amenities": 12945.58125,
+      "free_amenities": 3828.08375,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_security"
+      ],
+      "district_count": 4,
+      "last_building": "building_foundry_2",
+      "last_district": "district_city"
+    },
+    {
+      "id": "3467",
+      "name": "Treadway",
+      "type": "tropical",
+      "size": 12,
+      "population": 6164,
+      "stability": 100.0,
+      "amenities": 14299.51687,
+      "free_amenities": 8074.16437,
+      "crime": 0.0,
+      "modifiers": [
+        {
+          "name": "mastery_of_nature",
+          "display_name": "Mastery Of Nature",
+          "days": -1,
+          "permanent": true
+        }
+      ],
+      "buildings": [
+        "corporate_embassy",
+        "executive_retreat",
+        "commercial_forum",
+        "private_security"
+      ],
+      "district_count": 3,
+      "last_building": "building_robot_assembly_plant",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "5188",
+      "name": "Edor Vang 1",
+      "type": "continental",
+      "size": 16,
+      "population": 6066,
+      "stability": 91.01325,
+      "amenities": 12020.715,
+      "free_amenities": 5421.5225,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat"
+      ],
+      "district_count": 3,
+      "last_building": "building_executive_retreat",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "8531",
+      "name": "Dimm 1",
+      "type": "ocean",
+      "size": 13,
+      "population": 6357,
+      "stability": 95.7491,
+      "amenities": 14066.49562,
+      "free_amenities": 7908.49312,
+      "crime": 0.0,
+      "buildings": [
+        "executive_retreat",
+        "corporate_embassy",
+        "commercial_forum",
+        "private_security"
+      ],
+      "district_count": 2,
+      "last_building": "building_factory_3",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "10179",
+      "name": "RoDoman",
+      "type": "tropical",
+      "size": 10,
+      "population": 2110,
+      "stability": 91.146,
+      "amenities": 5235.625,
+      "free_amenities": 2843.2075,
+      "crime": 0.0,
+      "planet_modifier": "mineral_rich",
+      "modifiers": [
+        {
+          "name": "weak_magnetic_field",
+          "display_name": "Weak Magnetic Field",
+          "days": -1,
+          "permanent": true
+        },
+        {
+          "name": "mineral_rich",
+          "display_name": "Mineral Rich",
+          "days": -1,
+          "permanent": true
+        }
+      ],
+      "buildings": [
+        "commercial_forum"
+      ],
+      "district_count": 2,
+      "last_building": "building_commercial_forum",
+      "last_district": "district_generator"
+    },
+    {
+      "id": "10435",
+      "name": "Omicron Persei Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 4182,
+      "stability": 89.0744,
+      "amenities": 10129.455,
+      "free_amenities": 6182.67,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_research_initiative"
+      ],
+      "district_count": 3,
+      "last_building": "building_foundry_2",
+      "last_district": "district_hab_housing"
+    },
+    {
+      "id": "10436",
+      "name": "Edor Vang Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 5258,
+      "stability": 94.5107,
+      "amenities": 13333.81875,
+      "free_amenities": 9822.39625,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "industrial_subsidiary"
+      ],
+      "district_count": 3,
+      "last_building": "building_industrial_subsidiary",
+      "last_district": "district_hab_housing"
+    },
+    {
+      "id": "10441",
+      "name": "Yuhtaan Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 6887,
+      "stability": 86.10073,
+      "amenities": 7389.13875,
+      "free_amenities": 155.00125,
+      "crime": 0.0,
+      "modifiers": [
+        {
+          "name": "travel_advisory",
+          "display_name": "Travel Advisory",
+          "days": 699,
+          "permanent": false
+        }
+      ],
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat"
+      ],
+      "district_count": 3,
+      "last_building": "building_executive_retreat",
+      "last_district": "district_hab_energy"
+    },
+    {
+      "id": "10444",
+      "name": "Xirak Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 5571,
+      "stability": 93.40035,
+      "amenities": 11626.86,
+      "free_amenities": 5842.34,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "industrial_subsidiary"
+      ],
+      "district_count": 3,
+      "last_building": "building_commercial_megaplex",
+      "last_district": "district_hab_housing"
+    },
+    {
+      "id": "10445",
+      "name": "Ethiuq Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 3831,
+      "stability": 91.87975,
+      "amenities": 6785.3625,
+      "free_amenities": 2692.325,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_security"
+      ],
+      "district_count": 3,
+      "last_building": "building_private_security",
+      "last_district": "district_hab_housing"
+    },
+    {
+      "id": "10446",
+      "name": "Ler Zumon Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 3721,
+      "stability": 70.67412,
+      "amenities": 3316.98937,
+      "free_amenities": -1035.38813,
+      "crime": 1.5,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy"
+      ],
+      "district_count": 4,
+      "last_building": "building_clone_vats",
+      "last_district": "district_hab_mining"
+    },
+    {
+      "id": "10448",
+      "name": "Obetellus Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 3870,
+      "stability": 85.92555,
+      "amenities": 6831.195,
+      "free_amenities": 2383.7575,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "military_contractors"
+      ],
+      "district_count": 3,
+      "last_building": "building_foundry_2",
+      "last_district": "district_hab_mining"
+    },
+    {
+      "id": "10455",
+      "name": "T'u Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 4824,
+      "stability": 89.4948,
+      "amenities": 9356.27437,
+      "free_amenities": 4434.08937,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_security"
+      ],
+      "district_count": 2,
+      "last_building": "building_robot_assembly_complex",
+      "last_district": "district_hab_housing"
+    },
+    {
+      "id": "10489",
+      "name": "Ofeogliea Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 7200,
+      "stability": 95.5017,
+      "amenities": 16130.31472,
+      "free_amenities": 8409.88222,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_security"
+      ],
+      "district_count": 2,
+      "last_building": "building_foundry_2",
+      "last_district": "district_hab_housing"
+    },
+    {
+      "id": "10491",
+      "name": "Mesarthim Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 6122,
+      "stability": 84.6083,
+      "amenities": 7578.7425,
+      "free_amenities": 1467.4775,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_research_initiative"
+      ],
+      "district_count": 2,
+      "last_building": "building_foundry_2",
+      "last_district": "district_hab_housing"
+    },
+    {
+      "id": "10496",
+      "name": "Kenn Hijal Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 4465,
+      "stability": 100.0,
+      "amenities": 14492.8875,
+      "free_amenities": 9755.725,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_research_initiative"
+      ],
+      "district_count": 3,
+      "last_building": "building_foundry_1",
+      "last_district": "district_hab_energy"
+    },
+    {
+      "id": "10497",
+      "name": "Poaa Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 3690,
+      "stability": 89.73285,
+      "amenities": 7288.92937,
+      "free_amenities": 3383.54937,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat",
+        "private_research_initiative"
+      ],
+      "district_count": 2,
+      "last_building": "building_energy_nexus",
+      "last_district": "district_hab_housing"
+    },
+    {
+      "id": "10501",
+      "name": "Nicor Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 3165,
+      "stability": 90.8741,
+      "amenities": 6984.6,
+      "free_amenities": 3174.1725,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy"
+      ],
+      "district_count": 2,
+      "last_building": "building_robot_assembly_complex",
+      "last_district": "district_hab_energy"
+    },
+    {
+      "id": "10507",
+      "name": "Barnards Star Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 6767,
+      "stability": 88.13706,
+      "amenities": 19770.06937,
+      "free_amenities": 15541.14437,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy",
+        "executive_retreat"
+      ],
+      "district_count": 2,
+      "last_building": "building_executive_retreat",
+      "last_district": "district_hab_housing"
+    },
+    {
+      "id": "10509",
+      "name": "Marath Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 2144,
+      "stability": 75.7472,
+      "amenities": 3160.78875,
+      "free_amenities": 507.25875,
+      "crime": 0.0,
+      "buildings": [
+        "commercial_forum",
+        "corporate_embassy"
+      ],
+      "district_count": 2,
+      "last_building": "building_corporate_embassy",
+      "last_district": "district_hab_energy"
+    },
+    {
+      "id": "10527",
+      "name": "Lisswyn Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 897,
+      "stability": 70.779,
+      "amenities": 1349.90625,
+      "free_amenities": -83.69375,
+      "crime": 0.0,
+      "district_count": 2,
+      "last_building": "building_clone_vats",
+      "last_district": "district_hab_energy"
+    },
+    {
+      "id": "10528",
+      "name": "Deneb Habitat",
+      "type": "habitat",
+      "size": 6,
+      "population": 1309,
+      "stability": 67.708,
+      "amenities": 1538.07937,
+      "free_amenities": -267.32063,
+      "crime": 3.8,
+      "district_count": 2,
+      "last_building": "building_robot_assembly_plant",
+      "last_district": "district_hab_energy"
+    }
+  ],
+  "count": 32,
+  "total_pops": 171724,
+  "by_type": {
+    "continental": 8,
+    "tropical": 3,
+    "gaia": 1,
+    "tundra": 1,
+    "ocean": 2,
+    "habitat": 17
+  }
+}

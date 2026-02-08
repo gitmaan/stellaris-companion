@@ -1,0 +1,93 @@
+{
+  "fleets": [
+    {
+      "id": "16781652",
+      "name": "Fleet #1",
+      "ships": 32,
+      "military_power": 125963.0
+    },
+    {
+      "id": "50331689",
+      "name": "Fleet #7",
+      "ships": 10,
+      "military_power": 21078.0
+    },
+    {
+      "id": "150997910",
+      "name": "Fleet #10",
+      "ships": 1,
+      "military_power": 2734.0
+    },
+    {
+      "id": "251662611",
+      "name": "Fleet #8",
+      "ships": 7,
+      "military_power": 12635.0
+    },
+    {
+      "id": "268439822",
+      "name": "Fleet #3",
+      "ships": 4,
+      "military_power": 11727.0
+    },
+    {
+      "id": "402657258",
+      "name": "Fleet #6",
+      "ships": 8,
+      "military_power": 16669.0
+    },
+    {
+      "id": "436207655",
+      "name": "Fleet #9",
+      "ships": 12,
+      "military_power": 21803.0
+    },
+    {
+      "id": "486539286",
+      "name": "Fleet #2",
+      "ships": 38,
+      "military_power": 102698.0
+    },
+    {
+      "id": "1073745067",
+      "name": "Fleet #5",
+      "ships": 6,
+      "military_power": 16907.0
+    },
+    {
+      "id": "2868907679",
+      "name": "Fleet #4",
+      "ships": 9,
+      "military_power": 12227.0
+    }
+  ],
+  "count": 10,
+  "military_fleet_count": 10,
+  "starbase_count": 26,
+  "civilian_fleet_count": 22,
+  "military_ships": 127,
+  "total_military_power": 344441.25779,
+  "fleet_names": [
+    "Fleet #1",
+    "Fleet #7",
+    "Fleet #10",
+    "Fleet #8",
+    "Fleet #3",
+    "Fleet #6",
+    "Fleet #9",
+    "Fleet #2",
+    "Fleet #5",
+    "Fleet #4"
+  ],
+  "starbases": {
+    "citadels": 20,
+    "star_fortresses": 2,
+    "starholds": 1,
+    "starports": 3,
+    "outposts": 24,
+    "orbital_rings": 9,
+    "total_upgraded": 26,
+    "total_systems": 50,
+    "total": 60
+  }
+}

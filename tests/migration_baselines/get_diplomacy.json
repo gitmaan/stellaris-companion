@@ -1,0 +1,381 @@
+{
+  "relations": [
+    {
+      "country_id": 1,
+      "empire_name": "Orbis",
+      "trust": 100,
+      "opinion": 865,
+      "embassy": true,
+      "has_truce": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 2,
+      "empire_name": "Khessam State",
+      "trust": 0,
+      "opinion": 356,
+      "embassy": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 17,
+      "empire_name": "Zeppadroggan Shard",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 18,
+      "empire_name": "Zaanami Protectors",
+      "trust": 0,
+      "opinion": 238,
+      "has_contact": true
+    },
+    {
+      "country_id": 19,
+      "empire_name": "Ubaric Enforcers",
+      "trust": 0,
+      "opinion": 17,
+      "has_contact": true
+    },
+    {
+      "country_id": 25,
+      "empire_name": "Caravaneer Home",
+      "trust": 0,
+      "opinion": 108,
+      "has_contact": true
+    },
+    {
+      "country_id": 26,
+      "empire_name": "Caravaneer Fleet1 country",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 27,
+      "empire_name": "Caravaneer Fleet3",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 30,
+      "empire_name": "Association of Scrappers",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 31,
+      "empire_name": "Placid Leviathans",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 33,
+      "empire_name": "Hillos fleet",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 35,
+      "empire_name": "Placid Leviathans",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 37,
+      "empire_name": "Privateers",
+      "trust": 0,
+      "opinion": 98,
+      "has_contact": true
+    },
+    {
+      "country_id": 38,
+      "empire_name": "Prism",
+      "trust": 0,
+      "opinion": 13,
+      "has_contact": true
+    },
+    {
+      "country_id": 55,
+      "empire_name": "Ragerian Star Empire",
+      "trust": 40,
+      "opinion": 488,
+      "embassy": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 61,
+      "empire_name": "VLUUR",
+      "trust": 0,
+      "opinion": 98,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777219,
+      "empire_name": "Zithorian Dynastic Union",
+      "trust": 50,
+      "opinion": 569,
+      "embassy": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777222,
+      "empire_name": "Hiran Sacrosanct Council",
+      "trust": 0,
+      "opinion": -572,
+      "has_truce": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777223,
+      "empire_name": "Foundation Ozkox planet",
+      "trust": 50,
+      "opinion": 305,
+      "embassy": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777224,
+      "empire_name": "Yapathi Decimators",
+      "trust": 0,
+      "opinion": -2081,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777226,
+      "empire_name": "Sojagg Combine",
+      "trust": 57,
+      "opinion": 548,
+      "embassy": true,
+      "has_truce": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777227,
+      "empire_name": "Udkavongo Union",
+      "trust": 80,
+      "opinion": 515,
+      "embassy": true,
+      "has_truce": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777228,
+      "empire_name": "Gox League",
+      "trust": 50,
+      "opinion": 629,
+      "embassy": true,
+      "has_truce": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777229,
+      "empire_name": "Izki Star Authority",
+      "trust": 32,
+      "opinion": 328,
+      "embassy": true,
+      "has_truce": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777230,
+      "empire_name": "Mandate Sinrath system",
+      "trust": 50,
+      "opinion": 486,
+      "embassy": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 16777232,
+      "empire_name": "Ziiran Mediators",
+      "trust": 0,
+      "opinion": 281,
+      "has_contact": true
+    },
+    {
+      "country_id": 50331671,
+      "empire_name": "PRESCRIPTED species adjective orbis Hierarchy",
+      "trust": 63,
+      "opinion": 456,
+      "embassy": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 50331700,
+      "empire_name": "Hydras Fleet",
+      "trust": 0,
+      "opinion": 98,
+      "has_contact": true
+    },
+    {
+      "country_id": 50331701,
+      "empire_name": "Kraken Storm Lords",
+      "trust": 0,
+      "opinion": 138,
+      "has_contact": true
+    },
+    {
+      "country_id": 67108920,
+      "empire_name": "QwePulci Society Name",
+      "trust": 0,
+      "opinion": 206
+    },
+    {
+      "country_id": 83886100,
+      "empire_name": "Baanthurian Stellar Industries",
+      "trust": 26,
+      "opinion": 306,
+      "embassy": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 83886120,
+      "empire_name": "Star Mall Parking Services",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 100663317,
+      "empire_name": "Thalassocracy",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 100663337,
+      "empire_name": "Epsilon Spearhead",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 100663341,
+      "empire_name": "Daedalus Vigils",
+      "trust": 0,
+      "opinion": 38,
+      "has_contact": true
+    },
+    {
+      "country_id": 117440540,
+      "empire_name": "Ozkox Privateers",
+      "trust": 0,
+      "opinion": 98,
+      "has_contact": true
+    },
+    {
+      "country_id": 150994988,
+      "empire_name": "Aggressive Mining Drone Expansion Initiative",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 167772182,
+      "empire_name": "Epsilon Banner",
+      "trust": 0,
+      "opinion": 38,
+      "has_contact": true
+    },
+    {
+      "country_id": 184549440,
+      "empire_name": "Delta Banner",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 268435480,
+      "empire_name": "Crimson Terrors",
+      "trust": 0,
+      "opinion": 38,
+      "has_contact": true
+    },
+    {
+      "country_id": 318767154,
+      "empire_name": "Manticores Legionnaires",
+      "trust": 0,
+      "opinion": 38,
+      "has_contact": true
+    },
+    {
+      "country_id": 352321593,
+      "empire_name": "Kappa Corsairs",
+      "trust": 0,
+      "opinion": 38,
+      "has_contact": true
+    },
+    {
+      "country_id": 402653233,
+      "empire_name": "League AVI1 PLANET Taakir",
+      "trust": 100,
+      "opinion": 799,
+      "commercial_pact": true,
+      "embassy": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 503316527,
+      "empire_name": "Palisade Defenders",
+      "trust": 0,
+      "opinion": 28,
+      "has_contact": true
+    },
+    {
+      "country_id": 520093744,
+      "empire_name": "Ozkox Spearhead",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    },
+    {
+      "country_id": 536870917,
+      "empire_name": "Ragerian United Stars",
+      "trust": 50,
+      "opinion": 509,
+      "embassy": true,
+      "has_contact": true
+    },
+    {
+      "country_id": 587202611,
+      "empire_name": "Cerberus Terrors",
+      "trust": 0,
+      "opinion": 88,
+      "has_contact": true
+    }
+  ],
+  "treaties": [
+    {
+      "country_id": 402653233,
+      "empire_name": "League AVI1 PLANET Taakir",
+      "type": "commercial_pact"
+    }
+  ],
+  "allies": [],
+  "rivals": [],
+  "federation": null,
+  "defensive_pacts": [],
+  "non_aggression_pacts": [],
+  "closed_borders": [],
+  "migration_treaties": [],
+  "commercial_pacts": [
+    {
+      "id": 402653233,
+      "name": "League AVI1 PLANET Taakir"
+    }
+  ],
+  "sensor_links": [],
+  "relation_count": 47,
+  "summary": {
+    "positive": 45,
+    "negative": 2,
+    "neutral": 0,
+    "total_contacts": 47
+  }
+}

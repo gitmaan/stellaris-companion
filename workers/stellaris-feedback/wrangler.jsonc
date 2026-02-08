@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stellaris-feedback",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-27",
+  "workers_dev": true,
+
+  // Environment variables
+  "vars": {
+    "GITHUB_OWNER": "gitmaan",
+    "GITHUB_REPO": "stellaris-companion"
+  },
+
+  // KV namespace for rate limiting (10/day/IP)
+  "kv_namespaces": [
+    {
+      "binding": "RATE_LIMITS",
+      "id": "738a525505b64ad8906af7b92744d4cd"
+    }
+  ],
+
+  // D1 database for deduplication
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "feedback",
+      "database_id": "8423a0b6-db7f-460c-a76e-fbef82a5cb39"
+    }
+  ],
+
+  "routes": [
+    {
+      "pattern": "feedback.galacticfilingcabinet.com",
+      "custom_domain": true
+    }
+  ]
+
+  // Secrets (set via: npx wrangler secret put GITHUB_TOKEN)
+  // GITHUB_TOKEN - Personal access token with repo:issues scope
+}

@@ -1,0 +1,209 @@
+name: Build & Release Electron App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - linux-x64
+          - windows-x64
+          - mac-arm64
+          - mac-x64
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        shell: bash
+        run: |
+          ALL='{"include":[{"name":"linux-x64","os":"ubuntu-latest","electron_args":"--linux"},{"name":"windows-x64","os":"windows-latest","electron_args":"--win"},{"name":"mac-arm64","os":"macos-latest","electron_args":"--mac --arm64 --config.afterPack=scripts/afterPack.js"},{"name":"mac-x64","os":"macos-15-intel","electron_args":"--mac --x64 --config.afterPack=scripts/afterPack.js"}]}'
+
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.platform }}" = "all" ]; then
+            echo "matrix=$ALL" >> "$GITHUB_OUTPUT"
+          else
+            PLATFORM="${{ github.event.inputs.platform }}"
+            echo "matrix=$(echo "$ALL" | jq -c --arg p "$PLATFORM" '{"include": [.include[] | select(.name == $p)]}')" >> "$GITHUB_OUTPUT"
+          fi
+
+  release:
+    needs: setup
+    name: Release - ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # --- Rust Parser Build ---
+      - name: Build Rust Parser
+        run: |
+          cd stellaris-parser
+          cargo build --release
+          cd ..
+
+      - name: Prepare Rust Binary
+        shell: bash
+        run: |
+          mkdir -p bin
+          rm -f bin/stellaris-parser*
+
+          if [[ "${{ matrix.name }}" == "windows-x64" ]]; then
+            cp stellaris-parser/target/release/stellaris-parser.exe bin/stellaris-parser.exe
+          elif [[ "${{ matrix.name }}" == "mac-arm64" ]]; then
+            cp stellaris-parser/target/release/stellaris-parser bin/stellaris-parser-darwin-arm64
+          elif [[ "${{ matrix.name }}" == "mac-x64" ]]; then
+            cp stellaris-parser/target/release/stellaris-parser bin/stellaris-parser-darwin-x64
+          elif [[ "${{ matrix.name }}" == "linux-x64" ]]; then
+            cp stellaris-parser/target/release/stellaris-parser bin/stellaris-parser-linux-x64
+          else
+            cp stellaris-parser/target/release/stellaris-parser bin/stellaris-parser
+          fi
+
+          echo "Binaries in bin/:"
+          ls -la bin/
+
+      # --- Python Backend Build ---
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'pyproject.toml'
+
+      - name: Install Python Dependencies
+        run: |
+          pip install .
+          pip install pyinstaller
+
+      - name: Build Python Backend
+        shell: bash
+        run: |
+          chmod +x scripts/build-python.sh
+          ./scripts/build-python.sh
+
+      # --- Electron Build & Publish ---
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+
+      - name: Install Node Dependencies
+        run: |
+          cd electron
+          npm ci
+          cd renderer
+          npm ci
+
+      - name: Build Renderer
+        working-directory: electron/renderer
+        env:
+          VITE_ISSUES_URL: ${{ vars.VITE_ISSUES_URL }}
+          VITE_REPORT_ENDPOINT: ${{ vars.VITE_REPORT_ENDPOINT }}
+        run: npm run build
+
+      - name: CI smoke check (inputs for packaging)
+        shell: bash
+        run: |
+          bash scripts/ci-smoke-check.sh "${{ matrix.name }}"
+
+      - name: Import code signing certificate
+        if: startsWith(matrix.name, 'mac')
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          CERT_FILE=$(mktemp /tmp/cert.XXXXXX.p12)
+          echo "$CSC_LINK" | base64 --decode > "$CERT_FILE"
+
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_FILE" -P "$CSC_KEY_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          echo "Imported cert into keychain. Available identities:"
+          security find-identity -v -p codesigning
+
+          rm -f "$CERT_FILE"
+
+      - name: Publish Electron App
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cd electron
+          npx electron-builder ${{ matrix.electron_args }} --publish always
+
+      - name: Fetch notarization log on failure
+        if: failure() && startsWith(matrix.name, 'mac')
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
+        run: |
+          echo "=== Fetching notarization history ==="
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            2>&1 | head -20
+
+          echo ""
+          echo "=== Fetching log for most recent submission ==="
+          SUBMISSION_ID=$(xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            2>&1 | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
+
+          if [ -n "$SUBMISSION_ID" ]; then
+            echo "Submission ID: $SUBMISSION_ID"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              2>&1
+          else
+            echo "Could not find submission ID"
+          fi
+
+  deploy-promo-site:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger promo site rebuild
+        run: |
+          curl -s -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.PROMO_SITE_TOKEN }}" \
+            https://api.github.com/repos/gitmaan/stellaris-companion-site/dispatches \
+            -d '{"event_type":"release-published"}'

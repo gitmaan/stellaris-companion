@@ -1,0 +1,21 @@
+{
+  "name": "stellaris-companion-relay",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker relay for Stellaris Companion Discord integration",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "discord-interactions": "^4.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^3.93.0"
+  }
+}

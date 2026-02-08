@@ -1,0 +1,69 @@
+appId: com.stellaris.companion
+productName: Stellaris Companion
+
+directories:
+  output: dist
+
+files:
+  - main.js
+  - main/**/*
+  - preload.js
+  - renderer/dist/**/*
+  - assets/**/*
+
+extraResources:
+  # PyInstaller backend (onedir layout): dist-python/stellaris-backend/** -> Resources/python-backend/**
+  # This keeps the executable path stable:
+  # - macOS/Linux: python-backend/stellaris-backend
+  # - Windows:     python-backend/stellaris-backend.exe
+  - from: ../dist-python/stellaris-backend
+    to: python-backend
+    filter:
+      - "**/*"
+  # Rust parser binary (stellaris-parser)
+  # Binaries are placed in bin/ folder at project root
+  - from: ../bin
+    to: rust-parser
+    filter:
+      - "**/*"
+
+mac:
+  category: public.app-category.games
+  icon: assets/icon.png
+  target:
+    - target: dmg
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: entitlements.mac.plist
+  entitlementsInherit: entitlements.mac.plist
+  notarize:
+    teamId: TS8UHD459C
+  extendInfo:
+    NSDocumentsFolderUsageDescription: "Stellaris Companion needs access to your Documents folder to find Stellaris save files."
+
+win:
+  icon: assets/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  # Disable signing for now
+  signAndEditExecutable: false
+
+linux:
+  icon: assets/icon.png
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Game
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+publish:
+  provider: github
+  owner: gitmaan
+  repo: stellaris-companion
+  releaseType: release

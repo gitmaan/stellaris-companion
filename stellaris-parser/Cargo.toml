@@ -1,0 +1,20 @@
+[package]
+name = "stellaris-parser"
+version = "0.4.0"
+edition = "2021"
+license = "MIT"
+description = "Fast Clausewitz format parser for Stellaris saves"
+
+[dependencies]
+jomini = "0.28"
+clap = { version = "4", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+zip = "2.2"
+serde = { version = "1.0", features = ["derive"] }
+aho-corasick = "1.1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

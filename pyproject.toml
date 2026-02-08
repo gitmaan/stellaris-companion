@@ -1,0 +1,148 @@
+[project]
+name = "stellaris-companion"
+version = "0.5.0"
+description = "AI-powered strategic advisor for Stellaris using Gemini"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+keywords = ["stellaris", "ai", "gaming", "strategy", "gemini"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Other Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment :: Simulation",
+]
+
+dependencies = [
+    "google-genai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "watchdog>=3.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pydantic>=2.0.0",
+    "orjson>=3.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+
+# =============================================================================
+# Build system (setuptools)
+# =============================================================================
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+# Explicit discovery avoids setuptools errors on repos with multiple top-level dirs.
+include = [
+    "backend*",
+    "stellaris_companion*",
+    "stellaris_save_extractor*",
+]
+exclude = [
+    "build*",
+    "cloudflare*",
+    "dist*",
+    "docs*",
+    "electron*",
+    "patches*",
+    "scripts*",
+    "tests*",
+    "workers*",
+]
+
+# =============================================================================
+# Ruff - Fast Python linter and formatter
+# =============================================================================
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort (import sorting)
+    "UP",     # pyupgrade (modern Python syntax)
+    "B",      # flake8-bugbear (common bugs)
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "E721",   # type comparison - isinstance() preferred but == works
+    "E731",   # lambda assignment - sometimes cleaner than def
+    "E741",   # ambiguous variable name (l, O, I) - common in loops
+    "B007",   # unused loop variable - often intentional (e.g., for i, x in enumerate)
+    "B008",   # function call in default argument (common in FastAPI)
+    "B017",   # assert blind exception - acceptable in tests
+    "B904",   # raise from err - nice but not critical
+    "SIM102", # nested if statements - sometimes clearer than combined
+    "SIM105", # contextlib.suppress - try/except/pass is clearer
+    "SIM108", # ternary operator (sometimes less readable)
+    "SIM117", # nested with statements - sometimes clearer
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]  # assert False is fine in tests
+"backend/*.py" = ["E402"]  # backend files modify sys.path before imports
+"backend/**/*.py" = ["E402"]  # all backend submodules
+"scripts/*" = ["E402", "F841"]  # scripts have flexible structure
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# =============================================================================
+# MyPy - Static type checking
+# =============================================================================
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = false  # Gradual typing - don't require all functions
+check_untyped_defs = true      # But do check the ones without annotations
+
+[[tool.mypy.overrides]]
+module = [
+    "google.genai.*",
+    "watchdog.*",
+]
+ignore_missing_imports = true
+
+# =============================================================================
+# Pytest - Testing
+# =============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+# =============================================================================
+# Coverage - Test coverage reporting
+# =============================================================================
+[tool.coverage.run]
+source = ["backend", "stellaris_save_extractor"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
