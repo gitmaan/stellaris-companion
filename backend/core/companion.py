@@ -236,15 +236,28 @@ class Companion:
         Returns:
             Dict with version, required_dlcs, and missing_dlcs, or None if unavailable
         """
-        if not self.metadata:
+        metadata = self.metadata if isinstance(self.metadata, dict) else {}
+        if not metadata and self.extractor:
+            try:
+                # Fallback for ingestion flows where metadata may not be populated yet.
+                metadata = self.extractor.get_metadata() or {}
+            except Exception:
+                metadata = {}
+
+        if not metadata:
             return None
 
-        version = self.metadata.get("version")
-        required_dlcs = self.metadata.get("required_dlcs", [])
+        version = metadata.get("version")
+        required_dlcs = metadata.get("required_dlcs", [])
+        if not isinstance(required_dlcs, list):
+            required_dlcs = []
 
-        # Compute missing DLCs if extractor is available
-        missing_dlcs = []
-        if self.extractor and hasattr(self.extractor, "get_missing_dlcs"):
+        missing_dlcs = metadata.get("missing_dlcs", [])
+        if not isinstance(missing_dlcs, list):
+            missing_dlcs = []
+
+        # Compute missing DLCs from extractor only when metadata does not already provide it.
+        if not missing_dlcs and self.extractor and hasattr(self.extractor, "get_missing_dlcs"):
             try:
                 missing_dlcs = self.extractor.get_missing_dlcs()
             except Exception:
@@ -368,6 +381,7 @@ class Companion:
         game_date: str | None,
         identity: dict[str, Any] | None,
         situation: dict[str, Any] | None,
+        metadata: dict[str, Any] | None = None,
         save_hash: str | None = None,
     ) -> None:
         """Activate a precomputed briefing produced externally (e.g., worker process)."""
@@ -381,6 +395,10 @@ class Companion:
             self._briefing_ready.set()
 
         # Update identity/situation/personality out of lock (prompt building can do I/O/logging).
+        if isinstance(metadata, dict):
+            self.metadata = dict(metadata)
+        if game_date is not None and isinstance(self.metadata, dict):
+            self.metadata.setdefault("date", game_date)
         if isinstance(identity, dict):
             self.identity = identity
         if isinstance(situation, dict):

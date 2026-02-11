@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import multiprocessing as mp
 import os
@@ -104,11 +105,22 @@ def _process_main(job: WorkerJob, out_q: mp.Queue[dict[str, Any]]) -> None:
             timings["json_serialize"] = time.time() - t0
             log_timing("JSON serialize", timings["json_serialize"])
 
-            meta = briefing.get("meta", {}) if isinstance(briefing, dict) else {}
+            briefing_meta = briefing.get("meta", {}) if isinstance(briefing, dict) else {}
+            extractor_meta = extractor.get_metadata() if isinstance(briefing, dict) else {}
+            worker_meta: dict[str, Any] = {}
+            if isinstance(extractor_meta, dict):
+                worker_meta.update(extractor_meta)
+            if isinstance(briefing_meta, dict):
+                worker_meta.update(briefing_meta)
+
+            with contextlib.suppress(Exception):
+                missing_dlcs = extractor.get_missing_dlcs()
+                if isinstance(missing_dlcs, list):
+                    worker_meta["missing_dlcs"] = missing_dlcs
 
             payload = {
                 "briefing_json": briefing_json,
-                "meta": meta if isinstance(meta, dict) else {},
+                "meta": worker_meta,
                 "identity": (briefing.get("identity") if isinstance(briefing, dict) else None),
                 "situation": (briefing.get("situation") if isinstance(briefing, dict) else None),
                 "save_hash": (
@@ -116,7 +128,7 @@ def _process_main(job: WorkerJob, out_q: mp.Queue[dict[str, Any]]) -> None:
                     if isinstance(briefing, dict)
                     else None
                 ),
-                "game_date": meta.get("date") if isinstance(meta, dict) else None,
+                "game_date": worker_meta.get("date"),
                 "duration_ms": (time.time() - started) * 1000,
                 "timings": timings,
             }

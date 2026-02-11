@@ -8,9 +8,6 @@ on:
       - '.github/workflows/rust-parser.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'stellaris-parser/**'
-      - '.github/workflows/rust-parser.yml'
   workflow_dispatch:
     inputs:
       debug_enabled:
@@ -23,7 +20,7 @@ env:
 
 jobs:
   # Lint job runs on every push/PR for fast feedback
-  lint:
+  rust-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +41,25 @@ jobs:
       - name: Run tests
         working-directory: stellaris-parser
         run: cargo test
+
+  # Fast compile checks on PRs for Linux and Windows.
+  # Catches cross-platform toolchain issues before tag/release builds.
+  rust-pr-build:
+    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        working-directory: stellaris-parser
+        run: cargo build --release
 
   # Build jobs only run on tags (releases)
   build-windows:
