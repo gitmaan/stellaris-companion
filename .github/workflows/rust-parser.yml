@@ -3,8 +3,14 @@ name: Rust Parser Build
 on:
   push:
     branches: [main]
+    paths:
+      - 'stellaris-parser/**'
+      - '.github/workflows/rust-parser.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'stellaris-parser/**'
+      - '.github/workflows/rust-parser.yml'
   workflow_dispatch:
     inputs:
       debug_enabled:
