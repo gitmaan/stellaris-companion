@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import re
 import threading
 import time
 import zipfile
@@ -237,6 +238,11 @@ class IngestionManager:
                 value = value.strip().strip('"')
                 if key in {"version", "name", "date"}:
                     parsed[key] = value
+
+        # Mirror SaveExtractor metadata behavior for diagnostics/UI/prompt context.
+        # We parse required_dlcs directly from the meta text without loading gamestate.
+        dlc_match = re.search(r"required_dlcs\s*=\s*\{([^}]*)\}", meta_text, re.DOTALL)
+        parsed["required_dlcs"] = re.findall(r'"([^"]+)"', dlc_match.group(1)) if dlc_match else []
         return parsed
 
     def _wait_for_stable_save(self, save_path: Path, request_id: int) -> bool:
@@ -361,6 +367,13 @@ class IngestionManager:
             save_hash = t2.get("save_hash")
             game_date = t2.get("game_date")
             duration_ms = t2.get("duration_ms")
+            with self._lock:
+                t0_meta = (
+                    dict(self._status.t0_meta) if isinstance(self._status.t0_meta, dict) else {}
+                )
+            merged_meta = dict(t0_meta)
+            if isinstance(t2_meta, dict):
+                merged_meta.update(t2_meta)
 
             if not isinstance(briefing_json, str) or not briefing_json:
                 with self._lock:
@@ -406,6 +419,7 @@ class IngestionManager:
                     game_date=str(game_date) if game_date is not None else None,
                     identity=identity if isinstance(identity, dict) else None,
                     situation=situation if isinstance(situation, dict) else None,
+                    metadata=merged_meta or None,
                     save_hash=save_hash if isinstance(save_hash, str) else None,
                 )
             except Exception as e:
@@ -422,7 +436,7 @@ class IngestionManager:
                 if request_id != self._request_id:
                     continue
                 self._status.t2_ready = True
-                self._status.t2_meta = dict(t2_meta) if isinstance(t2_meta, dict) else {}
+                self._status.t2_meta = merged_meta
                 self._status.t2_game_date = str(game_date) if game_date is not None else None
                 self._status.t2_updated_at = time.time()
                 self._status.t2_last_duration_ms = (

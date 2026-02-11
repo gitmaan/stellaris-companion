@@ -1,5 +1,16 @@
 # Contributing to Stellaris Companion
 
+## What We're Prioritizing Right Now
+
+To keep the app stable at launch, we are currently accepting contributions that focus on:
+
+- DLC coverage and correctness
+- Windows/Linux reliability fixes
+- Stability and polish for existing features (bugs, regressions, tests, docs)
+
+Please avoid net-new feature work for now unless it is required to fix a critical bug or platform issue.
+If you're unsure whether a change fits, open an issue first and we will help scope it.
+
 ## Development Setup
 
 ```bash
@@ -55,4 +66,5 @@ Use conventional commit format:
 1. Create a branch from `main`
 2. Make your changes
 3. Ensure tests pass and Rust parser builds
-4. Submit a PR with a clear description
+4. Confirm the change aligns with current priorities (DLC/platform/stability)
+5. Submit a PR with a clear description

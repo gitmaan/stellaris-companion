@@ -204,6 +204,16 @@ stellaris-companion/
 └── pyproject.toml
 ```
 
+## Current Contribution Focus
+
+For upcoming releases, we are prioritizing:
+
+- DLC coverage and correctness across Stellaris content
+- Cross-platform reliability, with extra focus on Windows and Linux
+- Stability and polish of existing features (bug fixes, regressions, docs/tests)
+
+New feature work is temporarily de-prioritized unless it unblocks a critical bug or platform reliability issue.
+
 ## Contributing
 
 See `CONTRIBUTING.md`.

@@ -86,6 +86,9 @@ class TestIngestionManager:
         assert meta["file_size_mb"] > 0
         # The meta file should have name and date
         assert "name" in meta or "version" in meta
+        assert "required_dlcs" in meta
+        assert isinstance(meta["required_dlcs"], list)
+        assert "Overlord" in meta["required_dlcs"]
 
 
 # --- Worker Tests ---
@@ -111,6 +114,11 @@ class TestIngestionWorker:
         assert "briefing_json" in payload
         assert "meta" in payload
         assert "game_date" in payload
+        assert isinstance(payload["meta"], dict)
+        assert isinstance(payload["meta"].get("required_dlcs"), list)
+        assert isinstance(payload["meta"].get("missing_dlcs"), list)
+        assert "Overlord" in payload["meta"].get("required_dlcs", [])
+        assert "Overlord" not in payload["meta"].get("missing_dlcs", [])
 
 
 # --- Integration Tests ---
