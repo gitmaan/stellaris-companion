@@ -159,6 +159,27 @@ ERA_ENDING_EVENTS = {
 # Years between chapters (if no era-ending event)
 CHAPTER_TIME_THRESHOLD = 50
 
+# Chapter 1 should arrive quickly so players see something early.
+# We still guard on "enough events" so the first chapter has substance.
+FIRST_CHAPTER_TIME_THRESHOLD = 5
+FIRST_CHAPTER_MIN_EVENTS_TIME = 8
+
+# Milestone-based early Chapter 1 triggers (no need to wait 50 years).
+# These are intentionally early/midgame-relevant events that tend to occur soon.
+FIRST_CHAPTER_MILESTONE_EVENTS = {
+    "first_contact",
+    "war_started",
+    "federation_joined",
+    "colony_count_change",
+    "ruler_changed",
+    "subject_gained",
+    "became_subject",
+    "tradition_tree_completed",
+    "lgate_opened",
+}
+FIRST_CHAPTER_MIN_YEARS_MILESTONE = 2
+FIRST_CHAPTER_MIN_EVENTS_MILESTONE = 4
+
 # Minimum years after era-ending event before finalizing
 MIN_YEARS_AFTER_EVENT = 5
 
@@ -727,15 +748,35 @@ class ChronicleGenerator:
 
         # Check time threshold (50+ years)
         years_elapsed = current_year - era_start_year
-        if years_elapsed >= CHAPTER_TIME_THRESHOLD:
-            return True, "time_threshold"
-
-        # Check for era-ending events
+        # Pull events once; used for both chapter 1 special-cases and normal triggers.
         events = self.db.get_events_in_snapshot_range(
             save_id=save_id,
             from_snapshot_id=era_start_snapshot_id,
             to_snapshot_id=current_snapshot_id,
         )
+
+        # Special-case: get Chapter 1 on the page quickly.
+        # This also has the nice UX property of shrinking the "Current Era" window,
+        # which reduces visible rewrites of "The Story Continues...".
+        if not chapters:
+            if (
+                years_elapsed >= FIRST_CHAPTER_TIME_THRESHOLD
+                and len(events) >= FIRST_CHAPTER_MIN_EVENTS_TIME
+            ):
+                return True, "time_threshold"
+
+            if years_elapsed >= FIRST_CHAPTER_MIN_YEARS_MILESTONE and len(events) >= (
+                FIRST_CHAPTER_MIN_EVENTS_MILESTONE
+            ):
+                # Use the first matching milestone event type as the chapter end trigger
+                # (chapter end date becomes that event's date).
+                for event in events:
+                    et = event.get("event_type")
+                    if et in FIRST_CHAPTER_MILESTONE_EVENTS:
+                        return True, str(et)
+
+        if years_elapsed >= CHAPTER_TIME_THRESHOLD:
+            return True, "time_threshold"
 
         for event in events:
             if event.get("event_type") in ERA_ENDING_EVENTS:
@@ -820,8 +861,12 @@ class ChronicleGenerator:
 
         # Find the end date based on trigger
         if trigger == "time_threshold":
+            # Chapter 1 should appear early. Later chapters use the longer threshold.
+            threshold_years = (
+                FIRST_CHAPTER_TIME_THRESHOLD if chapter_number == 1 else CHAPTER_TIME_THRESHOLD
+            )
             start_year = parse_year(start_date) or 2200
-            target_end_year = start_year + CHAPTER_TIME_THRESHOLD
+            target_end_year = start_year + threshold_years
             target_end_date = f"{target_end_year}.01.01"
             snapshot_at_or_before = self.db.get_latest_snapshot_at_or_before(
                 save_id=save_id,
