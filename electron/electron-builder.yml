@@ -31,7 +31,10 @@ mac:
   category: public.app-category.games
   icon: assets/icon.png
   target:
+    # electron-updater on macOS requires a .zip artifact for auto-updates.
+    # Keep .dmg for manual installs, but publish .zip so updates work.
     - target: dmg
+    - target: zip
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: entitlements.mac.plist
