@@ -355,9 +355,7 @@ class TestComputeEvents:
         event_types = [e.event_type for e in result]
         assert "leader_died" in event_types
 
-    def test_ignores_recruitment_pool_leader_churn(
-        self, base_prev_snapshot, base_curr_snapshot
-    ):
+    def test_ignores_recruitment_pool_leader_churn(self, base_prev_snapshot, base_curr_snapshot):
         """Pool rerolls should not appear as hired/removed roster events."""
         base_prev_snapshot["history"]["leaders"]["leaders"] = [
             {"id": 100, "class": "scientist", "name": "Pool A", "recruitment_date": "0.01.01"}
