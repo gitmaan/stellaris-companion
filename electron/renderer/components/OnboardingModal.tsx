@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { HUDButton } from './hud/HUDButton'
 import { HUDInput } from './hud/HUDInput'
-import { HUDMicro } from './hud/HUDText'
+import { HUDLabel, HUDMicro } from './hud/HUDText'
+import { HUDPanel } from './hud/HUDPanel'
+import appLogo from '../assets/app_logo.svg'
 
 interface OnboardingModalProps {
   onComplete: () => void
@@ -43,6 +45,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const [direction, setDirection] = useState(1)
   const autoRescanAttemptedRef = useRef(false)
   const autoRescanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dialogRef = useRef<HTMLDivElement | null>(null)
 
   // Step 2 state
   const [apiKey, setApiKey] = useState('')
@@ -88,6 +91,51 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   useEffect(() => {
     return () => clearAutoRescanTimer()
   }, [clearAutoRescanTimer])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    const animationFrame = requestAnimationFrame(() => {
+      const focusable = getFocusableElements(dialog)
+      if (focusable.length > 0) {
+        focusable[0].focus()
+      } else {
+        dialog.focus()
+      }
+    })
+
+    const handleTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+
+      const focusable = getFocusableElements(dialog)
+      if (focusable.length === 0) {
+        event.preventDefault()
+        dialog.focus()
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement as HTMLElement | null
+
+      if (event.shiftKey) {
+        if (!active || active === first || !dialog.contains(active)) {
+          event.preventDefault()
+          last.focus()
+        }
+      } else if (!active || active === last || !dialog.contains(active)) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    dialog.addEventListener('keydown', handleTab)
+    return () => {
+      cancelAnimationFrame(animationFrame)
+      dialog.removeEventListener('keydown', handleTab)
+    }
+  }, [step, scanning, saveResult?.found])
 
   async function detectSaves(targetDirectory?: string) {
     clearAutoRescanTimer()
@@ -155,21 +203,18 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
     >
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="onboarding-step-title"
+        tabIndex={-1}
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ duration: 0.25 }}
-        className="relative w-full max-w-lg mx-4 bg-bg-elevated border border-border rounded-sm overflow-hidden"
-        style={{ boxShadow: '0 0 60px rgba(0, 212, 255, 0.08), 0 8px 32px rgba(0, 0, 0, 0.6)' }}
+        className="relative mx-4 h-[min(27.5rem,calc(100vh-4.5rem))] w-[min(41rem,calc(100%-2rem))] outline-none"
       >
-        {/* Corner accents */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-accent-cyan/60 z-10" />
-        <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-accent-cyan/60 z-10" />
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-accent-cyan/60 z-10" />
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-accent-cyan/60 z-10" />
-
-        {/* Content area with overflow hidden for slide transitions */}
-        <div className="relative min-h-[320px]">
+        <div className="relative h-full overflow-hidden">
           <AnimatePresence mode="wait" custom={direction}>
             {step === 1 && (
               <motion.div
@@ -180,7 +225,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
                 animate="center"
                 exit="exit"
                 transition={slideTransition}
-                className="p-8"
+                className="h-full p-1"
               >
                 <StepWelcome onNext={() => goTo(2)} />
               </motion.div>
@@ -194,7 +239,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
                 animate="center"
                 exit="exit"
                 transition={slideTransition}
-                className="p-8"
+                className="h-full p-1"
               >
                 <StepApiKey
                   apiKey={apiKey}
@@ -213,7 +258,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
                 animate="center"
                 exit="exit"
                 transition={slideTransition}
-                className="p-8"
+                className="h-full p-1"
               >
                 <StepSaveDirectory
                   scanning={scanning}
@@ -241,29 +286,34 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
 
 function StepWelcome({ onNext }: { onNext: () => void }) {
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-baseline justify-between mb-8">
-        <h2 className="font-display text-sm tracking-widest text-accent-cyan uppercase">
-          First Contact Protocol
-        </h2>
-        <HUDMicro>01 / 03</HUDMicro>
-      </div>
-
-      {/* Body */}
-      <div className="flex-1 space-y-4 mb-8">
-        <p className="text-sm text-text-primary leading-relaxed">
-          Advisor online. Awaiting configuration before strategic operations can commence.
-        </p>
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-end">
+    <StepFrame
+      step={1}
+      title="FIRST CONTACT PROTOCOL"
+      actions={(
         <HUDButton onClick={onNext}>
           Initialize
         </HUDButton>
+      )}
+    >
+      <div className="box-border h-full flex flex-col items-center justify-center gap-3 px-3 text-center">
+        <div className="relative">
+          <img
+            src={appLogo}
+            alt="Stellaris Companion logo"
+            className="relative h-20 w-20 rounded-xl border border-accent-cyan/40 shadow-glow-sm drop-shadow-[0_0_26px_rgba(0,212,255,0.55)]"
+          />
+        </div>
+
+        <div className="max-w-xl space-y-2">
+          <p className="font-display text-base tracking-wide text-text-primary uppercase">
+            Welcome to Stellaris Companion
+          </p>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            We will connect your advisor in two quick steps: API access and save data link.
+          </p>
+        </div>
       </div>
-    </div>
+    </StepFrame>
   )
 }
 
@@ -285,61 +335,54 @@ function StepApiKey({
   const hasKey = apiKey.trim().length > 0
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-baseline justify-between mb-8">
-        <h2 className="font-display text-sm tracking-widest text-accent-cyan uppercase">
-          Intelligence Uplink
-        </h2>
-        <HUDMicro>02 / 03</HUDMicro>
-      </div>
-
-      {/* Body */}
-      <div className="flex-1 space-y-5 mb-8">
+    <StepFrame
+      step={2}
+      title="INTELLIGENCE UPLINK"
+      actions={(
+        <>
+          <HUDButton variant="secondary" onClick={onBack}>
+            Back
+          </HUDButton>
+          <HUDButton onClick={onNext} disabled={!hasKey}>
+            Next
+          </HUDButton>
+        </>
+      )}
+    >
+      <div className="mx-auto w-full max-w-2xl space-y-5">
+        <div className="space-y-1">
+          <HUDLabel className="text-accent-cyan/80">Required Credential</HUDLabel>
+          <h2 className="font-display text-lg tracking-[0.1em] uppercase text-text-primary">
+            Google Gemini API Key
+          </h2>
+        </div>
         <p className="text-sm text-text-secondary leading-relaxed">
-          Your advisor runs on Google Gemini. You'll need an API key —
-          it's free and takes about 30 seconds.
+          Your advisor runs on Google Gemini. You will need an API key. Setup takes about 30 seconds.
         </p>
 
-        {/* API Key input box */}
         <div className="relative">
           <HUDInput
-            label="API Key Token"
+            label="API KEY TOKEN"
             type="password"
             placeholder="AIza..."
             value={apiKey}
             onChange={(e) => onChange(e.target.value)}
+            statusText={hasKey ? 'READY' : 'MISSING'}
+            statusClassName={hasKey ? 'text-accent-green' : 'text-accent-yellow'}
             autoFocus
           />
-          {/* Status indicator */}
-          <div className="flex justify-end mt-2">
-            <span className={`font-mono text-[10px] tracking-widest uppercase ${hasKey ? 'text-accent-green' : 'text-accent-red'}`}>
-              STATUS: {hasKey ? 'READY' : 'MISSING'}
-            </span>
-          </div>
         </div>
 
-        {/* External link */}
         <a
-          href="https://aistudio.google.com/apikey"
+          href="https://aistudio.google.com/app/apikey"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-block text-xs text-accent-cyan hover:text-accent-cyan/80 transition-colors"
+          className="inline-block font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
         >
-          Generate key at Google AI Studio &rarr;
+          GENERATE KEY &gt;
         </a>
       </div>
-
-      {/* Actions */}
-      <div className="flex justify-end gap-3">
-        <HUDButton variant="secondary" onClick={onBack}>
-          Back
-        </HUDButton>
-        <HUDButton onClick={onNext} disabled={!hasKey}>
-          Next
-        </HUDButton>
-      </div>
-    </div>
+    </StepFrame>
   )
 }
 
@@ -367,17 +410,44 @@ function StepSaveDirectory({
   onComplete: () => void
 }) {
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-baseline justify-between mb-8">
-        <h2 className="font-display text-sm tracking-widest text-accent-cyan uppercase">
-          Data Link
+    <StepFrame
+      step={3}
+      title="DATA LINK"
+      actions={(
+        <>
+          <HUDButton variant="secondary" onClick={onBack}>
+            Back
+          </HUDButton>
+          {scanning ? null : saveResult?.found ? (
+            <>
+              <HUDButton variant="secondary" onClick={onBrowse}>
+                Browse Elsewhere
+              </HUDButton>
+              <HUDButton onClick={onComplete}>
+                Confirm
+              </HUDButton>
+            </>
+          ) : (
+            <>
+              <HUDButton variant="ghost" onClick={onComplete}>
+                Set Up Later
+              </HUDButton>
+              <HUDButton variant="secondary" onClick={onRetry}>
+                Scan Again
+              </HUDButton>
+              <HUDButton onClick={onBrowse}>
+                Browse Folder
+              </HUDButton>
+            </>
+          )}
+        </>
+      )}
+    >
+      <div className="mx-auto w-full max-w-2xl pt-2">
+        <HUDLabel className="block mb-3 text-accent-cyan/80">Save Source</HUDLabel>
+        <h2 className="font-display text-lg tracking-[0.1em] uppercase text-text-primary mb-5">
+          Stellaris Save Directory
         </h2>
-        <HUDMicro>03 / 03</HUDMicro>
-      </div>
-
-      {/* Body */}
-      <div className="flex-1 mb-8">
         {scanning ? (
           <SaveScanning />
         ) : saveResult?.found ? (
@@ -393,35 +463,40 @@ function StepSaveDirectory({
           />
         )}
       </div>
+    </StepFrame>
+  )
+}
 
-      {/* Actions */}
-      <div className="flex justify-end gap-3">
-        <HUDButton variant="secondary" onClick={onBack}>
-          Back
-        </HUDButton>
-        {scanning ? null : saveResult?.found ? (
-          <>
-            <HUDButton variant="secondary" onClick={onBrowse}>
-              Browse Elsewhere
-            </HUDButton>
-            <HUDButton onClick={onComplete}>
-              Confirm
-            </HUDButton>
-          </>
-        ) : (
-          <>
-            <HUDButton variant="secondary" onClick={onComplete}>
-              Set Up Later
-            </HUDButton>
-            <HUDButton variant="secondary" onClick={onRetry}>
-              Scan Again
-            </HUDButton>
-            <HUDButton onClick={onBrowse}>
-              Browse Folder
-            </HUDButton>
-          </>
-        )}
-      </div>
+interface StepFrameProps {
+  step: Step
+  title: string
+  children: ReactNode
+  actions: ReactNode
+}
+
+function StepFrame({ step, title, children, actions }: StepFrameProps) {
+  return (
+    <div className="h-full">
+      <HUDPanel
+        className="relative h-full bg-bg-secondary/95 border border-accent-cyan/35 shadow-[0_0_40px_rgba(0,212,255,0.08),0_10px_28px_rgba(0,0,0,0.55)]"
+        decoration="brackets"
+        noPadding
+      >
+        <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] px-6 pt-4 pb-4">
+          <div className="mb-3">
+            <HUDMicro className="text-accent-cyan">{`STEP 0${step} / 03`}</HUDMicro>
+            <h1 id="onboarding-step-title" className="mt-1.5 font-display text-xl tracking-[0.12em] uppercase text-text-primary">
+              {title}
+            </h1>
+          </div>
+          <div className="min-h-0 overflow-y-auto custom-scrollbar">
+            {children}
+          </div>
+          <div className="mt-3 h-11 flex items-center justify-end gap-3 flex-nowrap [&>button]:h-11 [&>button]:min-w-[10rem]">
+            {actions}
+          </div>
+        </div>
+      </HUDPanel>
     </div>
   )
 }
@@ -448,7 +523,7 @@ function SaveFound({
   return (
     <div className="space-y-4">
       <p className="text-sm text-text-primary">Found your saves.</p>
-      <div className="p-4 bg-black/20 border border-white/10 rounded-sm">
+      <div className="p-4 bg-white/5 border border-white/10 rounded-sm">
         <div className="font-mono text-xs text-accent-cyan mb-1">
           {displayPath ? shortenPath(displayPath) : ''}
         </div>
@@ -482,4 +557,18 @@ function SaveNotFound({
       </p>
     </div>
   )
+}
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  const selector = [
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    'a[href]',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(', ')
+
+  return Array.from(container.querySelectorAll<HTMLElement>(selector))
+    .filter((el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true')
 }

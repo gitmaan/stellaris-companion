@@ -70,6 +70,47 @@ class ChronicleCustomRequest(BaseModel):
     custom_instructions: str | None = None
 
 
+def _parse_game_date(value: Any) -> tuple[int, int, int] | None:
+    """Parse a Stellaris game date string (YYYY.MM.DD with optional zero padding)."""
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    parts = raw.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        year, month, day = (int(part) for part in parts)
+    except ValueError:
+        return None
+    if year < 0 or month < 1 or month > 12 or day < 1 or day > 31:
+        return None
+    return (year, month, day)
+
+
+def _pick_latest_game_date(*values: Any) -> str | None:
+    """Pick the latest valid game date from candidate values.
+
+    Falls back to the first non-empty string when no values parse cleanly.
+    """
+    latest_parsed: tuple[int, int, int] | None = None
+    latest_raw: str | None = None
+    fallback_raw: str | None = None
+
+    for value in values:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped and fallback_raw is None:
+                fallback_raw = stripped
+            parsed = _parse_game_date(stripped)
+            if parsed is not None and (latest_parsed is None or parsed > latest_parsed):
+                latest_parsed = parsed
+                latest_raw = stripped
+
+    return latest_raw if latest_raw is not None else fallback_raw
+
+
 def get_auth_token() -> str | None:
     """Get the expected auth token from environment."""
     return os.environ.get(ENV_API_TOKEN)
@@ -585,6 +626,10 @@ def create_app() -> FastAPI:
         # Format response according to API spec
         sessions = []
         for session in sessions_data:
+            latest_game_date = _pick_latest_game_date(
+                session.get("last_game_date_computed"),
+                session.get("last_game_date"),
+            )
             sessions.append(
                 {
                     "id": session["id"],
@@ -593,8 +638,7 @@ def create_app() -> FastAPI:
                     "started_at": session["started_at"],
                     "ended_at": session["ended_at"],
                     "first_game_date": session["first_game_date"],
-                    "last_game_date": session["last_game_date_computed"]
-                    or session["last_game_date"],
+                    "last_game_date": latest_game_date,
                     "snapshot_count": session["snapshot_count"],
                     "is_active": session["ended_at"] is None,
                 }

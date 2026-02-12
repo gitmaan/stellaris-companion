@@ -3,11 +3,15 @@ import React, { InputHTMLAttributes } from 'react';
 interface HUDInputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
+  statusText?: string;
+  statusClassName?: string;
 }
 
 export const HUDInput: React.FC<HUDInputProps> = ({ 
   label, 
   error, 
+  statusText,
+  statusClassName = 'text-text-secondary',
   className = '', 
   ...props 
 }) => {
@@ -20,9 +24,14 @@ export const HUDInput: React.FC<HUDInputProps> = ({
       )}
       <div className="relative group">
         <input
-          className="w-full bg-black/20 border-b border-white/20 px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted/50 focus:outline-none focus:border-accent-cyan focus:bg-accent-cyan/5 transition-all duration-300 rounded-t-sm"
+          className={`w-full bg-black/20 border-b border-white/20 px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted/50 focus:outline-none focus:border-accent-cyan focus:bg-accent-cyan/5 transition-all duration-300 rounded-t-sm ${statusText ? 'pr-24' : ''}`}
           {...props}
         />
+        {statusText && (
+          <span className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] tracking-wider uppercase ${statusClassName}`}>
+            {statusText}
+          </span>
+        )}
         {/* Animated bottom line on focus */}
         <div className="absolute bottom-0 left-0 w-0 h-px bg-accent-cyan transition-all duration-500 group-focus-within:w-full" />
       </div>

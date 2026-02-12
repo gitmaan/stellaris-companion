@@ -139,7 +139,7 @@ function ChronicleChapterList({
           <div className="py-4 px-4">
             <p className="text-text-secondary text-sm mb-2">No chapters yet</p>
             <p className="text-text-muted text-xs">
-              Play 50+ years or reach a major event to generate your first chapter.
+              Play around 5 years with enough events, or hit a major event, to generate your first chapter.
             </p>
           </div>
         ) : (

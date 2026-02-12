@@ -69,7 +69,7 @@ export const HUDPanel: React.FC<HUDPanelProps> = ({
         </div>
       )}
 
-      <div className={`relative z-10 ${noPadding ? '' : 'p-4'}`}>
+      <div className={`relative z-10 ${noPadding ? 'h-full' : 'p-4'}`}>
         {children}
       </div>
     </div>

@@ -590,8 +590,13 @@ class GameDatabase:
             latest_hash = latest.get("save_hash")
             latest_date = latest.get("game_date")
             if save_hash and latest_hash == save_hash:
+                # Keep session recency metadata moving forward even when
+                # dedupe drops a duplicate snapshot row.
+                if game_date:
+                    self.update_session(session_id=session_id, last_game_date=game_date)
                 return False, None
             if (save_hash is None) and game_date and latest_date == game_date:
+                self.update_session(session_id=session_id, last_game_date=game_date)
                 return False, None
 
         # Only keep a full per-snapshot briefing for the baseline snapshot (first one in session).
