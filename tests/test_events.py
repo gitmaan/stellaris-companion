@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.events import (
     _get_leader_name,
+    _is_placeholder_recruitment_date,
     _normalize_federation,
     _pct_change,
     _sign_changed,
@@ -186,6 +187,20 @@ class TestGetLeaderName:
         assert _get_leader_name({}) == "#unknown"
 
 
+class TestRecruitmentDateFiltering:
+    """Tests for leader recruitment pool placeholder detection."""
+
+    def test_detects_placeholder_year_zero_date(self):
+        """Treats year-0 recruitment dates as unrecruited pool entries."""
+        assert _is_placeholder_recruitment_date("0.01.01") is True
+
+    def test_ignores_real_recruitment_dates(self):
+        """Real recruited leaders should not be filtered out."""
+        assert _is_placeholder_recruitment_date("2200.01.01") is False
+        assert _is_placeholder_recruitment_date("2391.11.12") is False
+        assert _is_placeholder_recruitment_date(None) is False
+
+
 # --- Tests for compute_events ---
 
 
@@ -339,6 +354,66 @@ class TestComputeEvents:
         )
         event_types = [e.event_type for e in result]
         assert "leader_died" in event_types
+
+    def test_ignores_recruitment_pool_leader_churn(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """Pool rerolls should not appear as hired/removed roster events."""
+        base_prev_snapshot["history"]["leaders"]["leaders"] = [
+            {"id": 100, "class": "scientist", "name": "Pool A", "recruitment_date": "0.01.01"}
+        ]
+        base_curr_snapshot["history"]["leaders"]["leaders"] = [
+            {"id": 101, "class": "scientist", "name": "Pool B", "recruitment_date": "0.01.01"}
+        ]
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        event_types = [e.event_type for e in result]
+        assert "leader_hired" not in event_types
+        assert "leader_removed" not in event_types
+
+    def test_tracks_real_hire_while_ignoring_pool_reroll(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """A real recruited leader still emits hire even if pool rerolls too."""
+        base_prev_snapshot["history"]["leaders"]["leaders"] = [
+            {"id": 100, "class": "scientist", "name": "Pool A", "recruitment_date": "0.01.01"},
+            {
+                "id": 200,
+                "class": "commander",
+                "name": "Veteran",
+                "recruitment_date": "2230.05.20",
+            },
+        ]
+        base_curr_snapshot["history"]["leaders"]["leaders"] = [
+            {"id": 101, "class": "scientist", "name": "Pool B", "recruitment_date": "0.01.01"},
+            {
+                "id": 200,
+                "class": "commander",
+                "name": "Veteran",
+                "recruitment_date": "2230.05.20",
+            },
+            {
+                "id": 201,
+                "class": "scientist",
+                "name": "Dr. Nova",
+                "recruitment_date": "2260.01.01",
+            },
+        ]
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        event_types = [e.event_type for e in result]
+        assert "leader_hired" in event_types
+        assert "leader_removed" not in event_types
 
     def test_detects_alliance_formed(self, base_prev_snapshot, base_curr_snapshot):
         """Detects new alliances forming."""

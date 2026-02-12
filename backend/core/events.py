@@ -129,6 +129,39 @@ def _parse_year(date_str: Any) -> int | None:
         return None
 
 
+def _is_placeholder_recruitment_date(value: Any) -> bool:
+    """Return True when a leader has an unrecruited pool placeholder date.
+
+    In Stellaris saves, recruitment pool candidates commonly use year 0 dates
+    (e.g. ``0.01.01``). These entries churn when the pool rerolls and should
+    not generate hire/removal chronicle events.
+    """
+    if value is None:
+        return False
+
+    text = str(value).strip()
+    if not text:
+        return False
+
+    year_part = text.split(".", 1)[0]
+    if not year_part.isdigit():
+        return False
+
+    return int(year_part) == 0
+
+
+def _is_trackable_leader(leader: dict[str, Any]) -> bool:
+    """Whether a leader should participate in roster diff events."""
+    if not isinstance(leader, dict):
+        return False
+
+    # Keep rulers even if date metadata is odd/missing.
+    if leader.get("is_ruler") is True:
+        return True
+
+    return not _is_placeholder_recruitment_date(leader.get("recruitment_date"))
+
+
 # Notable ascension perks that should be highlighted in chronicles
 _NOTABLE_ASCENSION_PERKS = {
     "ap_synthetic_evolution",
@@ -471,8 +504,16 @@ def compute_events(
         )
 
     # Leader roster events - using snapshot_reader
-    prev_leaders = get_player_leaders(prev)
-    curr_leaders = get_player_leaders(curr)
+    prev_leaders = {
+        lid: leader
+        for lid, leader in get_player_leaders(prev).items()
+        if _is_trackable_leader(leader)
+    }
+    curr_leaders = {
+        lid: leader
+        for lid, leader in get_player_leaders(curr).items()
+        if _is_trackable_leader(leader)
+    }
     prev_ids = set(prev_leaders.keys())
     curr_ids = set(curr_leaders.keys())
 
