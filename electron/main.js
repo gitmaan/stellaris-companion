@@ -1113,63 +1113,128 @@ wireAutoUpdaterEvents({ autoUpdater, getMainWindow: () => mainWindow })
 // =============================================================================
 
 /**
+ * Recursively scan a directory for .sav files and summarize results.
+ * @param {string} baseDir
+ * @returns {Promise<{saveCount: number, latest: {name: string, modified: string} | null}>}
+ */
+async function scanSaveFilesInDirectory(baseDir) {
+  const fs = require('fs')
+  const latestSave = { name: null, modifiedMs: -1 }
+  let saveCount = 0
+  const visited = new Set()
+
+  const walk = async (current) => {
+    let canonicalCurrent = current
+    try {
+      canonicalCurrent = await fs.promises.realpath(current)
+    } catch {
+      // Keep original path when realpath isn't available.
+    }
+
+    if (visited.has(canonicalCurrent)) return
+    visited.add(canonicalCurrent)
+
+    let entries
+    try {
+      entries = await fs.promises.readdir(current, { withFileTypes: true })
+    } catch {
+      return
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name)
+      if (entry.isDirectory()) {
+        await walk(fullPath)
+        continue
+      }
+      if (!entry.name.toLowerCase().endsWith('.sav')) continue
+
+      try {
+        const stat = await fs.promises.stat(fullPath)
+        saveCount += 1
+        if (stat.mtimeMs > latestSave.modifiedMs) {
+          latestSave.name = entry.name
+          latestSave.modifiedMs = stat.mtimeMs
+        }
+      } catch {
+        // Skip inaccessible files
+      }
+    }
+  }
+
+  await walk(baseDir)
+
+  return {
+    saveCount,
+    latest: latestSave.modifiedMs >= 0
+      ? { name: latestSave.name, modified: new Date(latestSave.modifiedMs).toISOString() }
+      : null,
+  }
+}
+
+/**
  * Detect Stellaris save files in platform-default directories.
  * Scans recursively for .sav files without needing the Python backend.
  * @returns {Promise<Object>} Detection result with found, directory, saveCount, latest
  */
-async function detectStellarissaves() {
+async function detectStellarisSaves() {
   const fs = require('fs')
   const candidates = getSaveDirCandidates()
+  let firstExistingDir = null
 
   for (const dir of candidates) {
     try {
-      await fs.promises.access(dir)
+      await fs.promises.access(dir, fs.constants.R_OK)
+      const stat = await fs.promises.stat(dir)
+      if (!stat.isDirectory()) continue
     } catch {
       continue
     }
+    if (!firstExistingDir) firstExistingDir = dir
 
-    // Recursively find .sav files
-    const savFiles = []
-    const walk = async (current) => {
-      let entries
-      try {
-        entries = await fs.promises.readdir(current, { withFileTypes: true })
-      } catch {
-        return
-      }
-      for (const entry of entries) {
-        const fullPath = path.join(current, entry.name)
-        if (entry.isDirectory()) {
-          await walk(fullPath)
-        } else if (entry.name.endsWith('.sav')) {
-          try {
-            const stat = await fs.promises.stat(fullPath)
-            savFiles.push({ name: entry.name, modified: stat.mtimeMs, path: fullPath })
-          } catch {
-            // Skip inaccessible files
-          }
-        }
-      }
-    }
-
-    await walk(dir)
-
-    if (savFiles.length > 0) {
-      savFiles.sort((a, b) => b.modified - a.modified)
-      const latest = savFiles[0]
+    const result = await scanSaveFilesInDirectory(dir)
+    if (result.saveCount > 0) {
       return {
         found: true,
         directory: dir,
-        saveCount: savFiles.length,
-        latest: { name: latest.name, modified: new Date(latest.modified).toISOString() },
+        saveCount: result.saveCount,
+        latest: result.latest,
       }
     }
-
-    // Directory exists but no saves found
-    return { found: false, directory: dir, saveCount: 0, latest: null }
   }
 
-  return { found: false, directory: null, saveCount: 0, latest: null }
+  return { found: false, directory: firstExistingDir, saveCount: 0, latest: null }
+}
+
+/**
+ * Detect save files in a user-selected directory.
+ * @param {string} directory
+ * @returns {Promise<Object>} Detection result with found, directory, saveCount, latest
+ */
+async function detectStellarisSavesInDirectory(directory) {
+  const fs = require('fs')
+  if (!directory || typeof directory !== 'string') {
+    return { found: false, directory: null, saveCount: 0, latest: null }
+  }
+
+  const resolved = path.resolve(directory)
+  try {
+    await fs.promises.access(resolved, fs.constants.R_OK)
+    const stat = await fs.promises.stat(resolved)
+    if (!stat.isDirectory()) {
+      return { found: false, directory: resolved, saveCount: 0, latest: null }
+    }
+  } catch {
+    return { found: false, directory: resolved, saveCount: 0, latest: null }
+  }
+
+  const result = await scanSaveFilesInDirectory(resolved)
+  return {
+    found: result.saveCount > 0,
+    directory: resolved,
+    saveCount: result.saveCount,
+    latest: result.latest,
+  }
 }
 
 ipcMain.handle('onboarding:status', async (event) => {
@@ -1185,7 +1250,13 @@ ipcMain.handle('onboarding:complete', async (event) => {
 
 ipcMain.handle('onboarding:detect-saves', async (event) => {
   validateSender(event)
-  return detectStellarisaves()
+  return detectStellarisSaves()
+})
+
+ipcMain.handle('onboarding:detect-saves-in-dir', async (event, payload) => {
+  validateSender(event)
+  const directory = typeof payload === 'string' ? payload : payload?.directory
+  return detectStellarisSavesInDirectory(directory)
 })
 
 // =============================================================================

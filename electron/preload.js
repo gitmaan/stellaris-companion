@@ -148,6 +148,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStatus: () => ipcRenderer.invoke('onboarding:status'),
     complete: () => ipcRenderer.invoke('onboarding:complete'),
     detectSaves: () => ipcRenderer.invoke('onboarding:detect-saves'),
+    detectSavesInDir: (directory) => ipcRenderer.invoke('onboarding:detect-saves-in-dir', { directory }),
   },
 
   // Announcements

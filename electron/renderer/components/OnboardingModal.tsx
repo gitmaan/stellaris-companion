@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { HUDButton } from './hud/HUDButton'
@@ -41,6 +41,8 @@ const slideTransition = {
 export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const [step, setStep] = useState<Step>(1)
   const [direction, setDirection] = useState(1)
+  const autoRescanAttemptedRef = useRef(false)
+  const autoRescanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Step 2 state
   const [apiKey, setApiKey] = useState('')
@@ -55,25 +57,58 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
     setStep(next)
   }, [step])
 
+  const clearAutoRescanTimer = useCallback(() => {
+    if (autoRescanTimerRef.current) {
+      clearTimeout(autoRescanTimerRef.current)
+      autoRescanTimerRef.current = null
+    }
+  }, [])
+
   // Auto-detect saves when entering step 3
   useEffect(() => {
     if (step === 3) {
+      autoRescanAttemptedRef.current = false
       detectSaves()
+      return
     }
-  }, [step])
+    clearAutoRescanTimer()
+  }, [step, clearAutoRescanTimer])
 
-  async function detectSaves() {
+  useEffect(() => {
+    if (step !== 3 || scanning || !saveResult || saveResult.found) return
+    if (autoRescanAttemptedRef.current) return
+
+    autoRescanAttemptedRef.current = true
+    autoRescanTimerRef.current = setTimeout(() => {
+      autoRescanTimerRef.current = null
+      void detectSaves(selectedPath || undefined)
+    }, 2000)
+  }, [step, scanning, saveResult, selectedPath])
+
+  useEffect(() => {
+    return () => clearAutoRescanTimer()
+  }, [clearAutoRescanTimer])
+
+  async function detectSaves(targetDirectory?: string) {
+    clearAutoRescanTimer()
     setScanning(true)
     try {
-      const result = await window.electronAPI?.onboarding.detectSaves()
+      const result = targetDirectory
+        ? await window.electronAPI?.onboarding.detectSavesInDir(targetDirectory)
+        : await window.electronAPI?.onboarding.detectSaves()
       if (result) {
         setSaveResult(result)
-        if (result.found && result.directory) {
+        if (result.directory) {
           setSelectedPath(result.directory)
         }
       }
     } catch {
-      setSaveResult({ found: false, directory: null, saveCount: 0, latest: null })
+      setSaveResult({
+        found: false,
+        directory: targetDirectory || null,
+        saveCount: 0,
+        latest: null,
+      })
     } finally {
       setScanning(false)
     }
@@ -83,7 +118,12 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
     const folder = await window.electronAPI?.showFolderDialog()
     if (folder) {
       setSelectedPath(folder)
+      await detectSaves(folder)
     }
+  }
+
+  async function handleRescan() {
+    await detectSaves(selectedPath || undefined)
   }
 
   async function handleComplete() {
@@ -181,6 +221,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
                   selectedPath={selectedPath}
                   shortenPath={shortenPath}
                   onBrowse={handleBrowse}
+                  onRetry={handleRescan}
                   onBack={() => goTo(2)}
                   onComplete={handleComplete}
                 />
@@ -312,6 +353,7 @@ function StepSaveDirectory({
   selectedPath,
   shortenPath,
   onBrowse,
+  onRetry,
   onBack,
   onComplete,
 }: {
@@ -320,6 +362,7 @@ function StepSaveDirectory({
   selectedPath: string | null
   shortenPath: (p: string) => string
   onBrowse: () => void
+  onRetry: () => void
   onBack: () => void
   onComplete: () => void
 }) {
@@ -344,7 +387,10 @@ function StepSaveDirectory({
             shortenPath={shortenPath}
           />
         ) : (
-          <SaveNotFound />
+          <SaveNotFound
+            selectedPath={selectedPath}
+            shortenPath={shortenPath}
+          />
         )}
       </div>
 
@@ -365,10 +411,13 @@ function StepSaveDirectory({
         ) : (
           <>
             <HUDButton variant="secondary" onClick={onComplete}>
-              Skip for Now
+              Set Up Later
+            </HUDButton>
+            <HUDButton variant="secondary" onClick={onRetry}>
+              Scan Again
             </HUDButton>
             <HUDButton onClick={onBrowse}>
-              Browse
+              Browse Folder
             </HUDButton>
           </>
         )}
@@ -411,15 +460,25 @@ function SaveFound({
   )
 }
 
-function SaveNotFound() {
+function SaveNotFound({
+  selectedPath,
+  shortenPath,
+}: {
+  selectedPath: string | null
+  shortenPath: (p: string) => string
+}) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-text-primary leading-relaxed">
-        Sensor sweep complete. No save files in the standard directories.
+        We couldn't find your Stellaris saves automatically.
       </p>
       <p className="text-sm text-text-secondary leading-relaxed">
-        You can point us to the right folder, or skip this — the advisor
-        will lock on automatically once Stellaris generates a save.
+        {selectedPath
+          ? `No .sav files were found in ${shortenPath(selectedPath)}.`
+          : 'We checked the default save locations but did not find any .sav files yet.'}
+      </p>
+      <p className="text-sm text-text-secondary leading-relaxed">
+        Click Browse Folder and select your "Stellaris/save games" folder, or choose Set Up Later and configure it in Settings.
       </p>
     </div>
   )

@@ -63,6 +63,12 @@ declare global {
           saveCount: number
           latest: { name: string; modified: string } | null
         }>
+        detectSavesInDir: (directory: string) => Promise<{
+          found: boolean
+          directory: string | null
+          saveCount: number
+          latest: { name: string; modified: string } | null
+        }>
       }
       // Discord OAuth (DISC-015)
       discord: {
