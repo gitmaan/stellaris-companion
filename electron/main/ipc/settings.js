@@ -18,7 +18,7 @@ function registerSettingsIpcHandlers({
     await saveSettings(settings)
 
     const fullSettings = await getSettingsWithSecrets()
-    await onSettingsSaved(fullSettings)
+    await onSettingsSaved(fullSettings, settings || {})
 
     return { success: true }
   })
@@ -41,4 +41,3 @@ function registerSettingsIpcHandlers({
 module.exports = {
   registerSettingsIpcHandlers,
 }
-

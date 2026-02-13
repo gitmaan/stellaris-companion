@@ -9,6 +9,7 @@ export interface Settings {
   // Deprecated (backwards-compat with older main process / renderer builds)
   savePath?: string
   discordEnabled: boolean
+  uiScale: number
 }
 
 export interface UseSettingsResult {
@@ -36,9 +37,11 @@ export function useSettings(): UseSettingsResult {
 
     try {
       const loaded = await window.electronAPI.getSettings() as Settings
+      const parsedUiScale = Number(loaded.uiScale)
       const normalized = {
         ...loaded,
         saveDir: loaded.saveDir || loaded.savePath || '',
+        uiScale: Number.isFinite(parsedUiScale) ? parsedUiScale : 1,
       }
       setSettings(normalized)
       setError(null)

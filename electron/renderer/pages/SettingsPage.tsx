@@ -5,6 +5,8 @@ import { HUDHeader, HUDSectionTitle, HUDMicro, HUDLabel } from '../components/hu
 import { HUDPanel } from '../components/hud/HUDPanel'
 import { HUDInput } from '../components/hud/HUDInput'
 import { HUDButton } from '../components/hud/HUDButton'
+import { HUDSelect } from '../components/hud/HUDForm'
+import { useToast } from '../components/Toast'
 
 /**
  * DISC-017: Convert technical error messages to user-friendly messages.
@@ -22,8 +24,16 @@ interface SettingsPageProps {
   onReportIssue?: () => void
 }
 
+const UI_SCALE_OPTIONS = [
+  { value: '1', label: '100%' },
+  { value: '1.1', label: '110%' },
+  { value: '1.25', label: '125%' },
+  { value: '1.4', label: '140%' },
+]
+
 function SettingsPage({ onReportIssue }: SettingsPageProps) {
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
+  const { showToast } = useToast()
 
   const {
     status: discordStatus,
@@ -37,6 +47,8 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
 
   const [googleApiKey, setGoogleApiKey] = useState('')
   const [saveDir, setSaveDir] = useState('')
+  const [uiScale, setUiScale] = useState(1)
+  const [uiScaleSaving, setUiScaleSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -53,6 +65,7 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
     if (settings) {
       setGoogleApiKey(settings.googleApiKeySet ? settings.googleApiKey : '')
       setSaveDir(settings.saveDir || '')
+      setUiScale(settings.uiScale || 1)
     }
   }, [settings])
 
@@ -87,6 +100,35 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
   const handleDisconnectDiscord = async () => { await disconnectDiscord() }
 
   const [retrying, setRetrying] = useState(false)
+  const handleUiScaleChange = async (rawValue: string) => {
+    const nextScale = Number(rawValue)
+    if (!Number.isFinite(nextScale)) return
+    if (Math.abs(nextScale - uiScale) < 0.0001) return
+
+    const previousScale = uiScale
+    setUiScale(nextScale)
+    setUiScaleSaving(true)
+
+    const success = await saveSettings({ uiScale: nextScale })
+    setUiScaleSaving(false)
+
+    if (!success) {
+      setUiScale(previousScale)
+      showToast({
+        type: 'error',
+        message: 'Failed to update text size. Please try again.',
+        duration: 4000,
+      })
+      return
+    }
+
+    showToast({
+      type: 'success',
+      message: `Text size set to ${Math.round(nextScale * 100)}%.`,
+      duration: 1800,
+    })
+  }
+
   const handleRetryConnection = async () => {
     if (!window.electronAPI?.discord) return
     setRetrying(true)
@@ -120,9 +162,17 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
                 <HUDMicro className="mb-1 text-accent-cyan">SYS // CONFIG_01</HUDMicro>
                 <HUDHeader size="xl">CONFIGURATION</HUDHeader>
             </div>
-            <div className="hidden md:block text-right">
-               <HUDMicro>TERMINAL ID: 8X-229</HUDMicro>
-               <HUDMicro>SECURE CONNECTION</HUDMicro>
+            <div className="w-[180px]">
+               <HUDSelect
+                  label="Text Size"
+                  value={String(uiScale)}
+                  disabled={uiScaleSaving}
+                  onChange={(e) => void handleUiScaleChange(e.target.value)}
+                  options={UI_SCALE_OPTIONS}
+               />
+               <HUDMicro className="block mt-1 text-right">
+                 {uiScaleSaving ? 'APPLYING...' : 'CMD/CTRL +/-/0'}
+               </HUDMicro>
             </div>
         </div>
 
@@ -141,7 +191,7 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
             <HUDPanel variant="primary" className="mb-6 border-accent-green/50" decoration="scanline">
                 <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-accent-green shadow-[0_0_10px_rgba(72,187,120,0.8)]" />
-                    <span className="font-mono text-accent-green text-sm">CONFIGURATION SAVED // REBOOTING SUBSYSTEMS...</span>
+                    <span className="font-mono text-accent-green text-sm">CONFIGURATION SAVED // SETTINGS APPLIED</span>
                 </div>
             </HUDPanel>
         )}

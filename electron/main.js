@@ -126,6 +126,7 @@ const store = new Store({
     // Anonymous ID for rate-limiting and de-duping reports (no personal data).
     installId: '',
     discordEnabled: false,
+    uiScale: 1,
     hasCompletedOnboarding: false,
     // Window state persistence
     windowState: {
@@ -186,6 +187,8 @@ const HEALTH_CHECK_INTERVAL = 5000 // 5 seconds
 const HEALTH_CHECK_TIMEOUT = 30000 // 30 seconds for initial startup
 const HEALTH_CHECK_REQUEST_TIMEOUT = 4000 // 4 seconds per health request (increased from 2s)
 const HEALTH_CHECK_FAIL_THRESHOLD = 2 // Require 2 consecutive failures before showing disconnected
+const UI_SCALE_PRESETS = [1, 1.1, 1.25, 1.4]
+const DEFAULT_UI_SCALE = 1
 
 // Discord configuration (DISC-007)
 // These are set via environment or will use defaults for development
@@ -627,6 +630,49 @@ function validateSender(event) {
 }
 
 /**
+ * Normalize UI scale to one of the supported presets.
+ * @param {unknown} rawValue
+ * @returns {number}
+ */
+function normalizeUiScale(rawValue) {
+  const value = Number(rawValue)
+  if (!Number.isFinite(value)) return DEFAULT_UI_SCALE
+
+  let nearest = UI_SCALE_PRESETS[0]
+  let nearestDelta = Math.abs(value - nearest)
+
+  for (const preset of UI_SCALE_PRESETS) {
+    const delta = Math.abs(value - preset)
+    if (delta < nearestDelta) {
+      nearest = preset
+      nearestDelta = delta
+    }
+  }
+
+  return nearest
+}
+
+function getUiScaleSetting() {
+  return normalizeUiScale(store.get('uiScale', DEFAULT_UI_SCALE))
+}
+
+function applyUiScaleToWindow(targetWindow = mainWindow) {
+  if (!targetWindow || targetWindow.isDestroyed()) return
+  targetWindow.webContents.setZoomFactor(getUiScaleSetting())
+}
+
+function stepUiScale(direction) {
+  const current = getUiScaleSetting()
+  const currentIndex = UI_SCALE_PRESETS.findIndex((preset) => Math.abs(preset - current) < 0.0001)
+  const safeCurrentIndex = currentIndex === -1 ? 0 : currentIndex
+  const nextIndex = Math.max(0, Math.min(UI_SCALE_PRESETS.length - 1, safeCurrentIndex + direction))
+  const nextScale = UI_SCALE_PRESETS[nextIndex]
+  store.set('uiScale', nextScale)
+  applyUiScaleToWindow()
+  return nextScale
+}
+
+/**
  * Get settings from storage.
  * Uses safeStorage-encrypted electron-store for secrets (returns masked),
  * plain electron-store for non-secrets.
@@ -638,6 +684,7 @@ function getSettings() {
 
   const saveDir = store.get('saveDir', '')
   const discordEnabled = store.get('discordEnabled', false)
+  const uiScale = getUiScaleSetting()
 
   return {
     googleApiKey: maskSecret(googleApiKey),
@@ -648,6 +695,7 @@ function getSettings() {
     // Backwards-compat: older renderer builds expect `savePath`.
     savePath: saveDir,
     discordEnabled,
+    uiScale,
   }
 }
 
@@ -661,6 +709,7 @@ function getSettingsWithSecrets() {
   const saveDir = store.get('saveDir', '')
   const lastSaveFilePath = store.get('lastSaveFilePath', '')
   const discordEnabled = store.get('discordEnabled', false)
+  const uiScale = getUiScaleSetting()
 
   return {
     googleApiKey,
@@ -670,6 +719,7 @@ function getSettingsWithSecrets() {
     savePath: saveDir,
     lastSaveFilePath,
     discordEnabled,
+    uiScale,
   }
 }
 
@@ -697,6 +747,11 @@ function saveSettings(settings) {
 
   if (settings.discordEnabled !== undefined) {
     store.set('discordEnabled', settings.discordEnabled)
+  }
+
+  if (settings.uiScale !== undefined) {
+    store.set('uiScale', normalizeUiScale(settings.uiScale))
+    applyUiScaleToWindow()
   }
 
   return { success: true }
@@ -929,6 +984,9 @@ function createWindow() {
     mainWindow.removeMenu()
   }
 
+  // Apply persisted UI scale immediately so users keep their preferred text size.
+  applyUiScaleToWindow(mainWindow)
+
   // Save window state on resize/move (debounced to avoid excessive writes)
   let saveStateTimeout = null
   const saveWindowState = () => {
@@ -966,6 +1024,34 @@ function createWindow() {
     }
   })
 
+  // Global zoom shortcuts for accessibility:
+  // Cmd/Ctrl +, Cmd/Ctrl -, Cmd/Ctrl 0
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+
+    const commandOrControl = process.platform === 'darwin' ? input.meta : input.control
+    if (!commandOrControl) return
+
+    const key = input.key
+    if (key === '+' || key === '=' || key === 'Add') {
+      event.preventDefault()
+      stepUiScale(1)
+      return
+    }
+
+    if (key === '-' || key === '_' || key === 'Subtract') {
+      event.preventDefault()
+      stepUiScale(-1)
+      return
+    }
+
+    if (key === '0') {
+      event.preventDefault()
+      store.set('uiScale', DEFAULT_UI_SCALE)
+      applyUiScaleToWindow()
+    }
+  })
+
   // In development, load from Vite dev server
   if (IS_DEV) {
     mainWindow.loadURL('http://localhost:5173')
@@ -996,6 +1082,7 @@ function createWindow() {
   // Ensure the renderer always receives at least one status event.
   mainWindow.webContents.on('did-finish-load', () => {
     if (!mainWindow) return
+    applyUiScaleToWindow(mainWindow)
     if (lastBackendStatusPayload) {
       mainWindow.webContents.send('backend-status', lastBackendStatusPayload)
     } else {
@@ -1088,9 +1175,17 @@ registerSettingsIpcHandlers({
   getSettings,
   saveSettings,
   getSettingsWithSecrets,
-  onSettingsSaved: async (fullSettings) => {
+  onSettingsSaved: async (fullSettings, changedSettings = {}) => {
     backendConfigured = !!fullSettings.googleApiKey
-    restartPythonBackend(fullSettings)
+
+    const backendRelevantSettingsChanged =
+      changedSettings.googleApiKey !== undefined ||
+      changedSettings.saveDir !== undefined ||
+      changedSettings.savePath !== undefined
+
+    if (backendRelevantSettingsChanged) {
+      restartPythonBackend(fullSettings)
+    }
   },
 })
 
