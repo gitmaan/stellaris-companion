@@ -2,6 +2,14 @@
   "version": 1,
   "announcements": [
     {
+      "id": "community-002-text-sizing-feedback",
+      "severity": "info",
+      "title": "Readability Update",
+      "body": "Huge thanks to choppytehbear1337 for calling out text readability. Text sizing is now available in Settings. Our recent Reddit post is currently banned, so please use the in-app feedback form to share ideas and bug reports. Hope you're having fun, and thanks for helping improve Stellaris Companion!",
+      "publishedAt": "2026-02-13T00:00:00Z",
+      "minVersion": "0.5.6"
+    },
+    {
       "id": "launch-001",
       "severity": "info",
       "title": "Fresh off the shipyard",
