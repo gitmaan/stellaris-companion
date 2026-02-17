@@ -174,7 +174,9 @@ function App() {
               return (
                 <motion.div
                   key={tab}
-                  className="absolute inset-0 px-6 pb-6 overflow-y-auto custom-scrollbar"
+                  className={`absolute inset-0 px-6 pb-6 ${
+                    tab === 'chat' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'
+                  }`}
                   animate={{
                     opacity: isActive ? 1 : 0,
                     scale: isActive ? 1 : 0.98,

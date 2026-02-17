@@ -125,6 +125,14 @@ const suggestionItem = {
   show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: EASE_CURVE } },
 }
 
+const COMPACT_WELCOME_HEIGHT = 760
+const COMPACT_WELCOME_WIDTH = 1100
+
+function isCompactWelcomeViewport(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.innerHeight <= COMPACT_WELCOME_HEIGHT || window.innerWidth <= COMPACT_WELCOME_WIDTH
+}
+
 interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -193,6 +201,7 @@ function ChatPage({
   const [loadingMessage, setLoadingMessage] = useState<string>('Consulting the Curators')
   const [suggestions, setSuggestions] = useState<string[]>(() => generateSuggestions())
   const [advisorPanelOpen, setAdvisorPanelOpen] = useState(false)
+  const [isWelcomeCompact, setIsWelcomeCompact] = useState<boolean>(() => isCompactWelcomeViewport())
 
   // Re-animate suggestions when tab becomes active again
   const [suggestionKey, setSuggestionKey] = useState(0)
@@ -241,6 +250,23 @@ function ChatPage({
       }
     }
   }, [])
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsWelcomeCompact(isCompactWelcomeViewport())
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const visibleSuggestions = useMemo(() => {
+    if (!isWelcomeCompact) return suggestions
+
+    const roast = suggestions.find((s) => s === 'Roast my empire')
+    const base = suggestions.filter((s) => s !== 'Roast my empire').slice(0, 3)
+    return roast ? [...base, roast] : suggestions.slice(0, 4)
+  }, [isWelcomeCompact, suggestions])
 
   const handleSend = useCallback(async (text: string) => {
     // Add user message
@@ -374,7 +400,7 @@ function ChatPage({
   }, [messages, isLoading, loadingMessage, onReportLlmIssue])
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full min-h-0 relative">
       <AdvisorInfoPanel
         isOpen={advisorPanelOpen}
         onClose={() => setAdvisorPanelOpen(false)}
@@ -388,28 +414,39 @@ function ChatPage({
       />
 
       {messages.length === 0 ? (
-        <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center p-6">
+        <div
+          className={`flex-1 overflow-y-auto flex flex-col items-center ${
+            isWelcomeCompact ? 'justify-start p-4 pt-5' : 'justify-center p-6'
+          }`}
+        >
           <motion.div
-            className="w-full max-w-2xl flex flex-col items-center gap-12"
+            className={`w-full max-w-2xl flex flex-col items-center ${
+              isWelcomeCompact ? 'gap-6' : 'gap-12'
+            }`}
             variants={welcomeContainer}
             initial="hidden"
             animate="show"
           >
 
             {/* Header Section */}
-            <div className="text-center space-y-4">
+            <div className={`text-center ${isWelcomeCompact ? 'space-y-2.5' : 'space-y-4'}`}>
               <motion.div
-                className="inline-flex justify-center items-center w-16 h-16 rounded-full border border-accent-cyan/30 bg-accent-cyan/5 mb-4 shadow-glow-sm animate-pulse-glow"
+                className={`inline-flex justify-center items-center rounded-full border border-accent-cyan/30 bg-accent-cyan/5 shadow-glow-sm animate-pulse-glow ${
+                  isWelcomeCompact ? 'w-10 h-10 mb-2' : 'w-16 h-16 mb-4'
+                }`}
                 variants={welcomeItem}
                 style={{ scale: 0 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: EASE_CURVE }}
               >
-                 <FolderIconG className="text-accent-cyan" size={32} />
+                 <FolderIconG className="text-accent-cyan" size={isWelcomeCompact ? 20 : 32} />
               </motion.div>
 
               <motion.div className="relative" variants={welcomeItem}>
-                <HUDHeader size="xl" className="tracking-[0.2em] text-accent-cyan drop-shadow-[0_0_10px_rgba(0,212,255,0.5)]">
+                <HUDHeader
+                  size={isWelcomeCompact ? 'lg' : 'xl'}
+                  className={`${isWelcomeCompact ? 'tracking-[0.12em]' : 'tracking-[0.2em]'} text-accent-cyan drop-shadow-[0_0_10px_rgba(0,212,255,0.5)]`}
+                >
                   Galactic Helpdesk
                 </HUDHeader>
                 <motion.div
@@ -420,7 +457,10 @@ function ChatPage({
                 />
               </motion.div>
 
-              <motion.p className="text-text-secondary font-mono text-sm tracking-wide" variants={welcomeItem}>
+              <motion.p
+                className={`text-text-secondary font-mono tracking-wide ${isWelcomeCompact ? 'text-xs' : 'text-sm'}`}
+                variants={welcomeItem}
+              >
                 {precomputeReady
                   ? 'YOUR FILE IS OPEN // SUBMIT YOUR REQUEST'
                   : <>INITIALIZING // SCANNING EMPIRE DATA<span className="animate-pulse-text ml-1">▍</span></>}
@@ -438,37 +478,45 @@ function ChatPage({
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.4, ease: EASE_CURVE }}
                   >
-                    <HUDPanel className="w-full" title="Suggested Inquiries" variant="primary">
-                      <motion.div
-                        key={suggestionKey}
-                        className="grid grid-cols-1 md:grid-cols-2 gap-3"
-                        variants={suggestionContainer}
-                        initial="hidden"
-                        animate="show"
-                      >
-                        {suggestions.map((suggestion, idx) => (
-                          <motion.button
-                            key={suggestion}
-                            variants={suggestionItem}
-                            onClick={() => handleSend(suggestion)}
-                            className="group relative flex items-start p-3 text-left transition-all duration-200 hover:bg-accent-cyan/5 border border-transparent hover:border-accent-cyan/20 rounded-sm"
-                          >
-                            <span className="font-mono text-xs text-accent-cyan/50 mr-3 opacity-50 group-hover:opacity-100 group-hover:text-accent-cyan transition-all">
-                              {String(idx + 1).padStart(2, '0')}
-                            </span>
-                            <span className="font-mono text-xs tracking-wide text-text-primary group-hover:text-accent-cyan group-hover:drop-shadow-[0_0_5px_rgba(0,212,255,0.5)] transition-all">
-                              {suggestion}
-                            </span>
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-1 bg-accent-cyan/50 rounded-full opacity-0 group-hover:opacity-100 shadow-glow-sm transition-opacity" />
-                          </motion.button>
-                        ))}
-                      </motion.div>
+                    <HUDPanel
+                      className={`w-full ${isWelcomeCompact ? 'max-h-[42vh]' : ''}`}
+                      title="Suggested Inquiries"
+                      variant="primary"
+                    >
+                      <div className={isWelcomeCompact ? 'max-h-[30vh] overflow-y-auto custom-scrollbar pr-1' : ''}>
+                        <motion.div
+                          key={suggestionKey}
+                          className={`grid grid-cols-1 md:grid-cols-2 ${isWelcomeCompact ? 'gap-2' : 'gap-3'}`}
+                          variants={suggestionContainer}
+                          initial="hidden"
+                          animate="show"
+                        >
+                          {visibleSuggestions.map((suggestion, idx) => (
+                            <motion.button
+                              key={suggestion}
+                              variants={suggestionItem}
+                              onClick={() => handleSend(suggestion)}
+                              className={`group relative flex items-start text-left transition-all duration-200 hover:bg-accent-cyan/5 border border-transparent hover:border-accent-cyan/20 rounded-sm ${
+                                isWelcomeCompact ? 'p-2.5' : 'p-3'
+                              }`}
+                            >
+                              <span className="font-mono text-xs text-accent-cyan/50 mr-3 opacity-50 group-hover:opacity-100 group-hover:text-accent-cyan transition-all">
+                                {String(idx + 1).padStart(2, '0')}
+                              </span>
+                              <span className={`font-mono tracking-wide text-text-primary group-hover:text-accent-cyan group-hover:drop-shadow-[0_0_5px_rgba(0,212,255,0.5)] transition-all ${isWelcomeCompact ? 'text-[11px]' : 'text-xs'}`}>
+                                {suggestion}
+                              </span>
+                              <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-1 bg-accent-cyan/50 rounded-full opacity-0 group-hover:opacity-100 shadow-glow-sm transition-opacity" />
+                            </motion.button>
+                          ))}
+                        </motion.div>
+                      </div>
                     </HUDPanel>
                   </motion.div>
                 ) : (
                   <motion.div
                     key="scanning"
-                    className="flex items-center justify-center gap-3 py-8"
+                    className={`flex items-center justify-center gap-3 ${isWelcomeCompact ? 'py-5' : 'py-8'}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0, y: -10 }}

@@ -434,6 +434,33 @@
   background: theme('colors.accent.cyan-dim');
 }
 
+/* Composer scrollbar: keep right-side behavior, but make it subtle and lightweight */
+.composer-scrollbar {
+  direction: ltr;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 212, 255, 0.45) transparent;
+  scrollbar-gutter: stable;
+}
+
+.composer-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.composer-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0 52px;
+}
+
+.composer-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(0, 212, 255, 0.22);
+}
+
+.composer-scrollbar:hover::-webkit-scrollbar-thumb,
+.composer-scrollbar:focus::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.52);
+}
+
 /* ============================================
    Selection Styling
    ============================================ */
