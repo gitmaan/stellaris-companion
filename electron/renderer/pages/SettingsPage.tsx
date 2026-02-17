@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useSettings } from '../hooks/useSettings'
+import { DEFAULT_UI_THEME, normalizeUiTheme, type UiTheme, useSettings } from '../hooks/useSettings'
 import { useDiscord } from '../hooks/useDiscord'
 import { HUDHeader, HUDSectionTitle, HUDMicro, HUDLabel } from '../components/hud/HUDText'
 import { HUDPanel } from '../components/hud/HUDPanel'
@@ -22,6 +22,7 @@ function getUserFriendlyErrorMessage(error: string | null): string | null {
 
 interface SettingsPageProps {
   onReportIssue?: () => void
+  onThemeChange?: (theme: UiTheme) => void
 }
 
 const UI_SCALE_OPTIONS = [
@@ -31,7 +32,19 @@ const UI_SCALE_OPTIONS = [
   { value: '1.4', label: '140%' },
 ]
 
-function SettingsPage({ onReportIssue }: SettingsPageProps) {
+const UI_THEME_OPTIONS: { value: UiTheme; label: string }[] = [
+  { value: 'stellaris-cyan', label: 'Ion Cyan' },
+  { value: 'tactica-green', label: 'Tactica Green' },
+  { value: 'command-amber', label: 'Command Amber' },
+]
+
+const UI_THEME_LABELS: Record<UiTheme, string> = {
+  'stellaris-cyan': 'Ion Cyan',
+  'tactica-green': 'Tactica Green',
+  'command-amber': 'Command Amber',
+}
+
+function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
   const { showToast } = useToast()
 
@@ -49,6 +62,8 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
   const [saveDir, setSaveDir] = useState('')
   const [uiScale, setUiScale] = useState(1)
   const [uiScaleSaving, setUiScaleSaving] = useState(false)
+  const [uiTheme, setUiTheme] = useState<UiTheme>(DEFAULT_UI_THEME)
+  const [uiThemeSaving, setUiThemeSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -66,8 +81,11 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
       setGoogleApiKey(settings.googleApiKeySet ? settings.googleApiKey : '')
       setSaveDir(settings.saveDir || '')
       setUiScale(settings.uiScale || 1)
+      const normalizedTheme = normalizeUiTheme(settings.uiTheme)
+      setUiTheme(normalizedTheme)
+      onThemeChange?.(normalizedTheme)
     }
-  }, [settings])
+  }, [onThemeChange, settings])
 
   useEffect(() => {
     if (!settings) return
@@ -129,6 +147,36 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
     })
   }
 
+  const handleUiThemeChange = async (rawValue: string) => {
+    const nextTheme = normalizeUiTheme(rawValue)
+    if (nextTheme === uiTheme) return
+
+    const previousTheme = uiTheme
+    setUiTheme(nextTheme)
+    onThemeChange?.(nextTheme)
+    setUiThemeSaving(true)
+
+    const success = await saveSettings({ uiTheme: nextTheme })
+    setUiThemeSaving(false)
+
+    if (!success) {
+      setUiTheme(previousTheme)
+      onThemeChange?.(previousTheme)
+      showToast({
+        type: 'error',
+        message: 'Failed to update color theme. Please try again.',
+        duration: 4000,
+      })
+      return
+    }
+
+    showToast({
+      type: 'success',
+      message: `Theme set to ${UI_THEME_LABELS[nextTheme]}.`,
+      duration: 1800,
+    })
+  }
+
   const handleRetryConnection = async () => {
     if (!window.electronAPI?.discord) return
     setRetrying(true)
@@ -162,17 +210,31 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
                 <HUDMicro className="mb-1 text-accent-cyan">SYS // CONFIG_01</HUDMicro>
                 <HUDHeader size="xl">CONFIGURATION</HUDHeader>
             </div>
-            <div className="w-[180px]">
-               <HUDSelect
+            <div className="w-[420px] max-w-[60%] grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <HUDSelect
                   label="Text Size"
                   value={String(uiScale)}
                   disabled={uiScaleSaving}
                   onChange={(e) => void handleUiScaleChange(e.target.value)}
                   options={UI_SCALE_OPTIONS}
-               />
-               <HUDMicro className="block mt-1 text-right">
-                 {uiScaleSaving ? 'APPLYING...' : 'CMD/CTRL +/-/0'}
-               </HUDMicro>
+                />
+                <HUDMicro className="block mt-1 text-right">
+                  {uiScaleSaving ? 'APPLYING...' : 'CMD/CTRL +/-/0'}
+                </HUDMicro>
+              </div>
+              <div>
+                <HUDSelect
+                  label="Color Theme"
+                  value={uiTheme}
+                  disabled={uiThemeSaving}
+                  onChange={(e) => void handleUiThemeChange(e.target.value)}
+                  options={UI_THEME_OPTIONS}
+                />
+                <HUDMicro className="block mt-1 text-right">
+                  {uiThemeSaving ? 'APPLYING...' : 'THEME PRESET'}
+                </HUDMicro>
+              </div>
             </div>
         </div>
 
@@ -190,7 +252,7 @@ function SettingsPage({ onReportIssue }: SettingsPageProps) {
         {saveSuccess && (
             <HUDPanel variant="primary" className="mb-6 border-accent-green/50" decoration="scanline">
                 <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-accent-green shadow-[0_0_10px_rgba(72,187,120,0.8)]" />
+                    <div className="w-2 h-2 bg-accent-green shadow-glow-green" />
                     <span className="font-mono text-accent-green text-sm">CONFIGURATION SAVED // SETTINGS APPLIED</span>
                 </div>
             </HUDPanel>

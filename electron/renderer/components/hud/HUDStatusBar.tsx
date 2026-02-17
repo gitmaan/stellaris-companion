@@ -132,7 +132,7 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
               Transmissions
             </span>
             {transmissionsUnread > 0 && (
-              <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan shadow-[0_0_6px_rgba(0,212,255,0.7)] animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan shadow-glow-dot animate-pulse" />
             )}
           </button>
         )}

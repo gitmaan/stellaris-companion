@@ -153,7 +153,7 @@ export default function ChronicleInfoPanel({
             className="absolute right-0 top-0 bottom-0 w-full max-w-[420px] bg-bg-secondary border-l border-border"
             style={{
               boxShadow:
-                '0 0 30px rgba(0, 212, 255, 0.18), inset 0 0 20px rgba(0, 212, 255, 0.04)',
+                '0 0 30px rgb(var(--color-accent-cyan) / 0.18), inset 0 0 20px rgb(var(--color-accent-cyan) / 0.04)',
             }}
             onClick={(e) => e.stopPropagation()}
           >

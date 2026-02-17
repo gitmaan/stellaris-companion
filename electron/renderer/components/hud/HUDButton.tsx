@@ -18,7 +18,7 @@ export const HUDButton: React.FC<HUDButtonProps> = ({
     primary: "bg-accent-cyan/10 border border-accent-cyan/40 text-accent-cyan hover:bg-accent-cyan/20 hover:border-accent-cyan hover:shadow-glow-sm active:translate-y-px",
     secondary: "bg-transparent border border-white/20 text-text-secondary hover:text-text-primary hover:border-white/40 active:translate-y-px",
     ghost: "bg-transparent border border-transparent text-text-secondary hover:text-accent-cyan hover:bg-accent-cyan/5",
-    danger: "bg-accent-red/10 border border-accent-red/40 text-accent-red hover:bg-accent-red/20 hover:border-accent-red hover:shadow-[0_0_10px_rgba(252,129,129,0.3)]",
+    danger: "bg-accent-red/10 border border-accent-red/40 text-accent-red hover:bg-accent-red/20 hover:border-accent-red hover:shadow-glow-red",
   };
 
   return (

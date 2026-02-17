@@ -418,7 +418,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ duration: 0.2 }}
           className="relative w-full max-w-lg mx-4 p-6 bg-bg-elevated border border-border rounded-lg"
-          style={{ boxShadow: '0 0 40px rgba(0, 212, 255, 0.1), 0 8px 32px rgba(0, 0, 0, 0.5)' }}
+          style={{ boxShadow: '0 0 40px rgb(var(--color-accent-cyan) / 0.1), 0 8px 32px rgb(0 0 0 / 0.5)' }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-accent-cyan/60" />

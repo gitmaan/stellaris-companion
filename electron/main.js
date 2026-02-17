@@ -127,6 +127,7 @@ const store = new Store({
     installId: '',
     discordEnabled: false,
     uiScale: 1,
+    uiTheme: 'stellaris-cyan',
     hasCompletedOnboarding: false,
     // Window state persistence
     windowState: {
@@ -189,6 +190,8 @@ const HEALTH_CHECK_REQUEST_TIMEOUT = 4000 // 4 seconds per health request (incre
 const HEALTH_CHECK_FAIL_THRESHOLD = 2 // Require 2 consecutive failures before showing disconnected
 const UI_SCALE_PRESETS = [1, 1.1, 1.25, 1.4]
 const DEFAULT_UI_SCALE = 1
+const UI_THEME_PRESETS = ['stellaris-cyan', 'tactica-green', 'command-amber']
+const DEFAULT_UI_THEME = 'stellaris-cyan'
 
 // Discord configuration (DISC-007)
 // These are set via environment or will use defaults for development
@@ -656,6 +659,16 @@ function getUiScaleSetting() {
   return normalizeUiScale(store.get('uiScale', DEFAULT_UI_SCALE))
 }
 
+function normalizeUiTheme(rawValue) {
+  if (typeof rawValue !== 'string') return DEFAULT_UI_THEME
+  if (rawValue === 'tactica-phosphor') return 'tactica-green'
+  return UI_THEME_PRESETS.includes(rawValue) ? rawValue : DEFAULT_UI_THEME
+}
+
+function getUiThemeSetting() {
+  return normalizeUiTheme(store.get('uiTheme', DEFAULT_UI_THEME))
+}
+
 function applyUiScaleToWindow(targetWindow = mainWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) return
   targetWindow.webContents.setZoomFactor(getUiScaleSetting())
@@ -685,6 +698,7 @@ function getSettings() {
   const saveDir = store.get('saveDir', '')
   const discordEnabled = store.get('discordEnabled', false)
   const uiScale = getUiScaleSetting()
+  const uiTheme = getUiThemeSetting()
 
   return {
     googleApiKey: maskSecret(googleApiKey),
@@ -696,6 +710,7 @@ function getSettings() {
     savePath: saveDir,
     discordEnabled,
     uiScale,
+    uiTheme,
   }
 }
 
@@ -710,6 +725,7 @@ function getSettingsWithSecrets() {
   const lastSaveFilePath = store.get('lastSaveFilePath', '')
   const discordEnabled = store.get('discordEnabled', false)
   const uiScale = getUiScaleSetting()
+  const uiTheme = getUiThemeSetting()
 
   return {
     googleApiKey,
@@ -720,6 +736,7 @@ function getSettingsWithSecrets() {
     lastSaveFilePath,
     discordEnabled,
     uiScale,
+    uiTheme,
   }
 }
 
@@ -752,6 +769,10 @@ function saveSettings(settings) {
   if (settings.uiScale !== undefined) {
     store.set('uiScale', normalizeUiScale(settings.uiScale))
     applyUiScaleToWindow()
+  }
+
+  if (settings.uiTheme !== undefined) {
+    store.set('uiTheme', normalizeUiTheme(settings.uiTheme))
   }
 
   return { success: true }

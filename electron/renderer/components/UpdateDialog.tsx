@@ -109,10 +109,7 @@ export default function UpdateDialog() {
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-md p-8 bg-bg-secondary border border-border rounded-lg"
-          style={{
-            boxShadow: '0 0 30px rgba(0, 212, 255, 0.2), inset 0 0 20px rgba(0, 212, 255, 0.05)',
-          }}
+          className="relative w-full max-w-md p-8 bg-bg-secondary border border-border rounded-lg shadow-panel-cyan-update"
           onClick={e => e.stopPropagation()}
         >
           {/* Corner accents */}
@@ -122,9 +119,7 @@ export default function UpdateDialog() {
           <div className="absolute bottom-0 right-0 w-3 h-3 border-r-2 border-b-2 border-accent-cyan/50" />
 
           {/* Glow effect */}
-          <div className="absolute inset-0 rounded-lg pointer-events-none" style={{
-            boxShadow: 'inset 0 0 30px rgba(0, 212, 255, 0.1)',
-          }} />
+          <div className="absolute inset-0 rounded-lg pointer-events-none shadow-inset-cyan" />
 
           <div className="relative z-10">
             {/* Header */}
@@ -159,7 +154,7 @@ export default function UpdateDialog() {
                       <motion.div
                         className="h-full bg-gradient-to-r from-accent-cyan to-accent-teal"
                         style={{
-                          boxShadow: '0 0 10px rgba(0, 212, 255, 0.6)',
+                          boxShadow: '0 0 10px rgb(var(--color-accent-cyan) / 0.6)',
                         }}
                         initial={{ width: 0 }}
                         animate={{ width: `${update.progress}%` }}
@@ -194,7 +189,7 @@ export default function UpdateDialog() {
                   disabled={update.downloading && update.progress < 100}
                   className="flex-1 px-4 py-2.5 bg-gradient-to-r from-accent-cyan/20 to-accent-teal/20 hover:from-accent-cyan/30 hover:to-accent-teal/30 border border-accent-cyan/50 hover:border-accent-cyan rounded text-accent-cyan text-sm font-semibold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
-                    boxShadow: '0 0 10px rgba(0, 212, 255, 0.2)',
+                    boxShadow: '0 0 10px rgb(var(--color-accent-cyan) / 0.2)',
                   }}
                 >
                   {update.downloading ? `Installing... ${update.progress}%` : 'Install & Restart'}

@@ -40,12 +40,15 @@ const slideTransition = {
   ease: [0.25, 0.46, 0.45, 0.94] as const,
 }
 
+const ACTION_ROW_DRIFT_TOLERANCE_PX = 2
+
 export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const [step, setStep] = useState<Step>(1)
   const [direction, setDirection] = useState(1)
   const autoRescanAttemptedRef = useRef(false)
   const autoRescanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dialogRef = useRef<HTMLDivElement | null>(null)
+  const actionRowBaselineTopRef = useRef<number | null>(null)
 
   // Step 2 state
   const [apiKey, setApiKey] = useState('')
@@ -136,6 +139,37 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
       dialog.removeEventListener('keydown', handleTab)
     }
   }, [step, scanning, saveResult?.found])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    const rafId = requestAnimationFrame(() => {
+      const frame = dialog.querySelector<HTMLElement>(`[data-onboarding-frame-step="${step}"]`)
+      const actionRow = frame?.querySelector<HTMLElement>('[data-onboarding-actions-row="true"]')
+      if (!actionRow) return
+
+      const top = Math.round(actionRow.getBoundingClientRect().top)
+      const baseline = actionRowBaselineTopRef.current
+      if (baseline === null) {
+        actionRowBaselineTopRef.current = top
+        return
+      }
+
+      const delta = top - baseline
+      if (Math.abs(delta) > ACTION_ROW_DRIFT_TOLERANCE_PX) {
+        console.warn('[OnboardingModal] action row vertical drift detected', {
+          step,
+          baselineTop: baseline,
+          currentTop: top,
+          delta,
+        })
+      }
+    })
+
+    return () => cancelAnimationFrame(rafId)
+  }, [step, scanning, saveResult?.found, apiKey])
 
   async function detectSaves(targetDirectory?: string) {
     clearAutoRescanTimer()
@@ -290,7 +324,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
       step={1}
       title="FIRST CONTACT PROTOCOL"
       actions={(
-        <HUDButton onClick={onNext}>
+        <HUDButton data-onboarding-primary="true" onClick={onNext}>
           Initialize
         </HUDButton>
       )}
@@ -300,7 +334,8 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
           <img
             src={appLogo}
             alt="Stellaris Companion logo"
-            className="relative h-20 w-20 rounded-xl border border-accent-cyan/40 shadow-glow-sm drop-shadow-[0_0_26px_rgba(0,212,255,0.55)]"
+            className="relative h-20 w-20 rounded-xl border border-accent-cyan/40 shadow-glow-sm"
+            style={{ filter: 'var(--theme-logo-filter) drop-shadow(0 0 26px rgb(var(--color-accent-cyan) / 0.55))' }}
           />
         </div>
 
@@ -343,7 +378,7 @@ function StepApiKey({
           <HUDButton variant="secondary" onClick={onBack}>
             Back
           </HUDButton>
-          <HUDButton onClick={onNext} disabled={!hasKey}>
+          <HUDButton data-onboarding-primary="true" onClick={onNext} disabled={!hasKey}>
             Next
           </HUDButton>
         </>
@@ -423,7 +458,7 @@ function StepSaveDirectory({
               <HUDButton variant="secondary" onClick={onBrowse}>
                 Browse Elsewhere
               </HUDButton>
-              <HUDButton onClick={onComplete}>
+              <HUDButton data-onboarding-primary="true" onClick={onComplete}>
                 Confirm
               </HUDButton>
             </>
@@ -435,7 +470,7 @@ function StepSaveDirectory({
               <HUDButton variant="secondary" onClick={onRetry}>
                 Scan Again
               </HUDButton>
-              <HUDButton onClick={onBrowse}>
+              <HUDButton data-onboarding-primary="true" onClick={onBrowse}>
                 Browse Folder
               </HUDButton>
             </>
@@ -476,9 +511,9 @@ interface StepFrameProps {
 
 function StepFrame({ step, title, children, actions }: StepFrameProps) {
   return (
-    <div className="h-full">
+    <div data-onboarding-frame-step={step} className="h-full">
       <HUDPanel
-        className="relative h-full bg-bg-secondary/95 border border-accent-cyan/35 shadow-[0_0_40px_rgba(0,212,255,0.08),0_10px_28px_rgba(0,0,0,0.55)]"
+        className="relative h-full bg-bg-secondary/95 border border-accent-cyan/35 shadow-panel-cyan-soft"
         decoration="brackets"
         noPadding
       >
@@ -492,7 +527,10 @@ function StepFrame({ step, title, children, actions }: StepFrameProps) {
           <div className="min-h-0 overflow-y-auto custom-scrollbar">
             {children}
           </div>
-          <div className="mt-3 h-11 flex items-center justify-end gap-3 flex-nowrap [&>button]:h-11 [&>button]:min-w-[10rem]">
+          <div
+            data-onboarding-actions-row="true"
+            className="mt-3 h-11 flex items-center justify-end gap-3 flex-nowrap [&>button]:h-11 [&>button]:min-w-[10rem]"
+          >
             {actions}
           </div>
         </div>

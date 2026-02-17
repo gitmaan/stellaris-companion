@@ -1,5 +1,109 @@
 import type { ChronicleChapter, CurrentEra, NarrativeSection } from '../hooks/useBackend'
 
+type ChronicleExportTheme = 'stellaris-cyan' | 'tactica-green' | 'command-amber'
+
+interface ChronicleExportPalette {
+  bgPrimary: string
+  bgSecondary: string
+  textPrimary: string
+  textSecondary: string
+  textSecondary40: string
+  textSecondary70: string
+  accent: string
+  accent40: string
+  accent50: string
+  accent60: string
+  border: string
+  border50: string
+  yellow: string
+  yellow30: string
+}
+
+const EXPORT_PALETTES: Record<ChronicleExportTheme, ChronicleExportPalette> = {
+  'stellaris-cyan': {
+    bgPrimary: '#05080d',
+    bgSecondary: '#0c1219',
+    textPrimary: '#e8f4f8',
+    textSecondary: '#7a8c99',
+    textSecondary40: 'rgba(122,140,153,0.4)',
+    textSecondary70: 'rgba(122,140,153,0.7)',
+    accent: '#00d4ff',
+    accent40: 'rgba(0,212,255,0.4)',
+    accent50: 'rgba(0,212,255,0.5)',
+    accent60: 'rgba(0,212,255,0.6)',
+    border: '#1e3a5f',
+    border50: 'rgba(30,58,95,0.5)',
+    yellow: '#ecc94b',
+    yellow30: 'rgba(236,201,75,0.3)',
+  },
+  'tactica-green': {
+    bgPrimary: '#050705',
+    bgSecondary: '#090e09',
+    textPrimary: '#e0ffe0',
+    textSecondary: '#7ca27c',
+    textSecondary40: 'rgba(124,162,124,0.4)',
+    textSecondary70: 'rgba(124,162,124,0.7)',
+    accent: '#7cff5b',
+    accent40: 'rgba(124,255,91,0.4)',
+    accent50: 'rgba(124,255,91,0.5)',
+    accent60: 'rgba(124,255,91,0.6)',
+    border: '#2c532c',
+    border50: 'rgba(44,83,44,0.5)',
+    yellow: '#e0c364',
+    yellow30: 'rgba(224,195,100,0.3)',
+  },
+  'command-amber': {
+    bgPrimary: '#0b0906',
+    bgSecondary: '#120e08',
+    textPrimary: '#fff3e0',
+    textSecondary: '#b19572',
+    textSecondary40: 'rgba(177,149,114,0.4)',
+    textSecondary70: 'rgba(177,149,114,0.7)',
+    accent: '#ffc857',
+    accent40: 'rgba(255,200,87,0.4)',
+    accent50: 'rgba(255,200,87,0.5)',
+    accent60: 'rgba(255,200,87,0.6)',
+    border: '#604622',
+    border50: 'rgba(96,70,34,0.5)',
+    yellow: '#ffd880',
+    yellow30: 'rgba(255,216,128,0.3)',
+  },
+}
+
+function resolveExportTheme(rawTheme: string | null | undefined): ChronicleExportTheme {
+  if (rawTheme === 'tactica-phosphor') {
+    return 'tactica-green'
+  }
+  if (rawTheme === 'tactica-green' || rawTheme === 'command-amber') {
+    return rawTheme
+  }
+  return 'stellaris-cyan'
+}
+
+function replaceAllCompat(input: string, needle: string, replacement: string): string {
+  return input.split(needle).join(replacement)
+}
+
+function applyExportTheme(css: string, theme: ChronicleExportTheme): string {
+  const palette = EXPORT_PALETTES[theme]
+  return [
+    ['#05080d', palette.bgPrimary],
+    ['#0c1219', palette.bgSecondary],
+    ['#e8f4f8', palette.textPrimary],
+    ['#7a8c99', palette.textSecondary],
+    ['rgba(122,140,153,0.4)', palette.textSecondary40],
+    ['rgba(122,140,153,0.7)', palette.textSecondary70],
+    ['#00d4ff', palette.accent],
+    ['rgba(0,212,255,0.4)', palette.accent40],
+    ['rgba(0,212,255,0.5)', palette.accent50],
+    ['rgba(0,212,255,0.6)', palette.accent60],
+    ['#1e3a5f', palette.border],
+    ['rgba(30,58,95,0.5)', palette.border50],
+    ['#ecc94b', palette.yellow],
+    ['rgba(236,201,75,0.3)', palette.yellow30],
+  ].reduce((acc, [needle, replacement]) => replaceAllCompat(acc, needle, replacement), css)
+}
+
 /**
  * Generate a self-contained HTML file for a chronicle export.
  * All styles are inlined — no external dependencies.
@@ -8,7 +112,9 @@ export function generateChronicleHtml(
   empireName: string,
   chapters: ChronicleChapter[],
   currentEra: CurrentEra | null,
+  rawTheme?: string,
 ): string {
+  const css = applyExportTheme(CSS, resolveExportTheme(rawTheme))
   const chaptersHtml = chapters.map(renderChapter).join('\n')
   const currentEraHtml = currentEra ? renderCurrentEra(currentEra) : ''
 
@@ -19,7 +125,7 @@ export function generateChronicleHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chronicles of ${escapeHtml(empireName)}</title>
 <style>
-${CSS}
+${css}
 </style>
 </head>
 <body>

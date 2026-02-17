@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 
+export const UI_THEME_VALUES = ['stellaris-cyan', 'tactica-green', 'command-amber'] as const
+export type UiTheme = (typeof UI_THEME_VALUES)[number]
+export const DEFAULT_UI_THEME: UiTheme = 'stellaris-cyan'
+
+export function normalizeUiTheme(rawValue: unknown): UiTheme {
+  if (typeof rawValue !== 'string') return DEFAULT_UI_THEME
+  if (rawValue === 'tactica-phosphor') return 'tactica-green'
+  return (UI_THEME_VALUES as readonly string[]).includes(rawValue)
+    ? rawValue as UiTheme
+    : DEFAULT_UI_THEME
+}
+
 export interface Settings {
   googleApiKey: string
   googleApiKeySet: boolean
@@ -10,6 +22,7 @@ export interface Settings {
   savePath?: string
   discordEnabled: boolean
   uiScale: number
+  uiTheme: UiTheme
 }
 
 export interface UseSettingsResult {
@@ -36,12 +49,13 @@ export function useSettings(): UseSettingsResult {
     }
 
     try {
-      const loaded = await window.electronAPI.getSettings() as Settings
+      const loaded = await window.electronAPI.getSettings() as Settings & { uiTheme?: unknown }
       const parsedUiScale = Number(loaded.uiScale)
-      const normalized = {
+      const normalized: Settings = {
         ...loaded,
         saveDir: loaded.saveDir || loaded.savePath || '',
         uiScale: Number.isFinite(parsedUiScale) ? parsedUiScale : 1,
+        uiTheme: normalizeUiTheme(loaded.uiTheme),
       }
       setSettings(normalized)
       setError(null)

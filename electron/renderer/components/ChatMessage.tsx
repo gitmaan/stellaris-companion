@@ -91,6 +91,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
   const isUser = role === 'user'
 
   const headerColor = isError ? 'text-accent-red' : isUser ? 'text-accent-cyan' : 'text-accent-teal'
+  const bodyTextSize = role === 'assistant' ? 'text-base' : 'text-sm'
 
   return (
     <motion.div
@@ -111,7 +112,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
       }`}>
         {/* Header Line */}
         <div className="flex items-baseline gap-3 mb-1">
-          <span className={`font-mono text-xs font-bold tracking-wide ${headerColor}`}>
+          <span className={`font-mono text-[13px] font-bold tracking-wide ${headerColor}`}>
              {isUser ? 'CMD_INPUT' : 'SYS_RESPONSE'}
           </span>
           {timestamp && (
@@ -124,7 +125,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
         </div>
 
         {/* Content */}
-        <div className={`text-sm leading-relaxed ${isError ? 'text-accent-red' : 'text-text-primary/90'}`}>
+        <div className={`${bodyTextSize} leading-relaxed ${isError ? 'text-accent-red' : 'advisor-body-copy text-text-primary/90'}`}>
             {role === 'assistant' ? (
               <div className="markdown-content font-sans">
                 <ReactMarkdown skipHtml components={markdownComponents}>{content}</ReactMarkdown>

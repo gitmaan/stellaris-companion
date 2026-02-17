@@ -53,36 +53,36 @@ function getStatusLabel(status: ConnectionStatus, stage: string | null): string 
 }
 
 // Status indicator colors with glow effects
-const statusColors: Record<ConnectionStatus, { text: string; bg: string; glow: string }> = {
+const statusColors: Record<ConnectionStatus, { text: string; bg: string; glowVar: string }> = {
   ready: {
     text: 'text-accent-green',
     bg: 'bg-accent-green',
-    glow: 'shadow-[0_0_8px_rgba(72,187,120,0.6)]',
+    glowVar: '--color-accent-green',
   },
   analyzing: {
     text: 'text-accent-yellow',
     bg: 'bg-accent-yellow',
-    glow: 'shadow-[0_0_8px_rgba(236,201,75,0.6)]',
+    glowVar: '--color-accent-yellow',
   },
   connecting: {
     text: 'text-accent-yellow',
     bg: 'bg-accent-yellow',
-    glow: 'shadow-[0_0_8px_rgba(236,201,75,0.6)]',
+    glowVar: '--color-accent-yellow',
   },
   'no-save': {
     text: 'text-accent-cyan',
     bg: 'bg-accent-cyan',
-    glow: 'shadow-[0_0_8px_rgba(0,212,255,0.6)]',
+    glowVar: '--color-accent-cyan',
   },
   'not-configured': {
     text: 'text-accent-orange',
     bg: 'bg-accent-orange',
-    glow: 'shadow-[0_0_8px_rgba(237,137,54,0.6)]',
+    glowVar: '--color-accent-orange',
   },
   disconnected: {
     text: 'text-accent-red',
     bg: 'bg-accent-red',
-    glow: 'shadow-[0_0_8px_rgba(252,129,129,0.6)]',
+    glowVar: '--color-accent-red',
   },
 }
 
@@ -167,7 +167,8 @@ function StatusBar() {
         <span className={`flex items-center gap-2 text-[13px] font-medium ${colors.text}`}>
           {/* Status indicator with glow */}
           <motion.span
-            className={`w-2 h-2 rounded-full ${colors.bg} ${colors.glow}`}
+            className={`w-2 h-2 rounded-full ${colors.bg}`}
+            style={{ boxShadow: `0 0 8px rgb(var(${colors.glowVar}) / 0.6)` }}
             animate={{
               scale: isAnimating ? [1, 1.3, 1] : 1,
               opacity: isAnimating ? [1, 0.7, 1] : 1,

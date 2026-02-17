@@ -67,7 +67,7 @@ function Tooltip({ content, children, position = 'top', delay = 100 }: TooltipPr
             >
               <div className="relative px-3 py-2 text-xs leading-relaxed text-text-primary bg-bg-tertiary border border-accent-cyan/40 rounded shadow-lg"
                 style={{
-                  boxShadow: '0 0 10px rgba(0, 212, 255, 0.2), 0 4px 12px rgba(0, 0, 0, 0.4)',
+                  boxShadow: '0 0 10px rgb(var(--color-accent-cyan) / 0.2), 0 4px 12px rgb(0 0 0 / 0.4)',
                   maxWidth: '200px',
                 }}
               >

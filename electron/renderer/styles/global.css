@@ -57,6 +57,136 @@
   src: url('./fonts/JetBrainsMono.woff2') format('woff2');
 }
 
+/* ============================================
+   Theme Variables
+   ============================================ */
+
+:root,
+[data-theme='stellaris-cyan'] {
+  --color-bg-primary: 5 8 13;
+  --color-bg-secondary: 12 18 25;
+  --color-bg-tertiary: 20 28 40;
+  --color-bg-elevated: 26 37 53;
+  --color-bg-glass: 12 18 25;
+  --color-bg-glass-dark: 5 8 13;
+
+  --color-text-primary: 232 244 248;
+  --color-text-secondary: 122 140 153;
+  --color-text-accent: 79 209 197;
+  --color-text-muted: 74 85 104;
+
+  --color-accent-cyan: 0 212 255;
+  --color-accent-cyan-dim: 0 168 204;
+  --color-accent-teal: 79 209 197;
+  --color-accent-teal-dim: 56 178 172;
+  --color-accent-green: 72 187 120;
+  --color-accent-yellow: 236 201 75;
+  --color-accent-yellow-dim: 214 158 46;
+  --color-accent-orange: 237 137 54;
+  --color-accent-red: 252 129 129;
+  --color-accent-red-dim: 245 101 101;
+  --color-accent-purple: 159 122 234;
+  --color-accent-blue: 66 153 225;
+  --color-accent-blue-hover: 49 130 206;
+
+  --color-border-default: 30 58 95;
+  --color-border-subtle: 22 42 69;
+  --color-border-glow: 0 212 255;
+  --color-border-active: 79 209 197;
+  --color-border-glass: 255 255 255;
+
+  --color-discord: 88 101 242;
+  --color-discord-hover: 71 82 196;
+  --theme-logo-filter: none;
+  --theme-scanline-alpha: 0.015;
+  --theme-vignette-alpha: 0.8;
+  --theme-hud-scanline-opacity: 0.1;
+  --theme-stars-opacity: 0.3;
+  --theme-grid-opacity: 0.2;
+}
+
+:root[data-theme='tactica-green'],
+[data-theme='tactica-green'] {
+  --color-bg-primary: 5 7 5;
+  --color-bg-secondary: 9 14 9;
+  --color-bg-tertiary: 15 23 15;
+  --color-bg-elevated: 21 31 21;
+  --color-bg-glass: 9 14 9;
+  --color-bg-glass-dark: 5 7 5;
+
+  --color-text-primary: 238 255 236;
+  --color-text-secondary: 154 196 153;
+  --color-text-accent: 124 255 91;
+  --color-text-muted: 104 136 103;
+
+  --color-accent-cyan: 124 255 91;
+  --color-accent-cyan-dim: 81 198 58;
+  --color-accent-teal: 84 224 125;
+  --color-accent-teal-dim: 56 173 94;
+  --color-accent-green: 139 255 120;
+  --color-accent-yellow: 224 195 100;
+  --color-accent-yellow-dim: 183 152 73;
+  --color-accent-orange: 222 151 89;
+  --color-accent-red: 245 121 121;
+  --color-accent-red-dim: 214 95 95;
+  --color-accent-purple: 158 156 220;
+  --color-accent-blue: 112 196 142;
+  --color-accent-blue-hover: 92 170 120;
+
+  --color-border-default: 44 83 44;
+  --color-border-subtle: 30 56 30;
+  --color-border-glow: 124 255 91;
+  --color-border-active: 84 224 125;
+  --color-border-glass: 204 255 204;
+  --theme-logo-filter: hue-rotate(70deg) saturate(1.25) brightness(1.05);
+  --theme-scanline-alpha: 0.008;
+  --theme-vignette-alpha: 0.66;
+  --theme-hud-scanline-opacity: 0.06;
+  --theme-stars-opacity: 0.18;
+  --theme-grid-opacity: 0.11;
+}
+
+:root[data-theme='command-amber'],
+[data-theme='command-amber'] {
+  --color-bg-primary: 11 9 6;
+  --color-bg-secondary: 18 14 8;
+  --color-bg-tertiary: 29 22 13;
+  --color-bg-elevated: 37 28 16;
+  --color-bg-glass: 18 14 8;
+  --color-bg-glass-dark: 11 9 6;
+
+  --color-text-primary: 255 249 238;
+  --color-text-secondary: 204 180 150;
+  --color-text-accent: 255 200 87;
+  --color-text-muted: 146 122 94;
+
+  --color-accent-cyan: 255 200 87;
+  --color-accent-cyan-dim: 209 143 42;
+  --color-accent-teal: 246 176 82;
+  --color-accent-teal-dim: 201 135 61;
+  --color-accent-green: 122 197 124;
+  --color-accent-yellow: 255 216 128;
+  --color-accent-yellow-dim: 212 166 74;
+  --color-accent-orange: 239 152 72;
+  --color-accent-red: 244 133 118;
+  --color-accent-red-dim: 207 102 88;
+  --color-accent-purple: 184 143 222;
+  --color-accent-blue: 124 165 210;
+  --color-accent-blue-hover: 102 140 181;
+
+  --color-border-default: 96 70 34;
+  --color-border-subtle: 67 49 25;
+  --color-border-glow: 255 200 87;
+  --color-border-active: 233 164 64;
+  --color-border-glass: 255 243 224;
+  --theme-logo-filter: hue-rotate(210deg) saturate(1.1) brightness(1.05);
+  --theme-scanline-alpha: 0.01;
+  --theme-vignette-alpha: 0.7;
+  --theme-hud-scanline-opacity: 0.08;
+  --theme-stars-opacity: 0.22;
+  --theme-grid-opacity: 0.13;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -80,11 +210,22 @@
       0deg,
       transparent,
       transparent 2px,
-      rgba(0, 212, 255, 0.015) 2px,
-      rgba(0, 212, 255, 0.015) 4px
+      rgb(var(--color-accent-cyan) / var(--theme-scanline-alpha, 0.015)) 2px,
+      rgb(var(--color-accent-cyan) / var(--theme-scanline-alpha, 0.015)) 4px
     );
     z-index: 9999;
   }
+}
+
+/* Readability tuning for advisor + chronicle body copy on non-cyan themes. */
+[data-theme='tactica-green'] .advisor-body-copy,
+[data-theme='command-amber'] .advisor-body-copy {
+  color: rgb(var(--color-text-primary) / 0.98);
+}
+
+[data-theme='tactica-green'] .chronicle-narrative,
+[data-theme='command-amber'] .chronicle-narrative {
+  color: rgb(var(--color-text-primary) / 0.99);
 }
 
 /* ============================================
@@ -119,7 +260,7 @@
   /* Panel with corner accents - Stellaris-style chrome */
   .stellaris-panel {
     @apply relative bg-bg-secondary border border-border rounded-lg overflow-hidden;
-    background: linear-gradient(180deg, rgba(0, 212, 255, 0.03) 0%, transparent 30%);
+    background: linear-gradient(180deg, rgb(var(--color-accent-cyan) / 0.03) 0%, transparent 30%);
   }
 
   .stellaris-panel::before,
@@ -152,7 +293,7 @@
   /* Energy border that glows subtly */
   .energy-border {
     @apply relative border border-border;
-    box-shadow: inset 0 0 20px rgba(0, 212, 255, 0.05);
+    box-shadow: inset 0 0 20px rgb(var(--color-accent-cyan) / 0.05);
   }
 
   .energy-border::before {
@@ -160,7 +301,12 @@
     position: absolute;
     inset: -1px;
     border-radius: inherit;
-    background: linear-gradient(135deg, rgba(0, 212, 255, 0.2) 0%, transparent 50%, rgba(79, 209, 197, 0.2) 100%);
+    background: linear-gradient(
+      135deg,
+      rgb(var(--color-accent-cyan) / 0.2) 0%,
+      transparent 50%,
+      rgb(var(--color-accent-teal) / 0.2) 100%
+    );
     opacity: 0.3;
     pointer-events: none;
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -352,8 +498,8 @@
 
 @keyframes highlight-flash {
   0% {
-    box-shadow: 0 0 0 2px theme('colors.accent.cyan'), 0 0 20px rgba(0, 212, 255, 0.4);
-    background: linear-gradient(135deg, theme('colors.bg.secondary') 0%, rgba(0, 212, 255, 0.1) 100%);
+    box-shadow: 0 0 0 2px theme('colors.accent.cyan'), 0 0 20px rgb(var(--color-accent-cyan) / 0.4);
+    background: linear-gradient(135deg, theme('colors.bg.secondary') 0%, rgb(var(--color-accent-cyan) / 0.1) 100%);
   }
   100% {
     box-shadow: none;
@@ -438,7 +584,7 @@
 .composer-scrollbar {
   direction: ltr;
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 212, 255, 0.45) transparent;
+  scrollbar-color: rgb(var(--color-accent-cyan) / 0.45) transparent;
   scrollbar-gutter: stable;
 }
 
@@ -453,12 +599,12 @@
 
 .composer-scrollbar::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(0, 212, 255, 0.22);
+  background: rgb(var(--color-accent-cyan) / 0.22);
 }
 
 .composer-scrollbar:hover::-webkit-scrollbar-thumb,
 .composer-scrollbar:focus::-webkit-scrollbar-thumb {
-  background: rgba(0, 212, 255, 0.52);
+  background: rgb(var(--color-accent-cyan) / 0.52);
 }
 
 /* ============================================
@@ -466,6 +612,6 @@
    ============================================ */
 
 ::selection {
-  background: rgba(0, 212, 255, 0.3);
+  background: rgb(var(--color-accent-cyan) / 0.3);
   color: theme('colors.text.primary');
 }

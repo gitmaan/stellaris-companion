@@ -562,7 +562,8 @@ function ChroniclePage() {
   // Export chronicle as standalone HTML
   const handleExport = useCallback(async () => {
     if (!chronicle) return
-    const html = generateChronicleHtml(empireName, chronicle.chapters, chronicle.current_era)
+    const activeTheme = document.documentElement.getAttribute('data-theme')
+    const html = generateChronicleHtml(empireName, chronicle.chapters, chronicle.current_era, activeTheme || undefined)
     const filename = `Chronicle - ${empireName}.html`
     await window.electronAPI?.exportChronicle(html, filename)
   }, [chronicle, empireName])

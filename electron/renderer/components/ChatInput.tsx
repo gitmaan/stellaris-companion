@@ -75,7 +75,7 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
 
   return (
     <form
-      className="relative rounded-lg border border-white/10 bg-black/35 backdrop-blur-sm px-2 py-1.5 flex items-end gap-2 transition-colors duration-200 focus-within:border-accent-cyan/45 focus-within:shadow-[0_0_14px_rgba(0,212,255,0.2)]"
+      className="relative rounded-lg border border-white/10 bg-black/35 backdrop-blur-sm px-2 py-1.5 flex items-end gap-2 transition-colors duration-200 focus-within:border-accent-cyan/45 focus-within:shadow-focus-cyan"
       onSubmit={handleSubmit}
     >
       <div className="relative group flex-1 min-w-0">

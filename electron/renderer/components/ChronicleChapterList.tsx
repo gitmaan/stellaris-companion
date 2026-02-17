@@ -298,7 +298,7 @@ function ChronicleChapterList({
             {pendingChapters === 1 ? 'chapter' : 'chapters'} pending
           </span>
           <button
-            className="w-8 h-8 border border-accent-yellow/50 rounded bg-accent-yellow/10 text-accent-yellow text-sm cursor-pointer flex items-center justify-center transition-all duration-200 hover:bg-accent-yellow/20 hover:shadow-[0_0_10px_rgba(236,201,75,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-8 h-8 border border-accent-yellow/50 rounded bg-accent-yellow/10 text-accent-yellow text-sm cursor-pointer flex items-center justify-center transition-all duration-200 hover:bg-accent-yellow/20 hover:shadow-glow-yellow disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onRefresh}
             disabled={loading}
             title="Generate more chapters"

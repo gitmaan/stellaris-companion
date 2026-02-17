@@ -386,9 +386,9 @@ function ChatPage({
         render: (ref: (el: HTMLDivElement | null) => void) => (
           <div key="__loading__" ref={ref} className="max-w-[85%] self-start flex items-center gap-3 p-4 text-text-secondary text-sm mb-2">
             <div className="flex gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-accent-cyan shadow-[0_0_6px_rgba(0,212,255,0.6)] animate-bounce-dot animate-bounce-dot-1"></span>
-              <span className="w-2 h-2 rounded-full bg-accent-cyan shadow-[0_0_6px_rgba(0,212,255,0.6)] animate-bounce-dot animate-bounce-dot-2"></span>
-              <span className="w-2 h-2 rounded-full bg-accent-cyan shadow-[0_0_6px_rgba(0,212,255,0.6)] animate-bounce-dot animate-bounce-dot-3"></span>
+              <span className="w-2 h-2 rounded-full bg-accent-cyan shadow-glow-dot animate-bounce-dot animate-bounce-dot-1"></span>
+              <span className="w-2 h-2 rounded-full bg-accent-cyan shadow-glow-dot animate-bounce-dot animate-bounce-dot-2"></span>
+              <span className="w-2 h-2 rounded-full bg-accent-cyan shadow-glow-dot animate-bounce-dot animate-bounce-dot-3"></span>
             </div>
             <span className="italic animate-pulse-text text-accent-cyan/80">{loadingMessage}</span>
           </div>
@@ -445,7 +445,7 @@ function ChatPage({
               <motion.div className="relative" variants={welcomeItem}>
                 <HUDHeader
                   size={isWelcomeCompact ? 'lg' : 'xl'}
-                  className={`${isWelcomeCompact ? 'tracking-[0.12em]' : 'tracking-[0.2em]'} text-accent-cyan drop-shadow-[0_0_10px_rgba(0,212,255,0.5)]`}
+                  className={`${isWelcomeCompact ? 'tracking-[0.12em]' : 'tracking-[0.2em]'} text-accent-cyan text-glow`}
                 >
                   Galactic Helpdesk
                 </HUDHeader>
@@ -503,7 +503,7 @@ function ChatPage({
                               <span className="font-mono text-xs text-accent-cyan/50 mr-3 opacity-50 group-hover:opacity-100 group-hover:text-accent-cyan transition-all">
                                 {String(idx + 1).padStart(2, '0')}
                               </span>
-                              <span className={`font-mono tracking-wide text-text-primary group-hover:text-accent-cyan group-hover:drop-shadow-[0_0_5px_rgba(0,212,255,0.5)] transition-all ${isWelcomeCompact ? 'text-[11px]' : 'text-xs'}`}>
+                              <span className={`font-mono tracking-wide text-text-primary group-hover:text-accent-cyan transition-all ${isWelcomeCompact ? 'text-[11px]' : 'text-xs'}`}>
                                 {suggestion}
                               </span>
                               <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-1 bg-accent-cyan/50 rounded-full opacity-0 group-hover:opacity-100 shadow-glow-sm transition-opacity" />
@@ -524,7 +524,7 @@ function ChatPage({
                   >
                     <span className="relative flex h-2.5 w-2.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-cyan/60" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent-cyan shadow-[0_0_8px_rgba(0,212,255,0.6)]" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent-cyan shadow-glow-indicator" />
                     </span>
                     <span className="font-mono text-xs text-accent-cyan/70 tracking-wider animate-pulse-text">
                       Scanning empire data...

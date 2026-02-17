@@ -22,7 +22,7 @@ export const HUDPanel: React.FC<HUDPanelProps> = ({
   const variantClasses = {
     primary: "bg-bg-glass border border-border-subtle hover:border-accent-cyan/30",
     secondary: "bg-bg-tertiary/40 border border-white/5",
-    alert: "bg-accent-red/10 border border-accent-red/30 shadow-[0_0_15px_rgba(252,129,129,0.1)]",
+    alert: "bg-accent-red/10 border border-accent-red/30 shadow-glow-red-soft",
     glass: "bg-black/20 border border-white/5 shadow-glass",
   };
 
@@ -59,7 +59,7 @@ export const HUDPanel: React.FC<HUDPanelProps> = ({
 
       {title && (
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/5 relative z-10">
-          <h3 className="font-display text-xs tracking-tech text-accent-cyan uppercase drop-shadow-[0_0_5px_rgba(0,212,255,0.5)]">
+          <h3 className="font-display text-xs tracking-tech text-accent-cyan uppercase text-glow-sm">
             {title}
           </h3>
           {/* Decorative lines next to title */}

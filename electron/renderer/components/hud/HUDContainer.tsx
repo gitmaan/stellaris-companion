@@ -1,29 +1,50 @@
-import React, { ReactNode } from 'react';
+import React, { HTMLAttributes, ReactNode } from 'react';
 
-interface HUDContainerProps {
+interface HUDContainerProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
-  className?: string;
 }
 
-export const HUDContainer: React.FC<HUDContainerProps> = ({ children, className = '' }) => {
+export const HUDContainer: React.FC<HUDContainerProps> = ({ children, className = '', ...props }) => {
   return (
-    <div className={`relative w-full h-screen overflow-hidden bg-bg-primary text-text-primary ${className}`}>
+    <div
+      className={`relative w-full h-screen overflow-hidden bg-bg-primary text-text-primary ${className}`}
+      {...props}
+    >
       {/* Background Layers */}
       
       {/* 1. Deep Space Base Gradient */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#0c1219_0%,_#000000_100%)] z-0" />
+      <div
+        className="absolute inset-0 z-0"
+        style={{
+          background: 'radial-gradient(circle at center, rgb(var(--color-bg-secondary) / 1) 0%, rgb(var(--color-bg-primary) / 1) 100%)',
+        }}
+      />
       
       {/* 2. Stars / Nebula subtle effect (CSS generated) */}
-      <div className="absolute inset-0 opacity-30 z-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] mix-blend-screen" />
+      <div
+        className="absolute inset-0 z-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] mix-blend-screen"
+        style={{ opacity: 'var(--theme-stars-opacity, 0.3)' }}
+      />
       
       {/* 3. Grid Overlay (The "Floor" or tactical map feel) */}
-      <div className="absolute inset-0 bg-grid-pattern bg-grid opacity-20 [mask-image:linear-gradient(to_bottom,transparent,black)] z-0 pointer-events-none" />
+      <div
+        className="absolute inset-0 bg-grid-pattern bg-grid [mask-image:linear-gradient(to_bottom,transparent,black)] z-0 pointer-events-none"
+        style={{ opacity: 'var(--theme-grid-opacity, 0.2)' }}
+      />
 
       {/* 4. Vignette for focus */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_50%,rgba(0,0,0,0.8)_100%)] z-10 pointer-events-none" />
+      <div
+        className="absolute inset-0 z-10 pointer-events-none"
+        style={{
+          background: 'radial-gradient(circle at center, transparent 50%, rgb(0 0 0 / var(--theme-vignette-alpha, 0.8)) 100%)',
+        }}
+      />
 
       {/* 5. Scanline Effect */}
-      <div className="absolute inset-0 bg-scanline opacity-10 pointer-events-none z-50" />
+      <div
+        className="absolute inset-0 bg-scanline pointer-events-none z-50"
+        style={{ opacity: 'var(--theme-hud-scanline-opacity, 0.1)' }}
+      />
       
       {/* 6. Decorative Corner HUD Elements (Fixed to screen) */}
       <div className="absolute top-4 left-4 w-32 h-32 border-l border-t border-border-glow opacity-50 z-20 pointer-events-none hud-corner-top" />

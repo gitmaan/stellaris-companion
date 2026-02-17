@@ -6,6 +6,7 @@ import ReportIssueModal from './components/ReportIssueModal'
 import UpdateDialog from './components/UpdateDialog'
 import { useErrorReporter } from './hooks/useErrorReporter'
 import { useAnnouncements } from './hooks/useAnnouncements'
+import { DEFAULT_UI_THEME, normalizeUiTheme, type UiTheme } from './hooks/useSettings'
 import { AnnouncementPanel } from './components/AnnouncementPanel'
 import { HUDContainer } from './components/hud/HUDContainer'
 import { HUDNavBar } from './components/hud/HUDNavBar'
@@ -32,6 +33,7 @@ const tabTransition = {
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('chat')
+  const [uiTheme, setUiTheme] = useState<UiTheme>(DEFAULT_UI_THEME)
   // Onboarding: null = checking, true = done, false = show modal
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null)
 
@@ -42,6 +44,19 @@ function App() {
       setOnboardingDone(true) // If check fails, skip onboarding
     })
   }, [])
+
+  useEffect(() => {
+    window.electronAPI?.getSettings().then((settings) => {
+      const loadedTheme = normalizeUiTheme((settings as { uiTheme?: unknown })?.uiTheme)
+      setUiTheme(loadedTheme)
+    }).catch(() => {
+      // Keep default theme when settings can't be loaded.
+    })
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', uiTheme)
+  }, [uiTheme])
 
   // Error reporting
   const {
@@ -102,7 +117,7 @@ function App() {
 
   return (
     <ErrorBoundary onError={(err) => promptErrorReport(err, 'ui')}>
-      <HUDContainer className="flex flex-col h-screen">
+      <HUDContainer data-theme={uiTheme} className="flex flex-col h-screen">
         {/* Top Status Bar - Fixed */}
         <div className="flex-none">
             <HUDStatusBar
@@ -197,7 +212,13 @@ function App() {
                       />
                     )}
                     {tab === 'chronicle' && <ChroniclePage />}
-                    {tab === 'settings' && <SettingsPage key={onboardingDone ? 'post-onboarding' : 'pre-onboarding'} onReportIssue={openReportModal} />}
+                    {tab === 'settings' && (
+                      <SettingsPage
+                        key={onboardingDone ? 'post-onboarding' : 'pre-onboarding'}
+                        onReportIssue={openReportModal}
+                        onThemeChange={setUiTheme}
+                      />
+                    )}
                   </div>
                 </motion.div>
               )

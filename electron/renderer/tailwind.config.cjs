@@ -1,3 +1,6 @@
+const colorVar = (cssVar) => `rgb(var(${cssVar}) / <alpha-value>)`
+const colorFixed = (cssVar, alpha) => `rgb(var(${cssVar}) / ${alpha})`
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -11,67 +14,63 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Background layers - Deep space with subtle blue undertones
         bg: {
-          primary: '#05080d',      // Darker, more cosmic
-          secondary: '#0c1219',    // Subtle blue undertone
-          tertiary: '#141c28',     // Panel backgrounds
-          elevated: '#1a2535',     // Hover states, elevated surfaces
-          glass: 'rgba(12, 18, 25, 0.7)', // Glassy background
-          'glass-dark': 'rgba(5, 8, 13, 0.85)', // Darker glassy background
+          primary: colorVar('--color-bg-primary'),
+          secondary: colorVar('--color-bg-secondary'),
+          tertiary: colorVar('--color-bg-tertiary'),
+          elevated: colorVar('--color-bg-elevated'),
+          glass: colorFixed('--color-bg-glass', 0.7),
+          'glass-dark': colorFixed('--color-bg-glass-dark', 0.85),
         },
-        // Text colors - Crisp with cyan influence
         text: {
-          primary: '#e8f4f8',      // Slightly cyan-tinted white
-          secondary: '#7a8c99',    // Muted cyan-gray
-          accent: '#4fd1c5',       // Stellaris teal
-          muted: '#4a5568',        // Very muted
-          dim: 'rgba(232, 244, 248, 0.5)', // Dimmed text
+          primary: colorVar('--color-text-primary'),
+          secondary: colorVar('--color-text-secondary'),
+          accent: colorVar('--color-text-accent'),
+          muted: colorVar('--color-text-muted'),
+          dim: colorFixed('--color-text-primary', 0.5),
         },
-        // Stellaris accent palette - Energy and power
         accent: {
-          cyan: '#00d4ff',         // Primary energy color
-          'cyan-dim': '#00a8cc',   // Dimmed cyan
-          'cyan-glow': 'rgba(0, 212, 255, 0.4)',
-          teal: '#4fd1c5',         // Secondary accent
-          'teal-dim': '#38b2ac',
-          green: '#48bb78',        // Success/positive
-          yellow: '#ecc94b',       // Warning/attention
-          'yellow-dim': '#d69e2e',
-          orange: '#ed8936',       // Alert
-          red: '#fc8181',          // Error/danger
-          'red-dim': '#f56565',
-          purple: '#9f7aea',       // Special/rare
-          blue: '#4299e1',         // Info/neutral accent
+          cyan: colorVar('--color-accent-cyan'),
+          'cyan-dim': colorVar('--color-accent-cyan-dim'),
+          'cyan-glow': colorFixed('--color-accent-cyan', 0.4),
+          teal: colorVar('--color-accent-teal'),
+          'teal-dim': colorVar('--color-accent-teal-dim'),
+          green: colorVar('--color-accent-green'),
+          yellow: colorVar('--color-accent-yellow'),
+          'yellow-dim': colorVar('--color-accent-yellow-dim'),
+          orange: colorVar('--color-accent-orange'),
+          red: colorVar('--color-accent-red'),
+          'red-dim': colorVar('--color-accent-red-dim'),
+          purple: colorVar('--color-accent-purple'),
+          blue: colorVar('--color-accent-blue'),
+          'blue-hover': colorVar('--color-accent-blue-hover'),
         },
-        // Border colors - Subtle energy lines
         border: {
-          DEFAULT: '#1e3a5f',      // Deep blue border
-          subtle: '#162a45',       // Very subtle
-          glow: '#00d4ff',         // Energy glow color
-          active: '#4fd1c5',       // Active state
-          glass: 'rgba(255, 255, 255, 0.1)', // Glass border
+          DEFAULT: colorVar('--color-border-default'),
+          subtle: colorVar('--color-border-subtle'),
+          glow: colorVar('--color-border-glow'),
+          active: colorVar('--color-border-active'),
+          glass: colorFixed('--color-border-glass', 0.1),
         },
-        // Discord brand
         discord: {
-          DEFAULT: '#5865F2',
-          hover: '#4752C4',
+          DEFAULT: colorVar('--color-discord'),
+          hover: colorVar('--color-discord-hover'),
         },
       },
       fontFamily: {
         sans: ['Rajdhani', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'],
         mono: ['JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', 'Menlo', 'monospace'],
-        display: ['Orbitron', 'Rajdhani', 'sans-serif'], // Sci-fi display font for headers
+        display: ['Orbitron', 'Rajdhani', 'sans-serif'],
       },
       fontSize: {
-        'xs': '0.75rem',
-        'sm': '0.875rem',
-        'base': '1rem',
-        'lg': '1.125rem',
-        'xl': '1.25rem',
+        xs: '0.75rem',
+        sm: '0.875rem',
+        base: '1rem',
+        lg: '1.125rem',
+        xl: '1.25rem',
         '2xl': '1.5rem',
         '3xl': '1.875rem',
-        'tiny': '0.65rem', // For technical labels
+        tiny: '0.65rem',
       },
       letterSpacing: {
         tighter: '-0.05em',
@@ -80,27 +79,39 @@ module.exports = {
         wide: '0.025em',
         wider: '0.05em',
         widest: '0.1em',
-        'tech': '0.2em', // Wide spacing for tech headers
+        tech: '0.2em',
       },
       boxShadow: {
-        'glow-sm': '0 0 10px rgba(0, 212, 255, 0.3)',
-        'glow': '0 0 20px rgba(0, 212, 255, 0.4)',
-        'glow-lg': '0 0 30px rgba(0, 212, 255, 0.5)',
-        'glow-teal': '0 0 20px rgba(79, 209, 197, 0.4)',
-        'inner-glow': 'inset 0 0 20px rgba(0, 212, 255, 0.1)',
-        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+        'glow-dot': '0 0 6px rgb(var(--color-accent-cyan) / 0.6)',
+        'glow-indicator': '0 0 8px rgb(var(--color-accent-cyan) / 0.6)',
+        'glow-sm': '0 0 10px rgb(var(--color-accent-cyan) / 0.3)',
+        glow: '0 0 20px rgb(var(--color-accent-cyan) / 0.4)',
+        'glow-lg': '0 0 30px rgb(var(--color-accent-cyan) / 0.5)',
+        'glow-green': '0 0 10px rgb(var(--color-accent-green) / 0.8)',
+        'glow-yellow': '0 0 10px rgb(var(--color-accent-yellow) / 0.3)',
+        'glow-yellow-lg': '0 0 15px rgb(var(--color-accent-yellow) / 0.4)',
+        'glow-red': '0 0 10px rgb(var(--color-accent-red) / 0.3)',
+        'glow-red-soft': '0 0 15px rgb(var(--color-accent-red) / 0.1)',
+        'panel-cyan': '0 0 30px rgb(var(--color-accent-cyan) / 0.18), inset 0 0 20px rgb(var(--color-accent-cyan) / 0.04)',
+        'panel-cyan-soft': '0 0 40px rgb(var(--color-accent-cyan) / 0.1), 0 8px 32px rgb(0 0 0 / 0.5)',
+        'panel-cyan-update': '0 0 30px rgb(var(--color-accent-cyan) / 0.2), inset 0 0 20px rgb(var(--color-accent-cyan) / 0.05)',
+        'inset-cyan': 'inset 0 0 30px rgb(var(--color-accent-cyan) / 0.1)',
+        'focus-cyan': '0 0 14px rgb(var(--color-accent-cyan) / 0.2)',
+        'tooltip-cyan': '0 0 10px rgb(var(--color-accent-cyan) / 0.2), 0 4px 12px rgb(0 0 0 / 0.4)',
+        'glow-teal': '0 0 20px rgb(var(--color-accent-teal) / 0.4)',
+        'inner-glow': 'inset 0 0 20px rgb(var(--color-accent-cyan) / 0.1)',
+        glass: '0 8px 32px 0 rgb(0 0 0 / 0.37)',
       },
       backgroundImage: {
-        // Cosmic gradients
-        'cosmic-radial': 'radial-gradient(ellipse at center, #0c1219 0%, #05080d 70%)',
-        'cosmic-subtle': 'radial-gradient(ellipse at 50% 0%, rgba(0, 212, 255, 0.03) 0%, transparent 50%)',
-        'panel-gradient': 'linear-gradient(180deg, rgba(0, 212, 255, 0.05) 0%, transparent 100%)',
-        'energy-line': 'linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.5), transparent)',
-        'scanline': 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 212, 255, 0.03) 2px, rgba(0, 212, 255, 0.03) 4px)',
-        'grid-pattern': 'linear-gradient(rgba(0, 212, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 212, 255, 0.05) 1px, transparent 1px)',
+        'cosmic-radial': 'radial-gradient(ellipse at center, rgb(var(--color-bg-secondary) / 1) 0%, rgb(var(--color-bg-primary) / 1) 70%)',
+        'cosmic-subtle': 'radial-gradient(ellipse at 50% 0%, rgb(var(--color-accent-cyan) / 0.03) 0%, transparent 50%)',
+        'panel-gradient': 'linear-gradient(180deg, rgb(var(--color-accent-cyan) / 0.05) 0%, transparent 100%)',
+        'energy-line': 'linear-gradient(90deg, transparent, rgb(var(--color-accent-cyan) / 0.5), transparent)',
+        scanline: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgb(var(--color-accent-cyan) / 0.03) 2px, rgb(var(--color-accent-cyan) / 0.03) 4px)',
+        'grid-pattern': 'linear-gradient(rgb(var(--color-accent-cyan) / 0.05) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--color-accent-cyan) / 0.05) 1px, transparent 1px)',
       },
       backgroundSize: {
-        'grid': '40px 40px',
+        grid: '40px 40px',
       },
       animation: {
         'pulse-slow': 'pulse 3s ease-in-out infinite',
@@ -124,17 +135,17 @@ module.exports = {
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         'pulse-glow': {
-          '0%, 100%': { boxShadow: '0 0 10px rgba(0, 212, 255, 0.2)' },
-          '50%': { boxShadow: '0 0 20px rgba(0, 212, 255, 0.4)' },
+          '0%, 100%': { boxShadow: '0 0 10px rgb(var(--color-accent-cyan) / 0.2)' },
+          '50%': { boxShadow: '0 0 20px rgb(var(--color-accent-cyan) / 0.4)' },
         },
         'highlight-flash': {
           '0%': {
-            boxShadow: '0 0 0 2px #00d4ff, 0 0 20px rgba(0, 212, 255, 0.4)',
-            background: 'linear-gradient(135deg, #0c1219 0%, rgba(0, 212, 255, 0.1) 100%)',
+            boxShadow: '0 0 0 2px rgb(var(--color-accent-cyan) / 1), 0 0 20px rgb(var(--color-accent-cyan) / 0.4)',
+            background: 'linear-gradient(135deg, rgb(var(--color-bg-secondary) / 1) 0%, rgb(var(--color-accent-cyan) / 0.1) 100%)',
           },
           '100%': {
             boxShadow: 'none',
-            background: '#0c1219',
+            background: 'rgb(var(--color-bg-secondary) / 1)',
           },
         },
         'energy-flow': {
@@ -151,11 +162,11 @@ module.exports = {
         },
       },
       borderRadius: {
-        'sm': '2px', // Sharper corners for tech look
-        'DEFAULT': '4px',
-        'md': '6px',
-        'lg': '8px',
-        'xl': '12px',
+        sm: '2px',
+        DEFAULT: '4px',
+        md: '6px',
+        lg: '8px',
+        xl: '12px',
       },
     },
   },

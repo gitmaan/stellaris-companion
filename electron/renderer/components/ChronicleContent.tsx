@@ -152,7 +152,7 @@ function ChapterBlock({
               />
               <div className="flex items-center gap-3">
                 <button
-                  className="py-2.5 px-5 border-none rounded-md bg-accent-yellow text-bg-primary text-sm font-semibold uppercase tracking-wider cursor-pointer transition-all duration-200 hover:shadow-[0_0_15px_rgba(236,201,75,0.4)]"
+                  className="py-2.5 px-5 border-none rounded-md bg-accent-yellow text-bg-primary text-sm font-semibold uppercase tracking-wider cursor-pointer transition-all duration-200 hover:shadow-glow-yellow-lg"
                   onClick={() => {
                     const instructions = regenInstructions.trim() || undefined
                     setRegenInstructions('')
