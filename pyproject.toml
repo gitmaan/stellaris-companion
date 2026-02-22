@@ -1,6 +1,6 @@
 [project]
 name = "stellaris-companion"
-version = "0.5.6"
+version = "0.6.0"
 description = "AI-powered strategic advisor for Stellaris using Gemini"
 readme = "README.md"
 license = "MIT"

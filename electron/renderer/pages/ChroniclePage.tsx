@@ -169,7 +169,10 @@ function ChroniclePage() {
   }, [backend])
 
   // Load chronicle for selected save (uses cached sessions)
-  const loadChronicle = useCallback(async (forceRefresh = false) => {
+  const loadChronicle = useCallback(async (
+    forceRefresh = false,
+    chapterOnly = false,
+  ) => {
     if (!selectedSaveId) return
 
     // Use cached sessions instead of fetching again
@@ -209,7 +212,7 @@ function ChroniclePage() {
     let retryAfterMs: number | null = null
 
     try {
-      const chronicleResult = await backend.chronicle(session.id, forceRefresh)
+      const chronicleResult = await backend.chronicle(session.id, forceRefresh, chapterOnly)
 
       if (!isMountedRef.current) return
       if (token !== chronicleRequestTokenRef.current) return
@@ -251,7 +254,7 @@ function ChroniclePage() {
           const delay = typeof retryAfterMs === 'number' && retryAfterMs > 0 ? retryAfterMs : 2000
           chronicleRetryTimerRef.current = setTimeout(() => {
             if (!isMountedRef.current) return
-            void loadChronicle(false)
+            void loadChronicle(false, chapterOnly)
           }, delay)
           return
         }
@@ -260,7 +263,7 @@ function ChroniclePage() {
 
         if (queuedForceRefreshRef.current) {
           queuedForceRefreshRef.current = false
-          void loadChronicle(true)
+          void loadChronicle(true, false)
         }
       }
     }
@@ -284,11 +287,11 @@ function ChroniclePage() {
     lastHiddenChapterFinalizeAtRef.current = now
 
     try {
-      await backend.chronicle(session.id, false, true)
+      await loadChronicle(false, true)
     } finally {
       hiddenChapterFinalizeInFlightRef.current = false
     }
-  }, [backend, latestSessionBySaveId, selectedSaveId, totalSnapshotsBySaveId])
+  }, [latestSessionBySaveId, loadChronicle, selectedSaveId, totalSnapshotsBySaveId])
 
   const refreshVisibleChronicleAfterResume = useCallback(async () => {
     if (visibleCatchupInFlightRef.current) return
@@ -300,7 +303,7 @@ function ChroniclePage() {
     try {
       await loadSaves({ silent: true })
       if (!isMountedRef.current) return
-      await loadChronicle(false)
+      await loadChronicle(false, true)
     } finally {
       visibleCatchupInFlightRef.current = false
     }
@@ -391,12 +394,12 @@ function ChroniclePage() {
         void finalizePendingChaptersHidden()
         return
       }
-      loadChronicle()
+      loadChronicle(false, true)
     }
   }, [cachedSessions.length, finalizePendingChaptersHidden, loadChronicle, selectedSaveId])
 
-  // When the user returns to the app, run one full chronicle refresh to update
-  // the current era narrative after hidden chapter-only catch-up.
+  // When the user returns to the app, run one chapter-only refresh to keep
+  // chapter backlog moving without spending a teaser generation call.
   useEffect(() => {
     const handleVisible = () => {
       if (!isMountedRef.current) return
@@ -500,7 +503,7 @@ function ChroniclePage() {
 
   // Handle refresh (generate more chapters)
   const handleRefresh = useCallback(() => {
-    loadChronicle(true)
+    loadChronicle(true, false)
   }, [loadChronicle])
 
   // Handle chapter regeneration (uses cached sessions)

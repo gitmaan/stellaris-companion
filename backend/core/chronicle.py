@@ -181,7 +181,7 @@ FIRST_CHAPTER_MIN_YEARS_MILESTONE = 2
 FIRST_CHAPTER_MIN_EVENTS_MILESTONE = 4
 
 # Minimum years after era-ending event before finalizing
-MIN_YEARS_AFTER_EVENT = 5
+MIN_YEARS_AFTER_EVENT = 3
 
 # Maximum chapters to finalize per request (prevent timeout)
 MAX_CHAPTERS_PER_REQUEST = 2
@@ -237,6 +237,10 @@ DEFAULT_CHAPTERS_DATA = {
     "current_era_start_snapshot_id": None,
 }
 
+# Auto chapter-only scheduling (used by renderer background refresh loops).
+AUTO_CHAPTER_IDLE_INTERVAL_SECONDS = 5 * 60
+AUTO_CHAPTER_PENDING_INTERVAL_SECONDS = 30
+
 
 def parse_year(date_str: str | None) -> int | None:
     """Parse year from Stellaris date string (e.g., '2250.03.15')."""
@@ -246,6 +250,22 @@ def parse_year(date_str: str | None) -> int | None:
         return int(date_str.split(".")[0])
     except (ValueError, IndexError):
         return None
+
+
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    """Parse ISO datetime string into timezone-aware datetime."""
+    if not isinstance(value, str) or not value:
+        return None
+    text = value.strip()
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 class ChronicleGenerator:
@@ -317,39 +337,62 @@ class ChronicleGenerator:
         # Check if we need to finalize any chapters
         chapters_finalized = 0
         pending_chapters = 0
+        deferred_chapter_only = False
 
-        while chapters_finalized < MAX_CHAPTERS_PER_REQUEST:
-            should_finalize, trigger = self._should_finalize_chapter(
+        if chapter_only and not force_refresh:
+            deferred_chapter_only, pending_chapters = self._chapter_only_cooldown_active(
+                chapters_data=chapters_data
+            )
+            if deferred_chapter_only:
+                logger.debug(
+                    "Chronicle chapter-only run deferred by cooldown (save_id=%s pending=%s)",
+                    save_id,
+                    pending_chapters,
+                )
+
+        if not deferred_chapter_only:
+            while chapters_finalized < MAX_CHAPTERS_PER_REQUEST:
+                should_finalize, trigger = self._should_finalize_chapter(
+                    save_id=save_id,
+                    chapters_data=chapters_data,
+                    current_date=current_date,
+                    current_snapshot_id=current_snapshot_id,
+                )
+                if not should_finalize:
+                    break
+
+                # Finalize the chapter
+                finalized = self._finalize_chapter(
+                    save_id=save_id,
+                    chapters_data=chapters_data,
+                    briefing=briefing,
+                    trigger=trigger,
+                    custom_instructions=custom_instructions,
+                )
+                if not finalized:
+                    break
+                chapters_finalized += 1
+
+            # Count remaining pending chapters
+            pending_chapters = self._count_pending_chapters(
                 save_id=save_id,
                 chapters_data=chapters_data,
                 current_date=current_date,
                 current_snapshot_id=current_snapshot_id,
             )
-            if not should_finalize:
-                break
 
-            # Finalize the chapter
-            finalized = self._finalize_chapter(
-                save_id=save_id,
+            self._set_next_chapter_only_run(
                 chapters_data=chapters_data,
-                briefing=briefing,
-                trigger=trigger,
-                custom_instructions=custom_instructions,
+                pending_chapters=pending_chapters,
             )
-            if not finalized:
-                break
-            chapters_finalized += 1
-
-        # Count remaining pending chapters
-        pending_chapters = self._count_pending_chapters(
-            save_id=save_id,
-            chapters_data=chapters_data,
-            current_date=current_date,
-            current_snapshot_id=current_snapshot_id,
-        )
 
         # Generate (or reuse cached) current era narrative unless this request is
         # finalizing chapters only for background catch-up.
+        #
+        # Design intent:
+        # - Current era is a teaser between chapters, not a live minute-by-minute feed.
+        # - Generate at most once per era window (or on explicit force refresh).
+        # - Do not spend teaser calls while chapters are still pending.
         era_start_date, era_start_snapshot_id = self._get_current_era_start(
             save_id=save_id,
             chapters_data=chapters_data,
@@ -360,6 +403,18 @@ class ChronicleGenerator:
         current_era: dict[str, Any] | None = None
         current_era_cache = chapters_data.get("current_era_cache")
 
+        cached_current_era = (
+            current_era_cache.get("current_era")
+            if isinstance(current_era_cache, dict)
+            and isinstance(current_era_cache.get("current_era"), dict)
+            else None
+        )
+        cache_matches_era = bool(
+            isinstance(current_era_cache, dict)
+            and current_era_cache.get("start_snapshot_id") == era_start_snapshot_id
+            and cached_current_era is not None
+        )
+
         if chapter_only:
             if isinstance(current_era_cache, dict) and isinstance(
                 current_era_cache.get("current_era"), dict
@@ -369,20 +424,26 @@ class ChronicleGenerator:
                 # full refresh will detect the cache mismatch and regenerate.
                 used_cached_current_era = True
                 current_era = current_era_cache["current_era"]
-        elif (
-            not force_refresh
-            and isinstance(current_era_cache, dict)
-            and current_snapshot_id is not None
-            and current_era_cache.get("start_snapshot_id") == era_start_snapshot_id
-            and current_era_cache.get("last_snapshot_id") == current_snapshot_id
-            and isinstance(current_era_cache.get("current_era"), dict)
-        ):
+        elif pending_chapters > 0:
+            # Chapter generation is always higher priority than teaser freshness.
+            # While there are still chapters to finalize, avoid spending extra
+            # calls on current-era rewrites.
+            if cache_matches_era:
+                used_cached_current_era = True
+                current_era = cached_current_era
+            else:
+                # Era boundary moved and no matching teaser exists yet.
+                # Keep teaser empty until chapter queue clears.
+                current_era = None
+                if current_era_cache:
+                    chapters_data.pop("current_era_cache", None)
+        elif cache_matches_era and not force_refresh:
             used_cached_current_era = True
-            current_era = current_era_cache["current_era"]
+            current_era = cached_current_era
             logger.debug(
-                "Chronicle current era cache hit (save_id=%s last_snapshot_id=%s)",
+                "Chronicle current era cache hit (save_id=%s era_start_snapshot_id=%s)",
                 save_id,
-                current_snapshot_id,
+                era_start_snapshot_id,
             )
         else:
             if current_era_cache and not used_cached_current_era:
@@ -405,9 +466,9 @@ class ChronicleGenerator:
                     "current_era": current_era,
                 }
                 logger.debug(
-                    "Chronicle current era generated (save_id=%s last_snapshot_id=%s)",
+                    "Chronicle current era generated (save_id=%s era_start_snapshot_id=%s)",
                     save_id,
-                    current_snapshot_id,
+                    era_start_snapshot_id,
                 )
 
         # Assemble full chronicle text for backward compatibility
@@ -702,6 +763,49 @@ class ChronicleGenerator:
             return data
         except json.JSONDecodeError:
             return dict(DEFAULT_CHAPTERS_DATA)
+
+    def _chapter_only_cooldown_active(
+        self,
+        *,
+        chapters_data: dict[str, Any],
+    ) -> tuple[bool, int]:
+        """Return whether chapter-only auto generation is currently deferred."""
+        auto_sync = chapters_data.get("auto_chapter_sync")
+        if not isinstance(auto_sync, dict):
+            return False, 0
+
+        next_allowed_at = _parse_iso_datetime(auto_sync.get("next_allowed_at"))
+        if next_allowed_at is None:
+            return False, 0
+
+        now = datetime.now(timezone.utc)
+        if now >= next_allowed_at:
+            return False, 0
+
+        pending = auto_sync.get("pending_chapters")
+        pending_count = pending if isinstance(pending, int) and pending >= 0 else 0
+        return True, pending_count
+
+    def _set_next_chapter_only_run(
+        self,
+        *,
+        chapters_data: dict[str, Any],
+        pending_chapters: int,
+    ) -> None:
+        """Persist next chapter-only auto sync window."""
+        pending = max(0, int(pending_chapters))
+        interval = (
+            AUTO_CHAPTER_PENDING_INTERVAL_SECONDS
+            if pending > 0
+            else AUTO_CHAPTER_IDLE_INTERVAL_SECONDS
+        )
+        next_allowed = datetime.now(timezone.utc).timestamp() + interval
+        chapters_data["auto_chapter_sync"] = {
+            "pending_chapters": pending,
+            "interval_seconds": interval,
+            "next_allowed_at": datetime.fromtimestamp(next_allowed, timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
 
     def _should_finalize_chapter(
         self,
@@ -1214,17 +1318,41 @@ End the final prose section with "The story continues..."
 Do NOT give advice. You are a historian, not an advisor.
 """
 
+        config = {
+            "temperature": 1.0,
+            "max_output_tokens": 1024,
+            "response_mime_type": "application/json",
+            "response_schema": CurrentEraOutput,
+        }
+
+        response = None
         try:
             response = self.client.models.generate_content(
                 model="gemini-3-flash-preview",
                 contents=prompt,
-                config={
-                    "temperature": 1.0,
-                    "max_output_tokens": 1024,
-                    "response_mime_type": "application/json",
-                    "response_schema": CurrentEraOutput,
-                },
+                config=config,
             )
+        except Exception as primary_error:
+            logger.warning(
+                "Current era generation failed on gemini-3-flash-preview, "
+                "retrying with gemini-2.5-flash: %s",
+                primary_error,
+            )
+            try:
+                response = self.client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                    config=config,
+                )
+            except Exception as fallback_error:
+                logger.warning(
+                    "Current era generation fallback failed on gemini-2.5-flash: %s",
+                    fallback_error,
+                )
+
+        try:
+            if response is None or not getattr(response, "text", None):
+                raise ValueError("Current era generation returned empty response")
 
             era_output = CurrentEraOutput.model_validate_json(response.text)
             sections = [s.model_dump() for s in era_output.sections]

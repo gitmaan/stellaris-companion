@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16">
+  <defs>
+    <!-- Carve detail out of the main shape so it survives mac template rendering -->
+    <mask id="advisorMask">
+      <rect x="0" y="0" width="16" height="16" fill="#fff"/>
+      <!-- Hollow center to mimic the advisor diamond ring -->
+      <path d="M8 3.2L12.8 8L8 12.8L3.2 8Z" fill="#000"/>
+    </mask>
+  </defs>
+
+  <!-- Advisor emblem: large diamond ring + centered core diamond -->
+  <path d="M8 0.9L15.1 8L8 15.1L0.9 8Z" fill="#000" mask="url(#advisorMask)"/>
+  <path d="M8 5.25L10.75 8L8 10.75L5.25 8Z" fill="#000"/>
+</svg>

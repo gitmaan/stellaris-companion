@@ -1,6 +1,6 @@
 {
   "name": "stellaris-companion",
-  "version": "0.5.6",
+  "version": "0.6.0",
   "description": "Desktop companion app for Stellaris - AI-powered strategic advisor",
   "main": "main.js",
   "author": "Stellaris Companion",

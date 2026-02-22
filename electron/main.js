@@ -860,22 +860,94 @@ function getEffectiveSaveDir(settings) {
 // System Tray (ELEC-006)
 
 /**
- * Get the path to the tray icon.
- * Uses template image for macOS (trayTemplate.png) and regular icon for other platforms.
- * @returns {string} Path to tray icon
+ * Resolve an asset path across dev and packaged layouts.
+ * When packaged, files can be in app.asar/assets or Resources/assets.
+ * @param {string} filename
+ * @returns {string} Resolved absolute path, or empty string if not found
  */
-function getTrayIconPath() {
-  if (app.isPackaged) {
-    if (process.platform === 'darwin') {
-      return path.join(process.resourcesPath, 'assets', 'trayTemplate.png')
+function resolveAssetPath(filename) {
+  const fs = require('fs')
+  const candidates = [
+    path.join(__dirname, 'assets', filename),
+    path.join(app.getAppPath(), 'assets', filename),
+    path.join(process.resourcesPath, 'app.asar', 'assets', filename),
+    path.join(process.resourcesPath, 'assets', filename),
+  ]
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) return candidate
+    } catch {
+      // Keep trying other layouts.
     }
-    return path.join(process.resourcesPath, 'assets', 'icon.png')
-  } else {
-    // Development - use assets folder
-    if (process.platform === 'darwin') {
-      return path.join(__dirname, 'assets', 'trayTemplate.png')
+  }
+
+  return ''
+}
+
+/**
+ * Determine whether a PNG file can be used as a macOS template icon.
+ * Template icons should include transparency (alpha channel).
+ * @param {string} filePath
+ * @returns {boolean}
+ */
+function pngLikelyHasAlpha(filePath) {
+  const fs = require('fs')
+  if (!filePath) return false
+
+  try {
+    const data = fs.readFileSync(filePath)
+    if (data.length < 26) return false
+
+    // PNG signature bytes
+    if (
+      data[0] !== 0x89 ||
+      data[1] !== 0x50 ||
+      data[2] !== 0x4e ||
+      data[3] !== 0x47 ||
+      data[4] !== 0x0d ||
+      data[5] !== 0x0a ||
+      data[6] !== 0x1a ||
+      data[7] !== 0x0a
+    ) {
+      return false
     }
-    return path.join(__dirname, 'assets', 'icon.png')
+
+    // IHDR color type byte is at offset 25.
+    // 4 = grayscale+alpha, 6 = RGBA, 3 = indexed (may include transparency via tRNS)
+    const colorType = data[25]
+    return colorType === 4 || colorType === 6 || colorType === 3
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Build tray icon candidate paths.
+ * macOS prefers a template icon and falls back to icon.png if needed.
+ * @returns {{ primary: string, fallback: string, useTemplate: boolean }}
+ */
+function getTrayIconPaths() {
+  if (process.platform === 'darwin') {
+    const templatePath = resolveAssetPath('trayTemplate.png')
+    const colorIconPath = resolveAssetPath('icon.png')
+    const templateIsUsable = templatePath && pngLikelyHasAlpha(templatePath)
+
+    if (templatePath && !templateIsUsable) {
+      console.warn('macOS trayTemplate.png has no alpha channel; falling back to icon.png')
+    }
+
+    return {
+      primary: templateIsUsable ? templatePath : colorIconPath,
+      fallback: templateIsUsable ? colorIconPath : '',
+      useTemplate: Boolean(templateIsUsable),
+    }
+  }
+
+  return {
+    primary: resolveAssetPath('icon.png'),
+    fallback: '',
+    useTemplate: false,
   }
 }
 
@@ -888,46 +960,57 @@ function getTrayIconPath() {
  * - macOS: app stays running when window closed
  */
 function createTray() {
-  // Create tray icon - use a placeholder if file doesn't exist
+  // Create tray icon with robust fallbacks across packaged layouts.
   let trayIcon
+  let useTemplateImage = false
+  let loadedIconPath = ''
   try {
-    const iconPath = getTrayIconPath()
-    trayIcon = nativeImage.createFromPath(iconPath)
+    const { primary, fallback, useTemplate } = getTrayIconPaths()
+    useTemplateImage = useTemplate
 
-    // If icon is empty (file doesn't exist), create a simple placeholder
-    if (trayIcon.isEmpty()) {
-      // Create a simple 16x16 placeholder icon
+    if (primary) {
+      loadedIconPath = primary
+      trayIcon = nativeImage.createFromPath(primary)
+    }
+
+    // If primary icon is missing/invalid, fall back to icon.png
+    if ((!trayIcon || trayIcon.isEmpty()) && fallback && fallback !== primary) {
+      loadedIconPath = fallback
+      trayIcon = nativeImage.createFromPath(fallback)
+      useTemplateImage = false
+    }
+
+    // Last resort to avoid crashing; this should be rare after path resolution.
+    if (!trayIcon || trayIcon.isEmpty()) {
+      console.error('Tray icon not found. Tried:', { primary, fallback })
       trayIcon = nativeImage.createEmpty()
+      useTemplateImage = false
     }
   } catch (e) {
     console.error('Failed to load tray icon:', e)
     trayIcon = nativeImage.createEmpty()
+    useTemplateImage = false
   }
 
-  // For macOS, mark as template image for proper menu bar appearance
+  // For macOS, keep native template image sizing (18x18 + @2x asset) for crisp rendering.
   if (process.platform === 'darwin') {
-    trayIcon.setTemplateImage(true)
+    if (useTemplateImage && !trayIcon.isEmpty()) {
+      trayIcon.setTemplateImage(true)
+    }
   }
 
   tray = new Tray(trayIcon)
   tray.setToolTip('Stellaris Companion')
+  if (loadedIconPath) {
+    console.log('Tray icon loaded from:', loadedIconPath)
+  }
 
   // Update tray context menu
   updateTrayMenu()
 
-  // Click handler - toggle window visibility
+  // Click handler - open/focus the app without hiding it.
   tray.on('click', () => {
-    if (mainWindow) {
-      if (mainWindow.isVisible()) {
-        mainWindow.hide()
-      } else {
-        mainWindow.show()
-        mainWindow.focus()
-      }
-    } else {
-      // Window was destroyed, recreate it
-      createWindow()
-    }
+    revealMainWindow()
   })
 }
 
@@ -951,12 +1034,7 @@ function updateTrayMenu() {
     {
       label: 'Open Stellaris Companion',
       click: () => {
-        if (mainWindow) {
-          mainWindow.show()
-          mainWindow.focus()
-        } else {
-          createWindow()
-        }
+        revealMainWindow()
       },
     },
     {
@@ -974,6 +1052,25 @@ function updateTrayMenu() {
   ])
 
   tray.setContextMenu(contextMenu)
+}
+
+function revealMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow()
+    return
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore()
+  }
+
+  if (!mainWindow.isVisible()) {
+    mainWindow.show()
+  }
+
+  if (!mainWindow.isFocused()) {
+    mainWindow.focus()
+  }
 }
 
 // Window Management

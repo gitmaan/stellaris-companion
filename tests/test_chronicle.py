@@ -1,6 +1,7 @@
 """Unit tests for chronicle.py."""
 
 import json
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 import pytest
@@ -293,7 +294,7 @@ class TestShouldFinalizeChapter:
         assert trigger is None
 
     def test_era_ending_event_triggers_with_cooldown(self, generator):
-        """Returns (True, event_type) for era-ending event with 5+ year cooldown."""
+        """Returns (True, event_type) for era-ending event with 3+ year cooldown."""
         chapters_data = {"chapters": []}
 
         generator.db.get_events_in_snapshot_range.return_value = [
@@ -310,11 +311,11 @@ class TestShouldFinalizeChapter:
         assert trigger == "war_ended"
 
     def test_era_ending_event_blocked_within_cooldown(self, generator):
-        """Returns (False, None) for era-ending event within 5 year cooldown."""
+        """Returns (False, None) for era-ending event within 3 year cooldown."""
         chapters_data = {"chapters": []}
 
         generator.db.get_events_in_snapshot_range.return_value = [
-            {"event_type": "war_ended", "game_date": "2206.01.01", "summary": "War ended"}
+            {"event_type": "war_ended", "game_date": "2208.01.01", "summary": "War ended"}
         ]
 
         should_finalize, trigger = generator._should_finalize_chapter(
@@ -652,6 +653,245 @@ class TestGenerateChronicleChapterOnly:
         upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
         stored = json.loads(upsert_kwargs["chapters_json"])
         assert "current_era_cache" in stored
+
+    def test_chapter_only_defers_when_auto_sync_cooldown_active(self, generator):
+        """Chapter-only auto runs should no-op until cooldown expires."""
+        next_allowed_at = (datetime.now(timezone.utc) + timedelta(seconds=90)).isoformat()
+        generator.db.get_chronicle_by_save_id.return_value = {
+            "chapters_json": json.dumps(
+                {
+                    "format_version": 1,
+                    "chapters": [],
+                    "current_era_start_date": "2200.01.01",
+                    "current_era_start_snapshot_id": 1,
+                    "current_era_cache": {
+                        "start_date": "2200.01.01",
+                        "start_snapshot_id": 1,
+                        "last_snapshot_id": 1,
+                        "generated_at": "2026-01-01T00:00:00Z",
+                        "current_era": {
+                            "start_date": "2200.01.01",
+                            "narrative": "Existing current era narrative.",
+                            "events_covered": 4,
+                            "sections": [{"type": "prose", "text": "Existing.", "attribution": ""}],
+                        },
+                    },
+                    "auto_chapter_sync": {
+                        "pending_chapters": 2,
+                        "interval_seconds": 30,
+                        "next_allowed_at": next_allowed_at,
+                        "updated_at": "2026-01-01T00:00:00Z",
+                    },
+                }
+            ),
+            "event_count": 4,
+            "snapshot_count": 2,
+        }
+        generator._should_finalize_chapter = MagicMock(return_value=(True, "time_threshold"))  # type: ignore[method-assign]
+        generator._count_pending_chapters = MagicMock(return_value=2)  # type: ignore[method-assign]
+
+        result = generator.generate_chronicle("session-1", chapter_only=True)
+
+        generator._should_finalize_chapter.assert_not_called()  # type: ignore[attr-defined]
+        generator._count_pending_chapters.assert_not_called()  # type: ignore[attr-defined]
+        assert result["pending_chapters"] == 2
+
+        upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
+        stored = json.loads(upsert_kwargs["chapters_json"])
+        assert stored["auto_chapter_sync"]["next_allowed_at"] == next_allowed_at
+
+    def test_chapter_only_sets_pending_cadence_when_backlog_exists(self, generator):
+        """Backlog should schedule the next chapter-only run on short cadence."""
+        generator._should_finalize_chapter = MagicMock(return_value=(False, None))  # type: ignore[method-assign]
+        generator._count_pending_chapters = MagicMock(return_value=3)  # type: ignore[method-assign]
+
+        generator.generate_chronicle("session-1", chapter_only=True)
+
+        upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
+        stored = json.loads(upsert_kwargs["chapters_json"])
+        auto_sync = stored.get("auto_chapter_sync")
+        assert isinstance(auto_sync, dict)
+        assert auto_sync["pending_chapters"] == 3
+        assert auto_sync["interval_seconds"] == 30
+
+        next_allowed = datetime.fromisoformat(auto_sync["next_allowed_at"])
+        delta = (next_allowed - datetime.now(timezone.utc)).total_seconds()
+        assert 20 <= delta <= 40
+
+    def test_chapter_only_sets_idle_cadence_when_no_backlog(self, generator):
+        """No backlog should schedule the next chapter-only run on idle cadence."""
+        generator._should_finalize_chapter = MagicMock(return_value=(False, None))  # type: ignore[method-assign]
+        generator._count_pending_chapters = MagicMock(return_value=0)  # type: ignore[method-assign]
+
+        generator.generate_chronicle("session-1", chapter_only=True)
+
+        upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
+        stored = json.loads(upsert_kwargs["chapters_json"])
+        auto_sync = stored.get("auto_chapter_sync")
+        assert isinstance(auto_sync, dict)
+        assert auto_sync["pending_chapters"] == 0
+        assert auto_sync["interval_seconds"] == 300
+
+        next_allowed = datetime.fromisoformat(auto_sync["next_allowed_at"])
+        delta = (next_allowed - datetime.now(timezone.utc)).total_seconds()
+        assert 280 <= delta <= 320
+
+
+class TestGenerateChronicleCurrentEraPolicy:
+    """Tests for low-priority current-era teaser behavior."""
+
+    @pytest.fixture
+    def generator(self):
+        """Create a ChronicleGenerator with mocked database."""
+        mock_db = MagicMock()
+        mock_db.get_save_id_for_session.return_value = "save-1"
+        mock_db.get_chronicle_custom_instructions.return_value = None
+        mock_db.get_snapshot_range_for_save.return_value = {
+            "snapshot_count": 3,
+            "first_game_date": "2200.01.01",
+            "first_snapshot_id": 1,
+            "last_game_date": "2208.01.01",
+            "last_snapshot_id": 3,
+        }
+        mock_db.get_latest_session_briefing_json.return_value = "{}"
+        mock_db.get_all_events_by_save_id.return_value = [
+            {"event_type": "war_started", "summary": "War begun", "game_date": "2205.01.01"}
+        ]
+        mock_db.upsert_chronicle_by_save_id.return_value = None
+        return ChronicleGenerator(db=mock_db, api_key="fake-key")
+
+    def test_reuses_current_era_cache_with_new_snapshot_in_same_era(self, generator):
+        """Current era teaser should be write-once per era (snapshot churn should not rewrite it)."""
+        generator.db.get_chronicle_by_save_id.return_value = {
+            "chapters_json": json.dumps(
+                {
+                    "format_version": 1,
+                    "chapters": [],
+                    "current_era_start_date": "2200.01.01",
+                    "current_era_start_snapshot_id": 1,
+                    "current_era_cache": {
+                        "start_date": "2200.01.01",
+                        "start_snapshot_id": 1,
+                        "last_snapshot_id": 1,
+                        "generated_at": "2026-01-01T00:00:00Z",
+                        "current_era": {
+                            "start_date": "2200.01.01",
+                            "narrative": "Existing teaser text.",
+                            "events_covered": 4,
+                            "sections": [
+                                {
+                                    "type": "prose",
+                                    "text": "Existing teaser text.",
+                                    "attribution": "",
+                                }
+                            ],
+                        },
+                    },
+                }
+            ),
+            "event_count": 4,
+            "snapshot_count": 2,
+        }
+        generator._should_finalize_chapter = MagicMock(return_value=(False, None))  # type: ignore[method-assign]
+        generator._count_pending_chapters = MagicMock(return_value=0)  # type: ignore[method-assign]
+        generator._generate_current_era = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+        result = generator.generate_chronicle("session-1")
+
+        generator._generate_current_era.assert_not_called()  # type: ignore[attr-defined]
+        assert result["current_era"] is not None
+        assert result["current_era"]["narrative"] == "Existing teaser text."
+        assert result["cached"] is True
+
+    def test_skips_current_era_generation_while_chapters_pending(self, generator):
+        """When chapters are pending, current era should not consume additional model calls."""
+        generator.db.get_chronicle_by_save_id.return_value = {
+            "chapters_json": json.dumps(
+                {
+                    "format_version": 1,
+                    "chapters": [],
+                    "current_era_start_date": "2200.01.01",
+                    "current_era_start_snapshot_id": 2,
+                    "current_era_cache": {
+                        "start_date": "2200.01.01",
+                        "start_snapshot_id": 1,
+                        "last_snapshot_id": 1,
+                        "generated_at": "2026-01-01T00:00:00Z",
+                        "current_era": {
+                            "start_date": "2200.01.01",
+                            "narrative": "Stale teaser text.",
+                            "events_covered": 4,
+                            "sections": [
+                                {"type": "prose", "text": "Stale teaser text.", "attribution": ""}
+                            ],
+                        },
+                    },
+                }
+            ),
+            "event_count": 4,
+            "snapshot_count": 2,
+        }
+        generator._should_finalize_chapter = MagicMock(return_value=(False, None))  # type: ignore[method-assign]
+        generator._count_pending_chapters = MagicMock(return_value=2)  # type: ignore[method-assign]
+        generator._generate_current_era = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+        result = generator.generate_chronicle("session-1")
+
+        generator._generate_current_era.assert_not_called()  # type: ignore[attr-defined]
+        assert result["current_era"] is None
+
+        upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
+        stored = json.loads(upsert_kwargs["chapters_json"])
+        assert "current_era_cache" not in stored
+
+
+class TestCurrentEraFallbackModel:
+    """Tests for current-era model fallback behavior."""
+
+    @pytest.fixture
+    def generator(self):
+        mock_db = MagicMock()
+        mock_db.get_events_in_snapshot_range.return_value = [
+            {"event_type": "war_started", "summary": "War begun", "game_date": "2205.01.01"}
+        ]
+        return ChronicleGenerator(db=mock_db, api_key="fake-key")
+
+    def test_falls_back_to_gemini_25_flash_for_current_era(self, generator):
+        """Current-era generation should retry on gemini-2.5-flash after primary failure."""
+        mock_client = MagicMock()
+        mock_client.models.generate_content.side_effect = [
+            RuntimeError("quota"),
+            MagicMock(
+                text=json.dumps(
+                    {
+                        "sections": [
+                            {"type": "prose", "text": "The frontier trembles.", "attribution": ""}
+                        ]
+                    }
+                )
+            ),
+        ]
+        generator._client = mock_client  # type: ignore[attr-defined]
+
+        result = generator._generate_current_era(  # type: ignore[attr-defined]
+            save_id="save-1",
+            chapters_data={
+                "chapters": [],
+                "current_era_start_date": "2200.01.01",
+                "current_era_start_snapshot_id": 1,
+            },
+            briefing={"identity": {"empire_name": "Test Empire", "ethics": ["militarist"]}},
+            current_date="2208.01.01",
+            custom_instructions=None,
+        )
+
+        assert result is not None
+        assert "The frontier trembles." in result["narrative"]
+        assert mock_client.models.generate_content.call_count == 2
+        first_call = mock_client.models.generate_content.call_args_list[0]
+        second_call = mock_client.models.generate_content.call_args_list[1]
+        assert first_call.kwargs["model"] == "gemini-3-flash-preview"
+        assert second_call.kwargs["model"] == "gemini-2.5-flash"
 
 
 class TestSectionsToText:
