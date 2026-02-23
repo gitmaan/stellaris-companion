@@ -1319,7 +1319,18 @@ registerExportIpcHandlers({
 // =============================================================================
 // Auto-Update Handlers (ELEC-006: electron-updater integration)
 // =============================================================================
-registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev: IS_DEV, getMainWindow: () => mainWindow })
+registerUpdateIpcHandlers({
+  ipcMain,
+  autoUpdater,
+  app,
+  isDev: IS_DEV,
+  getMainWindow: () => mainWindow,
+  prepareForUpdateQuit: () => {
+    isQuittingForUpdate = true
+    isQuitting = true
+    healthCheckManager.setIsQuitting(true)
+  },
+})
 wireAutoUpdaterEvents({ autoUpdater, getMainWindow: () => mainWindow })
 
 // =============================================================================

@@ -53,7 +53,7 @@ function sendUpdateEvent(getMainWindow, channel, payload) {
   mainWindow.webContents.send(channel, payload)
 }
 
-function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWindow }) {
+function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWindow, prepareForUpdateQuit }) {
   ipcMain.handle('check-for-update', async () => {
     if (isDev) {
       return { updateAvailable: false }
@@ -108,6 +108,11 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
       }
 
       // Install is explicitly user-triggered from renderer UI.
+      // Important: mark app as quitting-for-update before calling quitAndInstall.
+      // electron-updater may close windows before app's before-quit event fires.
+      if (typeof prepareForUpdateQuit === 'function') {
+        prepareForUpdateQuit()
+      }
       autoUpdater.quitAndInstall()
       return { success: true }
     } catch (err) {
