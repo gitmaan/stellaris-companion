@@ -53,6 +53,14 @@ declare global {
       getBackendLogTail: (opts?: { maxBytes?: number }) => Promise<{ ok: true; data: string } | { ok: false; error: string }>
       // Backend status events
       onBackendStatus: (callback: (status: BackendStatusEvent) => void) => () => void
+      // Updates
+      checkForUpdate: () => Promise<{ updateAvailable: boolean; version?: string; error?: string }>
+      installUpdate: () => Promise<{ success: boolean; alreadyInProgress?: boolean; error?: string }>
+      onUpdateAvailable: (callback: (payload: { version?: string }) => void) => () => void
+      onUpdateDownloaded: (callback: (payload: { version?: string }) => void) => () => void
+      onUpdateDownloadProgress: (callback: (progress: number) => void) => () => void
+      onUpdateInstalling: (callback: (payload: { version?: string | null }) => void) => () => void
+      onUpdateError: (callback: (message: string) => void) => () => void
       // Onboarding
       onboarding: {
         getStatus: () => Promise<boolean>

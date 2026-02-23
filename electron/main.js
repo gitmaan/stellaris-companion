@@ -7,7 +7,7 @@
 // - rust-parser/: Rust CLI parser binary (stellaris-parser) used by stellaris_companion/rust_bridge.py
 //   The Rust parser handles Clausewitz save file parsing with proper edge case handling.
 
-const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, shell, safeStorage } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, shell, safeStorage, autoUpdater: nativeAutoUpdater } = require('electron')
 const { clipboard } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
@@ -204,6 +204,7 @@ let pythonProcess = null
 let authToken = null
 let backendPort = DEFAULT_BACKEND_PORT
 let isQuitting = false
+let isQuittingForUpdate = false
 let tray = null
 let lastTrayStatus = null // Track last status to avoid rebuilding menu unnecessarily
 let backendConfigured = false
@@ -1318,7 +1319,7 @@ registerExportIpcHandlers({
 // =============================================================================
 // Auto-Update Handlers (ELEC-006: electron-updater integration)
 // =============================================================================
-registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev: IS_DEV })
+registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev: IS_DEV, getMainWindow: () => mainWindow })
 wireAutoUpdaterEvents({ autoUpdater, getMainWindow: () => mainWindow })
 
 // =============================================================================
@@ -1606,6 +1607,17 @@ app.on('before-quit', (event) => {
   isQuitting = true
   healthCheckManager.setIsQuitting(true)
 
+  if (isQuittingForUpdate) {
+    announcementsService.stopPolling()
+    if (tray) {
+      tray.destroy()
+      tray = null
+    }
+    // Keep updater-driven restart path unblocked.
+    stopPythonBackend().catch(() => {})
+    return
+  }
+
   announcementsService.stopPolling()
 
   // Ensure backend shutdown completes (esp. on Windows) before the app exits.
@@ -1627,6 +1639,14 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+
+if (nativeAutoUpdater && typeof nativeAutoUpdater.on === 'function') {
+  nativeAutoUpdater.on('before-quit-for-update', () => {
+    isQuittingForUpdate = true
+    isQuitting = true
+    healthCheckManager.setIsQuitting(true)
+  })
+}
 
 // Export for testing
 module.exports = {

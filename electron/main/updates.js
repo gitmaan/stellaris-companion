@@ -9,10 +9,19 @@ function setupAutoUpdater({ autoUpdater, app, isDev }) {
     return
   }
 
+  // We use a custom in-app updater UX, so avoid native notifications.
+  autoUpdater.autoDownload = true
+
+  // On macOS, keep installs explicitly user-triggered to avoid "silent wait"
+  // states where the app appears idle after pressing restart.
+  if (process.platform === 'darwin') {
+    autoUpdater.autoInstallOnAppQuit = false
+  }
+
   // Avoid startup crashes on platforms/configs where update checks can throw
   // synchronously or reject promises (network, feed parsing, etc).
   try {
-    const p = autoUpdater.checkForUpdatesAndNotify()
+    const p = autoUpdater.checkForUpdates()
     if (p && typeof p.catch === 'function') {
       p.catch((err) => console.error('Auto-updater error (startup):', err))
     }
@@ -32,7 +41,19 @@ function setupAutoUpdater({ autoUpdater, app, isDev }) {
   }, 3600000)
 }
 
-function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev }) {
+const updaterState = {
+  downloadedVersion: null,
+  installing: false,
+  installTimeout: null,
+}
+
+function sendUpdateEvent(getMainWindow, channel, payload) {
+  const mainWindow = getMainWindow()
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.webContents.send(channel, payload)
+}
+
+function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWindow }) {
   ipcMain.handle('check-for-update', async () => {
     if (isDev) {
       return { updateAvailable: false }
@@ -59,12 +80,42 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev }) {
       return { success: false, error: 'Updates are managed by Microsoft Store builds' }
     }
 
+    if (updaterState.installing) {
+      return { success: true, alreadyInProgress: true }
+    }
+
     try {
-      await autoUpdater.downloadUpdate()
+      updaterState.installing = true
+      sendUpdateEvent(getMainWindow, 'update-installing', { version: updaterState.downloadedVersion })
+
+      if (updaterState.installTimeout) {
+        clearTimeout(updaterState.installTimeout)
+        updaterState.installTimeout = null
+      }
+      updaterState.installTimeout = setTimeout(() => {
+        if (!updaterState.installing) return
+        updaterState.installing = false
+        sendUpdateEvent(
+          getMainWindow,
+          'update-error',
+          'Update restart is taking longer than expected. Please quit and reopen the app.'
+        )
+      }, 45000)
+
+      // If we don't already have a ready update, ensure one is downloaded first.
+      if (!updaterState.downloadedVersion) {
+        await autoUpdater.downloadUpdate()
+      }
+
       // Install is explicitly user-triggered from renderer UI.
       autoUpdater.quitAndInstall()
       return { success: true }
     } catch (err) {
+      updaterState.installing = false
+      if (updaterState.installTimeout) {
+        clearTimeout(updaterState.installTimeout)
+        updaterState.installTimeout = null
+      }
       console.error('Failed to download/install update:', err)
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -73,46 +124,42 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev }) {
 
 function wireAutoUpdaterEvents({ autoUpdater, getMainWindow }) {
   autoUpdater.on('checking-for-update', () => {
-    const mainWindow = getMainWindow()
-    if (mainWindow) {
-      mainWindow.webContents.send('update-checking')
-    }
+    sendUpdateEvent(getMainWindow, 'update-checking')
   })
 
   autoUpdater.on('update-available', (info) => {
     console.log('Update available:', info.version)
-    const mainWindow = getMainWindow()
-    if (mainWindow) {
-      mainWindow.webContents.send('update-available', { version: info.version })
-    }
+    sendUpdateEvent(getMainWindow, 'update-available', { version: info.version })
   })
 
   autoUpdater.on('update-not-available', () => {
     console.log('No update available')
+    updaterState.installing = false
+    if (updaterState.installTimeout) {
+      clearTimeout(updaterState.installTimeout)
+      updaterState.installTimeout = null
+    }
   })
 
   autoUpdater.on('download-progress', (progress) => {
-    const mainWindow = getMainWindow()
-    if (mainWindow) {
-      mainWindow.webContents.send('update-download-progress', Math.round(progress.percent))
-    }
+    sendUpdateEvent(getMainWindow, 'update-download-progress', Math.round(progress.percent))
   })
 
   autoUpdater.on('update-downloaded', (info) => {
     console.log('Update downloaded:', info.version)
-    const mainWindow = getMainWindow()
-    if (mainWindow) {
-      mainWindow.webContents.send('update-downloaded', { version: info.version })
-    }
+    updaterState.downloadedVersion = info.version || null
+    sendUpdateEvent(getMainWindow, 'update-downloaded', { version: info.version })
     console.log('Update ready to install; awaiting explicit user action')
   })
 
   autoUpdater.on('error', (err) => {
-    console.error('Auto-updater error:', err)
-    const mainWindow = getMainWindow()
-    if (mainWindow) {
-      mainWindow.webContents.send('update-error', err instanceof Error ? err.message : String(err))
+    updaterState.installing = false
+    if (updaterState.installTimeout) {
+      clearTimeout(updaterState.installTimeout)
+      updaterState.installTimeout = null
     }
+    console.error('Auto-updater error:', err)
+    sendUpdateEvent(getMainWindow, 'update-error', err instanceof Error ? err.message : String(err))
   })
 }
 

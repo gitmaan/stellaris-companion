@@ -49,8 +49,13 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  # Disable signing for now
+  # No Windows code-signing cert yet; keep executable unsigned.
   signAndEditExecutable: false
+  # Allow auto-updates on Windows even while unsigned.
+  # When we add a proper WIN_CSC cert, switch this back to true.
+  verifyUpdateCodeSignature: false
+  # Prevent deriving publisherName from unrelated cert metadata.
+  publisherName: null
 
 linux:
   icon: assets/icon.png

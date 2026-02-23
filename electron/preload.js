@@ -117,6 +117,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloadProgress: (callback) => {
     return createManagedListener('update-download-progress', callback)
   },
+  onUpdateInstalling: (callback) => {
+    return createManagedListener('update-installing', callback)
+  },
   onUpdateError: (callback) => {
     return createManagedListener('update-error', callback)
   },

@@ -150,7 +150,8 @@ jobs:
 
           rm -f "$CERT_FILE"
 
-      - name: Publish Electron App
+      - name: Publish Electron App (mac)
+        if: startsWith(matrix.name, 'mac')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
@@ -158,6 +159,14 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cd electron
+          npx electron-builder ${{ matrix.electron_args }} --publish always
+
+      - name: Publish Electron App (non-mac)
+        if: ${{ !startsWith(matrix.name, 'mac') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd electron
           npx electron-builder ${{ matrix.electron_args }} --publish always

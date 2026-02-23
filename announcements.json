@@ -2,19 +2,21 @@
   "version": 1,
   "announcements": [
     {
-      "id": "community-002-text-sizing-feedback",
-      "severity": "info",
-      "title": "Readability Update",
-      "body": "Huge thanks to choppytehbear1337 for calling out text readability. Text sizing is now available in Settings. Our recent Reddit post is currently banned, so please use the in-app feedback form to share ideas and bug reports. Hope you're having fun, and thanks for helping improve Stellaris Companion!",
-      "publishedAt": "2026-02-13T00:00:00Z",
-      "minVersion": "0.5.6"
+      "id": "windows-003-reinstall-required",
+      "severity": "warning",
+      "title": "Important for Windows Users: Reinstall Needed",
+      "body": "If you’re on Windows, please grab this update from our downloads page instead of in-app update. It’s a quick one-time reinstall to get everything back on track.",
+      "publishedAt": "2026-02-23T00:00:00Z",
+      "minVersion": "0.5.6",
+      "maxVersion": "0.6.0"
     },
     {
-      "id": "launch-001",
+      "id": "release-004-themes-gemini-efficiency",
       "severity": "info",
-      "title": "Fresh off the shipyard",
-      "body": "This is a brand new release — ambitious plans, not enough resources. If something breaks, hit Report Issue in Settings so we can fix it before the Prethoryn arrive.",
-      "publishedAt": "2026-02-08T00:00:00Z"
+      "title": "New Themes + Gemini Free-Tier Improvements",
+      "body": "New color themes are now live in the Settings tab. Huge thanks to u/PrimarchsWrath for the suggestion. We also improved Gemini efficiency so free-tier usage stretches further.",
+      "publishedAt": "2026-02-23T00:00:00Z",
+      "minVersion": "0.6.0"
     }
   ]
 }
