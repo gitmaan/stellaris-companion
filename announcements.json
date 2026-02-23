@@ -8,7 +8,11 @@
       "body": "If you’re on Windows, please grab this update from our downloads page instead of in-app update. It’s a quick one-time reinstall to get everything back on track.",
       "publishedAt": "2026-02-23T00:00:00Z",
       "minVersion": "0.5.6",
-      "maxVersion": "0.6.0"
+      "maxVersion": "0.6.0",
+      "link": {
+        "label": "Open Downloads",
+        "url": "https://galacticfilingcabinet.com/#download"
+      }
     },
     {
       "id": "release-004-themes-gemini-efficiency",
