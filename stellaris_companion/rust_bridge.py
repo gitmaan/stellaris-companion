@@ -86,6 +86,25 @@ def _raise_parser_binary_not_found(binary_path: Path) -> None:
     raise FileNotFoundError(f"Parser binary not found: {binary_path}")
 
 
+def _windows_subprocess_kwargs() -> dict[str, object]:
+    """Return subprocess kwargs that suppress console windows on Windows."""
+    if os.name != "nt":
+        return {}
+
+    kwargs: dict[str, object] = {}
+    create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if create_no_window:
+        kwargs["creationflags"] = create_no_window
+
+    with suppress(Exception):
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
+        startupinfo.wShowWindow = 0
+        kwargs["startupinfo"] = startupinfo
+
+    return kwargs
+
+
 def _get_binary_path() -> Path:
     """Get path to stellaris-parser binary for current platform.
 
@@ -238,6 +257,7 @@ class RustSession:
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            **_windows_subprocess_kwargs(),
         )
 
         # Start a reader thread to handle stdout asynchronously
@@ -848,6 +868,7 @@ def _spawn_extract_sections(save_path: str | Path, sections: list[str]) -> dict:
         ],
         capture_output=True,
         timeout=60,
+        **_windows_subprocess_kwargs(),
     )
 
     if result.returncode != 0:
@@ -915,6 +936,7 @@ def _spawn_iter_section_entries(save_path: str | Path, section: str) -> Iterator
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        **_windows_subprocess_kwargs(),
     )
 
     for line in proc.stdout:

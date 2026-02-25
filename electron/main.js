@@ -329,6 +329,8 @@ function startPythonBackend(settings) {
   pythonProcess = spawn(pythonPath, args, {
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
+    // Hide child console windows on Windows (prevents cmd popups during backend lifecycle).
+    windowsHide: true,
     // Detach on Unix so we can kill the whole process group with -pid
     detached: process.platform !== 'win32',
   })
