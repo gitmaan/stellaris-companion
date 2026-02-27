@@ -2,6 +2,18 @@
   "version": 1,
   "announcements": [
     {
+      "id": "windows-004-console-window-fix",
+      "severity": "update",
+      "title": "Windows Fix: Background Console Window",
+      "body": "Version 0.6.3 fixes the background console window issue on Windows. If you still run into anything odd, please send a quick report through the feedback form so we can follow up.",
+      "publishedAt": "2026-02-27T00:00:00Z",
+      "minVersion": "0.6.3",
+      "link": {
+        "label": "Open Feedback Form",
+        "url": "https://galacticfilingcabinet.com/feedback/"
+      }
+    },
+    {
       "id": "windows-003-reinstall-required",
       "severity": "warning",
       "title": "Important for Windows Users: Reinstall Needed",
