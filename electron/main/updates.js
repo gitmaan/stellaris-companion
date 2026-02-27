@@ -43,8 +43,64 @@ function setupAutoUpdater({ autoUpdater, app, isDev }) {
 
 const updaterState = {
   downloadedVersion: null,
+  releaseName: null,
+  releaseNotes: null,
   installing: false,
   installTimeout: null,
+}
+
+function normalizeReleaseNotes(releaseNotes) {
+  if (typeof releaseNotes === 'string') {
+    const trimmed = releaseNotes.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  if (Array.isArray(releaseNotes)) {
+    const merged = releaseNotes
+      .map((entry) => {
+        if (!entry || typeof entry.note !== 'string') return ''
+        return entry.note.trim()
+      })
+      .filter(Boolean)
+      .join('\n\n')
+      .trim()
+    return merged.length > 0 ? merged : null
+  }
+
+  return null
+}
+
+function cacheUpdateMetadata(info) {
+  if (!info || typeof info !== 'object') return
+
+  if (typeof info.version === 'string' && info.version.length > 0) {
+    const isNewVersion = updaterState.downloadedVersion && updaterState.downloadedVersion !== info.version
+    if (isNewVersion) {
+      updaterState.releaseName = null
+      updaterState.releaseNotes = null
+    }
+    updaterState.downloadedVersion = info.version
+  }
+
+  if (Object.prototype.hasOwnProperty.call(info, 'releaseName')) {
+    updaterState.releaseName = typeof info.releaseName === 'string' && info.releaseName.trim()
+      ? info.releaseName.trim()
+      : null
+  }
+
+  if (Object.prototype.hasOwnProperty.call(info, 'releaseNotes')) {
+    updaterState.releaseNotes = normalizeReleaseNotes(info.releaseNotes)
+  }
+}
+
+function buildUpdatePayload(info = {}) {
+  const normalizedReleaseNotes = normalizeReleaseNotes(info?.releaseNotes)
+
+  return {
+    version: info?.version || updaterState.downloadedVersion || undefined,
+    releaseName: info?.releaseName || updaterState.releaseName || undefined,
+    releaseNotes: normalizedReleaseNotes || updaterState.releaseNotes || undefined,
+  }
 }
 
 function sendUpdateEvent(getMainWindow, channel, payload) {
@@ -61,9 +117,10 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
 
     try {
       const result = await autoUpdater.checkForUpdates()
+      cacheUpdateMetadata(result?.updateInfo)
       return {
         updateAvailable: result?.updateInfo?.version !== app.getVersion(),
-        version: result?.updateInfo?.version,
+        ...buildUpdatePayload(result?.updateInfo),
       }
     } catch (err) {
       console.error('Failed to check for updates:', err)
@@ -86,7 +143,7 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
 
     try {
       updaterState.installing = true
-      sendUpdateEvent(getMainWindow, 'update-installing', { version: updaterState.downloadedVersion })
+      sendUpdateEvent(getMainWindow, 'update-installing', buildUpdatePayload())
 
       if (updaterState.installTimeout) {
         clearTimeout(updaterState.installTimeout)
@@ -133,8 +190,9 @@ function wireAutoUpdaterEvents({ autoUpdater, getMainWindow }) {
   })
 
   autoUpdater.on('update-available', (info) => {
+    cacheUpdateMetadata(info)
     console.log('Update available:', info.version)
-    sendUpdateEvent(getMainWindow, 'update-available', { version: info.version })
+    sendUpdateEvent(getMainWindow, 'update-available', buildUpdatePayload(info))
   })
 
   autoUpdater.on('update-not-available', () => {
@@ -151,9 +209,9 @@ function wireAutoUpdaterEvents({ autoUpdater, getMainWindow }) {
   })
 
   autoUpdater.on('update-downloaded', (info) => {
+    cacheUpdateMetadata(info)
     console.log('Update downloaded:', info.version)
-    updaterState.downloadedVersion = info.version || null
-    sendUpdateEvent(getMainWindow, 'update-downloaded', { version: info.version })
+    sendUpdateEvent(getMainWindow, 'update-downloaded', buildUpdatePayload(info))
     console.log('Update ready to install; awaiting explicit user action')
   })
 

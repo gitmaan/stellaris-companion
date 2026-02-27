@@ -54,12 +54,30 @@ declare global {
       // Backend status events
       onBackendStatus: (callback: (status: BackendStatusEvent) => void) => () => void
       // Updates
-      checkForUpdate: () => Promise<{ updateAvailable: boolean; version?: string; error?: string }>
+      checkForUpdate: () => Promise<{
+        updateAvailable: boolean
+        version?: string
+        releaseName?: string
+        releaseNotes?: string
+        error?: string
+      }>
       installUpdate: () => Promise<{ success: boolean; alreadyInProgress?: boolean; error?: string }>
-      onUpdateAvailable: (callback: (payload: { version?: string }) => void) => () => void
-      onUpdateDownloaded: (callback: (payload: { version?: string }) => void) => () => void
+      onUpdateAvailable: (callback: (payload: {
+        version?: string
+        releaseName?: string
+        releaseNotes?: string
+      }) => void) => () => void
+      onUpdateDownloaded: (callback: (payload: {
+        version?: string
+        releaseName?: string
+        releaseNotes?: string
+      }) => void) => () => void
       onUpdateDownloadProgress: (callback: (progress: number) => void) => () => void
-      onUpdateInstalling: (callback: (payload: { version?: string | null }) => void) => () => void
+      onUpdateInstalling: (callback: (payload: {
+        version?: string
+        releaseName?: string
+        releaseNotes?: string
+      }) => void) => () => void
       onUpdateError: (callback: (message: string) => void) => () => void
       // Onboarding
       onboarding: {

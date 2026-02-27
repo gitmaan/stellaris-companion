@@ -4,11 +4,61 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface UpdateState {
   available: boolean
   version?: string
+  releaseName?: string
+  releaseNotes?: string
   checking: boolean
   downloading: boolean
   installing: boolean
   progress: number
   error?: string
+}
+
+interface UpdateInfoPayload {
+  version?: string
+  releaseName?: string
+  releaseNotes?: string
+}
+
+function normalizeReleaseNotes(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
+function normalizeNoteLine(line: string): string {
+  return line
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#+\s*/, '')
+    .trim()
+}
+
+function extractReleaseHighlights(releaseNotes?: string, maxHighlights = 5): string[] {
+  if (!releaseNotes) return []
+
+  const lines = releaseNotes
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const bullets = lines
+    .map((line) => {
+      const match = line.match(/^[-*•]\s+(.+)$/) || line.match(/^\d+\.\s+(.+)$/)
+      return match ? normalizeNoteLine(match[1]) : ''
+    })
+    .filter(Boolean)
+
+  if (bullets.length > 0) {
+    return bullets.slice(0, maxHighlights)
+  }
+
+  return lines
+    .filter((line) => !line.startsWith('#'))
+    .map((line) => normalizeNoteLine(line))
+    .filter(Boolean)
+    .slice(0, Math.min(maxHighlights, 3))
 }
 
 export default function UpdateDialog() {
@@ -26,11 +76,14 @@ export default function UpdateDialog() {
       setUpdate(prev => ({ ...prev, checking: true }))
       try {
         const result = await (window as any).electronAPI.checkForUpdate()
+        const releaseNotes = normalizeReleaseNotes(result?.releaseNotes)
         if (result?.updateAvailable) {
           setUpdate(prev => ({
             ...prev,
             available: true,
             version: result.version,
+            releaseName: typeof result?.releaseName === 'string' ? result.releaseName : prev.releaseName,
+            releaseNotes: releaseNotes ?? prev.releaseNotes,
           }))
         }
       } catch (err) {
@@ -45,11 +98,14 @@ export default function UpdateDialog() {
 
   // Listen for update events
   useEffect(() => {
-    const unlistenUpdateAvailable = (window as any).electronAPI.onUpdateAvailable((info: { version?: string }) => {
+    const unlistenUpdateAvailable = (window as any).electronAPI.onUpdateAvailable((info: UpdateInfoPayload) => {
+      const releaseNotes = normalizeReleaseNotes(info?.releaseNotes)
       setUpdate(prev => ({
         ...prev,
         available: true,
         version: info?.version ?? prev.version,
+        releaseName: info?.releaseName ?? prev.releaseName,
+        releaseNotes: releaseNotes ?? prev.releaseNotes,
         error: undefined,
       }))
     })
@@ -64,11 +120,14 @@ export default function UpdateDialog() {
       }))
     })
 
-    const unlistenUpdateDownloaded = (window as any).electronAPI.onUpdateDownloaded((info: { version?: string }) => {
+    const unlistenUpdateDownloaded = (window as any).electronAPI.onUpdateDownloaded((info: UpdateInfoPayload) => {
+      const releaseNotes = normalizeReleaseNotes(info?.releaseNotes)
       setUpdate(prev => ({
         ...prev,
         available: true,
         version: info?.version ?? prev.version,
+        releaseName: info?.releaseName ?? prev.releaseName,
+        releaseNotes: releaseNotes ?? prev.releaseNotes,
         downloading: false,
         installing: false,
         progress: 100,
@@ -139,6 +198,8 @@ export default function UpdateDialog() {
     }))
   }
 
+  const releaseHighlights = extractReleaseHighlights(update.releaseNotes)
+
   if (!update.available) return null
 
   return (
@@ -178,6 +239,11 @@ export default function UpdateDialog() {
               <p className="text-text-secondary text-sm">
                 Stellaris Companion {update.version}
               </p>
+              {update.releaseName && (
+                <p className="text-text-muted text-xs mt-1">
+                  {update.releaseName}
+                </p>
+              )}
             </div>
 
             {/* Content */}
@@ -195,6 +261,22 @@ export default function UpdateDialog() {
                   <p className="text-text-primary text-sm mb-4">
                     A new version is ready to install. Restart the app to apply the update.
                   </p>
+                )}
+
+                {releaseHighlights.length > 0 && !update.installing && (
+                  <div className="mb-4 p-3 bg-bg-tertiary/40 border border-border/50 rounded-md">
+                    <p className="text-[11px] text-accent-cyan font-semibold uppercase tracking-wider">
+                      What&apos;s New
+                    </p>
+                    <ul className="mt-2 space-y-1.5">
+                      {releaseHighlights.map((item, idx) => (
+                        <li key={`${idx}-${item}`} className="text-xs text-text-secondary leading-relaxed flex items-start gap-2">
+                          <span className="text-accent-cyan mt-[1px]">•</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
 
                 {/* Progress bar */}
