@@ -193,7 +193,10 @@ test('enhanced mode refreshes current era sooner while Chronicle is open', async
     await installVisibilityShim(page)
 
     await page.getByRole('button', { name: /Config/i }).click()
-    await page.getByLabel('Chronicle Refresh').selectOption('enhanced')
+    const enhancedToggle = page.getByRole('button', { name: /Set refresh mode to Enhanced/i })
+    await expect(enhancedToggle).toHaveAttribute('aria-pressed', 'false')
+    await enhancedToggle.click()
+    await expect(enhancedToggle).toHaveAttribute('aria-pressed', 'true')
 
     await page.getByRole('button', { name: /Chronicle/i }).click()
     await expect(page.getByText('Old teaser.')).toBeVisible()

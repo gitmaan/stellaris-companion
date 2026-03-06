@@ -53,14 +53,14 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'command-amber': 'Command Amber',
 }
 
-const CHRONICLE_REFRESH_MODE_OPTIONS: { value: ChronicleRefreshMode; label: string }[] = [
-  { value: 'balanced', label: 'Balanced' },
-  { value: 'enhanced', label: 'Enhanced' },
-]
-
 const CHRONICLE_REFRESH_MODE_LABELS: Record<ChronicleRefreshMode, string> = {
   balanced: 'Balanced',
   enhanced: 'Enhanced',
+}
+
+const CHRONICLE_REFRESH_MODE_HELPERS: Record<ChronicleRefreshMode, string> = {
+  balanced: 'Lower Gemini usage. Best default for free tier and steadier cliffhanger updates.',
+  enhanced: 'Faster current-era story updates while viewing Chronicle. Uses more Gemini calls.',
 }
 
 function SettingsPage({
@@ -297,22 +297,6 @@ function SettingsPage({
                   {uiThemeSaving ? 'APPLYING...' : 'THEME PRESET'}
                 </HUDMicro>
               </div>
-              <div>
-                <HUDSelect
-                  label="Chronicle Refresh"
-                  value={chronicleRefreshMode}
-                  disabled={chronicleRefreshModeSaving}
-                  onChange={(e) => void handleChronicleRefreshModeChange(e.target.value)}
-                  options={CHRONICLE_REFRESH_MODE_OPTIONS}
-                />
-                <HUDMicro className="block mt-1 text-right">
-                  {chronicleRefreshModeSaving
-                    ? 'APPLYING...'
-                    : chronicleRefreshMode === 'balanced'
-                      ? 'FREE-TIER DEFAULT'
-                      : 'MORE GEMINI CALLS'}
-                </HUDMicro>
-              </div>
             </div>
         </div>
 
@@ -366,6 +350,46 @@ function SettingsPage({
                                  >
                                      GENERATE KEY &gt;
                                  </a>
+                             </div>
+                             <div className="border-t border-white/10 pt-4 space-y-3">
+                                 <div className="flex items-center justify-between gap-3">
+                                     <HUDLabel>CHRONICLE REFRESH</HUDLabel>
+                                     {chronicleRefreshModeSaving && (
+                                       <HUDMicro className="text-right">APPLYING...</HUDMicro>
+                                     )}
+                                 </div>
+
+                                 <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
+                                   {(['balanced', 'enhanced'] as const).map((mode) => {
+                                     const isSelected = chronicleRefreshMode === mode
+                                     return (
+                                       <button
+                                         key={mode}
+                                         type="button"
+                                         disabled={chronicleRefreshModeSaving}
+                                         aria-pressed={isSelected}
+                                         aria-label={`Set refresh mode to ${CHRONICLE_REFRESH_MODE_LABELS[mode]}`}
+                                         onClick={() => void handleChronicleRefreshModeChange(mode)}
+                                         className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
+                                           isSelected
+                                             ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
+                                             : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
+                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                       >
+                                         <div className="font-display text-[11px] uppercase tracking-[0.18em]">
+                                           {CHRONICLE_REFRESH_MODE_LABELS[mode]}
+                                         </div>
+                                         <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
+                                           {mode === 'balanced' ? 'FREE-TIER DEFAULT' : 'MORE RESPONSIVE'}
+                                         </div>
+                                       </button>
+                                     )
+                                   })}
+                                 </div>
+
+                                 <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                   {CHRONICLE_REFRESH_MODE_HELPERS[chronicleRefreshMode]}
+                                 </HUDMicro>
                              </div>
                         </div>
                     </HUDPanel>
