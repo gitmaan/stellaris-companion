@@ -7,12 +7,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.core.chronicle import (
+    CHRONICLE_REFRESH_MODE_ENHANCED,
     CURRENT_ERA_REGEN_MIN_NEW_EVENTS,
     ERA_ENDING_EVENTS,
     NOTABLE_EVENT_TYPES,
     ChronicleGenerator,
     _repair_json_string,
     _sections_to_text,
+    get_current_era_regen_min_new_events,
 )
 
 
@@ -955,6 +957,67 @@ class TestGenerateChronicleCurrentEraPolicy:
         generator._generate_current_era.assert_called_once()  # type: ignore[attr-defined]
         assert result["current_era"] is not None
         assert result["current_era"]["narrative"] == "Updated teaser."
+        assert result["cached"] is False
+
+    def test_enhanced_mode_regenerates_current_era_after_single_routine_event(self, generator):
+        """Enhanced mode should update after one new routine event while viewing Chronicle."""
+        cached_events = 4
+        current_events = cached_events + get_current_era_regen_min_new_events(
+            CHRONICLE_REFRESH_MODE_ENHANCED
+        )
+        generator.db.get_chronicle_by_save_id.return_value = {
+            "chapters_json": json.dumps(
+                {
+                    "format_version": 1,
+                    "chapters": [],
+                    "current_era_start_date": "2200.01.01",
+                    "current_era_start_snapshot_id": 1,
+                    "current_era_cache": {
+                        "start_date": "2200.01.01",
+                        "start_snapshot_id": 1,
+                        "last_snapshot_id": 1,
+                        "generated_at": "2026-01-01T00:00:00Z",
+                        "current_era": {
+                            "start_date": "2200.01.01",
+                            "narrative": "Old teaser.",
+                            "events_covered": cached_events,
+                            "sections": [
+                                {"type": "prose", "text": "Old teaser.", "attribution": ""}
+                            ],
+                        },
+                    },
+                }
+            ),
+            "event_count": cached_events,
+            "snapshot_count": 2,
+        }
+        generator.db.get_events_in_snapshot_range.return_value = [
+            {
+                "event_type": "tech_completed",
+                "summary": f"Event {i}",
+                "game_date": "2205.01.01",
+            }
+            for i in range(current_events)
+        ]
+        generator._should_finalize_chapter = MagicMock(return_value=(False, None))  # type: ignore[method-assign]
+        generator._count_pending_chapters = MagicMock(return_value=0)  # type: ignore[method-assign]
+        generator._generate_current_era = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "start_date": "2200.01.01",
+                "narrative": "Enhanced teaser.",
+                "events_covered": current_events,
+                "sections": [{"type": "prose", "text": "Enhanced teaser.", "attribution": ""}],
+            }
+        )
+
+        result = generator.generate_chronicle(
+            "session-1",
+            refresh_mode=CHRONICLE_REFRESH_MODE_ENHANCED,
+        )
+
+        generator._generate_current_era.assert_called_once()  # type: ignore[attr-defined]
+        assert result["current_era"] is not None
+        assert result["current_era"]["narrative"] == "Enhanced teaser."
         assert result["cached"] is False
 
     def test_regenerates_current_era_immediately_for_notable_event(self, generator):

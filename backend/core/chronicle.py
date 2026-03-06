@@ -242,6 +242,32 @@ AUTO_CHAPTER_IDLE_INTERVAL_SECONDS = 5 * 60
 AUTO_CHAPTER_PENDING_INTERVAL_SECONDS = 30
 # Refresh current-era teaser only after meaningful event growth.
 CURRENT_ERA_REGEN_MIN_NEW_EVENTS = 3
+ENHANCED_CURRENT_ERA_REGEN_MIN_NEW_EVENTS = 1
+CHRONICLE_REFRESH_MODE_BALANCED = "balanced"
+CHRONICLE_REFRESH_MODE_ENHANCED = "enhanced"
+DEFAULT_CHRONICLE_REFRESH_MODE = CHRONICLE_REFRESH_MODE_BALANCED
+CHRONICLE_REFRESH_MODES = {
+    CHRONICLE_REFRESH_MODE_BALANCED,
+    CHRONICLE_REFRESH_MODE_ENHANCED,
+}
+
+
+def normalize_chronicle_refresh_mode(value: Any) -> str:
+    """Normalize refresh mode from UI settings / API input."""
+    if not isinstance(value, str):
+        return DEFAULT_CHRONICLE_REFRESH_MODE
+    normalized = value.strip().lower()
+    if normalized in CHRONICLE_REFRESH_MODES:
+        return normalized
+    return DEFAULT_CHRONICLE_REFRESH_MODE
+
+
+def get_current_era_regen_min_new_events(refresh_mode: Any) -> int:
+    """Return the routine-event threshold for the selected refresh mode."""
+    normalized = normalize_chronicle_refresh_mode(refresh_mode)
+    if normalized == CHRONICLE_REFRESH_MODE_ENHANCED:
+        return ENHANCED_CURRENT_ERA_REGEN_MIN_NEW_EVENTS
+    return CURRENT_ERA_REGEN_MIN_NEW_EVENTS
 
 
 def parse_year(date_str: str | None) -> int | None:
@@ -299,6 +325,7 @@ class ChronicleGenerator:
         *,
         force_refresh: bool = False,
         chapter_only: bool = False,
+        refresh_mode: str = DEFAULT_CHRONICLE_REFRESH_MODE,
     ) -> dict[str, Any]:
         """Generate an incremental chronicle for the session.
 
@@ -316,6 +343,8 @@ class ChronicleGenerator:
         if not save_id:
             # Fallback to session-based chronicle (legacy)
             return self._generate_legacy_chronicle(session_id, force_refresh=force_refresh)
+
+        refresh_mode = normalize_chronicle_refresh_mode(refresh_mode)
 
         # Load existing chapters data
         cached = self.db.get_chronicle_by_save_id(save_id)
@@ -447,6 +476,7 @@ class ChronicleGenerator:
                     save_id=save_id,
                     era_start_snapshot_id=era_start_snapshot_id,
                     cached_current_era=cached_current_era,
+                    refresh_mode=refresh_mode,
                 )
                 if not regenerate_for_event_growth:
                     used_cached_current_era = True
@@ -552,6 +582,7 @@ class ChronicleGenerator:
         save_id: str,
         era_start_snapshot_id: int | None,
         cached_current_era: dict[str, Any] | None,
+        refresh_mode: str = DEFAULT_CHRONICLE_REFRESH_MODE,
     ) -> bool:
         """Refresh current era when enough new events accumulated for this era."""
         if era_start_snapshot_id is None:
@@ -577,7 +608,7 @@ class ChronicleGenerator:
         if any(event.get("event_type") in NOTABLE_EVENT_TYPES for event in recent_events):
             return True
 
-        return new_events >= CURRENT_ERA_REGEN_MIN_NEW_EVENTS
+        return new_events >= get_current_era_regen_min_new_events(refresh_mode)
 
     def _event_key(self, event: dict) -> tuple[Any, Any, Any]:
         return (event.get("game_date"), event.get("event_type"), event.get("summary"))

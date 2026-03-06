@@ -31,7 +31,14 @@ def test_api_chronicle_serializes_concurrent_requests(monkeypatch):
     started = threading.Event()
     unblock = threading.Event()
 
-    def slow_generate_chronicle(self, session_id, *, force_refresh=False, chapter_only=False):
+    def slow_generate_chronicle(
+        self,
+        session_id,
+        *,
+        force_refresh=False,
+        chapter_only=False,
+        refresh_mode="balanced",
+    ):
         started.set()
         # Hold the request open long enough for a second request to arrive.
         unblock.wait(timeout=10)
@@ -82,7 +89,14 @@ def test_api_chronicle_serializes_concurrent_requests(monkeypatch):
 def test_api_chronicle_releases_lock_on_exception(monkeypatch):
     server._chronicle_in_flight.clear()
 
-    def boom(self, session_id, *, force_refresh=False, chapter_only=False):
+    def boom(
+        self,
+        session_id,
+        *,
+        force_refresh=False,
+        chapter_only=False,
+        refresh_mode="balanced",
+    ):
         raise RuntimeError("boom")
 
     app = _make_app(monkeypatch)
@@ -94,7 +108,14 @@ def test_api_chronicle_releases_lock_on_exception(monkeypatch):
     assert first.status_code == 500
     assert server._chronicle_in_flight == set()
 
-    def ok(self, session_id, *, force_refresh=False, chapter_only=False):
+    def ok(
+        self,
+        session_id,
+        *,
+        force_refresh=False,
+        chapter_only=False,
+        refresh_mode="balanced",
+    ):
         return {"ok": True}
 
     monkeypatch.setattr(ChronicleGenerator, "generate_chronicle", ok, raising=True)

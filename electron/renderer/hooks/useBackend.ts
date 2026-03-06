@@ -2,6 +2,7 @@
 // Implements UI-006: useBackend hook with loading states and error handling
 
 import { useState, useCallback, useMemo, useRef } from 'react'
+import type { ChronicleRefreshMode } from './useSettings'
 
 // ============================================
 // API Response Types (match backend/api/server.py)
@@ -432,9 +433,10 @@ export function useBackend() {
     sessionId: string,
     forceRefresh?: boolean,
     chapterOnly?: boolean,
+    refreshMode?: ChronicleRefreshMode,
   ): Promise<UseBackendResult<ChronicleResponse>> => {
     return callApi<ChronicleResponse>('chronicle', () =>
-      window.electronAPI!.backend.chronicle(sessionId, forceRefresh, chapterOnly)
+      window.electronAPI!.backend.chronicle(sessionId, forceRefresh, chapterOnly, refreshMode)
     )
   }, [callApi])
 

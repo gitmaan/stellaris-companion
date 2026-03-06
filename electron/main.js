@@ -153,6 +153,7 @@ const store = new Store({
     discordEnabled: false,
     uiScale: 1,
     uiTheme: 'stellaris-cyan',
+    chronicleRefreshMode: 'balanced',
     hasCompletedOnboarding: false,
     // Window state persistence
     windowState: {
@@ -217,6 +218,8 @@ const UI_SCALE_PRESETS = [1, 1.1, 1.25, 1.4]
 const DEFAULT_UI_SCALE = 1
 const UI_THEME_PRESETS = ['stellaris-cyan', 'tactica-green', 'command-amber']
 const DEFAULT_UI_THEME = 'stellaris-cyan'
+const CHRONICLE_REFRESH_MODE_PRESETS = ['balanced', 'enhanced']
+const DEFAULT_CHRONICLE_REFRESH_MODE = 'balanced'
 
 // Discord configuration (DISC-007)
 // These are set via environment or will use defaults for development
@@ -696,6 +699,19 @@ function getUiThemeSetting() {
   return normalizeUiTheme(store.get('uiTheme', DEFAULT_UI_THEME))
 }
 
+function normalizeChronicleRefreshMode(rawValue) {
+  if (typeof rawValue !== 'string') return DEFAULT_CHRONICLE_REFRESH_MODE
+  return CHRONICLE_REFRESH_MODE_PRESETS.includes(rawValue)
+    ? rawValue
+    : DEFAULT_CHRONICLE_REFRESH_MODE
+}
+
+function getChronicleRefreshModeSetting() {
+  return normalizeChronicleRefreshMode(
+    store.get('chronicleRefreshMode', DEFAULT_CHRONICLE_REFRESH_MODE),
+  )
+}
+
 function applyUiScaleToWindow(targetWindow = mainWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) return
   targetWindow.webContents.setZoomFactor(getUiScaleSetting())
@@ -726,6 +742,7 @@ function getSettings() {
   const discordEnabled = store.get('discordEnabled', false)
   const uiScale = getUiScaleSetting()
   const uiTheme = getUiThemeSetting()
+  const chronicleRefreshMode = getChronicleRefreshModeSetting()
 
   return {
     googleApiKey: maskSecret(googleApiKey),
@@ -738,6 +755,7 @@ function getSettings() {
     discordEnabled,
     uiScale,
     uiTheme,
+    chronicleRefreshMode,
   }
 }
 
@@ -753,6 +771,7 @@ function getSettingsWithSecrets() {
   const discordEnabled = store.get('discordEnabled', false)
   const uiScale = getUiScaleSetting()
   const uiTheme = getUiThemeSetting()
+  const chronicleRefreshMode = getChronicleRefreshModeSetting()
 
   return {
     googleApiKey,
@@ -764,6 +783,7 @@ function getSettingsWithSecrets() {
     discordEnabled,
     uiScale,
     uiTheme,
+    chronicleRefreshMode,
   }
 }
 
@@ -800,6 +820,13 @@ function saveSettings(settings) {
 
   if (settings.uiTheme !== undefined) {
     store.set('uiTheme', normalizeUiTheme(settings.uiTheme))
+  }
+
+  if (settings.chronicleRefreshMode !== undefined) {
+    store.set(
+      'chronicleRefreshMode',
+      normalizeChronicleRefreshMode(settings.chronicleRefreshMode),
+    )
   }
 
   return { success: true }

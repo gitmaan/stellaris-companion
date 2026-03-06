@@ -52,11 +52,17 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload))
 }
 
-function createMockChronicleBackend() {
+function createMockChronicleBackend(options = {}) {
   let server = null
   let phase = 'initial'
   let healthUpdatedAt = 1_000
   const chronicleRequests = []
+  const initialEventsCovered = options.initialEventsCovered ?? 2
+  const advancedEventsCovered = options.advancedEventsCovered ?? 5
+  const initialNarrative = options.initialNarrative ?? 'Old teaser.'
+  const updatedNarrative = options.updatedNarrative ?? 'Updated after visible refresh.'
+  const balancedThreshold = options.balancedThreshold ?? 3
+  const enhancedThreshold = options.enhancedThreshold ?? 1
 
   const healthPayload = () => ({
     status: 'ok',
@@ -108,23 +114,34 @@ function createMockChronicleBackend() {
   const chroniclePayload = (body) => {
     if (phase === 'initial') {
       return buildChronicleResponse({
-        narrative: 'Old teaser.',
-        eventsCovered: 2,
+        narrative: initialNarrative,
+        eventsCovered: initialEventsCovered,
         cached: false,
       })
     }
 
     if (body.chapter_only) {
       return buildChronicleResponse({
-        narrative: 'Old teaser.',
-        eventsCovered: 2,
+        narrative: initialNarrative,
+        eventsCovered: initialEventsCovered,
+        cached: true,
+      })
+    }
+
+    const refreshMode = body.refresh_mode === 'enhanced' ? 'enhanced' : 'balanced'
+    const eventGrowth = Math.max(0, advancedEventsCovered - initialEventsCovered)
+    const threshold = refreshMode === 'enhanced' ? enhancedThreshold : balancedThreshold
+    if (eventGrowth < threshold) {
+      return buildChronicleResponse({
+        narrative: initialNarrative,
+        eventsCovered: initialEventsCovered,
         cached: true,
       })
     }
 
     return buildChronicleResponse({
-      narrative: 'Updated after visible refresh.',
-      eventsCovered: 5,
+      narrative: updatedNarrative,
+      eventsCovered: advancedEventsCovered,
       cached: false,
     })
   }
@@ -153,6 +170,7 @@ function createMockChronicleBackend() {
         session_id: body.session_id,
         force_refresh: !!body.force_refresh,
         chapter_only: !!body.chapter_only,
+        refresh_mode: body.refresh_mode || 'balanced',
       })
       sendJson(res, 200, chroniclePayload(body))
       return

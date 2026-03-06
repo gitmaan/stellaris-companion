@@ -1,5 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { DEFAULT_UI_THEME, normalizeUiTheme, type UiTheme, useSettings } from '../hooks/useSettings'
+import {
+  DEFAULT_CHRONICLE_REFRESH_MODE,
+  DEFAULT_UI_THEME,
+  normalizeChronicleRefreshMode,
+  normalizeUiTheme,
+  type ChronicleRefreshMode,
+  type UiTheme,
+  useSettings,
+} from '../hooks/useSettings'
 import { useDiscord } from '../hooks/useDiscord'
 import { HUDHeader, HUDSectionTitle, HUDMicro, HUDLabel } from '../components/hud/HUDText'
 import { HUDPanel } from '../components/hud/HUDPanel'
@@ -23,6 +31,7 @@ function getUserFriendlyErrorMessage(error: string | null): string | null {
 interface SettingsPageProps {
   onReportIssue?: () => void
   onThemeChange?: (theme: UiTheme) => void
+  onChronicleRefreshModeChange?: (mode: ChronicleRefreshMode) => void
 }
 
 const UI_SCALE_OPTIONS = [
@@ -44,7 +53,21 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'command-amber': 'Command Amber',
 }
 
-function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
+const CHRONICLE_REFRESH_MODE_OPTIONS: { value: ChronicleRefreshMode; label: string }[] = [
+  { value: 'balanced', label: 'Balanced' },
+  { value: 'enhanced', label: 'Enhanced' },
+]
+
+const CHRONICLE_REFRESH_MODE_LABELS: Record<ChronicleRefreshMode, string> = {
+  balanced: 'Balanced',
+  enhanced: 'Enhanced',
+}
+
+function SettingsPage({
+  onReportIssue,
+  onThemeChange,
+  onChronicleRefreshModeChange,
+}: SettingsPageProps) {
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
   const { showToast } = useToast()
 
@@ -64,6 +87,10 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
   const [uiScaleSaving, setUiScaleSaving] = useState(false)
   const [uiTheme, setUiTheme] = useState<UiTheme>(DEFAULT_UI_THEME)
   const [uiThemeSaving, setUiThemeSaving] = useState(false)
+  const [chronicleRefreshMode, setChronicleRefreshMode] = useState<ChronicleRefreshMode>(
+    DEFAULT_CHRONICLE_REFRESH_MODE,
+  )
+  const [chronicleRefreshModeSaving, setChronicleRefreshModeSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -82,10 +109,15 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
       setSaveDir(settings.saveDir || '')
       setUiScale(settings.uiScale || 1)
       const normalizedTheme = normalizeUiTheme(settings.uiTheme)
+      const normalizedChronicleRefreshMode = normalizeChronicleRefreshMode(
+        settings.chronicleRefreshMode,
+      )
       setUiTheme(normalizedTheme)
+      setChronicleRefreshMode(normalizedChronicleRefreshMode)
       onThemeChange?.(normalizedTheme)
+      onChronicleRefreshModeChange?.(normalizedChronicleRefreshMode)
     }
-  }, [onThemeChange, settings])
+  }, [onChronicleRefreshModeChange, onThemeChange, settings])
 
   useEffect(() => {
     if (!settings) return
@@ -177,6 +209,36 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
     })
   }
 
+  const handleChronicleRefreshModeChange = async (rawValue: string) => {
+    const nextMode = normalizeChronicleRefreshMode(rawValue)
+    if (nextMode === chronicleRefreshMode) return
+
+    const previousMode = chronicleRefreshMode
+    setChronicleRefreshMode(nextMode)
+    onChronicleRefreshModeChange?.(nextMode)
+    setChronicleRefreshModeSaving(true)
+
+    const success = await saveSettings({ chronicleRefreshMode: nextMode })
+    setChronicleRefreshModeSaving(false)
+
+    if (!success) {
+      setChronicleRefreshMode(previousMode)
+      onChronicleRefreshModeChange?.(previousMode)
+      showToast({
+        type: 'error',
+        message: 'Failed to update Chronicle refresh mode. Please try again.',
+        duration: 4000,
+      })
+      return
+    }
+
+    showToast({
+      type: 'success',
+      message: `Chronicle refresh mode set to ${CHRONICLE_REFRESH_MODE_LABELS[nextMode]}.`,
+      duration: 1800,
+    })
+  }
+
   const handleRetryConnection = async () => {
     if (!window.electronAPI?.discord) return
     setRetrying(true)
@@ -233,6 +295,22 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
                 />
                 <HUDMicro className="block mt-1 text-right">
                   {uiThemeSaving ? 'APPLYING...' : 'THEME PRESET'}
+                </HUDMicro>
+              </div>
+              <div>
+                <HUDSelect
+                  label="Chronicle Refresh"
+                  value={chronicleRefreshMode}
+                  disabled={chronicleRefreshModeSaving}
+                  onChange={(e) => void handleChronicleRefreshModeChange(e.target.value)}
+                  options={CHRONICLE_REFRESH_MODE_OPTIONS}
+                />
+                <HUDMicro className="block mt-1 text-right">
+                  {chronicleRefreshModeSaving
+                    ? 'APPLYING...'
+                    : chronicleRefreshMode === 'balanced'
+                      ? 'FREE-TIER DEFAULT'
+                      : 'MORE GEMINI CALLS'}
                 </HUDMicro>
               </div>
             </div>
