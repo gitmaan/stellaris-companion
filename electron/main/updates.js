@@ -1,4 +1,7 @@
+const IS_E2E = process.env.E2E === '1'
+
 function setupAutoUpdater({ autoUpdater, app, isDev }) {
+  if (IS_E2E) return
   if (isDev) return
   if (!app?.isPackaged) return
   if (process.windowsStore) return
@@ -111,6 +114,9 @@ function sendUpdateEvent(getMainWindow, channel, payload) {
 
 function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWindow, prepareForUpdateQuit }) {
   ipcMain.handle('check-for-update', async () => {
+    if (IS_E2E) {
+      return { updateAvailable: false }
+    }
     if (isDev) {
       return { updateAvailable: false }
     }
@@ -129,6 +135,9 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
   })
 
   ipcMain.handle('install-update', async () => {
+    if (IS_E2E) {
+      return { success: false, error: 'Updates disabled in E2E mode' }
+    }
     if (isDev) {
       return { success: false, error: 'Updates disabled in development' }
     }

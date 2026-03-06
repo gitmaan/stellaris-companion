@@ -303,7 +303,7 @@ function ChroniclePage() {
     try {
       await loadSaves({ silent: true })
       if (!isMountedRef.current) return
-      await loadChronicle(false, true)
+      await loadChronicle(false, false)
     } finally {
       visibleCatchupInFlightRef.current = false
     }
@@ -394,12 +394,12 @@ function ChroniclePage() {
         void finalizePendingChaptersHidden()
         return
       }
-      loadChronicle(false, true)
+      loadChronicle(false, false)
     }
   }, [cachedSessions.length, finalizePendingChaptersHidden, loadChronicle, selectedSaveId])
 
-  // When the user returns to the app, run one chapter-only refresh to keep
-  // chapter backlog moving without spending a teaser generation call.
+  // When the user returns to the app, run one visible refresh so current era
+  // can advance once meaningful new events have accumulated.
   useEffect(() => {
     const handleVisible = () => {
       if (!isMountedRef.current) return

@@ -240,6 +240,8 @@ DEFAULT_CHAPTERS_DATA = {
 # Auto chapter-only scheduling (used by renderer background refresh loops).
 AUTO_CHAPTER_IDLE_INTERVAL_SECONDS = 5 * 60
 AUTO_CHAPTER_PENDING_INTERVAL_SECONDS = 30
+# Refresh current-era teaser only after meaningful event growth.
+CURRENT_ERA_REGEN_MIN_NEW_EVENTS = 3
 
 
 def parse_year(date_str: str | None) -> int | None:
@@ -415,6 +417,8 @@ class ChronicleGenerator:
             and cached_current_era is not None
         )
 
+        regenerate_for_event_growth = False
+
         if chapter_only:
             if isinstance(current_era_cache, dict) and isinstance(
                 current_era_cache.get("current_era"), dict
@@ -437,39 +441,54 @@ class ChronicleGenerator:
                 current_era = None
                 if current_era_cache:
                     chapters_data.pop("current_era_cache", None)
-        elif cache_matches_era and not force_refresh:
-            used_cached_current_era = True
-            current_era = cached_current_era
-            logger.debug(
-                "Chronicle current era cache hit (save_id=%s era_start_snapshot_id=%s)",
-                save_id,
-                era_start_snapshot_id,
-            )
         else:
-            if current_era_cache and not used_cached_current_era:
-                chapters_data.pop("current_era_cache", None)
-
-            current_era = self._generate_current_era(
-                save_id=save_id,
-                chapters_data=chapters_data,
-                briefing=briefing,
-                current_date=current_date,
-                custom_instructions=custom_instructions,
-            )
-
-            if current_era and current_snapshot_id is not None:
-                chapters_data["current_era_cache"] = {
-                    "start_date": era_start_date,
-                    "start_snapshot_id": era_start_snapshot_id,
-                    "last_snapshot_id": current_snapshot_id,
-                    "generated_at": datetime.now(timezone.utc).isoformat(),
-                    "current_era": current_era,
-                }
-                logger.debug(
-                    "Chronicle current era generated (save_id=%s era_start_snapshot_id=%s)",
-                    save_id,
-                    era_start_snapshot_id,
+            if cache_matches_era and not force_refresh:
+                regenerate_for_event_growth = self._should_regenerate_current_era_for_event_growth(
+                    save_id=save_id,
+                    era_start_snapshot_id=era_start_snapshot_id,
+                    cached_current_era=cached_current_era,
                 )
+                if not regenerate_for_event_growth:
+                    used_cached_current_era = True
+                    current_era = cached_current_era
+                    logger.debug(
+                        "Chronicle current era cache hit (save_id=%s era_start_snapshot_id=%s)",
+                        save_id,
+                        era_start_snapshot_id,
+                    )
+                else:
+                    logger.debug(
+                        "Chronicle current era refresh due to event growth "
+                        "(save_id=%s era_start_snapshot_id=%s)",
+                        save_id,
+                        era_start_snapshot_id,
+                    )
+
+            if force_refresh or not cache_matches_era or regenerate_for_event_growth:
+                if current_era_cache and not used_cached_current_era:
+                    chapters_data.pop("current_era_cache", None)
+
+                current_era = self._generate_current_era(
+                    save_id=save_id,
+                    chapters_data=chapters_data,
+                    briefing=briefing,
+                    current_date=current_date,
+                    custom_instructions=custom_instructions,
+                )
+
+                if current_era and current_snapshot_id is not None:
+                    chapters_data["current_era_cache"] = {
+                        "start_date": era_start_date,
+                        "start_snapshot_id": era_start_snapshot_id,
+                        "last_snapshot_id": current_snapshot_id,
+                        "generated_at": datetime.now(timezone.utc).isoformat(),
+                        "current_era": current_era,
+                    }
+                    logger.debug(
+                        "Chronicle current era generated (save_id=%s era_start_snapshot_id=%s)",
+                        save_id,
+                        era_start_snapshot_id,
+                    )
 
         # Assemble full chronicle text for backward compatibility
         full_text = self._assemble_chronicle_text(chapters_data, current_era)
@@ -526,6 +545,39 @@ class ChronicleGenerator:
             "event_count": event_count,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
+
+    def _should_regenerate_current_era_for_event_growth(
+        self,
+        *,
+        save_id: str,
+        era_start_snapshot_id: int | None,
+        cached_current_era: dict[str, Any] | None,
+    ) -> bool:
+        """Refresh current era when enough new events accumulated for this era."""
+        if era_start_snapshot_id is None:
+            return False
+        if not isinstance(cached_current_era, dict):
+            return True
+
+        cached_events_covered = cached_current_era.get("events_covered")
+        if not isinstance(cached_events_covered, int) or cached_events_covered < 0:
+            return True
+
+        era_events = self.db.get_events_in_snapshot_range(
+            save_id=save_id,
+            from_snapshot_id=era_start_snapshot_id,
+            to_snapshot_id=None,
+        )
+        current_era_event_count = len(era_events)
+        new_events = max(0, current_era_event_count - cached_events_covered)
+        if new_events <= 0:
+            return False
+
+        recent_events = era_events[-new_events:]
+        if any(event.get("event_type") in NOTABLE_EVENT_TYPES for event in recent_events):
+            return True
+
+        return new_events >= CURRENT_ERA_REGEN_MIN_NEW_EVENTS
 
     def _event_key(self, event: dict) -> tuple[Any, Any, Any]:
         return (event.get("game_date"), event.get("event_type"), event.get("summary"))
