@@ -157,14 +157,14 @@ ERA_ENDING_EVENTS = {
 }
 
 # Years between chapters (if no era-ending event)
-CHAPTER_TIME_THRESHOLD = 50
+CHAPTER_TIME_THRESHOLD = 30
 
 # Chapter 1 should arrive quickly so players see something early.
 # We still guard on "enough events" so the first chapter has substance.
 FIRST_CHAPTER_TIME_THRESHOLD = 5
 FIRST_CHAPTER_MIN_EVENTS_TIME = 8
 
-# Milestone-based early Chapter 1 triggers (no need to wait 50 years).
+# Milestone-based early Chapter 1 triggers (no need to wait 30 years).
 # These are intentionally early/midgame-relevant events that tend to occur soon.
 FIRST_CHAPTER_MILESTONE_EVENTS = {
     "first_contact",
@@ -181,7 +181,7 @@ FIRST_CHAPTER_MIN_YEARS_MILESTONE = 2
 FIRST_CHAPTER_MIN_EVENTS_MILESTONE = 4
 
 # Minimum years after era-ending event before finalizing
-MIN_YEARS_AFTER_EVENT = 3
+MIN_YEARS_AFTER_EVENT = 2
 
 # Maximum chapters to finalize per request (prevent timeout)
 MAX_CHAPTERS_PER_REQUEST = 2
@@ -225,6 +225,15 @@ NOTABLE_EVENT_TYPES = {
     # Geography
     "new_border_contact",
     # Milestones
+    "colony_count_change",
+    "military_power_change",
+}
+
+# A narrower subset of notable events should force immediate current-era refreshes.
+# Colony and military power changes still matter for prompt selection and chapter
+# context, but they are common enough that they should not rewrite the teaser
+# on their own in balanced mode.
+CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES = NOTABLE_EVENT_TYPES - {
     "colony_count_change",
     "military_power_change",
 }
@@ -605,7 +614,10 @@ class ChronicleGenerator:
             return False
 
         recent_events = era_events[-new_events:]
-        if any(event.get("event_type") in NOTABLE_EVENT_TYPES for event in recent_events):
+        if any(
+            event.get("event_type") in CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES
+            for event in recent_events
+        ):
             return True
 
         return new_events >= get_current_era_regen_min_new_events(refresh_mode)
@@ -933,7 +945,7 @@ class ChronicleGenerator:
         ):
             return False, None
 
-        # Check time threshold (50+ years)
+        # Check time threshold (30+ years)
         years_elapsed = current_year - era_start_year
         # Pull events once; used for both chapter 1 special-cases and normal triggers.
         events = self.db.get_events_in_snapshot_range(

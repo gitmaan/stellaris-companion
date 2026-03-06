@@ -8,6 +8,7 @@ import pytest
 
 from backend.core.chronicle import (
     CHRONICLE_REFRESH_MODE_ENHANCED,
+    CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES,
     CURRENT_ERA_REGEN_MIN_NEW_EVENTS,
     ERA_ENDING_EVENTS,
     NOTABLE_EVENT_TYPES,
@@ -271,33 +272,33 @@ class TestShouldFinalizeChapter:
         assert trigger is None
 
     def test_time_threshold_triggers_finalization(self, generator):
-        """Returns (True, 'time_threshold') when 50+ years have elapsed."""
+        """Returns (True, 'time_threshold') when 30+ years have elapsed."""
         chapters_data = {"chapters": []}
 
         should_finalize, trigger = generator._should_finalize_chapter(
             save_id="test",
             chapters_data=chapters_data,
-            current_date="2250.01.01",
+            current_date="2230.01.01",
             current_snapshot_id=100,
         )
         assert should_finalize is True
         assert trigger == "time_threshold"
 
-    def test_time_threshold_49_years_no_finalization(self, generator):
-        """Returns (False, None) when only 49 years have elapsed."""
+    def test_time_threshold_29_years_no_finalization(self, generator):
+        """Returns (False, None) when only 29 years have elapsed."""
         chapters_data = {"chapters": []}
 
         should_finalize, trigger = generator._should_finalize_chapter(
             save_id="test",
             chapters_data=chapters_data,
-            current_date="2249.01.01",
+            current_date="2229.01.01",
             current_snapshot_id=100,
         )
         assert should_finalize is False
         assert trigger is None
 
     def test_era_ending_event_triggers_with_cooldown(self, generator):
-        """Returns (True, event_type) for era-ending event with 3+ year cooldown."""
+        """Returns (True, event_type) for era-ending event with 2+ year cooldown."""
         chapters_data = {"chapters": []}
 
         generator.db.get_events_in_snapshot_range.return_value = [
@@ -314,11 +315,11 @@ class TestShouldFinalizeChapter:
         assert trigger == "war_ended"
 
     def test_era_ending_event_blocked_within_cooldown(self, generator):
-        """Returns (False, None) for era-ending event within 3 year cooldown."""
+        """Returns (False, None) for era-ending event within 2 year cooldown."""
         chapters_data = {"chapters": []}
 
         generator.db.get_events_in_snapshot_range.return_value = [
-            {"event_type": "war_ended", "game_date": "2208.01.01", "summary": "War ended"}
+            {"event_type": "war_ended", "game_date": "2209.01.01", "summary": "War ended"}
         ]
 
         should_finalize, trigger = generator._should_finalize_chapter(
@@ -1088,6 +1089,70 @@ class TestGenerateChronicleCurrentEraPolicy:
         assert result["current_era"] is not None
         assert result["current_era"]["narrative"] == "Updated after notable event."
         assert result["cached"] is False
+
+    @pytest.mark.parametrize("event_type", ["colony_count_change", "military_power_change"])
+    def test_common_notable_events_do_not_force_immediate_current_era_refresh(
+        self, generator, event_type
+    ):
+        """Common progression events should wait for thresholded refreshes in balanced mode."""
+        cached_events = 4
+        generator.db.get_chronicle_by_save_id.return_value = {
+            "chapters_json": json.dumps(
+                {
+                    "format_version": 1,
+                    "chapters": [],
+                    "current_era_start_date": "2200.01.01",
+                    "current_era_start_snapshot_id": 1,
+                    "current_era_cache": {
+                        "start_date": "2200.01.01",
+                        "start_snapshot_id": 1,
+                        "last_snapshot_id": 1,
+                        "generated_at": "2026-01-01T00:00:00Z",
+                        "current_era": {
+                            "start_date": "2200.01.01",
+                            "narrative": "Old teaser.",
+                            "events_covered": cached_events,
+                            "sections": [
+                                {"type": "prose", "text": "Old teaser.", "attribution": ""}
+                            ],
+                        },
+                    },
+                }
+            ),
+            "event_count": cached_events,
+            "snapshot_count": 2,
+        }
+        generator.db.get_events_in_snapshot_range.return_value = [
+            {
+                "event_type": "tech_completed",
+                "summary": f"Tech {i}",
+                "game_date": "2205.01.01",
+            }
+            for i in range(cached_events)
+        ] + [
+            {
+                "event_type": event_type,
+                "summary": "Progress changed",
+                "game_date": "2205.07.01",
+            }
+        ]
+        generator._should_finalize_chapter = MagicMock(return_value=(False, None))  # type: ignore[method-assign]
+        generator._count_pending_chapters = MagicMock(return_value=0)  # type: ignore[method-assign]
+        generator._generate_current_era = MagicMock()  # type: ignore[method-assign]
+
+        result = generator.generate_chronicle("session-1")
+
+        generator._generate_current_era.assert_not_called()  # type: ignore[attr-defined]
+        assert result["current_era"] is not None
+        assert result["current_era"]["narrative"] == "Old teaser."
+        assert result["cached"] is True
+
+    def test_common_progression_events_still_count_as_notable_prompt_context(self):
+        """These events still stay prioritized for prompt context even if teaser refresh is gated."""
+        assert "colony_count_change" in NOTABLE_EVENT_TYPES
+        assert "military_power_change" in NOTABLE_EVENT_TYPES
+        assert "colony_count_change" not in CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES
+        assert "military_power_change" not in CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES
 
     def test_accumulates_small_updates_until_threshold_then_resets_baseline(self, generator):
         """Repeated small save updates should eventually refresh, then reuse the new baseline."""
