@@ -323,7 +323,7 @@ def resolve_save_inputs(args: argparse.Namespace) -> tuple[Path | None, list[Pat
     """Resolve initial save file and watch paths from args/env.
 
     Precedence:
-      1) CLI --save-path (file)
+      1) CLI --save-path (file or directory)
       2) STELLARIS_SAVE_PATH (file or directory)
       3) STELLARIS_SAVE_DIR (directory to search/watch)
       4) platform defaults (Python-side)
@@ -333,9 +333,18 @@ def resolve_save_inputs(args: argparse.Namespace) -> tuple[Path | None, list[Pat
     # CLI args override everything.
     if args.save_path:
         candidate = _normalize_input_path(args.save_path)
-        if candidate and candidate.exists() and candidate.is_file():
-            return candidate, None
-        logger.warning("Ignoring --save-path (not a readable file): %s", args.save_path)
+        try:
+            if candidate and candidate.exists() and candidate.is_file():
+                return candidate, None
+            if candidate and candidate.exists() and candidate.is_dir():
+                save_file = find_most_recent_save_in_directory(candidate)
+                if save_file:
+                    logger.info(f"Found save file in CLI directory: {save_file.name}")
+                return save_file, [candidate]
+        except OSError:
+            logger.warning("Ignoring --save-path (invalid): %s", args.save_path)
+        else:
+            logger.warning("Ignoring --save-path (not a readable file or directory): %s", args.save_path)
 
     env_save_path = os.environ.get("STELLARIS_SAVE_PATH")
     env_save_dir = os.environ.get("STELLARIS_SAVE_DIR")
