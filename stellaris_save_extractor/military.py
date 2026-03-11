@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 
 # Rust bridge for fast Clausewitz parsing - session mode required
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
@@ -158,9 +159,7 @@ class MilitaryMixin:
             # Extract battle statistics from battles block
             battle_stats = self._extract_battle_stats(
                 war_data.get("battles", []),
-                player_is_attacker,
-                attacker_ids,
-                defender_ids,
+                player_id=player_id,
             )
 
             war_info = {
@@ -188,27 +187,25 @@ class MilitaryMixin:
     def _extract_battle_stats(
         self,
         battles: list,
-        player_is_attacker: bool,
-        attacker_ids: list[str],
-        defender_ids: list[str],
+        *,
+        player_id: int | str,
     ) -> dict:
         """Extract battle statistics from the battles block.
 
         Args:
             battles: List of battle records from war data
-            player_is_attacker: True if player is on attacker side
-            attacker_ids: List of attacker country IDs
-            defender_ids: List of defender country IDs
+            player_id: Country ID of the player empire
 
         Returns:
-            Dict with battle statistics:
-            - total_battles: Total number of battles
-            - our_victories: Battles won by our side
-            - their_victories: Battles won by their side
-            - our_ship_losses: Ships lost by our side
-            - their_ship_losses: Ships lost by their side
-            - our_army_losses: Armies lost by our side
-            - their_army_losses: Armies lost by their side
+            Dict with battle statistics for battles where the player empire
+            directly participated:
+            - total_battles: Total number of player battles
+            - our_victories: Battles won by the player empire
+            - their_victories: Battles lost by the player empire
+            - our_ship_losses: Ships lost by the player empire
+            - their_ship_losses: Ships lost by the opponent
+            - our_army_losses: Armies lost by the player empire
+            - their_army_losses: Armies lost by the opponent
         """
         stats = {
             "total_battles": 0,
@@ -223,46 +220,38 @@ class MilitaryMixin:
         if not isinstance(battles, list):
             return stats
 
+        player_id_str = str(player_id)
+
         for battle in battles:
             if not isinstance(battle, dict):
                 continue
 
-            stats["total_battles"] += 1
-
             # Determine battle outcome
             # attacker_victory=yes means the battle's attackers won (not war attackers)
-            # We need to check who was attacking in THIS battle
-            battle_attackers = battle.get("attackers", [])
-            battle_defenders = battle.get("defenders", [])
+            # We need to check whether the player's empire was attacking or defending
+            # in THIS battle. Coalition-wide battles should not be attributed to the
+            # player when only allies participated.
+            battle_attackers = self._battle_participant_ids(battle.get("attackers", []))
+            battle_defenders = self._battle_participant_ids(battle.get("defenders", []))
             attacker_victory = battle.get("attacker_victory") == "yes"
 
-            # Convert to string sets for comparison
-            if isinstance(battle_attackers, list):
-                battle_attacker_ids = {str(a) for a in battle_attackers}
-            else:
-                battle_attacker_ids = {str(battle_attackers)} if battle_attackers else set()
+            player_was_battle_attacker = player_id_str in battle_attackers
+            player_was_battle_defender = player_id_str in battle_defenders
 
-            if isinstance(battle_defenders, list):
-                battle_defender_ids = {str(d) for d in battle_defenders}
-            else:
-                battle_defender_ids = {str(battle_defenders)} if battle_defenders else set()
+            if not player_was_battle_attacker and not player_was_battle_defender:
+                continue
 
-            # Check if our side was attacking or defending in this battle
-            our_side_ids = set(attacker_ids) if player_is_attacker else set(defender_ids)
-
-            our_side_was_battle_attacker = bool(our_side_ids & battle_attacker_ids)
-            our_side_was_battle_defender = bool(our_side_ids & battle_defender_ids)
+            stats["total_battles"] += 1
 
             # Determine if we won this battle
             if (
-                our_side_was_battle_attacker
+                player_was_battle_attacker
                 and attacker_victory
-                or our_side_was_battle_defender
+                or player_was_battle_defender
                 and not attacker_victory
             ):
                 stats["our_victories"] += 1
-            elif our_side_was_battle_attacker or our_side_was_battle_defender:
-                # We were involved but didn't win
+            else:
                 stats["their_victories"] += 1
 
             # Extract losses
@@ -276,15 +265,12 @@ class MilitaryMixin:
             battle_type = battle.get("type", "ships")
 
             # Assign losses to our side vs their side
-            if our_side_was_battle_attacker:
+            if player_was_battle_attacker:
                 our_losses = attacker_losses
                 their_losses = defender_losses
-            elif our_side_was_battle_defender:
+            else:
                 our_losses = defender_losses
                 their_losses = attacker_losses
-            else:
-                # Battle between other participants, skip loss counting
-                continue
 
             if battle_type == "armies":
                 stats["our_army_losses"] += our_losses
@@ -298,6 +284,10 @@ class MilitaryMixin:
         location_counts: dict[str, dict] = {}  # system_name -> {count, losses}
         for battle in battles:
             if not isinstance(battle, dict):
+                continue
+            battle_attackers = self._battle_participant_ids(battle.get("attackers", []))
+            battle_defenders = self._battle_participant_ids(battle.get("defenders", []))
+            if player_id_str not in battle_attackers and player_id_str not in battle_defenders:
                 continue
             sys_id = battle.get("system")
             if sys_id is None:
@@ -331,6 +321,68 @@ class MilitaryMixin:
         ]
 
         return stats
+
+    @staticmethod
+    def _battle_participant_ids(participants: object) -> set[str]:
+        """Normalize battle participant references into country ID strings."""
+        if isinstance(participants, list):
+            ids: set[str] = set()
+            for participant in participants:
+                if isinstance(participant, dict):
+                    country_id = participant.get("country") or participant.get("id")
+                    if country_id is not None:
+                        ids.add(str(country_id))
+                elif participant not in (None, ""):
+                    ids.add(str(participant))
+            return ids
+
+        if isinstance(participants, dict):
+            country_id = participants.get("country") or participants.get("id")
+            return {str(country_id)} if country_id is not None else set()
+
+        return {str(participants)} if participants not in (None, "") else set()
+
+    @staticmethod
+    def _has_active_megastructure_upgrade(upgrade: object) -> bool:
+        """Return True when a megastructure is actively upgrading."""
+        if not isinstance(upgrade, dict):
+            return False
+
+        upgrade_to = upgrade.get("upgrade_to")
+        if upgrade_to:
+            return True
+
+        progress = upgrade.get("progress")
+        if progress in (None, "", 0, 0.0, "0", "0.0"):
+            return False
+
+        with contextlib.suppress(ValueError, TypeError):
+            return float(progress) > 0
+        return True
+
+    @staticmethod
+    def _normalize_megastructure_display_type(mega_type: str) -> str:
+        """Strip status/stage suffixes for consistent megastructure grouping."""
+        if not isinstance(mega_type, str):
+            return mega_type
+        return re.sub(r"_(?:ruined|restored|site|\d+)$", "", mega_type)
+
+    def _classify_megastructure_status(self, entry: dict, mega_type: str) -> str:
+        """Classify a megastructure based on active construction state, not suffixes."""
+        if "ruined" in mega_type:
+            return "ruined"
+        if "_restored" in mega_type:
+            return "restored"
+
+        build_queue = entry.get("build_queue")
+        queue_active = build_queue not in (None, "", 4294967295, "4294967295")
+        site_active = "_site" in mega_type
+        upgrade_active = self._has_active_megastructure_upgrade(entry.get("upgrade"))
+
+        if queue_active or site_active or upgrade_active:
+            return "under_construction"
+
+        return "complete"
 
     def get_fleets(self) -> dict:
         """Get player's fleet information with proper categorization.
@@ -820,32 +872,8 @@ class MilitaryMixin:
             if owner != player_id:
                 continue
 
-            # Determine status from type name
-            status = "complete"
-            if is_ruined:
-                status = "ruined"
-            elif "_restored" in mega_type:
-                status = "restored"
-            elif any(x in mega_type for x in ["_0", "_1", "_2", "_3", "_4", "_site"]):
-                status = "under_construction"
-
-            # Clean up type name for display
-            display_type = mega_type
-            # Remove stage suffixes for cleaner grouping
-            for suffix in [
-                "_ruined",
-                "_restored",
-                "_0",
-                "_1",
-                "_2",
-                "_3",
-                "_4",
-                "_5",
-                "_site",
-            ]:
-                if display_type.endswith(suffix):
-                    display_type = display_type[: -len(suffix)]
-                    break
+            status = self._classify_megastructure_status(entry, mega_type)
+            display_type = self._normalize_megastructure_display_type(mega_type)
 
             mega_info = {
                 "id": mega_id,
