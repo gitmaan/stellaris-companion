@@ -1154,6 +1154,12 @@ class TestGenerateChronicleCurrentEraPolicy:
         assert "colony_count_change" not in CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES
         assert "military_power_change" not in CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES
 
+    def test_megastructure_lifecycle_events_are_notable(self):
+        """Major megastructure lifecycle milestones should reach chronicle prompts."""
+        assert "megastructure_construction_completed" in NOTABLE_EVENT_TYPES
+        assert "megastructure_restored" in NOTABLE_EVENT_TYPES
+        assert "megastructure_ruined" in NOTABLE_EVENT_TYPES
+
     def test_accumulates_small_updates_until_threshold_then_resets_baseline(self, generator):
         """Repeated small save updates should eventually refresh, then reuse the new baseline."""
         current_event_count = 2

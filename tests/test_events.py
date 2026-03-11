@@ -572,7 +572,13 @@ class TestComputeEvents:
         """Detects new megastructures starting construction."""
         base_prev_snapshot["history"]["megastructures"]["megastructures"] = []
         base_curr_snapshot["history"]["megastructures"]["megastructures"] = [
-            {"id": 0, "type": "dyson_sphere", "stage": 0}
+            {
+                "id": 0,
+                "type": "dyson_sphere_0",
+                "stage": 0,
+                "raw_stage": 0,
+                "status": "under_construction",
+            }
         ]
 
         result = compute_events(
@@ -587,10 +593,16 @@ class TestComputeEvents:
     def test_detects_megastructure_upgraded(self, base_prev_snapshot, base_curr_snapshot):
         """Detects megastructure stage upgrades."""
         base_prev_snapshot["history"]["megastructures"]["megastructures"] = [
-            {"id": 0, "type": "dyson_sphere", "stage": 1}
+            {"id": 0, "type": "dyson_sphere_1", "stage": 1, "raw_stage": 1, "status": "complete"}
         ]
         base_curr_snapshot["history"]["megastructures"]["megastructures"] = [
-            {"id": 0, "type": "dyson_sphere", "stage": 2}
+            {
+                "id": 0,
+                "type": "dyson_sphere_2",
+                "stage": 2,
+                "raw_stage": 2,
+                "status": "under_construction",
+            }
         ]
 
         result = compute_events(
@@ -601,6 +613,85 @@ class TestComputeEvents:
         )
         event_types = [e.event_type for e in result]
         assert "megastructure_upgraded" in event_types
+
+    def test_detects_megastructure_construction_completed_without_stage_change(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """Detects same-type construction finishing via status transition."""
+        base_prev_snapshot["history"]["megastructures"]["megastructures"] = [
+            {
+                "id": 0,
+                "type": "grand_archive_0",
+                "stage": 0,
+                "raw_stage": 0,
+                "status": "under_construction",
+            }
+        ]
+        base_curr_snapshot["history"]["megastructures"]["megastructures"] = [
+            {
+                "id": 0,
+                "type": "grand_archive_0",
+                "stage": 0,
+                "raw_stage": 0,
+                "status": "complete",
+            }
+        ]
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        event_types = [e.event_type for e in result]
+        assert "megastructure_construction_completed" in event_types
+
+    def test_detects_megastructure_restored(self, base_prev_snapshot, base_curr_snapshot):
+        """Detects a ruined megastructure being restored."""
+        base_prev_snapshot["history"]["megastructures"]["megastructures"] = [
+            {"id": 0, "type": "interstellar_assembly_ruined", "stage": 0, "status": "ruined"}
+        ]
+        base_curr_snapshot["history"]["megastructures"]["megastructures"] = [
+            {
+                "id": 0,
+                "type": "interstellar_assembly_restored",
+                "stage": 0,
+                "status": "restored",
+            }
+        ]
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        event_types = [e.event_type for e in result]
+        assert "megastructure_restored" in event_types
+
+    def test_detects_megastructure_ruined(self, base_prev_snapshot, base_curr_snapshot):
+        """Detects a megastructure becoming ruined."""
+        base_prev_snapshot["history"]["megastructures"]["megastructures"] = [
+            {
+                "id": 0,
+                "type": "interstellar_assembly_4",
+                "stage": 4,
+                "raw_stage": 4,
+                "status": "complete",
+            }
+        ]
+        base_curr_snapshot["history"]["megastructures"]["megastructures"] = [
+            {"id": 0, "type": "interstellar_assembly_ruined", "stage": 0, "status": "ruined"}
+        ]
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        event_types = [e.event_type for e in result]
+        assert "megastructure_ruined" in event_types
 
     def test_detects_crisis_started(self, base_prev_snapshot, base_curr_snapshot):
         """Detects crisis beginning."""
