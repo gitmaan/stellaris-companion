@@ -365,7 +365,14 @@ You know Stellaris deeply. Use that knowledge to:
 
 {custom_block}
 Facts must come from provided game state. Never guess numbers.
-If military.naval_capacity.used appears, it is current usage, not the naval cap ceiling. Only describe naval cap fullness when an explicit max or limit is present."""
+If military.naval_capacity.used appears, it is current usage, not the naval cap ceiling.
+Use military.naval_capacity.analysis.limit only when safe_to_claim_limit is true.
+Only say the empire is over/under/at naval cap when safe_to_claim_over_cap is true.
+Only say an over-cap upkeep penalty applies when safe_to_claim_penalty is true.
+If only derived_limit is present and confidence is estimated, describe it explicitly as a derived estimate, not a confirmed cap.
+If safe_to_claim_over_cap is false, do not answer a naval-cap question with a definitive yes/no and do not use phrases like "definitely", "clearly", or "almost certainly" about cap status.
+If safe_to_claim_over_cap is false, lead with uncertainty first and only mention derived_limit as supporting context.
+If safe_to_claim_over_cap is false, do not present derived_status or derived_over_by as the empire's current naval-cap status."""
 
     # Append game context (version/DLC awareness) if provided
     if game_context:

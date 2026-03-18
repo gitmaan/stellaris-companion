@@ -61,6 +61,8 @@ bin/stellaris-parser*
 # Generated benchmark/test results
 *_results.json
 t25_*.json
+tmp/
+uv.lock
 
 # Dev scripts
 .ralph-logs/
