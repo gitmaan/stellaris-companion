@@ -7,11 +7,11 @@ and compares two formatting approaches for token efficiency.
 Uses live Gemini 3 Flash API calls in standalone mode (no Rust parser needed).
 
 Usage:
-    python3 scripts/experiments/patch_notes_stress.py --hypothesis a -v
-    python3 scripts/experiments/patch_notes_stress.py --hypothesis b -v
-    python3 scripts/experiments/patch_notes_stress.py --hypothesis a --runs 3
-    python3 scripts/experiments/patch_notes_stress.py --test-name pop_94k -v
-    python3 scripts/experiments/patch_notes_stress.py --compare
+    python3 scripts/experiments/patch_notes_stress.py --hypothesis real
+    python3 scripts/experiments/patch_notes_stress.py --hypothesis raw
+    python3 scripts/experiments/patch_notes_stress.py --version "Cetus v4.3.0" --hypothesis real
+    python3 scripts/experiments/patch_notes_stress.py --test-name naval_cap_corvette_43
+    python3 scripts/experiments/patch_notes_stress.py --list-tests
 """
 
 import argparse
@@ -231,6 +231,8 @@ HYPOTHESIS_B_42 = """\
 # Hypothesis Registry
 # =============================================================================
 
+DEFAULT_VERSION = "Cetus v4.3.0"
+
 
 def _get_hypothesis_a():
     """Compact bullets — 4.3 style."""
@@ -242,18 +244,32 @@ def _get_hypothesis_b():
     return f"{HYPOTHESIS_B_40}\n\n{HYPOTHESIS_B_41}\n\n{HYPOTHESIS_B_42}"
 
 
-def _get_hypothesis_real():
-    """Real patch files via load_patch_notes()."""
+def _get_hypothesis_real(version: str = DEFAULT_VERSION):
+    """Patch content resolved by the production loader (prefers snapshots)."""
     from stellaris_companion.personality import load_patch_notes
 
-    return load_patch_notes("Corvus v4.2.4", cumulative=True) or ""
+    return load_patch_notes(version, cumulative=True, prefer_snapshot=True) or ""
+
+
+def _get_hypothesis_raw(version: str = DEFAULT_VERSION):
+    """Raw cumulative patch files with snapshots disabled."""
+    from stellaris_companion.personality import load_patch_notes
+
+    return load_patch_notes(version, cumulative=True, prefer_snapshot=False) or ""
 
 
 HYPOTHESES = {
-    "a": ("A: Compact bullets (4.3 style)", _get_hypothesis_a),
-    "b": ("B: Structured tables + bullets", _get_hypothesis_b),
-    "none": ("NONE: No patch notes (baseline)", lambda: ""),
-    "real": ("REAL: Actual patch files via load_patch_notes()", _get_hypothesis_real),
+    "a": (
+        "A: Compact bullets (legacy baseline)",
+        lambda version=DEFAULT_VERSION: _get_hypothesis_a(),
+    ),
+    "b": (
+        "B: Structured tables + bullets (legacy baseline)",
+        lambda version=DEFAULT_VERSION: _get_hypothesis_b(),
+    ),
+    "none": ("NONE: No patch notes (baseline)", lambda version=DEFAULT_VERSION: ""),
+    "raw": ("RAW: Raw cumulative patch files", _get_hypothesis_raw),
+    "real": ("REAL: Production loader output", _get_hypothesis_real),
 }
 
 
@@ -262,7 +278,7 @@ HYPOTHESES = {
 # =============================================================================
 
 
-def build_system_prompt(patch_content: str, version: str = "Corvus v4.2.4") -> str:
+def build_system_prompt(patch_content: str, version: str = DEFAULT_VERSION) -> str:
     """Build advisor system prompt with swappable patch content."""
     base = """You are the strategic advisor to the United Nations of Earth.
 
@@ -394,6 +410,72 @@ ALL_CASES = [
         "How does the population system work in Stellaris?",
         "Must present as facts. Must NOT say 'no longer', 'used to', 'patch', 'was changed'.",
     ),
+    # --- 4.3-specific checks ---
+    TestCase(
+        "naval_cap_corvette_43",
+        "How many corvettes fit into 100 naval capacity in Cetus?",
+        "Should answer 20 corvettes. Must not use old 1-cap expectations.",
+    ),
+    TestCase(
+        "anchorages_trade_upkeep_43",
+        "Are anchorages basically free naval cap, or do they have an economic cost now?",
+        "Should mention +5 naval cap per Anchorage and matching Trade upkeep.",
+    ),
+    TestCase(
+        "unemployment_demotes_43",
+        "My unemployed specialists turned into civilians at month end. Is that working as intended?",
+        "Should say yes: unemployed pops demote to Civilian or Maintenance Drone at month end.",
+    ),
+    TestCase(
+        "refugee_attraction_43",
+        "Will Free Haven actually pull in more refugees, and does slavery make refugees avoid me?",
+        "Should say Refugee Attraction matters, Free Haven helps, slavery hurts, same-species empires are preferred.",
+    ),
+    TestCase(
+        "soldiers_specialist_43",
+        "Do soldier bonuses count as worker bonuses, or are soldiers in a higher stratum now?",
+        "Should say Soldiers are Specialist jobs, or Complex Drones for gestalts, with Alloy upkeep.",
+    ),
+    TestCase(
+        "planet_automation_scope_43",
+        "If I enable Technician Automation on a planet, does it only affect Generator District technicians?",
+        "Should say it applies to all Technician jobs on the planet.",
+    ),
+    TestCase(
+        "planetary_ascension_43",
+        "How much does each tier of planetary ascension boost a colony designation in Cetus?",
+        "Should answer 10% per tier.",
+    ),
+    TestCase(
+        "branch_office_trade_43",
+        "Why can't I use Energy to set up a branch office anymore?",
+        "Should explain Branch Offices use Trade rather than Energy as their establishment resource.",
+    ),
+    TestCase(
+        "crisis_overlap_43",
+        "If I allow all end game crises, can another crisis spawn while one is already happening?",
+        "Should say another crisis can appear 25 years after one has spawned.",
+    ),
+    TestCase(
+        "dimensional_fleet_43",
+        "What does the Dimensional Fleet astral action give me in Cetus if I've explored 9 Astral Rifts?",
+        "Should answer 9 Escorts and 4 Cruisers.",
+    ),
+    TestCase(
+        "eternal_vigilance_43",
+        "Does Eternal Vigilance still give me free defense platforms in Cetus?",
+        "Should say no, and mention the home-territory combat bonus instead.",
+    ),
+    TestCase(
+        "zro_deficit_43",
+        "How bad is a Zro deficit for a psionic empire in Cetus?",
+        "Should mention severe psionic penalties and risk of Shroud Incursions.",
+    ),
+    TestCase(
+        "knights_soldiers_43",
+        "Do Knights still count like bureaucrats and researchers for modifiers, or are they treated like soldiers now?",
+        "Should say Knights are treated like Soldiers for economic modifiers.",
+    ),
 ]
 
 
@@ -442,18 +524,20 @@ def run_test(
 def run_suite(
     client: genai.Client,
     hypothesis_key: str,
+    version: str,
     test_name: str | None = None,
     save_path: str | None = None,
 ) -> dict:
     """Run the test suite for a hypothesis and collect responses for manual review."""
     label, content_fn = HYPOTHESES[hypothesis_key][0], HYPOTHESES[hypothesis_key][1]
-    patch_content = content_fn()
-    system_prompt = build_system_prompt(patch_content)
+    patch_content = content_fn(version)
+    system_prompt = build_system_prompt(patch_content, version=version)
 
     token_est = len(system_prompt) // 4
     print(f"\n{'=' * 60}")
     print("PATCH NOTES STRESS TEST")
     print(f"  Hypothesis: {label}")
+    print(f"  Version: {version}")
     print(f"  System prompt: {len(system_prompt)} chars (~{token_est} tokens)")
     print(f"  Patch content: {len(patch_content)} chars (~{len(patch_content) // 4} tokens)")
     print(f"{'=' * 60}")
@@ -493,6 +577,7 @@ def run_suite(
         output = {
             "hypothesis": hypothesis_key,
             "label": label,
+            "version": version,
             "token_est": token_est,
             "prompt_chars": len(system_prompt),
             "patch_chars": len(patch_content),
@@ -535,6 +620,12 @@ def main():
     parser.add_argument("--test-name", "-t", type=str, help="Run specific test by name")
     parser.add_argument("--save", "-s", type=str, help="Save results to JSON file")
     parser.add_argument("--list-tests", action="store_true", help="List all test names and exit")
+    parser.add_argument(
+        "--version",
+        type=str,
+        default=DEFAULT_VERSION,
+        help=f'Game version to inject into the prompt (default: "{DEFAULT_VERSION}")',
+    )
     args = parser.parse_args()
 
     if args.list_tests:
@@ -548,7 +639,13 @@ def main():
         sys.exit(1)
 
     client = genai.Client(api_key=api_key)
-    run_suite(client, args.hypothesis, test_name=args.test_name, save_path=args.save)
+    run_suite(
+        client,
+        args.hypothesis,
+        version=args.version,
+        test_name=args.test_name,
+        save_path=args.save,
+    )
 
 
 if __name__ == "__main__":
