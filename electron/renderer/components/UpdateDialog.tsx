@@ -19,14 +19,42 @@ interface UpdateInfoPayload {
   releaseNotes?: string
 }
 
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+}
+
+function stripReleaseNoteHtml(value: string): string {
+  return decodeHtmlEntities(
+    value
+      .replace(/\r\n/g, '\n')
+      .replace(/<\s*li\b[^>]*>/gi, '\n- ')
+      .replace(/<\s*\/li\s*>/gi, '')
+      .replace(/<\s*br\s*\/?>/gi, '\n')
+      .replace(/<\s*\/p\s*>/gi, '\n')
+      .replace(/<\s*p\b[^>]*>/gi, '')
+      .replace(/<\s*\/?(ul|ol|div|section|article|h[1-6])\b[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+  )
+}
+
 function normalizeReleaseNotes(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
+  const trimmed = stripReleaseNoteHtml(value)
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
   return trimmed.length > 0 ? trimmed : undefined
 }
 
 function normalizeNoteLine(line: string): string {
-  return line
+  return stripReleaseNoteHtml(line)
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
