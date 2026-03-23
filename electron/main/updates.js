@@ -1,4 +1,7 @@
+const IS_E2E = process.env.E2E === '1'
+
 function setupAutoUpdater({ autoUpdater, app, isDev }) {
+  if (IS_E2E) return
   if (isDev) return
   if (!app?.isPackaged) return
   if (process.windowsStore) return
@@ -49,9 +52,37 @@ const updaterState = {
   installTimeout: null,
 }
 
+function decodeHtmlEntities(value) {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+}
+
+function stripReleaseNoteHtml(value) {
+  return decodeHtmlEntities(
+    value
+      .replace(/\r\n/g, '\n')
+      .replace(/<\s*li\b[^>]*>/gi, '\n- ')
+      .replace(/<\s*\/li\s*>/gi, '')
+      .replace(/<\s*br\s*\/?>/gi, '\n')
+      .replace(/<\s*\/p\s*>/gi, '\n')
+      .replace(/<\s*p\b[^>]*>/gi, '')
+      .replace(/<\s*\/?(ul|ol|div|section|article|h[1-6])\b[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+  )
+}
+
 function normalizeReleaseNotes(releaseNotes) {
   if (typeof releaseNotes === 'string') {
-    const trimmed = releaseNotes.trim()
+    const trimmed = stripReleaseNoteHtml(releaseNotes)
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim()
     return trimmed.length > 0 ? trimmed : null
   }
 
@@ -59,7 +90,7 @@ function normalizeReleaseNotes(releaseNotes) {
     const merged = releaseNotes
       .map((entry) => {
         if (!entry || typeof entry.note !== 'string') return ''
-        return entry.note.trim()
+        return stripReleaseNoteHtml(entry.note).trim()
       })
       .filter(Boolean)
       .join('\n\n')
@@ -111,6 +142,9 @@ function sendUpdateEvent(getMainWindow, channel, payload) {
 
 function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWindow, prepareForUpdateQuit }) {
   ipcMain.handle('check-for-update', async () => {
+    if (IS_E2E) {
+      return { updateAvailable: false }
+    }
     if (isDev) {
       return { updateAvailable: false }
     }
@@ -129,6 +163,9 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
   })
 
   ipcMain.handle('install-update', async () => {
+    if (IS_E2E) {
+      return { success: false, error: 'Updates disabled in E2E mode' }
+    }
     if (isDev) {
       return { success: false, error: 'Updates disabled in development' }
     }

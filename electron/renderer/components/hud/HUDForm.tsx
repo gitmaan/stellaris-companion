@@ -51,6 +51,7 @@ export const HUDSelect: React.FC<HUDSelectProps> = ({ label, options, className 
       <div className="relative group">
         <select
           className="w-full appearance-none bg-black/20 border border-white/10 px-4 py-2 pr-8 font-mono text-sm text-text-primary focus:outline-none focus:border-accent-cyan/50 focus:bg-accent-cyan/5 transition-all duration-200 rounded-sm"
+          aria-label={props['aria-label'] || label}
           {...props}
         >
           {options.map((opt) => (

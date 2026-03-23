@@ -50,7 +50,15 @@ FACTUAL ACCURACY CONTRACT:
 - ALL numbers (military power, resources, populations, dates) MUST come from the provided game state
 - If a specific value is not in the data, say "unknown" or "I don't have that information" - NEVER estimate or guess
 - You may provide strategic advice and opinions, but clearly distinguish them from facts
-- When quoting numbers, use the exact values from the data"""
+- When quoting numbers, use the exact values from the data
+- `military.naval_capacity.used` is current usage, not the naval cap ceiling.
+- Use `military.naval_capacity.analysis.limit` only when `safe_to_claim_limit` is true.
+- Only say the empire is over/under/at naval cap when `safe_to_claim_over_cap` is true.
+- Only say an over-cap upkeep penalty applies when `safe_to_claim_penalty` is true.
+- If only `derived_limit` is present and confidence is `estimated`, describe it explicitly as a derived estimate, not a confirmed cap.
+- If `safe_to_claim_over_cap` is false, do not answer a naval-cap question with a definitive yes/no and do not use phrases like "definitely", "clearly", or "almost certainly" about cap status.
+- If `safe_to_claim_over_cap` is false, lead with uncertainty first and only mention `derived_limit` as supporting context.
+- If `safe_to_claim_over_cap` is false, do not present `derived_status` or `derived_over_by` as the empire's current naval-cap status."""
 
 
 class Companion:
@@ -673,6 +681,218 @@ class Companion:
         except Exception as e:
             logger.debug("advisor_memory_update_failed error=%s", e)
 
+    @staticmethod
+    def _classify_naval_capacity_intent(question: str) -> str | None:
+        normalized = " ".join((question or "").lower().split())
+        has_anchorages = any(
+            token in normalized
+            for token in (
+                "anchorage",
+                "anchorages",
+                "naval logistics office",
+                "more naval capacity",
+            )
+        )
+        has_ships = any(
+            token in normalized
+            for token in (
+                "expand my fleet",
+                "expand fleet",
+                "expand the fleet",
+                "build more ships",
+                "more ships",
+                "reinforce fleet",
+                "grow my fleet",
+                "grow the fleet",
+            )
+        )
+
+        if any(
+            token in normalized
+            for token in ("ship upkeep", "fleet upkeep", "maintenance", "upkeep")
+        ):
+            return "upkeep"
+        if has_anchorages and has_ships:
+            return "ships_vs_anchorages"
+        if has_anchorages or "urgent is more naval capacity" in normalized:
+            return "capacity_investment"
+        if has_ships:
+            return "fleet_expansion"
+        if any(token in normalized for token in ("naval cap", "naval capacity", "fleet cap")):
+            return "status"
+        return None
+
+    @staticmethod
+    def _extract_naval_capacity_context(
+        briefing_json: str | None,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        naval_capacity: dict[str, Any] = {}
+        try:
+            briefing = json.loads(briefing_json or "{}")
+            naval_capacity = (briefing.get("military") or {}).get("naval_capacity") or {}
+        except Exception:
+            naval_capacity = {}
+        analysis = naval_capacity.get("analysis") or {}
+        return naval_capacity, analysis
+
+    def _build_naval_capacity_policy_block(
+        self,
+        *,
+        question: str,
+        briefing_json: str | None,
+    ) -> str | None:
+        """Build a per-question naval-cap policy block for the normal advisor path."""
+        intent = self._classify_naval_capacity_intent(question)
+        if not intent:
+            return None
+
+        naval_capacity, analysis = self._extract_naval_capacity_context(briefing_json)
+        used = naval_capacity.get("used")
+        confirmed_limit = analysis.get("limit")
+        derived_limit = analysis.get("derived_limit")
+        safe_to_claim = bool(analysis.get("safe_to_claim_over_cap"))
+        safe_penalty = bool(analysis.get("safe_to_claim_penalty"))
+        confirmed_status = analysis.get("status")
+        over_by = analysis.get("over_by")
+
+        if safe_to_claim and confirmed_limit is not None:
+            state = "confirmed"
+        elif derived_limit is not None:
+            state = "estimated"
+        else:
+            state = "unavailable"
+
+        used_text = str(used) if used is not None else "unknown"
+        rules: list[str] = [
+            "NAVAL CAPACITY RESPONSE POLICY:",
+            "- Keep the normal immersive advisor voice, but obey the policy below exactly.",
+            f"- Intent: {intent}.",
+            f"- Response state: {state}.",
+        ]
+
+        if state == "confirmed":
+            limit_text = str(confirmed_limit)
+            used_int = int(used or 0)
+            confirmed_limit_int = int(confirmed_limit)
+            headroom = max(0, confirmed_limit_int - used_int)
+            tight_buffer = max(10, int(round(int(confirmed_limit) * 0.15)))
+            computed_over_by = (
+                over_by if over_by is not None else max(0, used_int - confirmed_limit_int)
+            )
+            rules.append("- You may describe the naval-cap status as confirmed from this save.")
+            rules.append(
+                f"- Fact summary: current naval usage is {used_text}; confirmed naval capacity is {limit_text}."
+            )
+
+            if intent == "status":
+                if confirmed_status == "over":
+                    rules.append(
+                        f"- Answer the status directly: the empire is over naval cap by {computed_over_by}."
+                    )
+                elif confirmed_status in {"at", "at_limit"}:
+                    rules.append(
+                        "- Answer the status directly: the empire is exactly at naval cap."
+                    )
+                else:
+                    rules.append("- Answer the status directly: the empire is below naval cap.")
+            elif intent == "upkeep":
+                if safe_penalty:
+                    rules.append(
+                        "- You may state directly that the over-cap ship upkeep penalty is active."
+                    )
+                else:
+                    rules.append(
+                        "- You may state directly that an over-cap ship upkeep penalty is not indicated from naval capacity."
+                    )
+            elif intent == "fleet_expansion":
+                if confirmed_status == "over":
+                    rules.append(
+                        "- Recommendation: naval capacity is not a safe reason to expand further unless the military need outweighs the extra upkeep."
+                    )
+                elif headroom <= tight_buffer:
+                    rules.append(
+                        "- Recommendation: ships can still be added, but naval capacity is becoming a near-term constraint."
+                    )
+                else:
+                    rules.append(
+                        "- Recommendation: capacity does not appear to be the immediate constraint, so ships are the more urgent investment if more strength is needed now."
+                    )
+            elif intent == "capacity_investment":
+                if confirmed_status == "over" or headroom <= tight_buffer:
+                    rules.append(
+                        "- Recommendation: more naval-capacity infrastructure looks worthwhile from this save."
+                    )
+                else:
+                    rules.append(
+                        "- Recommendation: anchorages are not urgent from a naval-capacity perspective right now."
+                    )
+            else:
+                if confirmed_status == "over" or headroom <= tight_buffer:
+                    rules.append(
+                        "- Recommendation: prioritize more naval capacity before further ship expansion."
+                    )
+                else:
+                    rules.append(
+                        "- Recommendation: build more ships first; anchorages are not the immediate naval-capacity bottleneck."
+                    )
+        elif state == "estimated":
+            rules.append(
+                "- Do not describe naval-cap status or over-cap penalties as confirmed facts."
+            )
+            rules.append(
+                f"- Fact summary: current naval usage is {used_text}; estimated naval capacity is about {derived_limit}, but that estimate is not confirmed from this save."
+            )
+            if intent == "status":
+                rules.append(
+                    "- Say you cannot confirm whether the empire is over naval cap from this alone."
+                )
+            elif intent == "upkeep":
+                rules.append(
+                    "- Say you cannot confirm an over-cap ship upkeep penalty from this alone."
+                )
+            elif intent == "fleet_expansion":
+                rules.append(
+                    "- Recommendation: capacity data alone does not block cautious fleet expansion, but do not plan around exact remaining headroom."
+                )
+            elif intent == "capacity_investment":
+                rules.append(
+                    "- Recommendation: do not treat anchorages as urgent purely from this save. Build them for a safer buffer, not because the data proves they are needed."
+                )
+            else:
+                rules.append(
+                    "- Recommendation: do not choose between ships and anchorages based only on this estimate. If immediate strength is needed, favor ships cautiously; if a safer buffer is needed, add anchorages."
+                )
+        else:
+            rules.append(
+                "- Do not describe naval-cap status or over-cap penalties as confirmed facts."
+            )
+            rules.append(
+                f"- Fact summary: current naval usage is {used_text}; exact naval capacity could not be derived from this save."
+            )
+            if intent == "status":
+                rules.append(
+                    "- Say you cannot confirm whether the empire is over naval cap from this data."
+                )
+            elif intent == "upkeep":
+                rules.append(
+                    "- Say you cannot confirm an over-cap ship upkeep penalty from this data."
+                )
+            elif intent == "fleet_expansion":
+                rules.append(
+                    "- Recommendation: capacity data does not rule out cautious expansion, but naval-cap numbers from this save should not be the deciding factor."
+                )
+            elif intent == "capacity_investment":
+                rules.append(
+                    "- Recommendation: do not treat anchorages as urgent based on naval-cap data alone here."
+                )
+            else:
+                rules.append(
+                    "- Recommendation: do not choose between ships and anchorages based on naval-cap data from this save alone."
+                )
+
+        rules.append("- Use the fact summary in the first paragraph, then continue in character.")
+        return "\n".join(rules)
+
     def ask_precomputed(
         self,
         question: str,
@@ -716,6 +936,12 @@ class Companion:
             "- If a value is missing, say 'unknown' and suggest what to check in-game.\n"
             "- Be a strategic ADVISOR: interpret, prioritize, and recommend next actions.\n"
         )
+        naval_cap_policy_block = self._build_naval_capacity_policy_block(
+            question=cleaned_question,
+            briefing_json=briefing_json,
+        )
+        if naval_cap_policy_block:
+            ask_system_prompt += f"{naval_cap_policy_block}\n"
 
         try:
             cfg = types.GenerateContentConfig(

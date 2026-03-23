@@ -3,6 +3,9 @@ import { useState, useEffect, useCallback } from 'react'
 export const UI_THEME_VALUES = ['stellaris-cyan', 'tactica-green', 'command-amber'] as const
 export type UiTheme = (typeof UI_THEME_VALUES)[number]
 export const DEFAULT_UI_THEME: UiTheme = 'stellaris-cyan'
+export const CHRONICLE_REFRESH_MODE_VALUES = ['balanced', 'enhanced'] as const
+export type ChronicleRefreshMode = (typeof CHRONICLE_REFRESH_MODE_VALUES)[number]
+export const DEFAULT_CHRONICLE_REFRESH_MODE: ChronicleRefreshMode = 'balanced'
 
 export function normalizeUiTheme(rawValue: unknown): UiTheme {
   if (typeof rawValue !== 'string') return DEFAULT_UI_THEME
@@ -10,6 +13,13 @@ export function normalizeUiTheme(rawValue: unknown): UiTheme {
   return (UI_THEME_VALUES as readonly string[]).includes(rawValue)
     ? rawValue as UiTheme
     : DEFAULT_UI_THEME
+}
+
+export function normalizeChronicleRefreshMode(rawValue: unknown): ChronicleRefreshMode {
+  if (typeof rawValue !== 'string') return DEFAULT_CHRONICLE_REFRESH_MODE
+  return (CHRONICLE_REFRESH_MODE_VALUES as readonly string[]).includes(rawValue)
+    ? rawValue as ChronicleRefreshMode
+    : DEFAULT_CHRONICLE_REFRESH_MODE
 }
 
 export interface Settings {
@@ -23,6 +33,7 @@ export interface Settings {
   discordEnabled: boolean
   uiScale: number
   uiTheme: UiTheme
+  chronicleRefreshMode: ChronicleRefreshMode
 }
 
 export interface UseSettingsResult {
@@ -49,13 +60,17 @@ export function useSettings(): UseSettingsResult {
     }
 
     try {
-      const loaded = await window.electronAPI.getSettings() as Settings & { uiTheme?: unknown }
+      const loaded = await window.electronAPI.getSettings() as Settings & {
+        uiTheme?: unknown
+        chronicleRefreshMode?: unknown
+      }
       const parsedUiScale = Number(loaded.uiScale)
       const normalized: Settings = {
         ...loaded,
         saveDir: loaded.saveDir || loaded.savePath || '',
         uiScale: Number.isFinite(parsedUiScale) ? parsedUiScale : 1,
         uiTheme: normalizeUiTheme(loaded.uiTheme),
+        chronicleRefreshMode: normalizeChronicleRefreshMode(loaded.chronicleRefreshMode),
       }
       setSettings(normalized)
       setError(null)

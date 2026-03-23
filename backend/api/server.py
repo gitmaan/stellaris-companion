@@ -47,6 +47,7 @@ class ChronicleRequest(BaseModel):
     session_id: str
     force_refresh: bool = False
     chapter_only: bool = False
+    refresh_mode: str = "balanced"
 
 
 class RegenerateChapterRequest(BaseModel):
@@ -890,6 +891,7 @@ def create_app() -> FastAPI:
                 session_id=body.session_id,
                 force_refresh=body.force_refresh,
                 chapter_only=body.chapter_only,
+                refresh_mode=body.refresh_mode,
             )
             return result
         except ValueError as e:

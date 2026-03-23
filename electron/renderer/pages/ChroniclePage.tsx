@@ -5,6 +5,10 @@ import ChronicleContent from '../components/ChronicleContent'
 import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
 import { useBackend, ChronicleResponse } from '../hooks/useBackend'
 import { generateChronicleHtml } from '../lib/chronicleExport'
+import {
+  DEFAULT_CHRONICLE_REFRESH_MODE,
+  type ChronicleRefreshMode,
+} from '../hooks/useSettings'
 
 interface SaveInfo {
   save_id: string
@@ -48,7 +52,15 @@ function isDocumentVisible(): boolean {
  * ChroniclePage - The hero feature: your empire's living history book
  * Galactic Archives aesthetic - document your empire's journey through the stars
  */
-function ChroniclePage() {
+interface ChroniclePageProps {
+  isActive?: boolean
+  refreshMode?: ChronicleRefreshMode
+}
+
+function ChroniclePage({
+  isActive = true,
+  refreshMode = DEFAULT_CHRONICLE_REFRESH_MODE,
+}: ChroniclePageProps) {
   const backend = useBackend()
   const isMountedRef = useRef(true)
 
@@ -212,7 +224,12 @@ function ChroniclePage() {
     let retryAfterMs: number | null = null
 
     try {
-      const chronicleResult = await backend.chronicle(session.id, forceRefresh, chapterOnly)
+      const chronicleResult = await backend.chronicle(
+        session.id,
+        forceRefresh,
+        chapterOnly,
+        refreshMode,
+      )
 
       if (!isMountedRef.current) return
       if (token !== chronicleRequestTokenRef.current) return
@@ -267,7 +284,7 @@ function ChroniclePage() {
         }
       }
     }
-  }, [backend, selectedSaveId, latestSessionBySaveId, totalSnapshotsBySaveId])
+  }, [backend, latestSessionBySaveId, refreshMode, selectedSaveId, totalSnapshotsBySaveId])
 
   const finalizePendingChaptersHidden = useCallback(async () => {
     if (isDocumentVisible()) return
@@ -295,6 +312,7 @@ function ChroniclePage() {
 
   const refreshVisibleChronicleAfterResume = useCallback(async () => {
     if (visibleCatchupInFlightRef.current) return
+    if (!isActive) return
     if (!isDocumentVisible()) return
     if (!isMountedRef.current) return
 
@@ -303,11 +321,11 @@ function ChroniclePage() {
     try {
       await loadSaves({ silent: true })
       if (!isMountedRef.current) return
-      await loadChronicle(false, true)
+      await loadChronicle(false, false)
     } finally {
       visibleCatchupInFlightRef.current = false
     }
-  }, [loadChronicle, loadSaves])
+  }, [isActive, loadChronicle, loadSaves])
 
   // Initial load
   useEffect(() => {
@@ -369,7 +387,13 @@ function ChroniclePage() {
     return () => {
       if (typeof cleanup === 'function') cleanup()
     }
-  }, [cachedSessions.length, finalizePendingChaptersHidden, latestSessionBySaveId, loadSaves, selectedSaveId])
+  }, [
+    cachedSessions.length,
+    finalizePendingChaptersHidden,
+    latestSessionBySaveId,
+    loadSaves,
+    selectedSaveId,
+  ])
 
   // Periodic backstop refresh in case backend status metadata misses an edge case.
   useEffect(() => {
@@ -389,25 +413,43 @@ function ChroniclePage() {
   // Load chronicle when save changes (only after sessions are cached)
   useEffect(() => {
     if (selectedSaveId && cachedSessions.length > 0) {
+      if (!isActive) {
+        pendingVisibleChronicleRefreshRef.current = true
+        return
+      }
       if (!isDocumentVisible()) {
         pendingVisibleChronicleRefreshRef.current = true
         void finalizePendingChaptersHidden()
         return
       }
-      loadChronicle(false, true)
+      if (pendingVisibleChronicleRefreshRef.current) {
+        return
+      }
+      loadChronicle(false, false)
     }
-  }, [cachedSessions.length, finalizePendingChaptersHidden, loadChronicle, selectedSaveId])
+  }, [
+    cachedSessions.length,
+    finalizePendingChaptersHidden,
+    isActive,
+    loadChronicle,
+    selectedSaveId,
+  ])
 
-  // When the user returns to the app, run one chapter-only refresh to keep
-  // chapter backlog moving without spending a teaser generation call.
+  const processPendingVisibleChronicleRefresh = useCallback(() => {
+    if (!isMountedRef.current) return
+    if (!isActive) return
+    if (!isDocumentVisible()) return
+    if (!pendingVisibleChronicleRefreshRef.current) return
+
+    pendingVisibleChronicleRefreshRef.current = false
+    void refreshVisibleChronicleAfterResume()
+  }, [isActive, refreshVisibleChronicleAfterResume])
+
+  // When the user returns to the app, run one visible refresh so current era
+  // can advance once meaningful new events have accumulated.
   useEffect(() => {
     const handleVisible = () => {
-      if (!isMountedRef.current) return
-      if (!isDocumentVisible()) return
-      if (!pendingVisibleChronicleRefreshRef.current) return
-
-      pendingVisibleChronicleRefreshRef.current = false
-      void refreshVisibleChronicleAfterResume()
+      processPendingVisibleChronicleRefresh()
     }
 
     document.addEventListener('visibilitychange', handleVisible)
@@ -416,7 +458,11 @@ function ChroniclePage() {
       document.removeEventListener('visibilitychange', handleVisible)
       window.removeEventListener('focus', handleVisible)
     }
-  }, [refreshVisibleChronicleAfterResume])
+  }, [processPendingVisibleChronicleRefresh])
+
+  useEffect(() => {
+    processPendingVisibleChronicleRefresh()
+  }, [processPendingVisibleChronicleRefresh])
 
   // Scroll spy: track which chapter is in view
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -539,7 +585,7 @@ function ChroniclePage() {
     }
 
     // Silently reload chronicle data without showing loading spinner
-    const chronicleResult = await backend.chronicle(session.id, false)
+    const chronicleResult = await backend.chronicle(session.id, false, false, refreshMode)
     if (!isMountedRef.current) return
 
     if (chronicleResult.data) {
@@ -552,7 +598,7 @@ function ChroniclePage() {
     }
 
     setRegeneratingChapter(null)
-  }, [backend, selectedSaveId, confirmRegen, latestSessionBySaveId])
+  }, [backend, selectedSaveId, confirmRegen, latestSessionBySaveId, refreshMode])
 
   // Cancel regeneration confirmation
   const handleCancelRegen = useCallback(() => {

@@ -9,6 +9,7 @@
 
 const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, shell, safeStorage, autoUpdater: nativeAutoUpdater } = require('electron')
 const { clipboard } = require('electron')
+const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
 const crypto = require('crypto')
@@ -30,6 +31,30 @@ const { createDiscordRelay } = require('./main/discord/relay')
 const { registerDiscordIpcHandlers } = require('./main/ipc/discord')
 
 const IS_DEV = process.env.NODE_ENV === 'development'
+const IS_E2E = process.env.E2E === '1'
+
+function parsePositiveIntEnv(name, fallback) {
+  const raw = process.env[name]
+  if (!raw) return fallback
+  const parsed = Number.parseInt(raw, 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const E2E_USER_DATA_DIR = IS_E2E && process.env.E2E_USER_DATA_DIR
+  ? path.resolve(process.env.E2E_USER_DATA_DIR)
+  : null
+const E2E_SKIP_BACKEND_AUTOSTART = IS_E2E && process.env.E2E_SKIP_BACKEND_AUTOSTART === '1'
+const E2E_BACKEND_CONFIGURED = IS_E2E && process.env.E2E_BACKEND_CONFIGURED === '1'
+const E2E_ONBOARDING_COMPLETE = IS_E2E && process.env.E2E_ONBOARDING_COMPLETE === '1'
+
+if (E2E_USER_DATA_DIR) {
+  try {
+    fs.mkdirSync(E2E_USER_DATA_DIR, { recursive: true })
+    app.setPath('userData', E2E_USER_DATA_DIR)
+  } catch (e) {
+    console.error('Failed to configure E2E userData path:', e)
+  }
+}
 
 // Configure electron-updater
 setupAutoUpdater({ autoUpdater, app, isDev: IS_DEV })
@@ -66,7 +91,7 @@ process.on('unhandledRejection', (reason) => {
 // Single-instance lock to prevent multiple Electron shells fighting over ports / subprocesses.
 // In development, skip this to avoid focusing a hidden production instance (tray mode),
 // which makes it look like code/CSS changes aren't taking effect.
-if (!IS_DEV) {
+if (!IS_DEV && !IS_E2E) {
   const gotSingleInstanceLock = app.requestSingleInstanceLock()
   if (!gotSingleInstanceLock) {
     app.quit()
@@ -128,6 +153,7 @@ const store = new Store({
     discordEnabled: false,
     uiScale: 1,
     uiTheme: 'stellaris-cyan',
+    chronicleRefreshMode: 'balanced',
     hasCompletedOnboarding: false,
     // Window state persistence
     windowState: {
@@ -184,14 +210,16 @@ const DEFAULT_BACKEND_PORT = (() => {
   const parsed = raw ? Number.parseInt(raw, 10) : 8742
   return Number.isFinite(parsed) && parsed > 0 && parsed <= 65535 ? parsed : 8742
 })()
-const HEALTH_CHECK_INTERVAL = 5000 // 5 seconds
-const HEALTH_CHECK_TIMEOUT = 30000 // 30 seconds for initial startup
-const HEALTH_CHECK_REQUEST_TIMEOUT = 4000 // 4 seconds per health request (increased from 2s)
-const HEALTH_CHECK_FAIL_THRESHOLD = 2 // Require 2 consecutive failures before showing disconnected
+const HEALTH_CHECK_INTERVAL = parsePositiveIntEnv('E2E_HEALTH_CHECK_INTERVAL_MS', 5000)
+const HEALTH_CHECK_TIMEOUT = parsePositiveIntEnv('E2E_HEALTH_CHECK_TIMEOUT_MS', 30000)
+const HEALTH_CHECK_REQUEST_TIMEOUT = parsePositiveIntEnv('E2E_HEALTH_CHECK_REQUEST_TIMEOUT_MS', 4000)
+const HEALTH_CHECK_FAIL_THRESHOLD = parsePositiveIntEnv('E2E_HEALTH_CHECK_FAIL_THRESHOLD', 2)
 const UI_SCALE_PRESETS = [1, 1.1, 1.25, 1.4]
 const DEFAULT_UI_SCALE = 1
 const UI_THEME_PRESETS = ['stellaris-cyan', 'tactica-green', 'command-amber']
 const DEFAULT_UI_THEME = 'stellaris-cyan'
+const CHRONICLE_REFRESH_MODE_PRESETS = ['balanced', 'enhanced']
+const DEFAULT_CHRONICLE_REFRESH_MODE = 'balanced'
 
 // Discord configuration (DISC-007)
 // These are set via environment or will use defaults for development
@@ -207,7 +235,7 @@ let isQuitting = false
 let isQuittingForUpdate = false
 let tray = null
 let lastTrayStatus = null // Track last status to avoid rebuilding menu unnecessarily
-let backendConfigured = false
+let backendConfigured = E2E_BACKEND_CONFIGURED
 let lastBackendConnected = false
 let lastBackendStatusPayload = null
 
@@ -234,7 +262,6 @@ function getPythonPath() {
     }
   } else {
     // In development, try venv first, then system Python
-    const fs = require('fs')
     const venvRoot = path.join(__dirname, '..', 'venv')
     const venvPythonCandidates = process.platform === 'win32'
       ? [
@@ -672,6 +699,19 @@ function getUiThemeSetting() {
   return normalizeUiTheme(store.get('uiTheme', DEFAULT_UI_THEME))
 }
 
+function normalizeChronicleRefreshMode(rawValue) {
+  if (typeof rawValue !== 'string') return DEFAULT_CHRONICLE_REFRESH_MODE
+  return CHRONICLE_REFRESH_MODE_PRESETS.includes(rawValue)
+    ? rawValue
+    : DEFAULT_CHRONICLE_REFRESH_MODE
+}
+
+function getChronicleRefreshModeSetting() {
+  return normalizeChronicleRefreshMode(
+    store.get('chronicleRefreshMode', DEFAULT_CHRONICLE_REFRESH_MODE),
+  )
+}
+
 function applyUiScaleToWindow(targetWindow = mainWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) return
   targetWindow.webContents.setZoomFactor(getUiScaleSetting())
@@ -702,6 +742,7 @@ function getSettings() {
   const discordEnabled = store.get('discordEnabled', false)
   const uiScale = getUiScaleSetting()
   const uiTheme = getUiThemeSetting()
+  const chronicleRefreshMode = getChronicleRefreshModeSetting()
 
   return {
     googleApiKey: maskSecret(googleApiKey),
@@ -714,6 +755,7 @@ function getSettings() {
     discordEnabled,
     uiScale,
     uiTheme,
+    chronicleRefreshMode,
   }
 }
 
@@ -729,6 +771,7 @@ function getSettingsWithSecrets() {
   const discordEnabled = store.get('discordEnabled', false)
   const uiScale = getUiScaleSetting()
   const uiTheme = getUiThemeSetting()
+  const chronicleRefreshMode = getChronicleRefreshModeSetting()
 
   return {
     googleApiKey,
@@ -740,6 +783,7 @@ function getSettingsWithSecrets() {
     discordEnabled,
     uiScale,
     uiTheme,
+    chronicleRefreshMode,
   }
 }
 
@@ -776,6 +820,13 @@ function saveSettings(settings) {
 
   if (settings.uiTheme !== undefined) {
     store.set('uiTheme', normalizeUiTheme(settings.uiTheme))
+  }
+
+  if (settings.chronicleRefreshMode !== undefined) {
+    store.set(
+      'chronicleRefreshMode',
+      normalizeChronicleRefreshMode(settings.chronicleRefreshMode),
+    )
   }
 
   return { success: true }
@@ -1189,7 +1240,7 @@ function createWindow() {
   // Minimize to tray on close (instead of quitting).
   // NOTE: In development, allow the window to close so hot-reload/restarts are reliable.
   mainWindow.on('close', (event) => {
-    if (IS_DEV) return
+    if (IS_DEV || IS_E2E) return
     if (!isQuitting) {
       event.preventDefault()
       mainWindow.hide()
@@ -1297,14 +1348,14 @@ registerSettingsIpcHandlers({
   saveSettings,
   getSettingsWithSecrets,
   onSettingsSaved: async (fullSettings, changedSettings = {}) => {
-    backendConfigured = !!fullSettings.googleApiKey
+    backendConfigured = !!fullSettings.googleApiKey || E2E_BACKEND_CONFIGURED
 
     const backendRelevantSettingsChanged =
       changedSettings.googleApiKey !== undefined ||
       changedSettings.saveDir !== undefined ||
       changedSettings.savePath !== undefined
 
-    if (backendRelevantSettingsChanged) {
+    if (backendRelevantSettingsChanged && !E2E_SKIP_BACKEND_AUTOSTART) {
       restartPythonBackend(fullSettings)
     }
   },
@@ -1466,6 +1517,7 @@ async function detectStellarisSavesInDirectory(directory) {
 
 ipcMain.handle('onboarding:status', async (event) => {
   validateSender(event)
+  if (E2E_ONBOARDING_COMPLETE) return true
   return store.get('hasCompletedOnboarding', false)
 })
 
@@ -1513,7 +1565,7 @@ app.whenReady().then(async () => {
 
   // If a second instance is started, focus the existing window instead.
   // (Production only; in dev we skip the single-instance lock entirely.)
-  if (!IS_DEV) {
+  if (!IS_DEV && !IS_E2E) {
     app.on('second-instance', () => {
       if (!mainWindow) return
       if (mainWindow.isMinimized()) mainWindow.restore()
@@ -1547,8 +1599,10 @@ app.whenReady().then(async () => {
   createWindow()
   phaseStart = logTiming('Create window', phaseStart)
 
-  createTray()
-  phaseStart = logTiming('Create tray', phaseStart)
+  if (!IS_E2E) {
+    createTray()
+    phaseStart = logTiming('Create tray', phaseStart)
+  }
 
   // Start health checks immediately - UI handles "connecting..." state
   startHealthCheck()
@@ -1556,11 +1610,13 @@ app.whenReady().then(async () => {
 
   // Load settings (backend health already checked above)
   const settings = await getSettingsWithSecrets()
-  backendConfigured = !!settings.googleApiKey
+  backendConfigured = !!settings.googleApiKey || E2E_BACKEND_CONFIGURED
   phaseStart = logTiming('Load settings', phaseStart)
 
   if (backendAlreadyRunning) {
     // Already logged above
+  } else if (E2E_SKIP_BACKEND_AUTOSTART) {
+    console.log('E2E backend autostart disabled')
   } else if (settings.googleApiKey) {
     startPythonBackend(settings)
     phaseStart = logTiming('Start Python backend (spawn)', phaseStart)

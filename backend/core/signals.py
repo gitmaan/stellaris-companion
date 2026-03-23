@@ -11,6 +11,7 @@ See docs/OPTION_D_UNIFIED_HISTORY_EXTRACTION.md for architecture.
 from __future__ import annotations
 
 import contextlib
+import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
 
 # Schema version for signals payload - increment when structure changes
 SIGNALS_FORMAT_VERSION = 1
+
+_MEGASTRUCTURE_STAGE_SUFFIX_RE = re.compile(r"_(\d+)$")
 
 
 class _BriefingBackedExtractor:
@@ -978,7 +981,7 @@ def _extract_megastructures_signals(extractor: SaveExtractor) -> dict[str, Any]:
     Returns format compatible with events.py _extract_megastructures():
         Dict with:
         - player_id: int | None
-        - megastructures: list of dicts with id, type, stage
+        - megastructures: list of dicts with id, type, status, stage
         - count: number of player megastructures
         - by_type: dict mapping type to count
     """
@@ -1019,29 +1022,22 @@ def _extract_megastructures_signals(extractor: SaveExtractor) -> dict[str, Any]:
             continue
 
         mega_type = mega.get("type", "")
-
-        # Derive stage from type suffix (e.g., _0, _1, _2, _3, _4, _5)
-        # Complete megastructures have no numeric suffix
-        stage = 0
+        raw_stage = None
         if isinstance(mega_type, str):
-            for i in range(6):
-                if mega_type.endswith(f"_{i}"):
-                    stage = i
-                    break
-            if "_site" in mega_type:
-                stage = 0
-            elif "_restored" in mega_type or "ruined" not in mega_type:
-                # Check if it's a complete megastructure (no stage suffix)
-                if not any(mega_type.endswith(f"_{i}") for i in range(6)):
-                    if "_site" not in mega_type:
-                        # Complete megastructure typically at stage 5
-                        stage = 5
+            match = _MEGASTRUCTURE_STAGE_SUFFIX_RE.search(mega_type)
+            if match:
+                with contextlib.suppress(ValueError, TypeError):
+                    raw_stage = int(match.group(1))
 
         entry: dict[str, Any] = {
             "id": mega_id_int,
             "type": mega_type,
-            "stage": stage,
+            # Backward-compatible numeric field: this is the literal type suffix,
+            # not an inferred construction/completion lifecycle.
+            "stage": raw_stage if raw_stage is not None else 0,
         }
+        if raw_stage is not None:
+            entry["raw_stage"] = raw_stage
 
         # Include display_type and status if available (useful for UI)
         if mega.get("display_type"):

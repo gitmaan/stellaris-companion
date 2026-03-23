@@ -54,6 +54,8 @@ class DetectedEvent:
 
 from backend.core.utils import safe_float, safe_int
 
+_MEGASTRUCTURE_UNDER_CONSTRUCTION_STATUSES = {"under_construction", "building"}
+
 
 def _pct_change(before: float | int | None, after: float | int | None) -> float | None:
     if before is None or after is None:
@@ -127,6 +129,47 @@ def _parse_year(date_str: Any) -> int | None:
         return int(date_str[:4])
     except Exception:
         return None
+
+
+def _normalize_megastructure_status(mega: dict[str, Any] | None) -> str | None:
+    """Return the best available megastructure lifecycle status."""
+    if not isinstance(mega, dict):
+        return None
+
+    status = mega.get("status")
+    if isinstance(status, str) and status.strip():
+        normalized = status.strip().lower()
+        if normalized == "building":
+            return "under_construction"
+        return normalized
+
+    mega_type = mega.get("type")
+    if not isinstance(mega_type, str):
+        return None
+    if "ruined" in mega_type:
+        return "ruined"
+    if "_restored" in mega_type:
+        return "restored"
+    if "_site" in mega_type:
+        return "under_construction"
+    return None
+
+
+def _get_megastructure_stage(mega: dict[str, Any] | None) -> int:
+    """Return the literal numeric stage suffix when present, else 0."""
+    if not isinstance(mega, dict):
+        return 0
+    return safe_int(mega.get("raw_stage", mega.get("stage"))) or 0
+
+
+def _format_megastructure_name(mega: dict[str, Any] | None) -> str:
+    """Get a display-friendly megastructure name."""
+    if not isinstance(mega, dict):
+        return "Megastructure"
+    label = mega.get("display_type") or mega.get("type") or "megastructure"
+    if isinstance(label, str) and label.strip():
+        return label.replace("_", " ").title()
+    return "Megastructure"
 
 
 def _is_placeholder_recruitment_date(value: Any) -> bool:
@@ -982,26 +1025,62 @@ def compute_events(
     for mega_id, curr_mega in curr_megas.items():
         prev_mega = prev_megas.get(mega_id)
         mega_type = curr_mega.get("type", "megastructure")
-        display_type = mega_type.replace("_", " ").title()
+        display_type = _format_megastructure_name(curr_mega)
+        curr_status = _normalize_megastructure_status(curr_mega)
+        curr_stage = _get_megastructure_stage(curr_mega)
 
         if prev_mega is None:
-            events.append(
-                DetectedEvent(
-                    event_type="megastructure_started",
-                    summary=f"Megastructure started: {display_type}",
-                    data={
-                        "mega_id": mega_id,
-                        "type": mega_type,
-                        "stage": curr_mega.get("stage", 0),
-                        "from_snapshot_id": from_snapshot_id,
-                        "to_snapshot_id": to_snapshot_id,
-                    },
+            if curr_status in _MEGASTRUCTURE_UNDER_CONSTRUCTION_STATUSES:
+                events.append(
+                    DetectedEvent(
+                        event_type="megastructure_started",
+                        summary=f"Megastructure started: {display_type}",
+                        data={
+                            "mega_id": mega_id,
+                            "type": mega_type,
+                            "stage": curr_stage,
+                            "status": curr_status,
+                            "from_snapshot_id": from_snapshot_id,
+                            "to_snapshot_id": to_snapshot_id,
+                        },
+                    )
                 )
-            )
         else:
-            prev_stage = prev_mega.get("stage", 0)
-            curr_stage = curr_mega.get("stage", 0)
-            if curr_stage > prev_stage:
+            prev_stage = _get_megastructure_stage(prev_mega)
+            prev_status = _normalize_megastructure_status(prev_mega)
+
+            if curr_status == "ruined" and prev_status != "ruined":
+                events.append(
+                    DetectedEvent(
+                        event_type="megastructure_ruined",
+                        summary=f"Megastructure ruined: {display_type}",
+                        data={
+                            "mega_id": mega_id,
+                            "type": mega_type,
+                            "prev_status": prev_status,
+                            "status": curr_status,
+                            "from_snapshot_id": from_snapshot_id,
+                            "to_snapshot_id": to_snapshot_id,
+                        },
+                    )
+                )
+            elif curr_status == "restored" and prev_status != "restored":
+                events.append(
+                    DetectedEvent(
+                        event_type="megastructure_restored",
+                        summary=f"Megastructure restored: {display_type}",
+                        data={
+                            "mega_id": mega_id,
+                            "type": mega_type,
+                            "prev_status": prev_status,
+                            "status": curr_status,
+                            "stage": curr_stage,
+                            "from_snapshot_id": from_snapshot_id,
+                            "to_snapshot_id": to_snapshot_id,
+                        },
+                    )
+                )
+            elif curr_stage > prev_stage:
                 events.append(
                     DetectedEvent(
                         event_type="megastructure_upgraded",
@@ -1010,6 +1089,27 @@ def compute_events(
                             "mega_id": mega_id,
                             "type": mega_type,
                             "prev_stage": prev_stage,
+                            "stage": curr_stage,
+                            "prev_status": prev_status,
+                            "status": curr_status,
+                            "from_snapshot_id": from_snapshot_id,
+                            "to_snapshot_id": to_snapshot_id,
+                        },
+                    )
+                )
+            elif (
+                prev_status in _MEGASTRUCTURE_UNDER_CONSTRUCTION_STATUSES
+                and curr_status == "complete"
+            ):
+                events.append(
+                    DetectedEvent(
+                        event_type="megastructure_construction_completed",
+                        summary=f"Megastructure construction completed: {display_type}",
+                        data={
+                            "mega_id": mega_id,
+                            "type": mega_type,
+                            "prev_status": prev_status,
+                            "status": curr_status,
                             "stage": curr_stage,
                             "from_snapshot_id": from_snapshot_id,
                             "to_snapshot_id": to_snapshot_id,

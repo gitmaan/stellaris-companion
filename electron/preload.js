@@ -72,11 +72,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }),
     recap: (sessionId, style) =>
       ipcRenderer.invoke('backend:recap', { session_id: sessionId, style: style || 'summary' }),
-    chronicle: (sessionId, forceRefresh, chapterOnly) =>
+    chronicle: (sessionId, forceRefresh, chapterOnly, refreshMode) =>
       ipcRenderer.invoke('backend:chronicle', {
         session_id: sessionId,
         force_refresh: forceRefresh || false,
         chapter_only: chapterOnly || false,
+        refresh_mode: refreshMode || 'balanced',
       }),
     regenerateChapter: (sessionId, chapterNumber, confirm, regenerationInstructions) =>
       ipcRenderer.invoke('backend:regenerate-chapter', {

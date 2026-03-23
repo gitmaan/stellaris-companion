@@ -3,11 +3,118 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
+from collections import Counter, defaultdict
 
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
 logger = logging.getLogger(__name__)
+
+_BASE_NAVAL_CAP = 50.0
+
+_NAVAL_CAP_DIFFICULTY_MULTS = {
+    "civilian": 1.0,
+    "cadet": 0.5,
+    "ensign": 0.0,
+    "captain": 0.25,
+    "commodore": 0.5,
+    "admiral": 0.75,
+    "grand_admiral": 1.0,
+}
+
+_NAVAL_CAP_TECH_ADDS = {
+    "tech_doctrine_navy_size_1": 25.0,
+    "tech_doctrine_navy_size_2": 50.0,
+    "tech_doctrine_navy_size_3": 75.0,
+    "tech_doctrine_navy_size_4": 100.0,
+}
+_NAVAL_CAP_REPEATABLE_ADD = 20.0
+
+_NAVAL_CAP_TRADITION_ADDS = {
+    "tr_supremacy_adopt": 20.0,
+}
+_NAVAL_CAP_TRADITION_MULTS = {
+    "tr_supremacy_fleet_logistical_corps": 0.20,
+    "tr_supremacy_fleet_logistical_corps_machine": 0.20,
+}
+
+_NAVAL_CAP_ASCENSION_PERK_ADDS = {
+    "ap_galactic_force_projection": 150.0,
+}
+
+_NAVAL_CAP_POLICY_MULTS = {
+    "diplo_stance_belligerent": 0.10,
+    "diplo_stance_supremacist": 0.20,
+}
+
+_NAVAL_CAP_EDICT_MULTS = {
+    "masters_writings_war": 0.10,
+    "grand_fleet": 0.20,
+    "cybernetic_creed_war_edict": 0.10,
+    "nanotech_naval_augmentation": 0.25,
+}
+
+_NAVAL_CAP_CIVIC_MULTS = {
+    "citizen_service": 0.15,
+    "naval_contractors": 0.15,
+    "fanatic_purifiers": 0.33,
+    "hive_subspace_ephapse": 0.15,
+    "hive_devouring_swarm": 0.33,
+    "machine_terminator": 0.33,
+    "sovereign_guardianship": 0.50,
+}
+
+_NAVAL_CAP_MEGASTRUCTURE_ADDS = {
+    "strategic_coordination_center_1": 200.0,
+    "strategic_coordination_center_2": 200.0,
+    "strategic_coordination_center_3": 300.0,
+    "strategic_coordination_center_restored": 300.0,
+    "galactic_crucible_1": 150.0,
+    "galactic_crucible_2": 225.0,
+    "galactic_crucible_3": 300.0,
+    "galactic_crucible_4": 375.0,
+    "crisis_sphere_0": 200.0,
+    "crisis_sphere_1": 300.0,
+    "crisis_sphere_2": 400.0,
+    "crisis_sphere_3": 500.0,
+    "shroud_seal": 10.0,
+}
+
+_NAVAL_CAP_FEDERATION_PERK_ADDS = {
+    "neutral": 20.0,
+}
+
+_NAVAL_CAP_SUBJECT_TERM_MULTS = {
+    "naval_cap_satrapy": -0.30,
+}
+
+_NAVAL_CAP_JOB_BASE_ADDS = {
+    "soldier": 2.0,
+    "warrior_drone": 4.0,
+    "duelist": 2.0,
+    "knight": 4.0,
+    "knight_commander": 4.0,
+}
+
+_NAVAL_CAP_LEADER_TRAIT_HINTS = {
+    "leader_trait_armada_logistician",
+    "leader_trait_armada_logistician_2",
+    "leader_trait_fleet_organizer",
+    "leader_trait_fleet_organizer_2",
+    "leader_trait_crew_trainer",
+    "leader_trait_crew_trainer_2",
+    "leader_trait_shroudshaper",
+    "leader_trait_has_backup_clone",
+}
+
+_NAVAL_CAP_TIMED_MODIFIER_HINTS = {
+    "resolution_sanctions_military",
+    "resolution_mutualdefense",
+    "resolution_defenseprivatization",
+    "resolution_commerce_leveraged_privateering",
+    "resolution_commerce_holistic_asset_coordination",
+    "resolution_rulesofwar_demobilization_initiative",
+}
 
 
 class PlayerMixin:
@@ -377,29 +484,50 @@ class PlayerMixin:
         return result
 
     def get_naval_capacity(self) -> dict:
-        """Get the player's naval capacity usage.
+        """Get the player's naval capacity usage plus a conservative cap verdict.
 
-        Note: Stellaris does not store max naval capacity directly in saves.
-        It's calculated dynamically from starbases, techs, civics, etc.
-        We provide the used capacity and fleet size.
+        Stellaris stores current naval usage directly in saves, but the actual
+        naval-cap ceiling is derived from many modifiers. This method computes a
+        best-effort verdict and marks whether the result is safe to state as fact.
 
         Requires Rust session mode to be active.
-
-        Returns:
-            Dict with:
-              - used: Current naval capacity in use (from used_naval_capacity)
-              - fleet_size: Total fleet size (ship count weighted by size)
-              - starbase_capacity: Max starbases allowed
-              - used_starbase_capacity: Current starbase count
-
-        Raises:
-            ParserError: If no Rust session is active
         """
         result = {
             "used": 0,
+            "max": None,
+            "max_is_unknown": True,
             "fleet_size": 0,
             "starbase_capacity": None,
             "used_starbase_capacity": None,
+            "_note": (
+                "used is current naval capacity in use, not the empire's naval capacity limit. "
+                "Use analysis.confidence and safe_to_claim_* flags before stating whether the empire "
+                "is under or over naval cap."
+            ),
+            "analysis": {
+                "confidence": "unknown",
+                "formula": "(base + flat_additions) * (1 + multiplier_total)",
+                "limit": None,
+                "derived_limit": None,
+                "status": "unknown",
+                "derived_status": None,
+                "over_by": None,
+                "derived_over_by": None,
+                "upkeep_penalty_applies": None,
+                "safe_to_claim_limit": False,
+                "safe_to_claim_over_cap": False,
+                "safe_to_claim_penalty": False,
+                "modeled_source_families": [],
+                "unresolved_source_families": [],
+                "reasons": [],
+                "breakdown": {
+                    "base": int(_BASE_NAVAL_CAP),
+                    "flat_additions": {},
+                    "multiplier_additions": {},
+                    "flat_additions_total": 0.0,
+                    "multiplier_total": 0.0,
+                },
+            },
         }
 
         # Rust session required (get_player_empire_id raises if no session)
@@ -430,7 +558,569 @@ class PlayerMixin:
             with contextlib.suppress(ValueError, TypeError):
                 result["used_starbase_capacity"] = int(used_starbase)
 
+        try:
+            analysis = self._analyze_naval_capacity(
+                player_id=player_id,
+                player_country=player_country,
+                used_capacity=result["used"],
+            )
+            result["analysis"] = analysis
+            if analysis.get("limit") is not None:
+                result["max"] = analysis["limit"]
+                result["max_is_unknown"] = False
+        except Exception as exc:
+            logger.warning("Failed to analyze naval capacity limit: %s", exc)
+
         return result
+
+    def _analyze_naval_capacity(
+        self,
+        *,
+        player_id: int,
+        player_country: dict,
+        used_capacity: int,
+    ) -> dict:
+        """Compute a conservative naval-cap verdict from modeled save sources."""
+        flat_additions: dict[str, float] = {}
+        multiplier_additions: dict[str, float] = {}
+        modeled_families: set[str] = set()
+        unresolved_families: set[str] = set()
+
+        def add_flat(label: str, amount: float, family: str) -> None:
+            if not amount:
+                return
+            flat_additions[label] = round(flat_additions.get(label, 0.0) + amount, 3)
+            modeled_families.add(family)
+
+        def add_mult(label: str, amount: float, family: str) -> None:
+            if not amount:
+                return
+            multiplier_additions[label] = round(multiplier_additions.get(label, 0.0) + amount, 6)
+            modeled_families.add(family)
+
+        difficulty = self._get_naval_cap_difficulty()
+        if difficulty in _NAVAL_CAP_DIFFICULTY_MULTS:
+            add_mult(
+                f"Difficulty ({difficulty})",
+                _NAVAL_CAP_DIFFICULTY_MULTS[difficulty],
+                "difficulty",
+            )
+
+        civics = self._get_country_civics(player_country)
+        for civic in sorted(civics):
+            amount = _NAVAL_CAP_CIVIC_MULTS.get(civic)
+            if amount:
+                add_mult(f"Civic ({civic})", amount, "civics")
+            if civic in {"distinguished_admiralty", "nationalistic_zeal"}:
+                unresolved_families.add("councilor_civic_modifiers")
+
+        researched_techs = self._get_researched_technologies(player_id)
+        for tech in sorted(set(researched_techs)):
+            amount = _NAVAL_CAP_TECH_ADDS.get(tech)
+            if amount:
+                add_flat(f"Technology ({tech})", amount, "technology")
+
+        repeatables = Counter(t for t in researched_techs if t == "tech_repeatable_naval_cap")
+        repeatable_levels = repeatables.get("tech_repeatable_naval_cap", 0)
+        if repeatable_levels:
+            add_flat(
+                "Repeatable naval-cap tech",
+                repeatable_levels * _NAVAL_CAP_REPEATABLE_ADD,
+                "technology",
+            )
+
+        traditions = self._get_country_traditions(player_country)
+        for tradition in sorted(traditions):
+            add_amount = _NAVAL_CAP_TRADITION_ADDS.get(tradition)
+            if add_amount:
+                add_flat(f"Tradition ({tradition})", add_amount, "traditions")
+            mult_amount = _NAVAL_CAP_TRADITION_MULTS.get(tradition)
+            if mult_amount:
+                add_mult(f"Tradition ({tradition})", mult_amount, "traditions")
+
+        perks = self._get_country_ascension_perks(player_country)
+        for perk in sorted(perks):
+            amount = _NAVAL_CAP_ASCENSION_PERK_ADDS.get(perk)
+            if amount:
+                add_flat(f"Ascension perk ({perk})", amount, "ascension_perks")
+
+        stance = self._get_active_diplomatic_stance(player_country)
+        if stance in _NAVAL_CAP_POLICY_MULTS:
+            add_mult(f"Diplomatic stance ({stance})", _NAVAL_CAP_POLICY_MULTS[stance], "policies")
+
+        for edict in sorted(self._get_active_edicts(player_country)):
+            amount = _NAVAL_CAP_EDICT_MULTS.get(edict)
+            if amount:
+                add_mult(f"Edict ({edict})", amount, "edicts")
+
+        for starbase in self.get_starbases().get("starbases", []):
+            if not isinstance(starbase, dict):
+                continue
+            modules = starbase.get("modules") or []
+            buildings = set(starbase.get("buildings") or [])
+            if not isinstance(modules, list):
+                continue
+
+            anchorage_count = modules.count("anchorage")
+            if anchorage_count:
+                add_flat("Anchorages", anchorage_count * 5.0, "starbases")
+                if "naval_logistics_office" in buildings:
+                    add_flat(
+                        "Naval Logistics Office bonus",
+                        anchorage_count * 3.0,
+                        "starbases",
+                    )
+
+            orbital_count = modules.count("orbital_ring_anchorage")
+            if orbital_count:
+                add_flat("Orbital ring anchorages", orbital_count * 5.0, "starbases")
+                if "naval_logistics_office" in buildings:
+                    add_flat(
+                        "Orbital naval logistics bonus",
+                        orbital_count * 3.0,
+                        "starbases",
+                    )
+
+        for megastructure in self.get_megastructures().get("megastructures", []):
+            if not isinstance(megastructure, dict) or megastructure.get("status") != "complete":
+                continue
+            mega_type = megastructure.get("type")
+            amount = _NAVAL_CAP_MEGASTRUCTURE_ADDS.get(str(mega_type))
+            if amount:
+                add_flat(f"Megastructure ({mega_type})", amount, "megastructures")
+
+        federation_perks = self._get_naval_cap_federation_perk_types(player_country)
+        for perk in federation_perks:
+            amount = _NAVAL_CAP_FEDERATION_PERK_ADDS.get(perk)
+            if amount:
+                add_flat(f"Federation perk ({perk})", amount, "federation")
+
+        subject_analysis = self._get_naval_cap_subject_analysis(player_id)
+        for term, amount in sorted(subject_analysis["modeled_terms"].items()):
+            add_mult(f"Subject term ({term})", amount, "subjects")
+        unresolved_families.update(subject_analysis["unresolved_source_families"])
+
+        country_flags = self._get_country_flags(player_country)
+        job_analysis = self._get_naval_cap_job_analysis(
+            player_country=player_country,
+            civics=civics,
+            country_flags=country_flags,
+            researched_techs=set(researched_techs),
+        )
+        for job_label, amount in sorted(job_analysis["flat_additions"].items()):
+            add_flat(job_label, amount, "jobs")
+        unresolved_families.update(job_analysis["unresolved_source_families"])
+
+        resolution_types = self._get_naval_cap_resolution_types()
+        if resolution_types:
+            unresolved_families.add("galactic_community_resolutions")
+
+        relics = set(self.get_relics().get("relics", []))
+        if "r_core_of_the_reckoning" in relics:
+            unresolved_families.add("relic_effects")
+
+        relevant_traits = self._get_naval_cap_leader_trait_hits()
+        if relevant_traits:
+            unresolved_families.add("leader_trait_modifiers")
+
+        active_timed_modifiers = self._get_relevant_timed_naval_modifiers(player_country)
+        if active_timed_modifiers:
+            unresolved_families.add("timed_modifiers")
+
+        flat_total = round(sum(flat_additions.values()), 3)
+        multiplier_total = round(sum(multiplier_additions.values()), 6)
+        derived_limit_float = (_BASE_NAVAL_CAP + flat_total) * (1.0 + multiplier_total)
+        derived_limit = max(0, int(round(derived_limit_float)))
+
+        if used_capacity > derived_limit:
+            derived_status = "over"
+        elif used_capacity < derived_limit:
+            derived_status = "under"
+        else:
+            derived_status = "at_limit"
+
+        derived_over_by = max(0, used_capacity - derived_limit)
+        can_claim_exact = derived_limit is not None and not unresolved_families
+        confidence = "high_derived" if can_claim_exact else "estimated"
+
+        reasons = [f"Base naval cap {_BASE_NAVAL_CAP:.0f}."]
+        for label, amount in sorted(flat_additions.items()):
+            reasons.append(f"{label}: {self._format_signed_capacity(amount)} flat.")
+        for label, amount in sorted(multiplier_additions.items()):
+            reasons.append(f"{label}: {self._format_signed_percent(amount)}.")
+        if unresolved_families:
+            unresolved_list = ", ".join(sorted(unresolved_families))
+            reasons.append(
+                f"Exact cap is not safe to claim because unresolved source families are active: "
+                f"{unresolved_list}."
+            )
+        else:
+            reasons.append("No unresolved naval-cap source families were detected.")
+
+        return {
+            "confidence": confidence,
+            "formula": "(base + flat_additions) * (1 + multiplier_total)",
+            "limit": derived_limit if can_claim_exact else None,
+            "derived_limit": derived_limit,
+            "status": derived_status if can_claim_exact else "unknown",
+            "derived_status": derived_status,
+            "over_by": derived_over_by if can_claim_exact and derived_over_by else None,
+            "derived_over_by": derived_over_by if derived_over_by else None,
+            "upkeep_penalty_applies": (used_capacity > derived_limit) if can_claim_exact else None,
+            "safe_to_claim_limit": can_claim_exact,
+            "safe_to_claim_over_cap": can_claim_exact,
+            "safe_to_claim_penalty": can_claim_exact and used_capacity > derived_limit,
+            "modeled_source_families": sorted(modeled_families),
+            "unresolved_source_families": sorted(unresolved_families),
+            "reasons": reasons,
+            "breakdown": {
+                "base": int(_BASE_NAVAL_CAP),
+                "flat_additions": flat_additions,
+                "multiplier_additions": multiplier_additions,
+                "flat_additions_total": flat_total,
+                "multiplier_total": multiplier_total,
+            },
+        }
+
+    def _get_naval_cap_difficulty(self) -> str | None:
+        """Return the save's galaxy difficulty name when available."""
+        session = _get_active_session()
+        if not session:
+            return None
+
+        galaxy = session.extract_sections(["galaxy"]).get("galaxy", {})
+        difficulty = galaxy.get("difficulty") if isinstance(galaxy, dict) else None
+        return str(difficulty) if isinstance(difficulty, str) else None
+
+    @staticmethod
+    def _get_country_civics(player_country: dict) -> set[str]:
+        """Extract cleaned civic IDs from the player country entry."""
+        government = player_country.get("government", {})
+        civics = government.get("civics", []) if isinstance(government, dict) else []
+        if not isinstance(civics, list):
+            return set()
+        return {civic.replace("civic_", "") for civic in civics if isinstance(civic, str) and civic}
+
+    @staticmethod
+    def _get_country_traditions(player_country: dict) -> set[str]:
+        """Extract picked traditions from the player country entry."""
+        traditions = player_country.get("traditions", [])
+        if not isinstance(traditions, list):
+            return set()
+        return {tradition for tradition in traditions if isinstance(tradition, str)}
+
+    @staticmethod
+    def _get_country_ascension_perks(player_country: dict) -> set[str]:
+        """Extract picked ascension perks from the player country entry."""
+        perks = player_country.get("ascension_perks", [])
+        if not isinstance(perks, list):
+            return set()
+        return {perk for perk in perks if isinstance(perk, str)}
+
+    @staticmethod
+    def _get_country_flags(player_country: dict) -> set[str]:
+        """Extract active country flag names from the player country entry."""
+        flags = player_country.get("flags", {})
+        if not isinstance(flags, dict):
+            return set()
+        return {flag for flag in flags if isinstance(flag, str)}
+
+    def _get_researched_technologies(self, player_id: int) -> list[str]:
+        """Return researched technology IDs for the player country."""
+        session = _get_active_session()
+        if not session:
+            return []
+        values = session.get_duplicate_values("country", str(player_id), "technology")
+        return [value for value in values if isinstance(value, str)]
+
+    @staticmethod
+    def _get_active_diplomatic_stance(player_country: dict) -> str | None:
+        """Extract the currently selected diplomatic stance."""
+        active_policies = player_country.get("active_policies", [])
+        if not isinstance(active_policies, list):
+            return None
+
+        for policy in active_policies:
+            if not isinstance(policy, dict):
+                continue
+            if policy.get("policy") == "diplomatic_stance":
+                selected = policy.get("selected")
+                if isinstance(selected, str) and selected:
+                    return selected
+        return None
+
+    @staticmethod
+    def _get_active_edicts(player_country: dict) -> set[str]:
+        """Extract active edict IDs from the player country entry."""
+        raw_edicts = player_country.get("edicts", [])
+        if not isinstance(raw_edicts, list):
+            return set()
+
+        edicts: set[str] = set()
+        for edict in raw_edicts:
+            if not isinstance(edict, dict):
+                continue
+            edict_name = edict.get("edict")
+            if isinstance(edict_name, str) and edict_name:
+                edicts.add(edict_name)
+        return edicts
+
+    def _get_naval_cap_federation_perk_types(self, player_country: dict) -> list[str]:
+        """Extract active federation perk types for the player federation."""
+        session = _get_active_session()
+        if not session:
+            return []
+
+        fed_id = player_country.get("federation")
+        if fed_id in (None, "4294967295", 4294967295):
+            return []
+
+        with contextlib.suppress(ValueError, TypeError):
+            fed_id_str = str(int(fed_id))
+            federation = session.get_entry("federation", fed_id_str)
+            progression = (
+                federation.get("federation_progression") if isinstance(federation, dict) else None
+            )
+            perks = progression.get("perks") if isinstance(progression, dict) else None
+            if not isinstance(perks, list):
+                return []
+
+            perk_types: list[str] = []
+            for perk in perks:
+                if isinstance(perk, dict):
+                    perk_type = perk.get("type")
+                    if isinstance(perk_type, str) and perk_type:
+                        perk_types.append(perk_type)
+                elif isinstance(perk, str) and perk:
+                    perk_types.append(perk)
+            return perk_types
+        return []
+
+    def _get_naval_cap_resolution_types(self) -> set[str]:
+        """Return active/passed resolution type IDs that can affect naval cap."""
+        session = _get_active_session()
+        if not session:
+            return set()
+
+        gc = session.extract_sections(["galactic_community"]).get("galactic_community")
+        if not isinstance(gc, dict):
+            return set()
+
+        passed_ids = gc.get("passed", [])
+        if not isinstance(passed_ids, list):
+            return set()
+
+        resolution_section = session.extract_sections(["resolution"]).get("resolution", {})
+        if not isinstance(resolution_section, dict):
+            return set()
+
+        relevant_types: set[str] = set()
+        for resolution_id in passed_ids:
+            with contextlib.suppress(ValueError, TypeError):
+                entry = resolution_section.get(str(int(resolution_id)))
+                if not isinstance(entry, dict):
+                    continue
+                type_key = entry.get("type")
+                if not isinstance(type_key, str):
+                    continue
+                if (
+                    type_key.startswith("resolution_mutualdefense_")
+                    or type_key.startswith("resolution_commerce_")
+                    or type_key.startswith("resolution_defenseprivatization_")
+                    or type_key.startswith("resolution_sanctions_military")
+                    or type_key == "resolution_rulesofwar_demobilization_initiative"
+                ):
+                    relevant_types.add(type_key)
+        return relevant_types
+
+    def _get_naval_cap_subject_analysis(self, player_id: int) -> dict:
+        """Extract naval-cap-relevant subject terms and unresolved subject sources."""
+        session = _get_active_session()
+        if not session:
+            return {"modeled_terms": {}, "unresolved_source_families": set()}
+
+        modeled_terms: dict[str, float] = {}
+        unresolved_families: set[str] = set()
+
+        data = session.extract_sections(["agreements"])
+        agreements_section = data.get("agreements", {})
+        inner_agreements = (
+            agreements_section.get("agreements", {}) if isinstance(agreements_section, dict) else {}
+        )
+        if not isinstance(inner_agreements, dict):
+            return {
+                "modeled_terms": modeled_terms,
+                "unresolved_source_families": unresolved_families,
+            }
+
+        for agreement in inner_agreements.values():
+            if not isinstance(agreement, dict):
+                continue
+            target = agreement.get("target")
+            sender = agreement.get("sender")
+            if str(target) != str(player_id) and str(sender) != str(player_id):
+                continue
+
+            term_data = agreement.get("term_data")
+            if not isinstance(term_data, dict):
+                continue
+
+            preset = term_data.get("agreement_preset")
+            if isinstance(preset, str) and "scholarium" in preset:
+                unresolved_families.add("specialist_subject_penalties")
+
+            discrete_terms = term_data.get("discrete_terms", [])
+            if not isinstance(discrete_terms, list):
+                continue
+            for item in discrete_terms:
+                if not isinstance(item, dict) or item.get("key") != "naval_capacity":
+                    continue
+                value = item.get("value")
+                if not isinstance(value, str):
+                    continue
+                modeled = _NAVAL_CAP_SUBJECT_TERM_MULTS.get(value)
+                if modeled is not None:
+                    modeled_terms[value] = modeled
+                elif value != "naval_cap_unmodified":
+                    unresolved_families.add("subject_terms")
+
+        return {
+            "modeled_terms": modeled_terms,
+            "unresolved_source_families": unresolved_families,
+        }
+
+    def _get_naval_cap_job_analysis(
+        self,
+        *,
+        player_country: dict,
+        civics: set[str],
+        country_flags: set[str],
+        researched_techs: set[str],
+    ) -> dict:
+        """Compute modeled job-based naval cap bonuses and unresolved job families."""
+        session = _get_active_session()
+        if not session:
+            return {"flat_additions": {}, "unresolved_source_families": set()}
+
+        planets = session.extract_sections(["planets"]).get("planets", {}).get("planet", {})
+        pop_jobs_section = session.extract_sections(["pop_jobs"]).get("pop_jobs", {})
+        if not isinstance(planets, dict) or not isinstance(pop_jobs_section, dict):
+            return {"flat_additions": {}, "unresolved_source_families": set()}
+
+        flat_additions: dict[str, float] = defaultdict(float)
+        unresolved: set[str] = set()
+        soldier_bonus = 1.0 if "tech_ground_defense_planning" in researched_techs else 0.0
+
+        planet_ids = player_country.get("owned_planets", [])
+        if isinstance(planet_ids, dict):
+            planet_ids = list(planet_ids.values())
+        if not isinstance(planet_ids, list):
+            return {"flat_additions": {}, "unresolved_source_families": set()}
+
+        for planet_id in planet_ids:
+            planet = planets.get(str(planet_id))
+            if not isinstance(planet, dict):
+                continue
+            pop_job_refs = planet.get("pop_jobs", [])
+            if isinstance(pop_job_refs, dict):
+                pop_job_refs = list(pop_job_refs.values())
+            if not isinstance(pop_job_refs, list):
+                continue
+
+            for ref in pop_job_refs:
+                job = pop_jobs_section.get(str(ref))
+                if not isinstance(job, dict):
+                    continue
+                job_type = job.get("type")
+                if not isinstance(job_type, str):
+                    continue
+                with contextlib.suppress(ValueError, TypeError):
+                    workforce = float(job.get("workforce", 0))
+                    if abs(workforce) < 1e-6:
+                        continue
+                    job_units = workforce / 100.0
+                    if abs(job_units) < 0.05:
+                        continue
+
+                    if job_type == "soldier":
+                        flat_additions["Soldier jobs"] += job_units * (2.0 + soldier_bonus)
+                    elif job_type == "warrior_drone":
+                        flat_additions["Warrior drone jobs"] += job_units * (4.0 + soldier_bonus)
+                    elif job_type in {"duelist", "knight", "knight_commander"}:
+                        flat_additions[f"{job_type.replace('_', ' ').title()} jobs"] += (
+                            job_units * _NAVAL_CAP_JOB_BASE_ADDS[job_type]
+                        )
+                    elif job_type == "telepath":
+                        if "eater_covenant_rank_1" in country_flags:
+                            flat_additions["Telepath jobs"] += job_units * 1.5
+                        elif "eater_covenant_confirmed" in country_flags:
+                            flat_additions["Telepath jobs"] += job_units * 1.0
+                    elif job_type == "telepath_drone":
+                        if "eater_covenant_rank_1" in country_flags:
+                            flat_additions["Telepath drone jobs"] += job_units * 1.5
+                        elif "eater_covenant_confirmed" in country_flags:
+                            flat_additions["Telepath drone jobs"] += job_units * 1.0
+                    elif job_type == "entertainer":
+                        if "warrior_culture" in civics:
+                            flat_additions["Entertainer/Duelist jobs"] += job_units * 2.0
+                        else:
+                            unresolved.add("specialist_entertainer_variants")
+                    elif job_type in {
+                        "experiment_engineer",
+                        "skywatcher",
+                        "skywatcher_drone",
+                        "squire",
+                    }:
+                        unresolved.add("specialist_job_variants")
+
+        return {
+            "flat_additions": {k: round(v, 3) for k, v in flat_additions.items() if v},
+            "unresolved_source_families": unresolved,
+        }
+
+    def _get_naval_cap_leader_trait_hits(self) -> set[str]:
+        """Return any known naval-cap leader traits visible in player leaders."""
+        traits: set[str] = set()
+        with contextlib.suppress(Exception):
+            leaders = self.get_leaders().get("leaders", [])
+            for leader in leaders:
+                if not isinstance(leader, dict):
+                    continue
+                for trait in leader.get("traits", []):
+                    if isinstance(trait, str) and trait in _NAVAL_CAP_LEADER_TRAIT_HINTS:
+                        traits.add(trait)
+        return traits
+
+    @staticmethod
+    def _get_relevant_timed_naval_modifiers(player_country: dict) -> set[str]:
+        """Return active timed modifiers that hint at unresolved naval-cap effects."""
+        timed_modifiers = player_country.get("timed_modifier", {})
+        items = timed_modifiers.get("items", []) if isinstance(timed_modifiers, dict) else []
+        if not isinstance(items, list):
+            return set()
+
+        relevant: set[str] = set()
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            modifier = item.get("modifier")
+            if not isinstance(modifier, str):
+                continue
+            if any(hint in modifier for hint in _NAVAL_CAP_TIMED_MODIFIER_HINTS):
+                relevant.add(modifier)
+        return relevant
+
+    @staticmethod
+    def _format_signed_capacity(amount: float) -> str:
+        """Format a flat naval-cap adjustment with explicit sign."""
+        if amount == int(amount):
+            return f"{amount:+.0f}"
+        return f"{amount:+.2f}"
+
+    @staticmethod
+    def _format_signed_percent(amount: float) -> str:
+        """Format a naval-cap multiplier as a human-readable percentage."""
+        return f"{amount * 100:+.1f}%"
 
     def get_relics(self) -> dict:
         """Extract owned relics and activation cooldown (best-effort).

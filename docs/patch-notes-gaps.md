@@ -10,7 +10,7 @@ Patch notes injected into the system prompt fix this. They give the model ground
 
 ## How It Works
 
-Each major Stellaris version has a corresponding file in `patches/`:
+Each major Stellaris version has a corresponding source file in `patches/`:
 
 ```
 patches/
@@ -18,9 +18,11 @@ patches/
   4.1.md   Stellaris 4.1 "Lyra"
   4.2.md   Stellaris 4.2 "Corvus"
   4.3.md   Stellaris 4.3 "Cetus"
+  snapshots/
+    4.3.md   compiled current-state snapshot through 4.3
 ```
 
-When the advisor builds its system prompt, `load_patch_notes()` in `stellaris_companion/personality.py` reads the player's game version from their save file and loads all patch files cumulatively up to that version. A player on v4.2 gets 4.0 + 4.1 + 4.2 concatenated. The content is injected into the `[GAME MECHANICS]` block of the system prompt with an instruction to treat it as ground truth and never reference patches or changes.
+When the advisor builds its system prompt, `load_patch_notes()` in `stellaris_companion/personality.py` reads the player's game version from their save file and loads cumulative mechanics for that version. By default it prefers the latest compiled snapshot at or below the target version, then appends any later delta files. A player on v4.2 gets 4.0 + 4.1 + 4.2 concatenated. A player on v4.3 gets the compiled `snapshots/4.3.md` current-state artifact instead of raw 4.0 + 4.1 + 4.2 + 4.3 concatenation. The content is injected into the `[GAME MECHANICS]` block of the system prompt with an instruction to treat it as ground truth and never reference patches or changes.
 
 Lines starting with `#` (markdown headers) or `<!--` (HTML comments) are stripped during loading. Headers exist only for human readability of the files — the model sees flat content.
 
@@ -50,7 +52,9 @@ The test script is at `scripts/experiments/patch_notes_stress.py`. It runs stand
 
 Below the tables, standard bullets cover other 4.0 mechanics (growth, colonies, zones, MegaCorp, Empire Focus).
 
-**4.1.md, 4.2.md, 4.3.md** use terse bullets only, since they're incremental changes building on the 4.0 baseline.
+**4.1.md and 4.2.md** use terse bullets only, since they're incremental changes building on the 4.0 baseline.
+
+**`snapshots/4.3.md`** is a compiled current-state sheet. It keeps the still-true 4.0 fundamentals, folds in relevant 4.1-4.3 mechanics, removes superseded facts, and trims low-value patch noise. This keeps the prompt cumulative without paying for repeated legacy text every advisor call.
 
 ### Writing rules
 
@@ -74,9 +78,14 @@ Not everything from official patch notes belongs here. The advisor needs mechani
 ## Adding a New Patch Version
 
 1. Create `patches/{major}.{minor}.md` with the `# Stellaris X.Y "Name" Game Mechanics` header and `<!-- LLM-transformed -->` comment.
-2. Write present-tense facts covering Tier 1 and Tier 2 content. Use terse bullets unless the patch introduces a fundamental system overhaul (in which case, reference tables).
-3. Run the stress test to verify: `PYTHONPATH=. python3 scripts/experiments/patch_notes_stress.py --hypothesis real -v`
-4. Check that unrelated questions (fleet comp, federation mechanics, lore) don't leak the new content.
+2. Audit the official notes into Tier 1 / Tier 2 / Tier 3 buckets. Keep only mechanics that materially change advice, common terminology, or high-frequency user questions.
+3. Write present-tense facts covering Tier 1 and Tier 2 content. Use terse bullets unless the patch introduces a fundamental system overhaul (in which case, reference tables).
+4. If the cumulative prompt is getting too large or the release is a major rebalance, create or refresh `patches/snapshots/{major}.{minor}.md` as a compiled current-state snapshot.
+5. Run the stress tests against the target version:
+   - `PYTHONPATH=. python3 scripts/experiments/patch_notes_stress.py --version "Cetus v4.3.0" --hypothesis raw`
+   - `PYTHONPATH=. python3 scripts/experiments/patch_notes_stress.py --version "Cetus v4.3.0" --hypothesis real`
+   - `PYTHONPATH=. python3 scripts/experiments/patch_notes_stress.py --version "Cetus v4.3.0" --hypothesis real --test-name naval_cap_corvette_43`
+6. Check that unrelated questions (fleet comp, federation mechanics, lore) don't leak the new content, and compare raw cumulative vs compiled snapshot answers before shipping.
 
 ## Sources
 

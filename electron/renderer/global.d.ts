@@ -18,6 +18,7 @@ import type {
   SessionsResponse,
   StatusResponse,
 } from './hooks/useBackend'
+import type { ChronicleRefreshMode } from './hooks/useSettings'
 
 declare global {
   interface Window {
@@ -30,7 +31,12 @@ declare global {
         sessions: () => Promise<BackendIpcResponse<SessionsResponse>>
         sessionEvents: (sessionId: string, limit?: number) => Promise<BackendIpcResponse<SessionEventsResponse>>
         recap: (sessionId: string, style?: string) => Promise<BackendIpcResponse<RecapResponse>>
-        chronicle: (sessionId: string, forceRefresh?: boolean, chapterOnly?: boolean) => Promise<BackendIpcResponse<ChronicleResponse>>
+        chronicle: (
+          sessionId: string,
+          forceRefresh?: boolean,
+          chapterOnly?: boolean,
+          refreshMode?: ChronicleRefreshMode,
+        ) => Promise<BackendIpcResponse<ChronicleResponse>>
         regenerateChapter: (sessionId: string, chapterNumber: number, confirm?: boolean, regenerationInstructions?: string) => Promise<BackendIpcResponse<RegenerateChapterResponse>>
         endSession: () => Promise<BackendIpcResponse<EndSessionResponse>>
         getChronicleCustom: () => Promise<BackendIpcResponse<ChronicleCustomResponse>>

@@ -1,5 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { DEFAULT_UI_THEME, normalizeUiTheme, type UiTheme, useSettings } from '../hooks/useSettings'
+import {
+  DEFAULT_CHRONICLE_REFRESH_MODE,
+  DEFAULT_UI_THEME,
+  normalizeChronicleRefreshMode,
+  normalizeUiTheme,
+  type ChronicleRefreshMode,
+  type UiTheme,
+  useSettings,
+} from '../hooks/useSettings'
 import { useDiscord } from '../hooks/useDiscord'
 import { HUDHeader, HUDSectionTitle, HUDMicro, HUDLabel } from '../components/hud/HUDText'
 import { HUDPanel } from '../components/hud/HUDPanel'
@@ -23,6 +31,7 @@ function getUserFriendlyErrorMessage(error: string | null): string | null {
 interface SettingsPageProps {
   onReportIssue?: () => void
   onThemeChange?: (theme: UiTheme) => void
+  onChronicleRefreshModeChange?: (mode: ChronicleRefreshMode) => void
 }
 
 const UI_SCALE_OPTIONS = [
@@ -44,7 +53,21 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'command-amber': 'Command Amber',
 }
 
-function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
+const CHRONICLE_REFRESH_MODE_LABELS: Record<ChronicleRefreshMode, string> = {
+  balanced: 'Balanced',
+  enhanced: 'Enhanced',
+}
+
+const CHRONICLE_REFRESH_MODE_HELPERS: Record<ChronicleRefreshMode, string> = {
+  balanced: 'Lower Gemini usage. Best default for free tier and steadier cliffhanger updates.',
+  enhanced: 'Faster current-era story updates while viewing Chronicle. Uses more Gemini calls.',
+}
+
+function SettingsPage({
+  onReportIssue,
+  onThemeChange,
+  onChronicleRefreshModeChange,
+}: SettingsPageProps) {
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
   const { showToast } = useToast()
 
@@ -64,6 +87,10 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
   const [uiScaleSaving, setUiScaleSaving] = useState(false)
   const [uiTheme, setUiTheme] = useState<UiTheme>(DEFAULT_UI_THEME)
   const [uiThemeSaving, setUiThemeSaving] = useState(false)
+  const [chronicleRefreshMode, setChronicleRefreshMode] = useState<ChronicleRefreshMode>(
+    DEFAULT_CHRONICLE_REFRESH_MODE,
+  )
+  const [chronicleRefreshModeSaving, setChronicleRefreshModeSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -82,10 +109,15 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
       setSaveDir(settings.saveDir || '')
       setUiScale(settings.uiScale || 1)
       const normalizedTheme = normalizeUiTheme(settings.uiTheme)
+      const normalizedChronicleRefreshMode = normalizeChronicleRefreshMode(
+        settings.chronicleRefreshMode,
+      )
       setUiTheme(normalizedTheme)
+      setChronicleRefreshMode(normalizedChronicleRefreshMode)
       onThemeChange?.(normalizedTheme)
+      onChronicleRefreshModeChange?.(normalizedChronicleRefreshMode)
     }
-  }, [onThemeChange, settings])
+  }, [onChronicleRefreshModeChange, onThemeChange, settings])
 
   useEffect(() => {
     if (!settings) return
@@ -173,6 +205,36 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
     showToast({
       type: 'success',
       message: `Theme set to ${UI_THEME_LABELS[nextTheme]}.`,
+      duration: 1800,
+    })
+  }
+
+  const handleChronicleRefreshModeChange = async (rawValue: string) => {
+    const nextMode = normalizeChronicleRefreshMode(rawValue)
+    if (nextMode === chronicleRefreshMode) return
+
+    const previousMode = chronicleRefreshMode
+    setChronicleRefreshMode(nextMode)
+    onChronicleRefreshModeChange?.(nextMode)
+    setChronicleRefreshModeSaving(true)
+
+    const success = await saveSettings({ chronicleRefreshMode: nextMode })
+    setChronicleRefreshModeSaving(false)
+
+    if (!success) {
+      setChronicleRefreshMode(previousMode)
+      onChronicleRefreshModeChange?.(previousMode)
+      showToast({
+        type: 'error',
+        message: 'Failed to update Chronicle refresh mode. Please try again.',
+        duration: 4000,
+      })
+      return
+    }
+
+    showToast({
+      type: 'success',
+      message: `Chronicle refresh mode set to ${CHRONICLE_REFRESH_MODE_LABELS[nextMode]}.`,
       duration: 1800,
     })
   }
@@ -288,6 +350,46 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
                                  >
                                      GENERATE KEY &gt;
                                  </a>
+                             </div>
+                             <div className="border-t border-white/10 pt-4 space-y-3">
+                                 <div className="flex items-center justify-between gap-3">
+                                     <HUDLabel>CHRONICLE REFRESH</HUDLabel>
+                                     {chronicleRefreshModeSaving && (
+                                       <HUDMicro className="text-right">APPLYING...</HUDMicro>
+                                     )}
+                                 </div>
+
+                                 <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
+                                   {(['balanced', 'enhanced'] as const).map((mode) => {
+                                     const isSelected = chronicleRefreshMode === mode
+                                     return (
+                                       <button
+                                         key={mode}
+                                         type="button"
+                                         disabled={chronicleRefreshModeSaving}
+                                         aria-pressed={isSelected}
+                                         aria-label={`Set refresh mode to ${CHRONICLE_REFRESH_MODE_LABELS[mode]}`}
+                                         onClick={() => void handleChronicleRefreshModeChange(mode)}
+                                         className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
+                                           isSelected
+                                             ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
+                                             : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
+                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                       >
+                                         <div className="font-display text-[11px] uppercase tracking-[0.18em]">
+                                           {CHRONICLE_REFRESH_MODE_LABELS[mode]}
+                                         </div>
+                                         <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
+                                           {mode === 'balanced' ? 'FREE-TIER DEFAULT' : 'MORE RESPONSIVE'}
+                                         </div>
+                                       </button>
+                                     )
+                                   })}
+                                 </div>
+
+                                 <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                   {CHRONICLE_REFRESH_MODE_HELPERS[chronicleRefreshMode]}
+                                 </HUDMicro>
                              </div>
                         </div>
                     </HUDPanel>

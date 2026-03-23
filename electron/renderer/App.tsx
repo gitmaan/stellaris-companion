@@ -6,7 +6,14 @@ import ReportIssueModal from './components/ReportIssueModal'
 import UpdateDialog from './components/UpdateDialog'
 import { useErrorReporter } from './hooks/useErrorReporter'
 import { useAnnouncements } from './hooks/useAnnouncements'
-import { DEFAULT_UI_THEME, normalizeUiTheme, type UiTheme } from './hooks/useSettings'
+import {
+  DEFAULT_CHRONICLE_REFRESH_MODE,
+  DEFAULT_UI_THEME,
+  normalizeChronicleRefreshMode,
+  normalizeUiTheme,
+  type ChronicleRefreshMode,
+  type UiTheme,
+} from './hooks/useSettings'
 import { AnnouncementPanel } from './components/AnnouncementPanel'
 import { HUDContainer } from './components/hud/HUDContainer'
 import { HUDNavBar } from './components/hud/HUDNavBar'
@@ -34,6 +41,9 @@ const tabTransition = {
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('chat')
   const [uiTheme, setUiTheme] = useState<UiTheme>(DEFAULT_UI_THEME)
+  const [chronicleRefreshMode, setChronicleRefreshMode] = useState<ChronicleRefreshMode>(
+    DEFAULT_CHRONICLE_REFRESH_MODE,
+  )
   // Onboarding: null = checking, true = done, false = show modal
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null)
 
@@ -47,8 +57,16 @@ function App() {
 
   useEffect(() => {
     window.electronAPI?.getSettings().then((settings) => {
-      const loadedTheme = normalizeUiTheme((settings as { uiTheme?: unknown })?.uiTheme)
+      const loadedSettings = settings as {
+        uiTheme?: unknown
+        chronicleRefreshMode?: unknown
+      }
+      const loadedTheme = normalizeUiTheme(loadedSettings?.uiTheme)
+      const loadedChronicleRefreshMode = normalizeChronicleRefreshMode(
+        loadedSettings?.chronicleRefreshMode,
+      )
       setUiTheme(loadedTheme)
+      setChronicleRefreshMode(loadedChronicleRefreshMode)
     }).catch(() => {
       // Keep default theme when settings can't be loaded.
     })
@@ -211,12 +229,18 @@ function App() {
                         onReportLlmIssue={openLLMReportModal}
                       />
                     )}
-                    {tab === 'chronicle' && <ChroniclePage />}
+                    {tab === 'chronicle' && (
+                      <ChroniclePage
+                        isActive={isActive}
+                        refreshMode={chronicleRefreshMode}
+                      />
+                    )}
                     {tab === 'settings' && (
                       <SettingsPage
                         key={onboardingDone ? 'post-onboarding' : 'pre-onboarding'}
                         onReportIssue={openReportModal}
                         onThemeChange={setUiTheme}
+                        onChronicleRefreshModeChange={setChronicleRefreshMode}
                       />
                     )}
                   </div>

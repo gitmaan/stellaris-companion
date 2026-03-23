@@ -47,7 +47,7 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     })
   })
 
-  ipcMain.handle('backend:chronicle', async (event, { session_id, force_refresh, chapter_only }) => {
+  ipcMain.handle('backend:chronicle', async (event, { session_id, force_refresh, chapter_only, refresh_mode }) => {
     try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
     return await callBackendApiEnvelope('/api/chronicle', {
       method: 'POST',
@@ -55,6 +55,7 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
         session_id,
         force_refresh: force_refresh || false,
         chapter_only: chapter_only || false,
+        refresh_mode: refresh_mode || 'balanced',
       }),
     })
   })

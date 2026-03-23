@@ -18,6 +18,7 @@ from backend.core.signals import (
     _extract_diplomacy_signals,
     _extract_edicts_signals,
     _extract_leader_signals,
+    _extract_megastructures_signals,
     _extract_policies_signals,
     _extract_systems_signals,
     _extract_technology_signals,
@@ -356,6 +357,55 @@ class TestExtractTechnologySignals:
 
         assert result["techs"] == []
         assert result["count"] == 0
+
+
+class TestExtractMegastructureSignals:
+    """Tests for _extract_megastructures_signals function."""
+
+    def test_uses_literal_suffix_stage_and_authoritative_status(self, mock_extractor):
+        """Completed stage-suffixed megas keep their literal stage in history."""
+        mock_extractor.get_megastructures.return_value = {
+            "megastructures": [
+                {
+                    "id": 10,
+                    "type": "grand_archive_0",
+                    "status": "complete",
+                    "display_type": "grand_archive",
+                },
+                {
+                    "id": 11,
+                    "type": "interstellar_assembly_4",
+                    "status": "complete",
+                    "display_type": "interstellar_assembly",
+                },
+                {
+                    "id": 12,
+                    "type": "hyper_relay",
+                    "status": "complete",
+                    "display_type": "hyper_relay",
+                },
+            ],
+            "by_type": {
+                "grand_archive": 1,
+                "interstellar_assembly": 1,
+                "hyper_relay": 1,
+            },
+        }
+
+        result = _extract_megastructures_signals(mock_extractor)
+        megas = {m["id"]: m for m in result["megastructures"]}
+
+        assert megas[10]["status"] == "complete"
+        assert megas[10]["stage"] == 0
+        assert megas[10]["raw_stage"] == 0
+
+        assert megas[11]["status"] == "complete"
+        assert megas[11]["stage"] == 4
+        assert megas[11]["raw_stage"] == 4
+
+        assert megas[12]["status"] == "complete"
+        assert megas[12]["stage"] == 0
+        assert "raw_stage" not in megas[12]
 
 
 # --- Tests for _extract_policies_signals ---

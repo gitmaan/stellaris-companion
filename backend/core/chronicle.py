@@ -157,14 +157,14 @@ ERA_ENDING_EVENTS = {
 }
 
 # Years between chapters (if no era-ending event)
-CHAPTER_TIME_THRESHOLD = 50
+CHAPTER_TIME_THRESHOLD = 30
 
 # Chapter 1 should arrive quickly so players see something early.
 # We still guard on "enough events" so the first chapter has substance.
 FIRST_CHAPTER_TIME_THRESHOLD = 5
 FIRST_CHAPTER_MIN_EVENTS_TIME = 8
 
-# Milestone-based early Chapter 1 triggers (no need to wait 50 years).
+# Milestone-based early Chapter 1 triggers (no need to wait 30 years).
 # These are intentionally early/midgame-relevant events that tend to occur soon.
 FIRST_CHAPTER_MILESTONE_EVENTS = {
     "first_contact",
@@ -181,7 +181,7 @@ FIRST_CHAPTER_MIN_YEARS_MILESTONE = 2
 FIRST_CHAPTER_MIN_EVENTS_MILESTONE = 4
 
 # Minimum years after era-ending event before finalizing
-MIN_YEARS_AFTER_EVENT = 3
+MIN_YEARS_AFTER_EVENT = 2
 
 # Maximum chapters to finalize per request (prevent timeout)
 MAX_CHAPTERS_PER_REQUEST = 2
@@ -208,6 +208,9 @@ NOTABLE_EVENT_TYPES = {
     "ascension_perk_selected",
     "lgate_opened",
     "crisis_level_increased",
+    "megastructure_construction_completed",
+    "megastructure_restored",
+    "megastructure_ruined",
     "ruler_changed",
     "first_contact",
     "great_khan_spawned",
@@ -229,6 +232,15 @@ NOTABLE_EVENT_TYPES = {
     "military_power_change",
 }
 
+# A narrower subset of notable events should force immediate current-era refreshes.
+# Colony and military power changes still matter for prompt selection and chapter
+# context, but they are common enough that they should not rewrite the teaser
+# on their own in balanced mode.
+CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES = NOTABLE_EVENT_TYPES - {
+    "colony_count_change",
+    "military_power_change",
+}
+
 # Default chapters_json structure
 DEFAULT_CHAPTERS_DATA = {
     "format_version": 1,
@@ -240,6 +252,34 @@ DEFAULT_CHAPTERS_DATA = {
 # Auto chapter-only scheduling (used by renderer background refresh loops).
 AUTO_CHAPTER_IDLE_INTERVAL_SECONDS = 5 * 60
 AUTO_CHAPTER_PENDING_INTERVAL_SECONDS = 30
+# Refresh current-era teaser only after meaningful event growth.
+CURRENT_ERA_REGEN_MIN_NEW_EVENTS = 3
+ENHANCED_CURRENT_ERA_REGEN_MIN_NEW_EVENTS = 1
+CHRONICLE_REFRESH_MODE_BALANCED = "balanced"
+CHRONICLE_REFRESH_MODE_ENHANCED = "enhanced"
+DEFAULT_CHRONICLE_REFRESH_MODE = CHRONICLE_REFRESH_MODE_BALANCED
+CHRONICLE_REFRESH_MODES = {
+    CHRONICLE_REFRESH_MODE_BALANCED,
+    CHRONICLE_REFRESH_MODE_ENHANCED,
+}
+
+
+def normalize_chronicle_refresh_mode(value: Any) -> str:
+    """Normalize refresh mode from UI settings / API input."""
+    if not isinstance(value, str):
+        return DEFAULT_CHRONICLE_REFRESH_MODE
+    normalized = value.strip().lower()
+    if normalized in CHRONICLE_REFRESH_MODES:
+        return normalized
+    return DEFAULT_CHRONICLE_REFRESH_MODE
+
+
+def get_current_era_regen_min_new_events(refresh_mode: Any) -> int:
+    """Return the routine-event threshold for the selected refresh mode."""
+    normalized = normalize_chronicle_refresh_mode(refresh_mode)
+    if normalized == CHRONICLE_REFRESH_MODE_ENHANCED:
+        return ENHANCED_CURRENT_ERA_REGEN_MIN_NEW_EVENTS
+    return CURRENT_ERA_REGEN_MIN_NEW_EVENTS
 
 
 def parse_year(date_str: str | None) -> int | None:
@@ -297,6 +337,7 @@ class ChronicleGenerator:
         *,
         force_refresh: bool = False,
         chapter_only: bool = False,
+        refresh_mode: str = DEFAULT_CHRONICLE_REFRESH_MODE,
     ) -> dict[str, Any]:
         """Generate an incremental chronicle for the session.
 
@@ -314,6 +355,8 @@ class ChronicleGenerator:
         if not save_id:
             # Fallback to session-based chronicle (legacy)
             return self._generate_legacy_chronicle(session_id, force_refresh=force_refresh)
+
+        refresh_mode = normalize_chronicle_refresh_mode(refresh_mode)
 
         # Load existing chapters data
         cached = self.db.get_chronicle_by_save_id(save_id)
@@ -415,6 +458,8 @@ class ChronicleGenerator:
             and cached_current_era is not None
         )
 
+        regenerate_for_event_growth = False
+
         if chapter_only:
             if isinstance(current_era_cache, dict) and isinstance(
                 current_era_cache.get("current_era"), dict
@@ -437,39 +482,55 @@ class ChronicleGenerator:
                 current_era = None
                 if current_era_cache:
                     chapters_data.pop("current_era_cache", None)
-        elif cache_matches_era and not force_refresh:
-            used_cached_current_era = True
-            current_era = cached_current_era
-            logger.debug(
-                "Chronicle current era cache hit (save_id=%s era_start_snapshot_id=%s)",
-                save_id,
-                era_start_snapshot_id,
-            )
         else:
-            if current_era_cache and not used_cached_current_era:
-                chapters_data.pop("current_era_cache", None)
-
-            current_era = self._generate_current_era(
-                save_id=save_id,
-                chapters_data=chapters_data,
-                briefing=briefing,
-                current_date=current_date,
-                custom_instructions=custom_instructions,
-            )
-
-            if current_era and current_snapshot_id is not None:
-                chapters_data["current_era_cache"] = {
-                    "start_date": era_start_date,
-                    "start_snapshot_id": era_start_snapshot_id,
-                    "last_snapshot_id": current_snapshot_id,
-                    "generated_at": datetime.now(timezone.utc).isoformat(),
-                    "current_era": current_era,
-                }
-                logger.debug(
-                    "Chronicle current era generated (save_id=%s era_start_snapshot_id=%s)",
-                    save_id,
-                    era_start_snapshot_id,
+            if cache_matches_era and not force_refresh:
+                regenerate_for_event_growth = self._should_regenerate_current_era_for_event_growth(
+                    save_id=save_id,
+                    era_start_snapshot_id=era_start_snapshot_id,
+                    cached_current_era=cached_current_era,
+                    refresh_mode=refresh_mode,
                 )
+                if not regenerate_for_event_growth:
+                    used_cached_current_era = True
+                    current_era = cached_current_era
+                    logger.debug(
+                        "Chronicle current era cache hit (save_id=%s era_start_snapshot_id=%s)",
+                        save_id,
+                        era_start_snapshot_id,
+                    )
+                else:
+                    logger.debug(
+                        "Chronicle current era refresh due to event growth "
+                        "(save_id=%s era_start_snapshot_id=%s)",
+                        save_id,
+                        era_start_snapshot_id,
+                    )
+
+            if force_refresh or not cache_matches_era or regenerate_for_event_growth:
+                if current_era_cache and not used_cached_current_era:
+                    chapters_data.pop("current_era_cache", None)
+
+                current_era = self._generate_current_era(
+                    save_id=save_id,
+                    chapters_data=chapters_data,
+                    briefing=briefing,
+                    current_date=current_date,
+                    custom_instructions=custom_instructions,
+                )
+
+                if current_era and current_snapshot_id is not None:
+                    chapters_data["current_era_cache"] = {
+                        "start_date": era_start_date,
+                        "start_snapshot_id": era_start_snapshot_id,
+                        "last_snapshot_id": current_snapshot_id,
+                        "generated_at": datetime.now(timezone.utc).isoformat(),
+                        "current_era": current_era,
+                    }
+                    logger.debug(
+                        "Chronicle current era generated (save_id=%s era_start_snapshot_id=%s)",
+                        save_id,
+                        era_start_snapshot_id,
+                    )
 
         # Assemble full chronicle text for backward compatibility
         full_text = self._assemble_chronicle_text(chapters_data, current_era)
@@ -526,6 +587,43 @@ class ChronicleGenerator:
             "event_count": event_count,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
+
+    def _should_regenerate_current_era_for_event_growth(
+        self,
+        *,
+        save_id: str,
+        era_start_snapshot_id: int | None,
+        cached_current_era: dict[str, Any] | None,
+        refresh_mode: str = DEFAULT_CHRONICLE_REFRESH_MODE,
+    ) -> bool:
+        """Refresh current era when enough new events accumulated for this era."""
+        if era_start_snapshot_id is None:
+            return False
+        if not isinstance(cached_current_era, dict):
+            return True
+
+        cached_events_covered = cached_current_era.get("events_covered")
+        if not isinstance(cached_events_covered, int) or cached_events_covered < 0:
+            return True
+
+        era_events = self.db.get_events_in_snapshot_range(
+            save_id=save_id,
+            from_snapshot_id=era_start_snapshot_id,
+            to_snapshot_id=None,
+        )
+        current_era_event_count = len(era_events)
+        new_events = max(0, current_era_event_count - cached_events_covered)
+        if new_events <= 0:
+            return False
+
+        recent_events = era_events[-new_events:]
+        if any(
+            event.get("event_type") in CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES
+            for event in recent_events
+        ):
+            return True
+
+        return new_events >= get_current_era_regen_min_new_events(refresh_mode)
 
     def _event_key(self, event: dict) -> tuple[Any, Any, Any]:
         return (event.get("game_date"), event.get("event_type"), event.get("summary"))
@@ -850,7 +948,7 @@ class ChronicleGenerator:
         ):
             return False, None
 
-        # Check time threshold (50+ years)
+        # Check time threshold (30+ years)
         years_elapsed = current_year - era_start_year
         # Pull events once; used for both chapter 1 special-cases and normal triggers.
         events = self.db.get_events_in_snapshot_range(

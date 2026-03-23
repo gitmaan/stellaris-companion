@@ -1,5 +1,6 @@
 const DEFAULT_ANNOUNCEMENTS_URL = 'https://raw.githubusercontent.com/gitmaan/stellaris-companion/main/announcements.json'
 const DEFAULT_FETCH_INTERVAL_MS = 1800000 // 30 minutes
+const IS_E2E = process.env.E2E === '1'
 
 /**
  * Compare two semver strings (e.g. "1.2.3" vs "1.3.0").
@@ -41,6 +42,7 @@ function createAnnouncementsService({ app, store, url = DEFAULT_ANNOUNCEMENTS_UR
   let pollTimer = null
 
   async function fetchAnnouncements(forceRefresh = false) {
+    if (IS_E2E) return []
     const appVersion = app.getVersion()
     const cached = store.get('announcementsCache')
 
@@ -81,6 +83,7 @@ function createAnnouncementsService({ app, store, url = DEFAULT_ANNOUNCEMENTS_UR
   }
 
   function startPolling({ onAnnouncements }) {
+    if (IS_E2E) return
     if (pollTimer) clearInterval(pollTimer)
 
     pollTimer = setInterval(() => {
