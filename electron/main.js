@@ -78,6 +78,8 @@ if (!IS_DEV) {
 // native module and eliminates architecture-mismatch crashes.
 const SECRET_STORE_KEYS = {
   googleApiKey: 'secrets.google-api-key',
+  openaiApiKey: 'secrets.openai-api-key',
+  anthropicApiKey: 'secrets.anthropic-api-key',
   discordToken: 'secrets.discord-token',
   discordAccessToken: 'secrets.discord-access-token',
   discordRefreshToken: 'secrets.discord-refresh-token',
@@ -117,6 +119,10 @@ function setSecret(key, value) {
 const store = new Store({
   name: 'settings',
   defaults: {
+    // LLM Provider settings
+    llmProvider: 'gemini', // 'gemini', 'openai', 'anthropic', 'openai-compatible', 'ollama'
+    llmModel: '', // Model name (empty = use provider default)
+    llmBaseUrl: '', // Base URL for openai-compatible/ollama providers
     // Save directory (folder) containing Stellaris "save games".
     // NOTE: Legacy key was `savePath` (directory), which is migrated on startup.
     saveDir: '',
@@ -270,9 +276,30 @@ function buildBackendEnv(settings) {
     STELLARIS_LOG_DIR: path.join(app.getPath('userData'), 'logs'),
   }
 
-  // Add Google API key if provided
+  // LLM Provider configuration
+  if (settings.llmProvider) {
+    env.LLM_PROVIDER = settings.llmProvider
+  }
+
+  if (settings.llmModel) {
+    env.LLM_MODEL = settings.llmModel
+  }
+
+  if (settings.llmBaseUrl) {
+    env.LLM_BASE_URL = settings.llmBaseUrl
+  }
+
+  // Add API keys based on selected provider
   if (settings.googleApiKey) {
     env.GOOGLE_API_KEY = settings.googleApiKey
+  }
+
+  if (settings.openaiApiKey) {
+    env.OPENAI_API_KEY = settings.openaiApiKey
+  }
+
+  if (settings.anthropicApiKey) {
+    env.ANTHROPIC_API_KEY = settings.anthropicApiKey
   }
 
   // Prefer an explicit directory, otherwise auto-detect a standard location.
@@ -290,6 +317,29 @@ function buildBackendEnv(settings) {
 }
 
 /**
+ * Check if the required API key is configured for the selected LLM provider.
+ * @param {Object} settings - User settings
+ * @returns {boolean} True if the required API key is present
+ */
+function hasRequiredApiKey(settings) {
+  const provider = settings.llmProvider || 'gemini'
+  switch (provider) {
+    case 'gemini':
+      return !!settings.googleApiKey
+    case 'openai':
+      return !!settings.openaiApiKey
+    case 'anthropic':
+      return !!settings.anthropicApiKey
+    case 'openai-compatible':
+    case 'ollama':
+      // Local providers don't require API keys (base URL is optional but not required)
+      return true
+    default:
+      return !!settings.googleApiKey // Default to Gemini behavior
+  }
+}
+
+/**
  * Start the Python backend process.
  * @param {Object} settings - User settings containing API keys
  */
@@ -299,8 +349,9 @@ function startPythonBackend(settings) {
     return
   }
 
-  if (!settings.googleApiKey) {
-    console.log('Cannot start backend: Google API key not configured')
+  if (!hasRequiredApiKey(settings)) {
+    const provider = settings.llmProvider || 'gemini'
+    console.log(`Cannot start backend: API key not configured for provider ${provider}`)
     return
   }
 
@@ -696,16 +747,28 @@ function stepUiScale(direction) {
  */
 function getSettings() {
   const googleApiKey = getSecret(SECRET_STORE_KEYS.googleApiKey)
+  const openaiApiKey = getSecret(SECRET_STORE_KEYS.openaiApiKey)
+  const anthropicApiKey = getSecret(SECRET_STORE_KEYS.anthropicApiKey)
   const discordToken = getSecret(SECRET_STORE_KEYS.discordToken)
 
+  const llmProvider = store.get('llmProvider', 'gemini')
+  const llmModel = store.get('llmModel', '')
+  const llmBaseUrl = store.get('llmBaseUrl', '')
   const saveDir = store.get('saveDir', '')
   const discordEnabled = store.get('discordEnabled', false)
   const uiScale = getUiScaleSetting()
   const uiTheme = getUiThemeSetting()
 
   return {
+    llmProvider,
+    llmModel,
+    llmBaseUrl,
     googleApiKey: maskSecret(googleApiKey),
     googleApiKeySet: !!googleApiKey,
+    openaiApiKey: maskSecret(openaiApiKey),
+    openaiApiKeySet: !!openaiApiKey,
+    anthropicApiKey: maskSecret(anthropicApiKey),
+    anthropicApiKeySet: !!anthropicApiKey,
     discordToken: maskSecret(discordToken),
     discordTokenSet: !!discordToken,
     saveDir,
@@ -723,7 +786,12 @@ function getSettings() {
  */
 function getSettingsWithSecrets() {
   const googleApiKey = getSecret(SECRET_STORE_KEYS.googleApiKey) || ''
+  const openaiApiKey = getSecret(SECRET_STORE_KEYS.openaiApiKey) || ''
+  const anthropicApiKey = getSecret(SECRET_STORE_KEYS.anthropicApiKey) || ''
   const discordToken = getSecret(SECRET_STORE_KEYS.discordToken) || ''
+  const llmProvider = store.get('llmProvider', 'gemini')
+  const llmModel = store.get('llmModel', '')
+  const llmBaseUrl = store.get('llmBaseUrl', '')
   const saveDir = store.get('saveDir', '')
   const lastSaveFilePath = store.get('lastSaveFilePath', '')
   const discordEnabled = store.get('discordEnabled', false)
@@ -731,7 +799,12 @@ function getSettingsWithSecrets() {
   const uiTheme = getUiThemeSetting()
 
   return {
+    llmProvider,
+    llmModel,
+    llmBaseUrl,
     googleApiKey,
+    openaiApiKey,
+    anthropicApiKey,
     discordToken,
     saveDir,
     // Backwards-compat: older renderer builds may still send/expect `savePath`.
@@ -750,12 +823,34 @@ function getSettingsWithSecrets() {
  * @returns {Object} Result with success status
  */
 function saveSettings(settings) {
+  // Save API keys (secrets) if provided and not masked
   if (settings.googleApiKey !== undefined && !settings.googleApiKey.includes('...')) {
     setSecret(SECRET_STORE_KEYS.googleApiKey, settings.googleApiKey || null)
   }
 
+  if (settings.openaiApiKey !== undefined && !settings.openaiApiKey.includes('...')) {
+    setSecret(SECRET_STORE_KEYS.openaiApiKey, settings.openaiApiKey || null)
+  }
+
+  if (settings.anthropicApiKey !== undefined && !settings.anthropicApiKey.includes('...')) {
+    setSecret(SECRET_STORE_KEYS.anthropicApiKey, settings.anthropicApiKey || null)
+  }
+
   if (settings.discordToken !== undefined && !settings.discordToken.includes('...')) {
     setSecret(SECRET_STORE_KEYS.discordToken, settings.discordToken || null)
+  }
+
+  // Save LLM provider settings
+  if (settings.llmProvider !== undefined) {
+    store.set('llmProvider', settings.llmProvider)
+  }
+
+  if (settings.llmModel !== undefined) {
+    store.set('llmModel', settings.llmModel)
+  }
+
+  if (settings.llmBaseUrl !== undefined) {
+    store.set('llmBaseUrl', settings.llmBaseUrl)
   }
 
   const nextSaveDir = settings.saveDir !== undefined ? settings.saveDir : settings.savePath
@@ -1297,10 +1392,15 @@ registerSettingsIpcHandlers({
   saveSettings,
   getSettingsWithSecrets,
   onSettingsSaved: async (fullSettings, changedSettings = {}) => {
-    backendConfigured = !!fullSettings.googleApiKey
+    backendConfigured = hasRequiredApiKey(fullSettings)
 
     const backendRelevantSettingsChanged =
+      changedSettings.llmProvider !== undefined ||
+      changedSettings.llmModel !== undefined ||
+      changedSettings.llmBaseUrl !== undefined ||
       changedSettings.googleApiKey !== undefined ||
+      changedSettings.openaiApiKey !== undefined ||
+      changedSettings.anthropicApiKey !== undefined ||
       changedSettings.saveDir !== undefined ||
       changedSettings.savePath !== undefined
 
@@ -1556,12 +1656,12 @@ app.whenReady().then(async () => {
 
   // Load settings (backend health already checked above)
   const settings = await getSettingsWithSecrets()
-  backendConfigured = !!settings.googleApiKey
+  backendConfigured = hasRequiredApiKey(settings)
   phaseStart = logTiming('Load settings', phaseStart)
 
   if (backendAlreadyRunning) {
     // Already logged above
-  } else if (settings.googleApiKey) {
+  } else if (hasRequiredApiKey(settings)) {
     startPythonBackend(settings)
     phaseStart = logTiming('Start Python backend (spawn)', phaseStart)
 
@@ -1574,7 +1674,8 @@ app.whenReady().then(async () => {
       console.error('Backend failed to start')
     }
   } else {
-    console.log('No Google API key configured, skipping backend start')
+    const provider = settings.llmProvider || 'gemini'
+    console.log(`No API key configured for provider ${provider}, skipping backend start`)
   }
 
   console.log('[TIMING] ═══════════════════════════════════════════')

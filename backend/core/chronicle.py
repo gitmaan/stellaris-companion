@@ -5,6 +5,13 @@ Chronicle Generation Engine
 LLM-powered narrative generation for empire storytelling.
 Produces dramatic chronicles from game events.
 
+Supports multiple LLM backends:
+- Google Gemini (cloud)
+- OpenAI GPT (cloud)
+- Anthropic Claude (cloud)
+- OpenAI-compatible API (local: LM Studio, vLLM, LocalAI)
+- Ollama native API (local)
+
 Supports incremental chapters - early chapters are permanent while new
 chapters are added as the game progresses.
 
@@ -20,11 +27,15 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from google import genai
 from pydantic import BaseModel, Field
 
 from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
+from backend.core.llm_providers import (
+    LLMConfig,
+    LLMProvider,
+    get_provider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -271,6 +282,7 @@ def _parse_iso_datetime(value: Any) -> datetime | None:
 class ChronicleGenerator:
     """Generate LLM-powered chronicles for empire sessions.
 
+    Supports multiple LLM backends via the provider abstraction.
     Supports incremental chapters keyed by save_id for cross-session continuity.
     """
 
@@ -278,18 +290,53 @@ class ChronicleGenerator:
     STALE_EVENT_THRESHOLD = 10
     STALE_SNAPSHOT_THRESHOLD = 5
 
-    def __init__(self, db: GameDatabase, api_key: str | None = None):
+    def __init__(
+        self,
+        db: GameDatabase,
+        api_key: str | None = None,
+        llm_config: LLMConfig | None = None,
+    ):
+        """Initialize the chronicle generator.
+
+        Args:
+            db: Database instance for persistence.
+            api_key: API key for the LLM provider (backward compatibility).
+            llm_config: LLM configuration. If None, loads from environment.
+        """
         self.db = db
-        self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
-        self._client: genai.Client | None = None
+
+        # Initialize LLM provider
+        if llm_config is not None:
+            self._llm_config = llm_config
+        else:
+            self._llm_config = LLMConfig.from_env()
+
+        # Override API key if explicitly provided (backward compatibility)
+        if api_key:
+            self._llm_config.api_key = api_key
+        elif not self._llm_config.api_key:
+            # Fallback to GOOGLE_API_KEY for backward compatibility
+            self._llm_config.api_key = os.environ.get("GOOGLE_API_KEY")
+
+        self._provider: LLMProvider | None = None
+
+        # Legacy compatibility
+        self.api_key = self._llm_config.api_key
 
     @property
-    def client(self) -> genai.Client:
-        if self._client is None:
-            if not self.api_key:
-                raise ValueError("GOOGLE_API_KEY not configured")
-            self._client = genai.Client(api_key=self.api_key)
-        return self._client
+    def provider(self) -> LLMProvider:
+        """Lazy-initialized LLM provider."""
+        if self._provider is None:
+            if not self._llm_config.api_key:
+                raise ValueError("LLM API key not configured")
+            self._provider = get_provider(self._llm_config)
+        return self._provider
+
+    # Keep client property for backward compatibility but map to provider
+    @property
+    def client(self):
+        """Backward-compatible client property."""
+        return self.provider
 
     def generate_chronicle(
         self,
@@ -733,10 +780,10 @@ class ChronicleGenerator:
 
         prompt = self._build_recap_prompt(data)
 
-        response = self.client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=prompt,
-            config={"temperature": 1.0, "max_output_tokens": 2048},
+        response = self.provider.generate(
+            prompt=prompt,
+            temperature=1.0,
+            max_tokens=2048,
         )
 
         return {
@@ -1157,16 +1204,13 @@ Do NOT give advice. You are a historian, not an advisor.
 Do NOT fabricate events not in the event list.
 {regen_section}"""
 
+        response = None
         try:
-            response = self.client.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=prompt,
-                config={
-                    "temperature": 1.0,
-                    "max_output_tokens": 4096,  # Increased: 500-800 word narrative + JSON overhead
-                    "response_mime_type": "application/json",
-                    "response_schema": ChapterOutput,
-                },
+            response = self.provider.generate_structured(
+                prompt=prompt,
+                schema=ChapterOutput,
+                temperature=1.0,
+                max_tokens=4096,  # Increased: 500-800 word narrative + JSON overhead
             )
 
             # Parse with Pydantic for validation
@@ -1184,10 +1228,7 @@ Do NOT fabricate events not in the event list.
             logger.warning("Structured output failed for chapter %d: %s", chapter_number, e)
             try:
                 # Attempt JSON repair if we got a response
-                if hasattr(e, "__context__") and hasattr(e.__context__, "doc"):
-                    raw_text = e.__context__.doc
-                else:
-                    raw_text = getattr(response, "text", "") if "response" in dir() else ""
+                raw_text = getattr(response, "text", "") if response else ""
 
                 if raw_text:
                     repaired = _repair_json_string(raw_text)
@@ -1318,35 +1359,30 @@ End the final prose section with "The story continues..."
 Do NOT give advice. You are a historian, not an advisor.
 """
 
-        config = {
-            "temperature": 1.0,
-            "max_output_tokens": 1024,
-            "response_mime_type": "application/json",
-            "response_schema": CurrentEraOutput,
-        }
-
         response = None
         try:
-            response = self.client.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=prompt,
-                config=config,
+            response = self.provider.generate_structured(
+                prompt=prompt,
+                schema=CurrentEraOutput,
+                temperature=1.0,
+                max_tokens=1024,
             )
         except Exception as primary_error:
             logger.warning(
-                "Current era generation failed on gemini-3-flash-preview, "
-                "retrying with gemini-2.5-flash: %s",
+                "Current era generation failed, retrying: %s",
                 primary_error,
             )
             try:
-                response = self.client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt,
-                    config=config,
+                # Retry with same provider
+                response = self.provider.generate_structured(
+                    prompt=prompt,
+                    schema=CurrentEraOutput,
+                    temperature=1.0,
+                    max_tokens=1024,
                 )
             except Exception as fallback_error:
                 logger.warning(
-                    "Current era generation fallback failed on gemini-2.5-flash: %s",
+                    "Current era generation retry failed: %s",
                     fallback_error,
                 )
 
@@ -1435,11 +1471,11 @@ Do NOT give advice. You are a historian, not an advisor.
         # Build prompt
         prompt = self._build_chronicler_prompt(data)
 
-        # Call Gemini
-        response = self.client.models.generate_content(
-            model="gemini-3-flash-preview",
-            contents=prompt,
-            config={"temperature": 1.0, "max_output_tokens": 4096},
+        # Call LLM
+        response = self.provider.generate(
+            prompt=prompt,
+            temperature=1.0,
+            max_tokens=4096,
         )
 
         chronicle_text = response.text

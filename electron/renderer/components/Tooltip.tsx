@@ -17,7 +17,7 @@ function Tooltip({ content, children, position = 'top', delay = 100 }: TooltipPr
   const [isVisible, setIsVisible] = useState(false)
   const [style, setStyle] = useState<React.CSSProperties>({})
   const triggerRef = useRef<HTMLSpanElement>(null)
-  const timeoutRef = useRef<NodeJS.Timeout>()
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
 
   const showTooltip = () => {
     timeoutRef.current = setTimeout(() => {

@@ -18,6 +18,9 @@ classifiers = [
 
 dependencies = [
     "google-genai>=1.0.0",
+    "openai>=1.0.0",
+    "anthropic>=0.25.0",
+    "httpx>=0.25.0",
     "python-dotenv>=1.0.0",
     "watchdog>=3.0",
     "fastapi>=0.100.0",
@@ -117,6 +120,9 @@ check_untyped_defs = true      # But do check the ones without annotations
 module = [
     "google.genai.*",
     "watchdog.*",
+    "openai.*",
+    "anthropic.*",
+    "httpx.*",
 ]
 ignore_missing_imports = true
 

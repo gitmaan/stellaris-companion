@@ -2,8 +2,15 @@
 Stellaris Companion Core
 ========================
 
-Provides the Companion class — the Gemini-powered strategic advisor
+Provides the Companion class — an LLM-powered strategic advisor
 used by the Electron app via the backend API.
+
+Supports multiple LLM backends:
+- Google Gemini (cloud)
+- OpenAI GPT (cloud)
+- Anthropic Claude (cloud)
+- OpenAI-compatible API (local: LM Studio, vLLM, LocalAI)
+- Ollama native API (local)
 """
 
 import json
@@ -21,14 +28,15 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-try:
-    from google import genai
-    from google.genai import types
-except ImportError:
-    raise ImportError("google-genai package not installed. Run: pip install google-genai")
-
 from backend.core.conversation import ConversationManager
 from backend.core.json_utils import json_dumps
+from backend.core.llm_providers import (
+    LLMConfig,
+    LLMProvider,
+    LLMResponse,
+    ProviderType,
+    get_provider,
+)
 from backend.core.utils import compute_save_hash_from_briefing
 from stellaris_companion.personality import build_optimized_prompt
 from stellaris_save_extractor import SaveExtractor
@@ -54,8 +62,9 @@ FACTUAL ACCURACY CONTRACT:
 
 
 class Companion:
-    """Stellaris companion powered by Gemini with precomputed briefings.
+    """Stellaris companion powered by LLM with precomputed briefings.
 
+    Supports multiple LLM backends via the provider abstraction.
     Used by the Electron app via the backend API (server.py).
     """
 
@@ -65,21 +74,49 @@ class Companion:
         api_key: str | None = None,
         *,
         auto_precompute: bool = True,
+        llm_config: LLMConfig | None = None,
     ):
         """Initialize the companion.
 
         Args:
             save_path: Path to the Stellaris .sav file. If None, will try to find most recent.
-            api_key: Google API key. If None, reads from GOOGLE_API_KEY env var.
+            api_key: API key for the LLM provider. If None, reads from environment.
+                     For backward compatibility, also checks GOOGLE_API_KEY.
+            auto_precompute: Whether to automatically start background precomputation.
+            llm_config: LLM configuration. If None, loads from environment variables.
         """
-        # Get API key
-        self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
-        if not self.api_key:
-            raise ValueError("GOOGLE_API_KEY environment variable not set")
+        # Initialize LLM provider
+        if llm_config is not None:
+            self._llm_config = llm_config
+        else:
+            self._llm_config = LLMConfig.from_env()
 
-        self.client = genai.Client(api_key=self.api_key)
+        # Override API key if explicitly provided (backward compatibility)
+        if api_key:
+            self._llm_config.api_key = api_key
+        elif not self._llm_config.api_key:
+            # Fallback to GOOGLE_API_KEY for backward compatibility
+            self._llm_config.api_key = os.environ.get("GOOGLE_API_KEY")
+
+        # Validate API key for cloud providers
+        if self._llm_config.provider in (
+            ProviderType.GOOGLE_GEMINI,
+            ProviderType.OPENAI,
+            ProviderType.ANTHROPIC,
+        ):
+            if not self._llm_config.api_key:
+                provider_name = self._llm_config.provider.value
+                raise ValueError(
+                    f"API key not set for {provider_name} provider. "
+                    f"Set LLM_API_KEY or the provider-specific key (e.g., GOOGLE_API_KEY)."
+                )
+
+        self._provider: LLMProvider = get_provider(self._llm_config)
         self._thinking_level = "dynamic"
         self._auto_precompute = bool(auto_precompute)
+
+        # Legacy compatibility: expose api_key for code that might reference it
+        self.api_key = self._llm_config.api_key
 
         # Initialize save-related attributes
         self.save_path: Path | None = None
@@ -718,18 +755,11 @@ class Companion:
         )
 
         try:
-            cfg = types.GenerateContentConfig(
-                system_instruction=ask_system_prompt,
+            response = self._provider.generate(
+                prompt=user_prompt,
+                system_prompt=ask_system_prompt,
                 temperature=1.0,
-                max_output_tokens=4096,
-            )
-            if self._thinking_level != "dynamic":
-                cfg.thinking_config = types.ThinkingConfig(thinking_level=self._thinking_level)
-
-            response = self.client.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=user_prompt,
-                config=cfg,
+                max_tokens=4096,
             )
             response_text_raw = response.text or "Could not generate a response."
             response_text = response_text_raw

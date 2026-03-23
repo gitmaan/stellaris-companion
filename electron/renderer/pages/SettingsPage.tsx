@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { DEFAULT_UI_THEME, normalizeUiTheme, type UiTheme, useSettings } from '../hooks/useSettings'
+import { DEFAULT_UI_THEME, normalizeUiTheme, type UiTheme, useSettings, type LLMProvider, DEFAULT_LLM_PROVIDER, normalizeLLMProvider } from '../hooks/useSettings'
 import { useDiscord } from '../hooks/useDiscord'
 import { HUDHeader, HUDSectionTitle, HUDMicro, HUDLabel } from '../components/hud/HUDText'
 import { HUDPanel } from '../components/hud/HUDPanel'
@@ -44,6 +44,29 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'command-amber': 'Command Amber',
 }
 
+const LLM_PROVIDER_OPTIONS: { value: LLMProvider; label: string }[] = [
+  { value: 'gemini', label: 'Google Gemini' },
+  { value: 'openai', label: 'OpenAI GPT' },
+  { value: 'anthropic', label: 'Anthropic Claude' },
+  { value: 'openai-compatible', label: 'OpenAI-Compatible (Local)' },
+  { value: 'ollama', label: 'Ollama (Local)' },
+]
+
+// Which providers require which API key
+const PROVIDER_API_KEY_MAP: Record<LLMProvider, 'google' | 'openai' | 'anthropic' | 'none'> = {
+  'gemini': 'google',
+  'openai': 'openai',
+  'anthropic': 'anthropic',
+  'openai-compatible': 'none',
+  'ollama': 'none',
+}
+
+// Default base URLs for local providers
+const DEFAULT_BASE_URLS: Partial<Record<LLMProvider, string>> = {
+  'openai-compatible': 'http://localhost:1234/v1',
+  'ollama': 'http://localhost:11434',
+}
+
 function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
   const { showToast } = useToast()
@@ -59,6 +82,11 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
   } = useDiscord()
 
   const [googleApiKey, setGoogleApiKey] = useState('')
+  const [openaiApiKey, setOpenaiApiKey] = useState('')
+  const [anthropicApiKey, setAnthropicApiKey] = useState('')
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>(DEFAULT_LLM_PROVIDER)
+  const [llmModel, setLlmModel] = useState('')
+  const [llmBaseUrl, setLlmBaseUrl] = useState('')
   const [saveDir, setSaveDir] = useState('')
   const [uiScale, setUiScale] = useState(1)
   const [uiScaleSaving, setUiScaleSaving] = useState(false)
@@ -79,6 +107,11 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
   useEffect(() => {
     if (settings) {
       setGoogleApiKey(settings.googleApiKeySet ? settings.googleApiKey : '')
+      setOpenaiApiKey(settings.openaiApiKeySet ? settings.openaiApiKey : '')
+      setAnthropicApiKey(settings.anthropicApiKeySet ? settings.anthropicApiKey : '')
+      setLlmProvider(normalizeLLMProvider(settings.llmProvider))
+      setLlmModel(settings.llmModel || '')
+      setLlmBaseUrl(settings.llmBaseUrl || '')
       setSaveDir(settings.saveDir || '')
       setUiScale(settings.uiScale || 1)
       const normalizedTheme = normalizeUiTheme(settings.uiTheme)
@@ -89,10 +122,36 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
 
   useEffect(() => {
     if (!settings) return
-    const hasApiKeyChange = settings.googleApiKeySet ? googleApiKey !== settings.googleApiKey : googleApiKey !== ''
+    
+    // Check for API key changes (only if not masked)
+    const hasGoogleKeyChange = settings.googleApiKeySet 
+      ? googleApiKey !== settings.googleApiKey 
+      : googleApiKey !== ''
+    const hasOpenaiKeyChange = settings.openaiApiKeySet 
+      ? openaiApiKey !== settings.openaiApiKey 
+      : openaiApiKey !== ''
+    const hasAnthropicKeyChange = settings.anthropicApiKeySet 
+      ? anthropicApiKey !== settings.anthropicApiKey 
+      : anthropicApiKey !== ''
+    
+    // Check for LLM provider changes
+    const hasProviderChange = llmProvider !== (settings.llmProvider || DEFAULT_LLM_PROVIDER)
+    const hasModelChange = llmModel !== (settings.llmModel || '')
+    const hasBaseUrlChange = llmBaseUrl !== (settings.llmBaseUrl || '')
+    
+    // Check for path change
     const hasPathChange = saveDir !== (settings.saveDir || '')
-    setHasChanges(hasApiKeyChange || hasPathChange)
-  }, [googleApiKey, saveDir, settings])
+    
+    setHasChanges(
+      hasGoogleKeyChange || 
+      hasOpenaiKeyChange || 
+      hasAnthropicKeyChange || 
+      hasProviderChange || 
+      hasModelChange || 
+      hasBaseUrlChange || 
+      hasPathChange
+    )
+  }, [googleApiKey, openaiApiKey, anthropicApiKey, llmProvider, llmModel, llmBaseUrl, saveDir, settings])
 
   const handleBrowse = async () => {
     const selectedPath = await showFolderDialog()
@@ -101,9 +160,22 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
 
   const handleSave = async () => {
     setSaveSuccess(false)
-    const settingsToSave: Record<string, string | boolean> = { saveDir }
+    const settingsToSave: Record<string, string | boolean> = { 
+      saveDir,
+      llmProvider,
+      llmModel,
+      llmBaseUrl,
+    }
+    
+    // Only save API keys if they're not masked (i.e., user entered a new value)
     if (!googleApiKey.includes('...')) {
       settingsToSave.googleApiKey = googleApiKey
+    }
+    if (!openaiApiKey.includes('...')) {
+      settingsToSave.openaiApiKey = openaiApiKey
+    }
+    if (!anthropicApiKey.includes('...')) {
+      settingsToSave.anthropicApiKey = anthropicApiKey
     }
 
     const success = await saveSettings(settingsToSave)
@@ -267,28 +339,129 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
                 {/* API Section */}
                 <section>
                     <HUDSectionTitle number="01">INTELLIGENCE UPLINK</HUDSectionTitle>
-                    <HUDPanel decoration="tech" title="GEMINI MODEL ACCESS">
+                    <HUDPanel decoration="tech" title="LLM PROVIDER CONFIG">
                         <div className="space-y-4 pt-2">
-                             <HUDInput 
-                                label="API KEY TOKEN"
-                                type="password"
-                                value={googleApiKey}
-                                onChange={(e) => setGoogleApiKey(e.target.value)}
-                                placeholder={settings?.googleApiKeySet ? '••••••••••••••••' : 'ENTER KEY'}
+                             {/* Provider Selection */}
+                             <HUDSelect
+                               label="AI PROVIDER"
+                               value={llmProvider}
+                               onChange={(e) => {
+                                 const newProvider = normalizeLLMProvider(e.target.value)
+                                 setLlmProvider(newProvider)
+                                 // Auto-fill default base URL for local providers
+                                 if (DEFAULT_BASE_URLS[newProvider] && !llmBaseUrl) {
+                                   setLlmBaseUrl(DEFAULT_BASE_URLS[newProvider] || '')
+                                 }
+                               }}
+                               options={LLM_PROVIDER_OPTIONS}
                              />
-                             <div className="flex justify-between items-center">
-                                 <span className="font-mono text-xs text-white/30">
-                                     STATUS: {settings?.googleApiKeySet ? <span className="text-accent-green">ACTIVE</span> : <span className="text-accent-yellow">MISSING</span>}
-                                 </span>
-                                 <a 
-                                    href="https://aistudio.google.com/app/apikey" 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
-                                 >
-                                     GENERATE KEY &gt;
-                                 </a>
-                             </div>
+                             
+                             {/* API Key for cloud providers */}
+                             {PROVIDER_API_KEY_MAP[llmProvider] === 'google' && (
+                               <>
+                                 <HUDInput 
+                                    label="GOOGLE API KEY"
+                                    type="password"
+                                    value={googleApiKey}
+                                    onChange={(e) => setGoogleApiKey(e.target.value)}
+                                    placeholder={settings?.googleApiKeySet ? '••••••••••••••••' : 'ENTER KEY'}
+                                 />
+                                 <div className="flex justify-between items-center">
+                                     <span className="font-mono text-xs text-white/30">
+                                         STATUS: {settings?.googleApiKeySet ? <span className="text-accent-green">ACTIVE</span> : <span className="text-accent-yellow">REQUIRED</span>}
+                                     </span>
+                                     <a 
+                                        href="https://aistudio.google.com/app/apikey" 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
+                                     >
+                                         GET API KEY &gt;
+                                     </a>
+                                 </div>
+                               </>
+                             )}
+                             
+                             {PROVIDER_API_KEY_MAP[llmProvider] === 'openai' && (
+                               <>
+                                 <HUDInput 
+                                    label="OPENAI API KEY"
+                                    type="password"
+                                    value={openaiApiKey}
+                                    onChange={(e) => setOpenaiApiKey(e.target.value)}
+                                    placeholder={settings?.openaiApiKeySet ? '••••••••••••••••' : 'ENTER KEY'}
+                                 />
+                                 <div className="flex justify-between items-center">
+                                     <span className="font-mono text-xs text-white/30">
+                                         STATUS: {settings?.openaiApiKeySet ? <span className="text-accent-green">ACTIVE</span> : <span className="text-accent-yellow">REQUIRED</span>}
+                                     </span>
+                                     <a 
+                                        href="https://platform.openai.com/api-keys" 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
+                                     >
+                                         GET API KEY &gt;
+                                     </a>
+                                 </div>
+                               </>
+                             )}
+                             
+                             {PROVIDER_API_KEY_MAP[llmProvider] === 'anthropic' && (
+                               <>
+                                 <HUDInput 
+                                    label="ANTHROPIC API KEY"
+                                    type="password"
+                                    value={anthropicApiKey}
+                                    onChange={(e) => setAnthropicApiKey(e.target.value)}
+                                    placeholder={settings?.anthropicApiKeySet ? '••••••••••••••••' : 'ENTER KEY'}
+                                 />
+                                 <div className="flex justify-between items-center">
+                                     <span className="font-mono text-xs text-white/30">
+                                         STATUS: {settings?.anthropicApiKeySet ? <span className="text-accent-green">ACTIVE</span> : <span className="text-accent-yellow">REQUIRED</span>}
+                                     </span>
+                                     <a 
+                                        href="https://console.anthropic.com/settings/keys" 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
+                                     >
+                                         GET API KEY &gt;
+                                     </a>
+                                 </div>
+                               </>
+                             )}
+                             
+                             {/* Base URL for local providers */}
+                             {(llmProvider === 'openai-compatible' || llmProvider === 'ollama') && (
+                               <>
+                                 <HUDInput 
+                                    label="BASE URL"
+                                    type="text"
+                                    value={llmBaseUrl}
+                                    onChange={(e) => setLlmBaseUrl(e.target.value)}
+                                    placeholder={DEFAULT_BASE_URLS[llmProvider] || 'http://localhost:8080'}
+                                 />
+                                 <HUDMicro className="block">
+                                     {llmProvider === 'openai-compatible' 
+                                       ? 'COMPATIBLE: LM Studio, vLLM, LocalAI, text-generation-webui'
+                                       : 'NATIVE OLLAMA API ENDPOINT'
+                                     }
+                                 </HUDMicro>
+                               </>
+                             )}
+                             
+                             {/* Optional Model Override */}
+                             <HUDInput 
+                                label="MODEL OVERRIDE (OPTIONAL)"
+                                type="text"
+                                value={llmModel}
+                                onChange={(e) => setLlmModel(e.target.value)}
+                                placeholder="Leave empty for default"
+                             />
+                             <HUDMicro className="block">
+                                 OVERRIDE DEFAULT MODEL SELECTION
+                             </HUDMicro>
                         </div>
                     </HUDPanel>
                 </section>

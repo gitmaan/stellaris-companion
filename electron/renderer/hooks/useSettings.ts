@@ -12,11 +12,34 @@ export function normalizeUiTheme(rawValue: unknown): UiTheme {
     : DEFAULT_UI_THEME
 }
 
+// LLM Provider types
+export const LLM_PROVIDER_VALUES = ['gemini', 'openai', 'anthropic', 'openai-compatible', 'ollama'] as const
+export type LLMProvider = (typeof LLM_PROVIDER_VALUES)[number]
+export const DEFAULT_LLM_PROVIDER: LLMProvider = 'gemini'
+
+export function normalizeLLMProvider(rawValue: unknown): LLMProvider {
+  if (typeof rawValue !== 'string') return DEFAULT_LLM_PROVIDER
+  return (LLM_PROVIDER_VALUES as readonly string[]).includes(rawValue)
+    ? rawValue as LLMProvider
+    : DEFAULT_LLM_PROVIDER
+}
+
 export interface Settings {
+  // LLM Provider settings
+  llmProvider: LLMProvider
+  llmModel: string
+  llmBaseUrl: string
+  // API Keys (secrets)
   googleApiKey: string
   googleApiKeySet: boolean
+  openaiApiKey: string
+  openaiApiKeySet: boolean
+  anthropicApiKey: string
+  anthropicApiKeySet: boolean
+  // Legacy Discord token
   discordToken: string
   discordTokenSet: boolean
+  // Other settings
   saveDir: string
   // Deprecated (backwards-compat with older main process / renderer builds)
   savePath?: string
@@ -49,13 +72,16 @@ export function useSettings(): UseSettingsResult {
     }
 
     try {
-      const loaded = await window.electronAPI.getSettings() as Settings & { uiTheme?: unknown }
+      const loaded = await window.electronAPI.getSettings() as Settings & { uiTheme?: unknown; llmProvider?: unknown }
       const parsedUiScale = Number(loaded.uiScale)
       const normalized: Settings = {
         ...loaded,
         saveDir: loaded.saveDir || loaded.savePath || '',
         uiScale: Number.isFinite(parsedUiScale) ? parsedUiScale : 1,
         uiTheme: normalizeUiTheme(loaded.uiTheme),
+        llmProvider: normalizeLLMProvider(loaded.llmProvider),
+        llmModel: loaded.llmModel || '',
+        llmBaseUrl: loaded.llmBaseUrl || '',
       }
       setSettings(normalized)
       setError(null)
@@ -92,6 +118,16 @@ export function useSettings(): UseSettingsResult {
         // If googleApiKey was changed (not masked), update the Set flag
         if (newSettings.googleApiKey !== undefined && !newSettings.googleApiKey.includes('...')) {
           updated.googleApiKeySet = !!newSettings.googleApiKey
+        }
+
+        // If openaiApiKey was changed (not masked), update the Set flag
+        if (newSettings.openaiApiKey !== undefined && !newSettings.openaiApiKey.includes('...')) {
+          updated.openaiApiKeySet = !!newSettings.openaiApiKey
+        }
+
+        // If anthropicApiKey was changed (not masked), update the Set flag
+        if (newSettings.anthropicApiKey !== undefined && !newSettings.anthropicApiKey.includes('...')) {
+          updated.anthropicApiKeySet = !!newSettings.anthropicApiKey
         }
 
         // If discordToken was changed (not masked), update the Set flag
