@@ -5,7 +5,32 @@ import { HUDButton } from './hud/HUDButton'
 import { HUDInput } from './hud/HUDInput'
 import { HUDLabel, HUDMicro } from './hud/HUDText'
 import { HUDPanel } from './hud/HUDPanel'
+import { HUDSelect } from './hud/HUDForm'
+import { type LLMProvider, DEFAULT_LLM_PROVIDER, normalizeLLMProvider } from '../hooks/useSettings'
 import appLogo from '../assets/app_logo.svg'
+
+const LLM_PROVIDER_OPTIONS: { value: LLMProvider; label: string }[] = [
+  { value: 'gemini', label: 'Google Gemini' },
+  { value: 'openai', label: 'OpenAI GPT' },
+  { value: 'anthropic', label: 'Anthropic Claude' },
+  { value: 'openai-compatible', label: 'OpenAI-Compatible (Local)' },
+  { value: 'ollama', label: 'Ollama (Local)' },
+]
+
+// Which providers require which API key
+const PROVIDER_API_KEY_MAP: Record<LLMProvider, 'google' | 'openai' | 'anthropic' | 'none'> = {
+  'gemini': 'google',
+  'openai': 'openai',
+  'anthropic': 'anthropic',
+  'openai-compatible': 'none',
+  'ollama': 'none',
+}
+
+// Default base URLs for local providers
+const DEFAULT_BASE_URLS: Partial<Record<LLMProvider, string>> = {
+  'openai-compatible': 'http://localhost:1234/v1',
+  'ollama': 'http://localhost:11434',
+}
 
 interface OnboardingModalProps {
   onComplete: () => void
@@ -51,7 +76,11 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const actionRowBaselineTopRef = useRef<number | null>(null)
 
   // Step 2 state
-  const [apiKey, setApiKey] = useState('')
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>(DEFAULT_LLM_PROVIDER)
+  const [googleApiKey, setGoogleApiKey] = useState('')
+  const [openaiApiKey, setOpenaiApiKey] = useState('')
+  const [anthropicApiKey, setAnthropicApiKey] = useState('')
+  const [llmBaseUrl, setLlmBaseUrl] = useState('')
 
   // Step 3 state
   const [saveResult, setSaveResult] = useState<SaveDetectionResult | null>(null)
@@ -169,7 +198,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
     })
 
     return () => cancelAnimationFrame(rafId)
-  }, [step, scanning, saveResult?.found, apiKey])
+  }, [step, scanning, saveResult?.found, llmProvider, googleApiKey, openaiApiKey, anthropicApiKey])
 
   async function detectSaves(targetDirectory?: string) {
     clearAutoRescanTimer()
@@ -209,11 +238,28 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   }
 
   async function handleComplete() {
-    // Save settings (triggers backend start via restartPythonBackend)
-    await window.electronAPI?.saveSettings({
-      googleApiKey: apiKey,
+    // Build settings object based on selected provider
+    const settings: Record<string, string> = {
+      llmProvider,
       saveDir: selectedPath || '',
-    })
+    }
+
+    // Add the appropriate API key based on provider
+    if (PROVIDER_API_KEY_MAP[llmProvider] === 'google' && googleApiKey) {
+      settings.googleApiKey = googleApiKey
+    } else if (PROVIDER_API_KEY_MAP[llmProvider] === 'openai' && openaiApiKey) {
+      settings.openaiApiKey = openaiApiKey
+    } else if (PROVIDER_API_KEY_MAP[llmProvider] === 'anthropic' && anthropicApiKey) {
+      settings.anthropicApiKey = anthropicApiKey
+    }
+
+    // Add base URL for local providers
+    if ((llmProvider === 'openai-compatible' || llmProvider === 'ollama') && llmBaseUrl) {
+      settings.llmBaseUrl = llmBaseUrl
+    }
+
+    // Save settings (triggers backend start via restartPythonBackend)
+    await window.electronAPI?.saveSettings(settings)
 
     // Mark onboarding complete
     await window.electronAPI?.onboarding.complete()
@@ -276,8 +322,22 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
                 className="h-full p-1"
               >
                 <StepApiKey
-                  apiKey={apiKey}
-                  onChange={setApiKey}
+                  llmProvider={llmProvider}
+                  onProviderChange={(p) => {
+                    setLlmProvider(p)
+                    // Auto-fill default base URL for local providers
+                    if (DEFAULT_BASE_URLS[p] && !llmBaseUrl) {
+                      setLlmBaseUrl(DEFAULT_BASE_URLS[p] || '')
+                    }
+                  }}
+                  googleApiKey={googleApiKey}
+                  onGoogleApiKeyChange={setGoogleApiKey}
+                  openaiApiKey={openaiApiKey}
+                  onOpenaiApiKeyChange={setOpenaiApiKey}
+                  anthropicApiKey={anthropicApiKey}
+                  onAnthropicApiKeyChange={setAnthropicApiKey}
+                  llmBaseUrl={llmBaseUrl}
+                  onBaseUrlChange={setLlmBaseUrl}
                   onBack={() => goTo(1)}
                   onNext={() => goTo(3)}
                 />
@@ -353,21 +413,61 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
 }
 
 // =============================================================================
-// Step 2: API Key
+// Step 2: API Key / LLM Provider
 // =============================================================================
 
 function StepApiKey({
-  apiKey,
-  onChange,
+  llmProvider,
+  onProviderChange,
+  googleApiKey,
+  onGoogleApiKeyChange,
+  openaiApiKey,
+  onOpenaiApiKeyChange,
+  anthropicApiKey,
+  onAnthropicApiKeyChange,
+  llmBaseUrl,
+  onBaseUrlChange,
   onBack,
   onNext,
 }: {
-  apiKey: string
-  onChange: (v: string) => void
+  llmProvider: LLMProvider
+  onProviderChange: (p: LLMProvider) => void
+  googleApiKey: string
+  onGoogleApiKeyChange: (v: string) => void
+  openaiApiKey: string
+  onOpenaiApiKeyChange: (v: string) => void
+  anthropicApiKey: string
+  onAnthropicApiKeyChange: (v: string) => void
+  llmBaseUrl: string
+  onBaseUrlChange: (v: string) => void
   onBack: () => void
   onNext: () => void
 }) {
-  const hasKey = apiKey.trim().length > 0
+  const requiredKeyType = PROVIDER_API_KEY_MAP[llmProvider]
+  
+  // Check if we can proceed based on provider type
+  const canProceed = (() => {
+    switch (requiredKeyType) {
+      case 'google':
+        return googleApiKey.trim().length > 0
+      case 'openai':
+        return openaiApiKey.trim().length > 0
+      case 'anthropic':
+        return anthropicApiKey.trim().length > 0
+      case 'none':
+        // Local providers don't require API keys
+        return true
+      default:
+        return false
+    }
+  })()
+
+  const currentApiKey = requiredKeyType === 'google' ? googleApiKey 
+    : requiredKeyType === 'openai' ? openaiApiKey 
+    : requiredKeyType === 'anthropic' ? anthropicApiKey 
+    : ''
+
+  const hasKey = currentApiKey.trim().length > 0
 
   return (
     <StepFrame
@@ -378,7 +478,7 @@ function StepApiKey({
           <HUDButton variant="secondary" onClick={onBack}>
             Back
           </HUDButton>
-          <HUDButton data-onboarding-primary="true" onClick={onNext} disabled={!hasKey}>
+          <HUDButton data-onboarding-primary="true" onClick={onNext} disabled={!canProceed}>
             Next
           </HUDButton>
         </>
@@ -386,36 +486,115 @@ function StepApiKey({
     >
       <div className="mx-auto w-full max-w-2xl space-y-5">
         <div className="space-y-1">
-          <HUDLabel className="text-accent-cyan/80">Required Credential</HUDLabel>
+          <HUDLabel className="text-accent-cyan/80">AI Provider Selection</HUDLabel>
           <h2 className="font-display text-lg tracking-[0.1em] uppercase text-text-primary">
-            Google Gemini API Key
+            Configure Your Advisor
           </h2>
         </div>
         <p className="text-sm text-text-secondary leading-relaxed">
-          Your advisor runs on Google Gemini. You will need an API key. Setup takes about 30 seconds.
+          Choose an AI provider for your advisor. Cloud providers require an API key. Local providers run on your machine.
         </p>
 
-        <div className="relative">
-          <HUDInput
-            label="API KEY TOKEN"
-            type="password"
-            placeholder="AIza..."
-            value={apiKey}
-            onChange={(e) => onChange(e.target.value)}
-            statusText={hasKey ? 'READY' : 'MISSING'}
-            statusClassName={hasKey ? 'text-accent-green' : 'text-accent-yellow'}
-            autoFocus
-          />
-        </div>
+        {/* Provider Selection */}
+        <HUDSelect
+          label="AI PROVIDER"
+          value={llmProvider}
+          onChange={(e) => onProviderChange(normalizeLLMProvider(e.target.value))}
+          options={LLM_PROVIDER_OPTIONS}
+        />
 
-        <a
-          href="https://aistudio.google.com/app/apikey"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
-        >
-          GENERATE KEY &gt;
-        </a>
+        {/* Google Gemini API Key */}
+        {requiredKeyType === 'google' && (
+          <div className="space-y-3">
+            <HUDInput
+              label="GOOGLE API KEY"
+              type="password"
+              placeholder="AIza..."
+              value={googleApiKey}
+              onChange={(e) => onGoogleApiKeyChange(e.target.value)}
+              statusText={hasKey ? 'READY' : 'REQUIRED'}
+              statusClassName={hasKey ? 'text-accent-green' : 'text-accent-yellow'}
+              autoFocus
+            />
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
+            >
+              GET API KEY &gt;
+            </a>
+          </div>
+        )}
+
+        {/* OpenAI API Key */}
+        {requiredKeyType === 'openai' && (
+          <div className="space-y-3">
+            <HUDInput
+              label="OPENAI API KEY"
+              type="password"
+              placeholder="sk-..."
+              value={openaiApiKey}
+              onChange={(e) => onOpenaiApiKeyChange(e.target.value)}
+              statusText={hasKey ? 'READY' : 'REQUIRED'}
+              statusClassName={hasKey ? 'text-accent-green' : 'text-accent-yellow'}
+              autoFocus
+            />
+            <a
+              href="https://platform.openai.com/api-keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
+            >
+              GET API KEY &gt;
+            </a>
+          </div>
+        )}
+
+        {/* Anthropic API Key */}
+        {requiredKeyType === 'anthropic' && (
+          <div className="space-y-3">
+            <HUDInput
+              label="ANTHROPIC API KEY"
+              type="password"
+              placeholder="sk-ant-..."
+              value={anthropicApiKey}
+              onChange={(e) => onAnthropicApiKeyChange(e.target.value)}
+              statusText={hasKey ? 'READY' : 'REQUIRED'}
+              statusClassName={hasKey ? 'text-accent-green' : 'text-accent-yellow'}
+              autoFocus
+            />
+            <a
+              href="https://console.anthropic.com/settings/keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
+            >
+              GET API KEY &gt;
+            </a>
+          </div>
+        )}
+
+        {/* Local Provider Base URL */}
+        {requiredKeyType === 'none' && (
+          <div className="space-y-3">
+            <HUDInput
+              label="BASE URL (OPTIONAL)"
+              type="text"
+              placeholder={DEFAULT_BASE_URLS[llmProvider] || 'http://localhost:8080'}
+              value={llmBaseUrl}
+              onChange={(e) => onBaseUrlChange(e.target.value)}
+              statusText="LOCAL"
+              statusClassName="text-accent-green"
+            />
+            <HUDMicro className="text-text-secondary">
+              {llmProvider === 'openai-compatible' 
+                ? 'Works with LM Studio, vLLM, LocalAI, text-generation-webui'
+                : 'Native Ollama API endpoint'
+              }
+            </HUDMicro>
+          </div>
+        )}
       </div>
     </StepFrame>
   )
