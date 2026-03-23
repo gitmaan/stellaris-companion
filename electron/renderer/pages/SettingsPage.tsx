@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { DEFAULT_UI_THEME, normalizeUiTheme, type UiTheme, useSettings, type LLMProvider, DEFAULT_LLM_PROVIDER, normalizeLLMProvider } from '../hooks/useSettings'
 import { useDiscord } from '../hooks/useDiscord'
 import { HUDHeader, HUDSectionTitle, HUDMicro, HUDLabel } from '../components/hud/HUDText'
@@ -67,6 +67,15 @@ const DEFAULT_BASE_URLS: Partial<Record<LLMProvider, string>> = {
   'ollama': 'http://localhost:11434',
 }
 
+// Providers that require model selection (no sensible default)
+const LOCAL_PROVIDERS: LLMProvider[] = ['openai-compatible', 'ollama']
+
+interface OllamaModel {
+  name: string
+  size: number
+  modifiedAt: string
+}
+
 function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
   const { showToast } = useToast()
@@ -95,6 +104,52 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
   const [hasChanges, setHasChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Ollama model fetching state
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([])
+  const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false)
+  const [ollamaModelsError, setOllamaModelsError] = useState<string | null>(null)
+
+  // Check if model is required but missing
+  const isLocalProvider = LOCAL_PROVIDERS.includes(llmProvider)
+  const modelRequired = isLocalProvider && !llmModel.trim()
+
+  // Fetch Ollama models when provider is ollama and base URL changes
+  const fetchOllamaModels = useCallback(async (baseUrl: string) => {
+    if (!window.electronAPI?.fetchOllamaModels) return
+    
+    setOllamaModelsLoading(true)
+    setOllamaModelsError(null)
+    
+    try {
+      const result = await window.electronAPI.fetchOllamaModels(baseUrl)
+      if (result.error) {
+        setOllamaModelsError(result.error)
+        setOllamaModels([])
+      } else {
+        setOllamaModels(result.models)
+        // If we got models and no model is selected, auto-select the first one
+        if (result.models.length > 0 && !llmModel) {
+          setLlmModel(result.models[0].name)
+        }
+      }
+    } catch (err) {
+      setOllamaModelsError(err instanceof Error ? err.message : 'Failed to fetch models')
+      setOllamaModels([])
+    } finally {
+      setOllamaModelsLoading(false)
+    }
+  }, [llmModel])
+
+  // Fetch models when Ollama is selected and base URL is available
+  useEffect(() => {
+    if (llmProvider === 'ollama' && llmBaseUrl) {
+      fetchOllamaModels(llmBaseUrl)
+    } else {
+      setOllamaModels([])
+      setOllamaModelsError(null)
+    }
+  }, [llmProvider, llmBaseUrl, fetchOllamaModels])
 
   useEffect(() => {
     return () => {
@@ -463,17 +518,71 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
                                </>
                              )}
                              
-                             {/* Optional Model Override */}
-                             <HUDInput 
-                                label="MODEL OVERRIDE (OPTIONAL)"
-                                type="text"
-                                value={llmModel}
-                                onChange={(e) => setLlmModel(e.target.value)}
-                                placeholder="Leave empty for default"
-                             />
-                             <HUDMicro className="block">
-                                 OVERRIDE DEFAULT MODEL SELECTION
-                             </HUDMicro>
+                             {/* Model Selection - Required for local providers, optional for cloud */}
+                             {llmProvider === 'ollama' ? (
+                               <>
+                                 <div className="flex gap-2 items-end">
+                                   <div className="flex-1">
+                                     <HUDSelect
+                                       label="MODEL (REQUIRED)"
+                                       value={llmModel}
+                                       onChange={(e) => setLlmModel(e.target.value)}
+                                       options={
+                                         ollamaModels.length > 0
+                                           ? ollamaModels.map(m => ({ value: m.name, label: m.name }))
+                                           : [{ value: '', label: ollamaModelsLoading ? 'Loading...' : 'No models found' }]
+                                       }
+                                       disabled={ollamaModelsLoading || ollamaModels.length === 0}
+                                     />
+                                   </div>
+                                   <HUDButton 
+                                     variant="secondary" 
+                                     onClick={() => llmBaseUrl && fetchOllamaModels(llmBaseUrl)}
+                                     disabled={!llmBaseUrl || ollamaModelsLoading}
+                                     className="mb-[1px]"
+                                   >
+                                     {ollamaModelsLoading ? 'SCANNING...' : 'REFRESH'}
+                                   </HUDButton>
+                                 </div>
+                                 <HUDMicro className={`block ${ollamaModelsError ? 'text-accent-red' : ''}`}>
+                                   {ollamaModelsError 
+                                     ? `ERROR: ${ollamaModelsError.toUpperCase()}`
+                                     : ollamaModels.length > 0 
+                                       ? `${ollamaModels.length} MODEL${ollamaModels.length !== 1 ? 'S' : ''} AVAILABLE`
+                                       : 'CONNECT TO OLLAMA TO LOAD MODELS'
+                                   }
+                                 </HUDMicro>
+                               </>
+                             ) : llmProvider === 'openai-compatible' ? (
+                               <>
+                                 <HUDInput 
+                                    label="MODEL NAME (REQUIRED)"
+                                    type="text"
+                                    value={llmModel}
+                                    onChange={(e) => setLlmModel(e.target.value)}
+                                    placeholder="e.g., llama-3-8b, mistral-7b"
+                                 />
+                                 <HUDMicro className={`block ${modelRequired ? 'text-accent-yellow' : ''}`}>
+                                     {modelRequired 
+                                       ? 'MODEL NAME REQUIRED FOR LOCAL PROVIDERS'
+                                       : 'ENTER THE MODEL NAME AS SHOWN IN YOUR LOCAL SERVER'
+                                     }
+                                 </HUDMicro>
+                               </>
+                             ) : (
+                               <>
+                                 <HUDInput 
+                                    label="MODEL OVERRIDE (OPTIONAL)"
+                                    type="text"
+                                    value={llmModel}
+                                    onChange={(e) => setLlmModel(e.target.value)}
+                                    placeholder="Leave empty for default"
+                                 />
+                                 <HUDMicro className="block">
+                                     OVERRIDE DEFAULT MODEL SELECTION
+                                 </HUDMicro>
+                               </>
+                             )}
                         </div>
                     </HUDPanel>
                 </section>
@@ -600,14 +709,14 @@ function SettingsPage({ onReportIssue, onThemeChange }: SettingsPageProps) {
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
              <div className="bg-black/80 backdrop-blur-md border border-accent-cyan/30 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center gap-6">
                  <div className="flex items-center gap-2">
-                     <div className={`w-2 h-2 rounded-full ${hasChanges ? 'bg-accent-yellow animate-pulse' : 'bg-white/20'}`} />
-                     <HUDMicro>{hasChanges ? 'UNSAVED CHANGES' : 'SYSTEM READY'}</HUDMicro>
+                     <div className={`w-2 h-2 rounded-full ${modelRequired ? 'bg-accent-red' : hasChanges ? 'bg-accent-yellow animate-pulse' : 'bg-white/20'}`} />
+                     <HUDMicro>{modelRequired ? 'MODEL REQUIRED' : hasChanges ? 'UNSAVED CHANGES' : 'SYSTEM READY'}</HUDMicro>
                  </div>
                  <div className="h-4 w-px bg-white/10" />
                  <HUDButton 
                     variant="primary" 
                     onClick={handleSave} 
-                    disabled={saving || !hasChanges}
+                    disabled={saving || !hasChanges || modelRequired}
                     className="min-w-[140px]"
                  >
                      {saving ? 'COMMITTING...' : 'APPLY CHANGES'}

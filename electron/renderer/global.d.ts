@@ -42,6 +42,10 @@ declare global {
       getSettings: () => Promise<unknown>
       saveSettings: (settings: unknown) => Promise<unknown>
       showFolderDialog: () => Promise<string | null>
+      fetchOllamaModels: (baseUrl: string) => Promise<{
+        models: Array<{ name: string; size: number; modifiedAt: string }>
+        error?: string
+      }>
       // Feedback reporting
       getPlatformInfo: () => { platform: string; arch: string }
       captureScreenshot: () => Promise<string | null>

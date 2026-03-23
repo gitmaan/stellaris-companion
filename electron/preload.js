@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('load-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   showFolderDialog: () => ipcRenderer.invoke('select-folder'),
+  fetchOllamaModels: (baseUrl) => ipcRenderer.invoke('fetch-ollama-models', { baseUrl }),
 
   // Feedback reporting
   getPlatformInfo: () => ({ platform: process.platform, arch: process.arch }),

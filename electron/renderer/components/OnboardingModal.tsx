@@ -32,6 +32,15 @@ const DEFAULT_BASE_URLS: Partial<Record<LLMProvider, string>> = {
   'ollama': 'http://localhost:11434',
 }
 
+// Providers that require model selection (no sensible default)
+const LOCAL_PROVIDERS: LLMProvider[] = ['openai-compatible', 'ollama']
+
+interface OllamaModel {
+  name: string
+  size: number
+  modifiedAt: string
+}
+
 interface OnboardingModalProps {
   onComplete: () => void
 }
@@ -81,11 +90,54 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const [openaiApiKey, setOpenaiApiKey] = useState('')
   const [anthropicApiKey, setAnthropicApiKey] = useState('')
   const [llmBaseUrl, setLlmBaseUrl] = useState('')
+  const [llmModel, setLlmModel] = useState('')
+  
+  // Ollama model fetching state
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([])
+  const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false)
+  const [ollamaModelsError, setOllamaModelsError] = useState<string | null>(null)
 
   // Step 3 state
   const [saveResult, setSaveResult] = useState<SaveDetectionResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
+
+  // Fetch Ollama models when provider is ollama and base URL changes
+  const fetchOllamaModels = useCallback(async (baseUrl: string) => {
+    if (!window.electronAPI?.fetchOllamaModels) return
+    
+    setOllamaModelsLoading(true)
+    setOllamaModelsError(null)
+    
+    try {
+      const result = await window.electronAPI.fetchOllamaModels(baseUrl)
+      if (result.error) {
+        setOllamaModelsError(result.error)
+        setOllamaModels([])
+      } else {
+        setOllamaModels(result.models)
+        // If we got models and no model is selected, auto-select the first one
+        if (result.models.length > 0 && !llmModel) {
+          setLlmModel(result.models[0].name)
+        }
+      }
+    } catch (err) {
+      setOllamaModelsError(err instanceof Error ? err.message : 'Failed to fetch models')
+      setOllamaModels([])
+    } finally {
+      setOllamaModelsLoading(false)
+    }
+  }, [llmModel])
+
+  // Fetch models when Ollama is selected and base URL is available
+  useEffect(() => {
+    if (llmProvider === 'ollama' && llmBaseUrl) {
+      fetchOllamaModels(llmBaseUrl)
+    } else {
+      setOllamaModels([])
+      setOllamaModelsError(null)
+    }
+  }, [llmProvider, llmBaseUrl, fetchOllamaModels])
 
   const goTo = useCallback((next: Step) => {
     setDirection(next > step ? 1 : -1)
@@ -258,6 +310,11 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
       settings.llmBaseUrl = llmBaseUrl
     }
 
+    // Add model (required for local providers, optional for cloud)
+    if (llmModel) {
+      settings.llmModel = llmModel
+    }
+
     // Save settings (triggers backend start via restartPythonBackend)
     await window.electronAPI?.saveSettings(settings)
 
@@ -341,6 +398,9 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
                       // Clear base URL when switching to cloud providers
                       setLlmBaseUrl('')
                     }
+                    
+                    // Clear model when switching providers
+                    setLlmModel('')
                   }}
                   googleApiKey={googleApiKey}
                   onGoogleApiKeyChange={setGoogleApiKey}
@@ -350,6 +410,12 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
                   onAnthropicApiKeyChange={setAnthropicApiKey}
                   llmBaseUrl={llmBaseUrl}
                   onBaseUrlChange={setLlmBaseUrl}
+                  llmModel={llmModel}
+                  onModelChange={setLlmModel}
+                  ollamaModels={ollamaModels}
+                  ollamaModelsLoading={ollamaModelsLoading}
+                  ollamaModelsError={ollamaModelsError}
+                  onRefreshOllamaModels={() => llmBaseUrl && fetchOllamaModels(llmBaseUrl)}
                   onBack={() => goTo(1)}
                   onNext={() => goTo(3)}
                 />
@@ -439,6 +505,12 @@ function StepApiKey({
   onAnthropicApiKeyChange,
   llmBaseUrl,
   onBaseUrlChange,
+  llmModel,
+  onModelChange,
+  ollamaModels,
+  ollamaModelsLoading,
+  ollamaModelsError,
+  onRefreshOllamaModels,
   onBack,
   onNext,
 }: {
@@ -452,13 +524,26 @@ function StepApiKey({
   onAnthropicApiKeyChange: (v: string) => void
   llmBaseUrl: string
   onBaseUrlChange: (v: string) => void
+  llmModel: string
+  onModelChange: (v: string) => void
+  ollamaModels: OllamaModel[]
+  ollamaModelsLoading: boolean
+  ollamaModelsError: string | null
+  onRefreshOllamaModels: () => void
   onBack: () => void
   onNext: () => void
 }) {
   const requiredKeyType = PROVIDER_API_KEY_MAP[llmProvider]
+  const isLocalProvider = LOCAL_PROVIDERS.includes(llmProvider)
+  const modelRequired = isLocalProvider && !llmModel.trim()
   
   // Check if we can proceed based on provider type
   const canProceed = (() => {
+    // Local providers require a model selection
+    if (isLocalProvider && !llmModel.trim()) {
+      return false
+    }
+    
     switch (requiredKeyType) {
       case 'google':
         return googleApiKey.trim().length > 0
@@ -467,7 +552,7 @@ function StepApiKey({
       case 'anthropic':
         return anthropicApiKey.trim().length > 0
       case 'none':
-        // Local providers don't require API keys
+        // Local providers just need a model selected
         return true
       default:
         return false
@@ -589,22 +674,76 @@ function StepApiKey({
 
         {/* Local Provider Base URL */}
         {requiredKeyType === 'none' && (
-          <div className="space-y-3">
-            <HUDInput
-              label="BASE URL (OPTIONAL)"
-              type="text"
-              placeholder={DEFAULT_BASE_URLS[llmProvider] || 'http://localhost:8080'}
-              value={llmBaseUrl}
-              onChange={(e) => onBaseUrlChange(e.target.value)}
-              statusText="LOCAL"
-              statusClassName="text-accent-green"
-            />
-            <HUDMicro className="text-text-secondary">
-              {llmProvider === 'openai-compatible' 
-                ? 'Works with LM Studio, vLLM, LocalAI, text-generation-webui'
-                : 'Native Ollama API endpoint'
-              }
-            </HUDMicro>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <HUDInput
+                label="BASE URL"
+                type="text"
+                placeholder={DEFAULT_BASE_URLS[llmProvider] || 'http://localhost:8080'}
+                value={llmBaseUrl}
+                onChange={(e) => onBaseUrlChange(e.target.value)}
+                statusText="LOCAL"
+                statusClassName="text-accent-green"
+              />
+              <HUDMicro className="text-text-secondary">
+                {llmProvider === 'openai-compatible' 
+                  ? 'Works with LM Studio, vLLM, LocalAI, text-generation-webui'
+                  : 'Native Ollama API endpoint'
+                }
+              </HUDMicro>
+            </div>
+
+            {/* Model Selection - Required for local providers */}
+            {llmProvider === 'ollama' ? (
+              <div className="space-y-3">
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <HUDSelect
+                      label="MODEL (REQUIRED)"
+                      value={llmModel}
+                      onChange={(e) => onModelChange(e.target.value)}
+                      options={
+                        ollamaModels.length > 0
+                          ? ollamaModels.map(m => ({ value: m.name, label: m.name }))
+                          : [{ value: '', label: ollamaModelsLoading ? 'Loading...' : 'No models found' }]
+                      }
+                      disabled={ollamaModelsLoading || ollamaModels.length === 0}
+                    />
+                  </div>
+                  <HUDButton 
+                    variant="secondary" 
+                    onClick={onRefreshOllamaModels}
+                    disabled={!llmBaseUrl || ollamaModelsLoading}
+                    className="mb-[1px]"
+                  >
+                    {ollamaModelsLoading ? 'SCANNING...' : 'REFRESH'}
+                  </HUDButton>
+                </div>
+                <HUDMicro className={ollamaModelsError ? 'text-accent-red' : 'text-text-secondary'}>
+                  {ollamaModelsError 
+                    ? `Error: ${ollamaModelsError}`
+                    : ollamaModels.length > 0 
+                      ? `${ollamaModels.length} model${ollamaModels.length !== 1 ? 's' : ''} available`
+                      : 'Connect to Ollama to load models'
+                  }
+                </HUDMicro>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <HUDInput 
+                  label="MODEL NAME (REQUIRED)"
+                  type="text"
+                  value={llmModel}
+                  onChange={(e) => onModelChange(e.target.value)}
+                  placeholder="e.g., llama-3-8b, mistral-7b"
+                  statusText={modelRequired ? 'REQUIRED' : 'READY'}
+                  statusClassName={modelRequired ? 'text-accent-yellow' : 'text-accent-green'}
+                />
+                <HUDMicro className="text-text-secondary">
+                  Enter the model name as shown in your local server
+                </HUDMicro>
+              </div>
+            )}
           </div>
         )}
       </div>
