@@ -6,40 +6,16 @@ import { HUDInput } from './hud/HUDInput'
 import { HUDLabel, HUDMicro } from './hud/HUDText'
 import { HUDPanel } from './hud/HUDPanel'
 import { HUDSelect } from './hud/HUDForm'
-import { type LLMProvider, DEFAULT_LLM_PROVIDER, normalizeLLMProvider } from '../hooks/useSettings'
+import { type LLMProvider, normalizeLLMProvider } from '../hooks/useSettings'
+import {
+  DEFAULT_LLM_PROVIDER,
+  LLM_PROVIDER_OPTIONS,
+  PROVIDER_API_KEY_MAP,
+  DEFAULT_BASE_URLS,
+  LOCAL_PROVIDERS,
+  type OllamaModel,
+} from '../constants/llmProviders'
 import appLogo from '../assets/app_logo.svg'
-
-const LLM_PROVIDER_OPTIONS: { value: LLMProvider; label: string }[] = [
-  { value: 'gemini', label: 'Google Gemini' },
-  { value: 'openai', label: 'OpenAI GPT' },
-  { value: 'anthropic', label: 'Anthropic Claude' },
-  { value: 'openai-compatible', label: 'OpenAI-Compatible (Local)' },
-  { value: 'ollama', label: 'Ollama (Local)' },
-]
-
-// Which providers require which API key
-const PROVIDER_API_KEY_MAP: Record<LLMProvider, 'google' | 'openai' | 'anthropic' | 'none'> = {
-  'gemini': 'google',
-  'openai': 'openai',
-  'anthropic': 'anthropic',
-  'openai-compatible': 'none',
-  'ollama': 'none',
-}
-
-// Default base URLs for local providers
-const DEFAULT_BASE_URLS: Partial<Record<LLMProvider, string>> = {
-  'openai-compatible': 'http://localhost:1234/v1',
-  'ollama': 'http://localhost:11434',
-}
-
-// Providers that require model selection (no sensible default)
-const LOCAL_PROVIDERS: LLMProvider[] = ['openai-compatible', 'ollama']
-
-interface OllamaModel {
-  name: string
-  size: number
-  modifiedAt: string
-}
 
 interface OnboardingModalProps {
   onComplete: () => void
@@ -97,6 +73,12 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false)
   const [ollamaModelsError, setOllamaModelsError] = useState<string | null>(null)
 
+  // Ref for current model to avoid unnecessary re-fetches
+  const llmModelRef = useRef(llmModel)
+  useEffect(() => {
+    llmModelRef.current = llmModel
+  }, [llmModel])
+
   // Step 3 state
   const [saveResult, setSaveResult] = useState<SaveDetectionResult | null>(null)
   const [scanning, setScanning] = useState(false)
@@ -117,7 +99,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
       } else {
         setOllamaModels(result.models)
         // If we got models and no model is selected, auto-select the first one
-        if (result.models.length > 0 && !llmModel) {
+        if (result.models.length > 0 && !llmModelRef.current) {
           setLlmModel(result.models[0].name)
         }
       }
@@ -127,7 +109,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
     } finally {
       setOllamaModelsLoading(false)
     }
-  }, [llmModel])
+  }, [])
 
   // Fetch models when Ollama is selected and base URL is available
   useEffect(() => {

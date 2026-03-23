@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -11,13 +12,20 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.companion import Companion
+from backend.core.llm_providers import LLMConfig, LLMResponse, ProviderType
 
 
-class _DummyClient:
-    """Minimal stand-in for the Gemini client during unit tests."""
+class _DummyProvider:
+    """Minimal stand-in for an LLM provider during unit tests."""
 
-    def __init__(self, *args, **kwargs):
-        self.models = SimpleNamespace(generate_content=lambda *a, **k: None)
+    def __init__(self, config: LLMConfig):
+        self.config = config
+
+    def generate(self, prompt, **kwargs):
+        return LLMResponse(text="Test response", model="test-model")
+
+    def generate_structured(self, prompt, schema, **kwargs):
+        return LLMResponse(text="{}", model="test-model")
 
 
 def _identity() -> dict:
@@ -43,7 +51,10 @@ def _situation() -> dict:
 
 @pytest.fixture
 def companion(monkeypatch):
-    monkeypatch.setattr("backend.core.companion.genai.Client", _DummyClient)
+    # Mock the get_provider function to return our dummy provider
+    monkeypatch.setattr(
+        "backend.core.companion.get_provider", lambda config: _DummyProvider(config)
+    )
     return Companion(save_path=None, api_key="test-key", auto_precompute=False)
 
 
@@ -235,15 +246,15 @@ def test_ask_precomputed_injects_policy_block_but_uses_normal_advisor_path(compa
     )
     captured = {}
 
-    def _fake_generate_content(*, model, contents, config):
-        captured["model"] = model
-        captured["contents"] = contents
-        captured["system_instruction"] = config.system_instruction
-        return SimpleNamespace(
-            text="President, our naval ledgers remain estimates rather than certainties."
+    def _fake_generate(prompt, *, system_prompt=None, **kwargs):
+        captured["prompt"] = prompt
+        captured["system_prompt"] = system_prompt
+        return LLMResponse(
+            text="President, our naval ledgers remain estimates rather than certainties.",
+            model="test-model",
         )
 
-    companion.client.models.generate_content = _fake_generate_content
+    companion._provider.generate = _fake_generate
 
     companion.apply_precomputed_briefing(
         save_path=None,
@@ -260,7 +271,7 @@ def test_ask_precomputed_injects_policy_block_but_uses_normal_advisor_path(compa
     )
 
     assert answer == "President, our naval ledgers remain estimates rather than certainties."
-    assert "NAVAL CAPACITY RESPONSE POLICY:" in captured["system_instruction"]
-    assert "Response state: estimated." in captured["system_instruction"]
-    assert "cannot confirm whether the empire is over naval cap" in captured["system_instruction"]
+    assert "NAVAL CAPACITY RESPONSE POLICY:" in captured["system_prompt"]
+    assert "Response state: estimated." in captured["system_prompt"]
+    assert "cannot confirm whether the empire is over naval cap" in captured["system_prompt"]
     assert companion.get_call_stats()["tools_used"] == ["ask_precomputed_no_tools"]

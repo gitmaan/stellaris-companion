@@ -44,6 +44,36 @@ class ProviderType(str, Enum):
     OPENAI_COMPATIBLE = "openai_compatible"
     OLLAMA = "ollama"
 
+    @classmethod
+    def _missing_(cls, value: object) -> "ProviderType | None":
+        """Allow common alias values used by the UI / environment configuration.
+
+        Examples:
+            - "gemini" -> ProviderType.GOOGLE_GEMINI
+            - "openai-compatible" -> ProviderType.OPENAI_COMPATIBLE
+        """
+        if not isinstance(value, str):
+            return None
+        # Normalize: lowercase, replace hyphens with underscores
+        normalized = value.strip().lower().replace("-", "_")
+
+        # First, try to match normalized value directly to an existing enum value
+        for member in cls:
+            if member.value == normalized:
+                return member
+
+        # Then, handle known aliases that don't match 1:1 with enum values
+        aliases = {
+            "gemini": cls.GOOGLE_GEMINI,
+            "google": cls.GOOGLE_GEMINI,
+        }
+        return aliases.get(normalized)
+
+    @classmethod
+    def requires_api_key(cls, provider: "ProviderType") -> bool:
+        """Check if a provider requires an API key."""
+        return provider in {cls.GOOGLE_GEMINI, cls.OPENAI, cls.ANTHROPIC}
+
 
 @dataclass
 class LLMConfig:
@@ -125,7 +155,8 @@ class LLMConfig:
             if provider == ProviderType.OLLAMA:
                 base_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
             elif provider == ProviderType.OPENAI_COMPATIBLE:
-                base_url = os.environ.get("OPENAI_COMPATIBLE_BASE_URL", "http://localhost:8000")
+                # Default to LM Studio-style endpoint to match Electron UI
+                base_url = os.environ.get("OPENAI_COMPATIBLE_BASE_URL", "http://localhost:1234/v1")
 
         # Parse numeric values
         temperature = float(os.environ.get("LLM_TEMPERATURE", "1.0"))

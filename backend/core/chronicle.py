@@ -34,6 +34,7 @@ from backend.core.json_utils import json_dumps
 from backend.core.llm_providers import (
     LLMConfig,
     LLMProvider,
+    ProviderType,
     get_provider,
 )
 
@@ -354,8 +355,10 @@ class ChronicleGenerator:
         # Override API key if explicitly provided (backward compatibility)
         if api_key:
             self._llm_config.api_key = api_key
-        elif not self._llm_config.api_key:
-            # Fallback to GOOGLE_API_KEY for backward compatibility
+        elif (
+            not self._llm_config.api_key and self._llm_config.provider == ProviderType.GOOGLE_GEMINI
+        ):
+            # Fallback to GOOGLE_API_KEY only for Gemini provider (backward compatibility)
             self._llm_config.api_key = os.environ.get("GOOGLE_API_KEY")
 
         self._provider: LLMProvider | None = None
@@ -367,8 +370,10 @@ class ChronicleGenerator:
     def provider(self) -> LLMProvider:
         """Lazy-initialized LLM provider."""
         if self._provider is None:
-            if not self._llm_config.api_key:
-                raise ValueError("LLM API key not configured")
+            # Only require API key for cloud providers
+            if ProviderType.requires_api_key(self._llm_config.provider):
+                if not self._llm_config.api_key:
+                    raise ValueError("LLM API key not configured")
             self._provider = get_provider(self._llm_config)
         return self._provider
 

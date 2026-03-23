@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
   DEFAULT_UI_THEME,
-  DEFAULT_LLM_PROVIDER,
   normalizeChronicleRefreshMode,
   normalizeUiTheme,
   normalizeLLMProvider,
@@ -11,6 +10,14 @@ import {
   type LLMProvider,
   useSettings,
 } from '../hooks/useSettings'
+import {
+  DEFAULT_LLM_PROVIDER,
+  LLM_PROVIDER_OPTIONS,
+  PROVIDER_API_KEY_MAP,
+  DEFAULT_BASE_URLS,
+  LOCAL_PROVIDERS,
+  type OllamaModel,
+} from '../constants/llmProviders'
 import { useDiscord } from '../hooks/useDiscord'
 import { HUDHeader, HUDSectionTitle, HUDMicro, HUDLabel } from '../components/hud/HUDText'
 import { HUDPanel } from '../components/hud/HUDPanel'
@@ -54,38 +61,6 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'stellaris-cyan': 'Ion Cyan',
   'tactica-green': 'Tactica Green',
   'command-amber': 'Command Amber',
-}
-
-const LLM_PROVIDER_OPTIONS: { value: LLMProvider; label: string }[] = [
-  { value: 'gemini', label: 'Google Gemini' },
-  { value: 'openai', label: 'OpenAI GPT' },
-  { value: 'anthropic', label: 'Anthropic Claude' },
-  { value: 'openai-compatible', label: 'OpenAI-Compatible (Local)' },
-  { value: 'ollama', label: 'Ollama (Local)' },
-]
-
-// Which providers require which API key
-const PROVIDER_API_KEY_MAP: Record<LLMProvider, 'google' | 'openai' | 'anthropic' | 'none'> = {
-  'gemini': 'google',
-  'openai': 'openai',
-  'anthropic': 'anthropic',
-  'openai-compatible': 'none',
-  'ollama': 'none',
-}
-
-// Default base URLs for local providers
-const DEFAULT_BASE_URLS: Partial<Record<LLMProvider, string>> = {
-  'openai-compatible': 'http://localhost:1234/v1',
-  'ollama': 'http://localhost:11434',
-}
-
-// Providers that require model selection (no sensible default)
-const LOCAL_PROVIDERS: LLMProvider[] = ['openai-compatible', 'ollama']
-
-interface OllamaModel {
-  name: string
-  size: number
-  modifiedAt: string
 }
 
 const CHRONICLE_REFRESH_MODE_LABELS: Record<ChronicleRefreshMode, string> = {
@@ -140,6 +115,12 @@ function SettingsPage({
   const [ollamaModelsLoading, setOllamaModelsLoading] = useState(false)
   const [ollamaModelsError, setOllamaModelsError] = useState<string | null>(null)
 
+  // Ref for current model to avoid unnecessary re-fetches
+  const llmModelRef = useRef(llmModel)
+  useEffect(() => {
+    llmModelRef.current = llmModel
+  }, [llmModel])
+
   // Check if model is required but missing
   const isLocalProvider = LOCAL_PROVIDERS.includes(llmProvider)
   const modelRequired = isLocalProvider && !llmModel.trim()
@@ -159,7 +140,7 @@ function SettingsPage({
       } else {
         setOllamaModels(result.models)
         // If we got models and no model is selected, auto-select the first one
-        if (result.models.length > 0 && !llmModel) {
+        if (result.models.length > 0 && !llmModelRef.current) {
           setLlmModel(result.models[0].name)
         }
       }
@@ -169,7 +150,7 @@ function SettingsPage({
     } finally {
       setOllamaModelsLoading(false)
     }
-  }, [llmModel])
+  }, [])
 
   // Fetch models when Ollama is selected and base URL is available
   useEffect(() => {

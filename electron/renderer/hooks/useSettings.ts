@@ -1,5 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 
+// Import and re-export LLM provider types from shared constants
+import {
+  LLM_PROVIDER_VALUES,
+  DEFAULT_LLM_PROVIDER,
+  normalizeLLMProvider,
+  type LLMProvider,
+} from '../constants/llmProviders'
+
+export {
+  LLM_PROVIDER_VALUES,
+  DEFAULT_LLM_PROVIDER,
+  normalizeLLMProvider,
+  type LLMProvider,
+}
+
 export const UI_THEME_VALUES = ['stellaris-cyan', 'tactica-green', 'command-amber'] as const
 export type UiTheme = (typeof UI_THEME_VALUES)[number]
 export const DEFAULT_UI_THEME: UiTheme = 'stellaris-cyan'
@@ -13,18 +28,6 @@ export function normalizeUiTheme(rawValue: unknown): UiTheme {
   return (UI_THEME_VALUES as readonly string[]).includes(rawValue)
     ? rawValue as UiTheme
     : DEFAULT_UI_THEME
-}
-
-// LLM Provider types
-export const LLM_PROVIDER_VALUES = ['gemini', 'openai', 'anthropic', 'openai-compatible', 'ollama'] as const
-export type LLMProvider = (typeof LLM_PROVIDER_VALUES)[number]
-export const DEFAULT_LLM_PROVIDER: LLMProvider = 'gemini'
-
-export function normalizeLLMProvider(rawValue: unknown): LLMProvider {
-  if (typeof rawValue !== 'string') return DEFAULT_LLM_PROVIDER
-  return (LLM_PROVIDER_VALUES as readonly string[]).includes(rawValue)
-    ? rawValue as LLMProvider
-    : DEFAULT_LLM_PROVIDER
 }
 
 export function normalizeChronicleRefreshMode(rawValue: unknown): ChronicleRefreshMode {

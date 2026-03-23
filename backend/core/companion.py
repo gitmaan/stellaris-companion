@@ -102,8 +102,10 @@ class Companion:
         # Override API key if explicitly provided (backward compatibility)
         if api_key:
             self._llm_config.api_key = api_key
-        elif not self._llm_config.api_key:
-            # Fallback to GOOGLE_API_KEY for backward compatibility
+        elif (
+            not self._llm_config.api_key and self._llm_config.provider == ProviderType.GOOGLE_GEMINI
+        ):
+            # Fallback to GOOGLE_API_KEY only for Gemini provider (backward compatibility)
             self._llm_config.api_key = os.environ.get("GOOGLE_API_KEY")
 
         # Validate API key for cloud providers
