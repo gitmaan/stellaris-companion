@@ -8,10 +8,13 @@ import { useErrorReporter } from './hooks/useErrorReporter'
 import { useAnnouncements } from './hooks/useAnnouncements'
 import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
+  DEFAULT_MODEL_ROUTING_MODE,
   DEFAULT_UI_THEME,
   normalizeChronicleRefreshMode,
+  normalizeModelRoutingMode,
   normalizeUiTheme,
   type ChronicleRefreshMode,
+  type ModelRoutingMode,
   type UiTheme,
 } from './hooks/useSettings'
 import { AnnouncementPanel } from './components/AnnouncementPanel'
@@ -44,6 +47,9 @@ function App() {
   const [chronicleRefreshMode, setChronicleRefreshMode] = useState<ChronicleRefreshMode>(
     DEFAULT_CHRONICLE_REFRESH_MODE,
   )
+  const [modelRoutingMode, setModelRoutingMode] = useState<ModelRoutingMode>(
+    DEFAULT_MODEL_ROUTING_MODE,
+  )
   // Onboarding: null = checking, true = done, false = show modal
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null)
 
@@ -60,13 +66,16 @@ function App() {
       const loadedSettings = settings as {
         uiTheme?: unknown
         chronicleRefreshMode?: unknown
+        modelRoutingMode?: unknown
       }
       const loadedTheme = normalizeUiTheme(loadedSettings?.uiTheme)
       const loadedChronicleRefreshMode = normalizeChronicleRefreshMode(
         loadedSettings?.chronicleRefreshMode,
       )
+      const loadedModelRoutingMode = normalizeModelRoutingMode(loadedSettings?.modelRoutingMode)
       setUiTheme(loadedTheme)
       setChronicleRefreshMode(loadedChronicleRefreshMode)
+      setModelRoutingMode(loadedModelRoutingMode)
     }).catch(() => {
       // Keep default theme when settings can't be loaded.
     })
@@ -226,6 +235,7 @@ function App() {
                     {tab === 'chat' && (
                       <ChatPage
                         isActive={isActive}
+                        modelRoutingMode={modelRoutingMode}
                         onReportLlmIssue={openLLMReportModal}
                       />
                     )}
@@ -233,6 +243,7 @@ function App() {
                       <ChroniclePage
                         isActive={isActive}
                         refreshMode={chronicleRefreshMode}
+                        modelRoutingMode={modelRoutingMode}
                       />
                     )}
                     {tab === 'settings' && (
@@ -241,6 +252,7 @@ function App() {
                         onReportIssue={openReportModal}
                         onThemeChange={setUiTheme}
                         onChronicleRefreshModeChange={setChronicleRefreshMode}
+                        onModelRoutingModeChange={setModelRoutingMode}
                       />
                     )}
                   </div>

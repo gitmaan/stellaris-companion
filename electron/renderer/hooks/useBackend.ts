@@ -2,7 +2,7 @@
 // Implements UI-006: useBackend hook with loading states and error handling
 
 import { useState, useCallback, useMemo, useRef } from 'react'
-import type { ChronicleRefreshMode } from './useSettings'
+import type { ChronicleRefreshMode, ModelRoutingMode } from './useSettings'
 
 // ============================================
 // API Response Types (match backend/api/server.py)
@@ -58,6 +58,11 @@ export interface ChatResponse {
   text: string
   game_date: string
   response_time_ms: number
+  model?: string
+  model_display?: string
+  requested_model?: string
+  requested_model_display?: string
+  model_routing?: ModelRoutingEvent | null
 }
 
 export interface ChatRetryResponse {
@@ -119,6 +124,7 @@ export interface RecapResponse {
   events_summarized: number
   date_range: string
   style?: string
+  model_routing?: ModelRoutingSummary | null
 }
 
 export interface NarrativeSection {
@@ -159,12 +165,36 @@ export interface ChronicleResponse {
   cached: boolean
   event_count: number
   generated_at: string
+  model_routing?: ModelRoutingSummary | null
+}
+
+export interface ModelRoutingEvent {
+  requested_model?: string
+  requested_model_display?: string
+  attempted_model?: string
+  attempted_model_display?: string
+  final_model?: string
+  final_model_display?: string
+  fallback?: boolean
+  reason?: string | null
+  notice?: string | null
+  error?: string | null
+}
+
+export interface ModelRoutingSummary {
+  mode?: string
+  model?: string | null
+  model_display?: string | null
+  fallback?: boolean
+  notice?: string | null
+  events?: ModelRoutingEvent[]
 }
 
 export interface RegenerateChapterResponse {
   chapter: ChronicleChapter
   regenerated: boolean
   stale_chapters: number[]
+  model_routing?: ModelRoutingSummary | null
   error?: string
   confirm_required?: boolean
 }
@@ -374,10 +404,12 @@ export function useBackend() {
    */
   const chat = useCallback(async (
     message: string,
-    sessionKey?: string
+    sessionKey?: string,
+    model?: string,
+    modelRoutingMode?: ModelRoutingMode,
   ): Promise<UseBackendResult<ChatResponse>> => {
     return callApi<ChatResponse>('chat', () =>
-      window.electronAPI!.backend.chat(message, sessionKey)
+      window.electronAPI!.backend.chat(message, sessionKey, model, modelRoutingMode)
     )
   }, [callApi])
 
@@ -417,10 +449,11 @@ export function useBackend() {
    */
   const recap = useCallback(async (
     sessionId: string,
-    style?: string
+    style?: string,
+    modelRoutingMode?: ModelRoutingMode,
   ): Promise<UseBackendResult<RecapResponse>> => {
     return callApi<RecapResponse>('recap', () =>
-      window.electronAPI!.backend.recap(sessionId, style)
+      window.electronAPI!.backend.recap(sessionId, style, modelRoutingMode)
     )
   }, [callApi])
 
@@ -434,9 +467,16 @@ export function useBackend() {
     forceRefresh?: boolean,
     chapterOnly?: boolean,
     refreshMode?: ChronicleRefreshMode,
+    modelRoutingMode?: ModelRoutingMode,
   ): Promise<UseBackendResult<ChronicleResponse>> => {
     return callApi<ChronicleResponse>('chronicle', () =>
-      window.electronAPI!.backend.chronicle(sessionId, forceRefresh, chapterOnly, refreshMode)
+      window.electronAPI!.backend.chronicle(
+        sessionId,
+        forceRefresh,
+        chapterOnly,
+        refreshMode,
+        modelRoutingMode,
+      )
     )
   }, [callApi])
 
@@ -449,10 +489,17 @@ export function useBackend() {
     sessionId: string,
     chapterNumber: number,
     confirm?: boolean,
-    regenerationInstructions?: string
+    regenerationInstructions?: string,
+    modelRoutingMode?: ModelRoutingMode,
   ): Promise<UseBackendResult<RegenerateChapterResponse>> => {
     return callApi<RegenerateChapterResponse>('regenerateChapter', () =>
-      window.electronAPI!.backend.regenerateChapter(sessionId, chapterNumber, confirm, regenerationInstructions)
+      window.electronAPI!.backend.regenerateChapter(
+        sessionId,
+        chapterNumber,
+        confirm,
+        regenerationInstructions,
+        modelRoutingMode,
+      )
     )
   }, [callApi])
 

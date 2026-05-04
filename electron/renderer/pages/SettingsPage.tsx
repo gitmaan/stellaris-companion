@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
+  DEFAULT_MODEL_ROUTING_MODE,
   DEFAULT_UI_THEME,
   normalizeChronicleRefreshMode,
+  normalizeModelRoutingMode,
   normalizeUiTheme,
   type ChronicleRefreshMode,
+  type ModelRoutingMode,
   type UiTheme,
   useSettings,
 } from '../hooks/useSettings'
@@ -32,6 +35,7 @@ interface SettingsPageProps {
   onReportIssue?: () => void
   onThemeChange?: (theme: UiTheme) => void
   onChronicleRefreshModeChange?: (mode: ChronicleRefreshMode) => void
+  onModelRoutingModeChange?: (mode: ModelRoutingMode) => void
 }
 
 const UI_SCALE_OPTIONS = [
@@ -63,10 +67,21 @@ const CHRONICLE_REFRESH_MODE_HELPERS: Record<ChronicleRefreshMode, string> = {
   enhanced: 'Faster current-era story updates while viewing Chronicle. Uses more Gemini calls.',
 }
 
+const MODEL_ROUTING_MODE_LABELS: Record<ModelRoutingMode, string> = {
+  quality_first: 'Quality First',
+  conserve: 'Quota Saver',
+}
+
+const MODEL_ROUTING_MODE_HELPERS: Record<ModelRoutingMode, string> = {
+  quality_first: 'Uses Gemini Flash first for Advisor and Chronicle, then falls back to Gemini 3.1 Flash-Lite Preview.',
+  conserve: 'Uses Gemini 3.1 Flash-Lite Preview for Advisor to save Gemini Flash quota for Chronicle writing.',
+}
+
 function SettingsPage({
   onReportIssue,
   onThemeChange,
   onChronicleRefreshModeChange,
+  onModelRoutingModeChange,
 }: SettingsPageProps) {
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
   const { showToast } = useToast()
@@ -91,6 +106,10 @@ function SettingsPage({
     DEFAULT_CHRONICLE_REFRESH_MODE,
   )
   const [chronicleRefreshModeSaving, setChronicleRefreshModeSaving] = useState(false)
+  const [modelRoutingMode, setModelRoutingMode] = useState<ModelRoutingMode>(
+    DEFAULT_MODEL_ROUTING_MODE,
+  )
+  const [modelRoutingModeSaving, setModelRoutingModeSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -112,12 +131,15 @@ function SettingsPage({
       const normalizedChronicleRefreshMode = normalizeChronicleRefreshMode(
         settings.chronicleRefreshMode,
       )
+      const normalizedModelRoutingMode = normalizeModelRoutingMode(settings.modelRoutingMode)
       setUiTheme(normalizedTheme)
       setChronicleRefreshMode(normalizedChronicleRefreshMode)
+      setModelRoutingMode(normalizedModelRoutingMode)
       onThemeChange?.(normalizedTheme)
       onChronicleRefreshModeChange?.(normalizedChronicleRefreshMode)
+      onModelRoutingModeChange?.(normalizedModelRoutingMode)
     }
-  }, [onChronicleRefreshModeChange, onThemeChange, settings])
+  }, [onChronicleRefreshModeChange, onModelRoutingModeChange, onThemeChange, settings])
 
   useEffect(() => {
     if (!settings) return
@@ -239,6 +261,36 @@ function SettingsPage({
     })
   }
 
+  const handleModelRoutingModeChange = async (rawValue: string) => {
+    const nextMode = normalizeModelRoutingMode(rawValue)
+    if (nextMode === modelRoutingMode) return
+
+    const previousMode = modelRoutingMode
+    setModelRoutingMode(nextMode)
+    onModelRoutingModeChange?.(nextMode)
+    setModelRoutingModeSaving(true)
+
+    const success = await saveSettings({ modelRoutingMode: nextMode })
+    setModelRoutingModeSaving(false)
+
+    if (!success) {
+      setModelRoutingMode(previousMode)
+      onModelRoutingModeChange?.(previousMode)
+      showToast({
+        type: 'error',
+        message: 'Failed to update model routing. Please try again.',
+        duration: 4000,
+      })
+      return
+    }
+
+    showToast({
+      type: 'success',
+      message: `Model routing set to ${MODEL_ROUTING_MODE_LABELS[nextMode]}.`,
+      duration: 1800,
+    })
+  }
+
   const handleRetryConnection = async () => {
     if (!window.electronAPI?.discord) return
     setRetrying(true)
@@ -351,6 +403,47 @@ function SettingsPage({
                                      GENERATE KEY &gt;
                                  </a>
                              </div>
+                             <div className="border-t border-white/10 pt-4 space-y-3">
+                                 <div className="flex items-center justify-between gap-3">
+                                     <HUDLabel>MODEL ROUTING</HUDLabel>
+                                     {modelRoutingModeSaving && (
+                                       <HUDMicro className="text-right">APPLYING...</HUDMicro>
+                                     )}
+                                 </div>
+
+                                 <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
+                                   {(['quality_first', 'conserve'] as const).map((mode) => {
+                                     const isSelected = modelRoutingMode === mode
+                                     return (
+                                       <button
+                                         key={mode}
+                                         type="button"
+                                         disabled={modelRoutingModeSaving}
+                                         aria-pressed={isSelected}
+                                         aria-label={`Set model routing to ${MODEL_ROUTING_MODE_LABELS[mode]}`}
+                                         onClick={() => void handleModelRoutingModeChange(mode)}
+                                         className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
+                                           isSelected
+                                             ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
+                                             : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
+                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                       >
+                                         <div className="font-display text-[11px] uppercase tracking-[0.18em]">
+                                           {MODEL_ROUTING_MODE_LABELS[mode]}
+                                         </div>
+                                         <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
+                                           {mode === 'quality_first' ? 'FLASH FIRST' : 'FLASH-LITE ADVISOR'}
+                                         </div>
+                                       </button>
+                                     )
+                                   })}
+                                 </div>
+
+                                 <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                   {MODEL_ROUTING_MODE_HELPERS[modelRoutingMode]}
+                                 </HUDMicro>
+                             </div>
+
                              <div className="border-t border-white/10 pt-4 space-y-3">
                                  <div className="flex items-center justify-between gap-3">
                                      <HUDLabel>CHRONICLE REFRESH</HUDLabel>

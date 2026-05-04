@@ -25,6 +25,17 @@ from pydantic import BaseModel, Field
 
 from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
+from backend.core.model_routing import (
+    GEMINI_FLASH_MODEL,
+    classify_model_error,
+    display_model_name,
+    fallback_notice,
+    get_model_unavailable_event,
+    is_model_temporarily_unavailable,
+    mark_model_failure,
+    normalize_model_routing_mode,
+    route_models_for,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -318,10 +329,20 @@ class ChronicleGenerator:
     STALE_EVENT_THRESHOLD = 10
     STALE_SNAPSHOT_THRESHOLD = 5
 
-    def __init__(self, db: GameDatabase, api_key: str | None = None):
+    def __init__(
+        self,
+        db: GameDatabase,
+        api_key: str | None = None,
+        *,
+        model_routing_mode: str | None = None,
+    ):
         self.db = db
         self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
         self._client: genai.Client | None = None
+        self.model_routing_mode = normalize_model_routing_mode(
+            model_routing_mode or os.environ.get("STELLARIS_MODEL_ROUTING_MODE")
+        )
+        self._model_route_events: list[dict[str, Any]] = []
 
     @property
     def client(self) -> genai.Client:
@@ -338,6 +359,7 @@ class ChronicleGenerator:
         force_refresh: bool = False,
         chapter_only: bool = False,
         refresh_mode: str = DEFAULT_CHRONICLE_REFRESH_MODE,
+        model_routing_mode: str | None = None,
     ) -> dict[str, Any]:
         """Generate an incremental chronicle for the session.
 
@@ -356,6 +378,9 @@ class ChronicleGenerator:
             # Fallback to session-based chronicle (legacy)
             return self._generate_legacy_chronicle(session_id, force_refresh=force_refresh)
 
+        self._model_route_events = []
+        if model_routing_mode:
+            self.model_routing_mode = normalize_model_routing_mode(model_routing_mode)
         refresh_mode = normalize_chronicle_refresh_mode(refresh_mode)
 
         # Load existing chapters data
@@ -586,6 +611,7 @@ class ChronicleGenerator:
             "cached": response_cached,
             "event_count": event_count,
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "model_routing": self._model_routing_response(),
         }
 
     def _should_regenerate_current_era_for_event_growth(
@@ -712,6 +738,7 @@ class ChronicleGenerator:
         *,
         confirm: bool = False,
         regeneration_instructions: str | None = None,
+        model_routing_mode: str | None = None,
     ) -> dict[str, Any]:
         """Regenerate a specific finalized chapter.
 
@@ -720,6 +747,9 @@ class ChronicleGenerator:
         """
         if not confirm:
             return {"error": "Must confirm regeneration", "confirm_required": True}
+        self._model_route_events = []
+        if model_routing_mode:
+            self.model_routing_mode = normalize_model_routing_mode(model_routing_mode)
 
         save_id = self.db.get_save_id_for_session(session_id)
         if not save_id:
@@ -799,6 +829,7 @@ class ChronicleGenerator:
             "chapter": chapter,
             "regenerated": True,
             "stale_chapters": list(range(chapter_number + 1, len(chapters) + 1)),
+            "model_routing": self._model_routing_response(),
         }
 
     def generate_recap(
@@ -807,12 +838,17 @@ class ChronicleGenerator:
         *,
         style: str = "summary",
         max_events: int = 30,
+        model_routing_mode: str | None = None,
     ) -> dict[str, Any]:
         """Generate a recap for the session.
 
         Args:
             style: "summary" (deterministic) or "dramatic" (LLM-powered)
         """
+        self._model_route_events = []
+        if model_routing_mode:
+            self.model_routing_mode = normalize_model_routing_mode(model_routing_mode)
+
         if style == "summary":
             from backend.core.reporting import build_session_report_text
 
@@ -831,16 +867,125 @@ class ChronicleGenerator:
 
         prompt = self._build_recap_prompt(data)
 
-        response = self.client.models.generate_content(
-            model="gemini-3-flash-preview",
+        response = self._generate_content_with_routing(
             contents=prompt,
             config={"temperature": 1.0, "max_output_tokens": 2048},
+            purpose_label="Chronicle recap",
         )
 
         return {
             "recap": response.text,
             "style": "dramatic",
             "events_summarized": len(data["events"]),
+            "model_routing": self._model_routing_response(),
+        }
+
+    def _generate_content_with_routing(
+        self,
+        *,
+        contents: str,
+        config: dict[str, Any],
+        purpose_label: str,
+    ) -> Any:
+        """Generate content with Flash-first routing and Flash-Lite fallback on quota errors."""
+        candidate_models = route_models_for(
+            mode=self.model_routing_mode,
+            purpose="chronicle",
+        )
+        requested_model = candidate_models[0] if candidate_models else GEMINI_FLASH_MODEL
+        route_event = None
+        last_error: Exception | None = None
+
+        for index, candidate_model in enumerate(candidate_models):
+            fallback_model = (
+                candidate_models[index + 1] if index + 1 < len(candidate_models) else None
+            )
+            if fallback_model and is_model_temporarily_unavailable(candidate_model):
+                route_event = get_model_unavailable_event(
+                    requested_model=requested_model,
+                    skipped_model=candidate_model,
+                    final_model=fallback_model,
+                )
+                continue
+
+            try:
+                response = self.client.models.generate_content(
+                    model=candidate_model,
+                    contents=contents,
+                    config=config,
+                )
+                final_event = route_event or (
+                    None
+                    if candidate_model == requested_model
+                    else get_model_unavailable_event(
+                        requested_model=requested_model,
+                        skipped_model=requested_model,
+                        final_model=candidate_model,
+                    )
+                )
+                if final_event:
+                    final_event.final_model = candidate_model
+                    self._model_route_events.append(final_event.to_dict())
+                else:
+                    self._model_route_events.append(
+                        {
+                            "requested_model": requested_model,
+                            "requested_model_display": display_model_name(requested_model),
+                            "attempted_model": candidate_model,
+                            "attempted_model_display": display_model_name(candidate_model),
+                            "final_model": candidate_model,
+                            "final_model_display": display_model_name(candidate_model),
+                            "fallback": False,
+                            "reason": None,
+                            "notice": None,
+                            "error": None,
+                        }
+                    )
+                return response
+            except Exception as exc:
+                last_error = exc
+                failure = classify_model_error(exc)
+                if failure and fallback_model:
+                    logger.warning(
+                        "%s failed on %s; routing via %s: %s",
+                        purpose_label,
+                        display_model_name(candidate_model),
+                        display_model_name(fallback_model),
+                        exc,
+                    )
+                    mark_model_failure(candidate_model, failure)
+                    route_event = get_model_unavailable_event(
+                        requested_model=requested_model,
+                        skipped_model=candidate_model,
+                        final_model=fallback_model,
+                    )
+                    if route_event:
+                        route_event.reason = failure.reason
+                        route_event.error = failure.message[:500]
+                        route_event.notice = fallback_notice(
+                            candidate_model,
+                            fallback_model,
+                            reason=failure.reason,
+                        )
+                    continue
+                raise
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("No Chronicle model was available")
+
+    def _model_routing_response(self) -> dict[str, Any]:
+        events = list(self._model_route_events)
+        last_event = events[-1] if events else None
+        fallback_events = [event for event in events if event.get("fallback")]
+        last_fallback = fallback_events[-1] if fallback_events else None
+        return {
+            "mode": self.model_routing_mode,
+            "model": last_event.get("final_model") if last_event else None,
+            "model_display": last_event.get("final_model_display") if last_event else None,
+            "fallback": bool(fallback_events),
+            "notice": last_fallback.get("notice") if last_fallback else None,
+            "events": events,
         }
 
     # --- Private Methods ---
@@ -1256,8 +1401,7 @@ Do NOT fabricate events not in the event list.
 {regen_section}"""
 
         try:
-            response = self.client.models.generate_content(
-                model="gemini-3-flash-preview",
+            response = self._generate_content_with_routing(
                 contents=prompt,
                 config={
                     "temperature": 1.0,
@@ -1265,6 +1409,7 @@ Do NOT fabricate events not in the event list.
                     "response_mime_type": "application/json",
                     "response_schema": ChapterOutput,
                 },
+                purpose_label=f"Chronicle chapter {chapter_number}",
             )
 
             # Parse with Pydantic for validation
@@ -1425,28 +1570,13 @@ Do NOT give advice. You are a historian, not an advisor.
 
         response = None
         try:
-            response = self.client.models.generate_content(
-                model="gemini-3-flash-preview",
+            response = self._generate_content_with_routing(
                 contents=prompt,
                 config=config,
+                purpose_label="Chronicle current era",
             )
-        except Exception as primary_error:
-            logger.warning(
-                "Current era generation failed on gemini-3-flash-preview, "
-                "retrying with gemini-2.5-flash: %s",
-                primary_error,
-            )
-            try:
-                response = self.client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt,
-                    config=config,
-                )
-            except Exception as fallback_error:
-                logger.warning(
-                    "Current era generation fallback failed on gemini-2.5-flash: %s",
-                    fallback_error,
-                )
+        except Exception as error:
+            logger.warning("Current era generation failed: %s", error)
 
         try:
             if response is None or not getattr(response, "text", None):
@@ -1502,6 +1632,7 @@ Do NOT give advice. You are a historian, not an advisor.
             "cached": False,
             "event_count": 0,
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "model_routing": self._model_routing_response(),
         }
 
     # --- Legacy Support ---
@@ -1534,10 +1665,10 @@ Do NOT give advice. You are a historian, not an advisor.
         prompt = self._build_chronicler_prompt(data)
 
         # Call Gemini
-        response = self.client.models.generate_content(
-            model="gemini-3-flash-preview",
+        response = self._generate_content_with_routing(
             contents=prompt,
             config={"temperature": 1.0, "max_output_tokens": 4096},
+            purpose_label="Chronicle legacy",
         )
 
         chronicle_text = response.text

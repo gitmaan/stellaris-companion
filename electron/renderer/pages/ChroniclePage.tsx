@@ -8,7 +8,9 @@ import { generateChronicleHtml } from '../lib/chronicleExport'
 import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
   type ChronicleRefreshMode,
+  type ModelRoutingMode,
 } from '../hooks/useSettings'
+import { HUDMicro } from '../components/hud/HUDText'
 
 interface SaveInfo {
   save_id: string
@@ -55,11 +57,13 @@ function isDocumentVisible(): boolean {
 interface ChroniclePageProps {
   isActive?: boolean
   refreshMode?: ChronicleRefreshMode
+  modelRoutingMode?: ModelRoutingMode
 }
 
 function ChroniclePage({
   isActive = true,
   refreshMode = DEFAULT_CHRONICLE_REFRESH_MODE,
+  modelRoutingMode,
 }: ChroniclePageProps) {
   const backend = useBackend()
   const isMountedRef = useRef(true)
@@ -229,6 +233,7 @@ function ChroniclePage({
         forceRefresh,
         chapterOnly,
         refreshMode,
+        modelRoutingMode,
       )
 
       if (!isMountedRef.current) return
@@ -284,7 +289,14 @@ function ChroniclePage({
         }
       }
     }
-  }, [backend, latestSessionBySaveId, refreshMode, selectedSaveId, totalSnapshotsBySaveId])
+  }, [
+    backend,
+    latestSessionBySaveId,
+    modelRoutingMode,
+    refreshMode,
+    selectedSaveId,
+    totalSnapshotsBySaveId,
+  ])
 
   const finalizePendingChaptersHidden = useCallback(async () => {
     if (isDocumentVisible()) return
@@ -574,7 +586,13 @@ function ChroniclePage({
       return
     }
 
-    const result = await backend.regenerateChapter(session.id, chapterNumber, true, regenerationInstructions)
+    const result = await backend.regenerateChapter(
+      session.id,
+      chapterNumber,
+      true,
+      regenerationInstructions,
+      modelRoutingMode,
+    )
 
     if (!isMountedRef.current) return
 
@@ -585,7 +603,13 @@ function ChroniclePage({
     }
 
     // Silently reload chronicle data without showing loading spinner
-    const chronicleResult = await backend.chronicle(session.id, false, false, refreshMode)
+    const chronicleResult = await backend.chronicle(
+      session.id,
+      false,
+      false,
+      refreshMode,
+      modelRoutingMode,
+    )
     if (!isMountedRef.current) return
 
     if (chronicleResult.data) {
@@ -598,7 +622,7 @@ function ChroniclePage({
     }
 
     setRegeneratingChapter(null)
-  }, [backend, selectedSaveId, confirmRegen, latestSessionBySaveId, refreshMode])
+  }, [backend, selectedSaveId, confirmRegen, latestSessionBySaveId, modelRoutingMode, refreshMode])
 
   // Cancel regeneration confirmation
   const handleCancelRegen = useCallback(() => {
@@ -676,6 +700,14 @@ function ChroniclePage({
                 >
                   Dismiss
                 </button>
+              </div>
+            )}
+
+            {chronicle?.model_routing?.fallback && chronicle.model_routing.notice && (
+              <div className="stellaris-panel bg-accent-yellow/10 border-accent-yellow/30 rounded-lg p-3 mb-4">
+                <HUDMicro className="text-accent-yellow">
+                  {chronicle.model_routing.notice}
+                </HUDMicro>
               </div>
             )}
 

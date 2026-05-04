@@ -61,8 +61,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   backend: {
     health: () => ipcRenderer.invoke('backend:health'),
     diagnostics: () => ipcRenderer.invoke('backend:diagnostics'),
-    chat: (message, sessionKey) =>
-      ipcRenderer.invoke('backend:chat', { message, session_key: sessionKey }),
+    chat: (message, sessionKey, model, modelRoutingMode) =>
+      ipcRenderer.invoke('backend:chat', {
+        message,
+        session_key: sessionKey,
+        model,
+        model_routing_mode: modelRoutingMode,
+      }),
     status: () => ipcRenderer.invoke('backend:status'),
     sessions: () => ipcRenderer.invoke('backend:sessions'),
     sessionEvents: (sessionId, limit) =>
@@ -70,21 +75,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
         session_id: sessionId,
         limit,
       }),
-    recap: (sessionId, style) =>
-      ipcRenderer.invoke('backend:recap', { session_id: sessionId, style: style || 'summary' }),
-    chronicle: (sessionId, forceRefresh, chapterOnly, refreshMode) =>
+    recap: (sessionId, style, modelRoutingMode) =>
+      ipcRenderer.invoke('backend:recap', {
+        session_id: sessionId,
+        style: style || 'summary',
+        model_routing_mode: modelRoutingMode,
+      }),
+    chronicle: (sessionId, forceRefresh, chapterOnly, refreshMode, modelRoutingMode) =>
       ipcRenderer.invoke('backend:chronicle', {
         session_id: sessionId,
         force_refresh: forceRefresh || false,
         chapter_only: chapterOnly || false,
         refresh_mode: refreshMode || 'balanced',
+        model_routing_mode: modelRoutingMode,
       }),
-    regenerateChapter: (sessionId, chapterNumber, confirm, regenerationInstructions) =>
+    regenerateChapter: (sessionId, chapterNumber, confirm, regenerationInstructions, modelRoutingMode) =>
       ipcRenderer.invoke('backend:regenerate-chapter', {
         session_id: sessionId,
         chapter_number: chapterNumber,
         confirm: confirm || false,
         regeneration_instructions: regenerationInstructions || null,
+        model_routing_mode: modelRoutingMode,
       }),
     endSession: () => ipcRenderer.invoke('backend:end-session'),
     getChronicleCustom: () => ipcRenderer.invoke('backend:get-chronicle-custom'),

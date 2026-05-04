@@ -17,6 +17,7 @@ from backend.core.chronicle import (
     _sections_to_text,
     get_current_era_regen_min_new_events,
 )
+from backend.core.model_routing import clear_model_state
 
 
 class TestRepairJsonString:
@@ -1328,14 +1329,16 @@ class TestCurrentEraFallbackModel:
 
     @pytest.fixture
     def generator(self):
+        clear_model_state()
         mock_db = MagicMock()
         mock_db.get_events_in_snapshot_range.return_value = [
             {"event_type": "war_started", "summary": "War begun", "game_date": "2205.01.01"}
         ]
-        return ChronicleGenerator(db=mock_db, api_key="fake-key")
+        yield ChronicleGenerator(db=mock_db, api_key="fake-key")
+        clear_model_state()
 
-    def test_falls_back_to_gemini_25_flash_for_current_era(self, generator):
-        """Current-era generation should retry on gemini-2.5-flash after primary failure."""
+    def test_falls_back_to_flash_lite_for_current_era(self, generator):
+        """Current-era generation should route via Flash-Lite after Flash quota failure."""
         mock_client = MagicMock()
         mock_client.models.generate_content.side_effect = [
             RuntimeError("quota"),
@@ -1369,7 +1372,8 @@ class TestCurrentEraFallbackModel:
         first_call = mock_client.models.generate_content.call_args_list[0]
         second_call = mock_client.models.generate_content.call_args_list[1]
         assert first_call.kwargs["model"] == "gemini-3-flash-preview"
-        assert second_call.kwargs["model"] == "gemini-2.5-flash"
+        assert second_call.kwargs["model"] == "gemini-3.1-flash-lite-preview"
+        assert generator._model_routing_response()["fallback"] is True  # type: ignore[attr-defined]
 
 
 class TestSectionsToText:

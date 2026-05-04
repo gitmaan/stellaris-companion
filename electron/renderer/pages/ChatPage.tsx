@@ -5,6 +5,7 @@ import ChatInput from '../components/ChatInput'
 import VirtualChatList from '../components/VirtualChatList'
 import AdvisorInfoPanel from '../components/AdvisorInfoPanel'
 import { useBackend, ChatResponse, EmpireType } from '../hooks/useBackend'
+import type { ModelRoutingMode } from '../hooks/useSettings'
 import { HUDHeader } from '../components/hud/HUDText'
 import { HUDPanel } from '../components/hud/HUDPanel'
 import { FolderIconG } from '../components/icons/FolderIcon'
@@ -139,6 +140,9 @@ interface Message {
   content: string
   timestamp: Date
   responseTimeMs?: number
+  model?: string
+  modelDisplay?: string
+  modelRouting?: ChatResponse['model_routing']
   isError?: boolean
 }
 
@@ -171,6 +175,7 @@ function buildRecentTurnsForReport(messages: Message[], assistantIndex: number):
  */
 interface ChatPageProps {
   isActive?: boolean
+  modelRoutingMode?: ModelRoutingMode
   onReportLlmIssue?: (llm: {
     lastPrompt?: string
     lastResponse?: string
@@ -182,6 +187,7 @@ interface ChatPageProps {
 
 function ChatPage({
   isActive = true,
+  modelRoutingMode,
   onReportLlmIssue,
 }: ChatPageProps) {
   const backend = useBackend()
@@ -282,7 +288,7 @@ function ChatPage({
     setIsLoading(true)
 
     try {
-      const result = await backend.chat(text, sessionKey)
+      const result = await backend.chat(text, sessionKey, undefined, modelRoutingMode)
 
       // Only update state if component is still mounted
       if (!isMountedRef.current) return
@@ -318,6 +324,9 @@ function ChatPage({
           content: chatResponse.text,
           timestamp: new Date(),
           responseTimeMs: chatResponse.response_time_ms,
+          model: chatResponse.model,
+          modelDisplay: chatResponse.model_display,
+          modelRouting: chatResponse.model_routing,
         }
         setMessages(prev => capMessages([...prev, assistantMessage]))
       }
@@ -339,7 +348,7 @@ function ChatPage({
         setIsLoading(false)
       }
     }
-  }, [backend, sessionKey, empireType])
+  }, [backend, sessionKey, empireType, modelRoutingMode])
 
   const handleNewChat = useCallback(() => {
     if (isLoading) return
@@ -361,6 +370,8 @@ function ChatPage({
           content={message.content}
           timestamp={message.timestamp}
           responseTimeMs={message.responseTimeMs}
+          modelDisplay={message.modelDisplay}
+          modelRouting={message.modelRouting}
           isError={message.isError}
           onReport={
             onReportLlmIssue && message.role === 'assistant' && !message.isError
@@ -371,7 +382,7 @@ function ChatPage({
                   lastResponse: truncateForReport(message.content),
                   recentTurns: buildRecentTurnsForReport(messages, idx),
                   responseTimeMs: message.responseTimeMs,
-                  model: 'gemini-3-flash-preview',
+                  model: message.model,
                 })
               }
               : undefined

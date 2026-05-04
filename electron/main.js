@@ -154,6 +154,7 @@ const store = new Store({
     uiScale: 1,
     uiTheme: 'stellaris-cyan',
     chronicleRefreshMode: 'balanced',
+    modelRoutingMode: 'quality_first',
     hasCompletedOnboarding: false,
     // Window state persistence
     windowState: {
@@ -220,6 +221,8 @@ const UI_THEME_PRESETS = ['stellaris-cyan', 'tactica-green', 'command-amber']
 const DEFAULT_UI_THEME = 'stellaris-cyan'
 const CHRONICLE_REFRESH_MODE_PRESETS = ['balanced', 'enhanced']
 const DEFAULT_CHRONICLE_REFRESH_MODE = 'balanced'
+const MODEL_ROUTING_MODE_PRESETS = ['quality_first', 'conserve']
+const DEFAULT_MODEL_ROUTING_MODE = 'quality_first'
 
 // Discord configuration (DISC-007)
 // These are set via environment or will use defaults for development
@@ -301,6 +304,8 @@ function buildBackendEnv(settings) {
   if (settings.googleApiKey) {
     env.GOOGLE_API_KEY = settings.googleApiKey
   }
+
+  env.STELLARIS_MODEL_ROUTING_MODE = normalizeModelRoutingMode(settings.modelRoutingMode)
 
   // Prefer an explicit directory, otherwise auto-detect a standard location.
   const effectiveSaveDir = getEffectiveSaveDir(settings)
@@ -712,6 +717,20 @@ function getChronicleRefreshModeSetting() {
   )
 }
 
+function normalizeModelRoutingMode(rawValue) {
+  if (typeof rawValue !== 'string') return DEFAULT_MODEL_ROUTING_MODE
+  const normalized = rawValue.replace(/-/g, '_')
+  if (normalized === 'auto' || normalized === 'flash_first') return 'quality_first'
+  if (normalized === 'quota_saver' || normalized === 'lite_first' || normalized === 'flash_lite_first') return 'conserve'
+  return MODEL_ROUTING_MODE_PRESETS.includes(normalized)
+    ? normalized
+    : DEFAULT_MODEL_ROUTING_MODE
+}
+
+function getModelRoutingModeSetting() {
+  return normalizeModelRoutingMode(store.get('modelRoutingMode', DEFAULT_MODEL_ROUTING_MODE))
+}
+
 function applyUiScaleToWindow(targetWindow = mainWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) return
   targetWindow.webContents.setZoomFactor(getUiScaleSetting())
@@ -743,6 +762,7 @@ function getSettings() {
   const uiScale = getUiScaleSetting()
   const uiTheme = getUiThemeSetting()
   const chronicleRefreshMode = getChronicleRefreshModeSetting()
+  const modelRoutingMode = getModelRoutingModeSetting()
 
   return {
     googleApiKey: maskSecret(googleApiKey),
@@ -756,6 +776,7 @@ function getSettings() {
     uiScale,
     uiTheme,
     chronicleRefreshMode,
+    modelRoutingMode,
   }
 }
 
@@ -772,6 +793,7 @@ function getSettingsWithSecrets() {
   const uiScale = getUiScaleSetting()
   const uiTheme = getUiThemeSetting()
   const chronicleRefreshMode = getChronicleRefreshModeSetting()
+  const modelRoutingMode = getModelRoutingModeSetting()
 
   return {
     googleApiKey,
@@ -784,6 +806,7 @@ function getSettingsWithSecrets() {
     uiScale,
     uiTheme,
     chronicleRefreshMode,
+    modelRoutingMode,
   }
 }
 
@@ -827,6 +850,10 @@ function saveSettings(settings) {
       'chronicleRefreshMode',
       normalizeChronicleRefreshMode(settings.chronicleRefreshMode),
     )
+  }
+
+  if (settings.modelRoutingMode !== undefined) {
+    store.set('modelRoutingMode', normalizeModelRoutingMode(settings.modelRoutingMode))
   }
 
   return { success: true }
@@ -1353,7 +1380,8 @@ registerSettingsIpcHandlers({
     const backendRelevantSettingsChanged =
       changedSettings.googleApiKey !== undefined ||
       changedSettings.saveDir !== undefined ||
-      changedSettings.savePath !== undefined
+      changedSettings.savePath !== undefined ||
+      changedSettings.modelRoutingMode !== undefined
 
     if (backendRelevantSettingsChanged && !E2E_SKIP_BACKEND_AUTOSTART) {
       restartPythonBackend(fullSettings)

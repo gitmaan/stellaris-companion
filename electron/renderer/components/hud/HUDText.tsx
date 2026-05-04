@@ -3,6 +3,7 @@ import React, { ReactNode } from 'react';
 interface TextProps {
   children: ReactNode;
   className?: string;
+  title?: string;
 }
 
 export const HUDHeader: React.FC<TextProps & { size?: 'sm' | 'md' | 'lg' | 'xl' }> = ({ 
@@ -33,9 +34,12 @@ export const HUDLabel: React.FC<TextProps> = ({ children, className = '' }) => {
 };
 
 // Extremely small technical label
-export const HUDMicro: React.FC<TextProps> = ({ children, className = '' }) => {
+export const HUDMicro: React.FC<TextProps> = ({ children, className = '', title }) => {
   return (
-    <span className={`font-mono text-[9px] tracking-[0.1em] text-white/30 uppercase ${className}`}>
+    <span
+      className={`font-mono text-[9px] tracking-[0.1em] text-white/30 uppercase ${className}`}
+      title={title}
+    >
       {children}
     </span>
   );

@@ -18,7 +18,7 @@ import type {
   SessionsResponse,
   StatusResponse,
 } from './hooks/useBackend'
-import type { ChronicleRefreshMode } from './hooks/useSettings'
+import type { ChronicleRefreshMode, ModelRoutingMode } from './hooks/useSettings'
 
 declare global {
   interface Window {
@@ -26,18 +26,34 @@ declare global {
       backend: {
         health: () => Promise<BackendIpcResponse<HealthResponse>>
         diagnostics: () => Promise<BackendIpcResponse<DiagnosticsResponse>>
-        chat: (message: string, sessionKey?: string) => Promise<BackendIpcResponse<ChatResponse>>
+        chat: (
+          message: string,
+          sessionKey?: string,
+          model?: string,
+          modelRoutingMode?: ModelRoutingMode,
+        ) => Promise<BackendIpcResponse<ChatResponse>>
         status: () => Promise<BackendIpcResponse<StatusResponse>>
         sessions: () => Promise<BackendIpcResponse<SessionsResponse>>
         sessionEvents: (sessionId: string, limit?: number) => Promise<BackendIpcResponse<SessionEventsResponse>>
-        recap: (sessionId: string, style?: string) => Promise<BackendIpcResponse<RecapResponse>>
+        recap: (
+          sessionId: string,
+          style?: string,
+          modelRoutingMode?: ModelRoutingMode,
+        ) => Promise<BackendIpcResponse<RecapResponse>>
         chronicle: (
           sessionId: string,
           forceRefresh?: boolean,
           chapterOnly?: boolean,
           refreshMode?: ChronicleRefreshMode,
+          modelRoutingMode?: ModelRoutingMode,
         ) => Promise<BackendIpcResponse<ChronicleResponse>>
-        regenerateChapter: (sessionId: string, chapterNumber: number, confirm?: boolean, regenerationInstructions?: string) => Promise<BackendIpcResponse<RegenerateChapterResponse>>
+        regenerateChapter: (
+          sessionId: string,
+          chapterNumber: number,
+          confirm?: boolean,
+          regenerationInstructions?: string,
+          modelRoutingMode?: ModelRoutingMode,
+        ) => Promise<BackendIpcResponse<RegenerateChapterResponse>>
         endSession: () => Promise<BackendIpcResponse<EndSessionResponse>>
         getChronicleCustom: () => Promise<BackendIpcResponse<ChronicleCustomResponse>>
         setChronicleCustom: (customInstructions: string) => Promise<BackendIpcResponse<ChronicleCustomResponse>>

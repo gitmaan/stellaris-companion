@@ -38,6 +38,7 @@ def test_api_chronicle_serializes_concurrent_requests(monkeypatch):
         force_refresh=False,
         chapter_only=False,
         refresh_mode="balanced",
+        model_routing_mode=None,
     ):
         started.set()
         # Hold the request open long enough for a second request to arrive.
@@ -96,6 +97,7 @@ def test_api_chronicle_releases_lock_on_exception(monkeypatch):
         force_refresh=False,
         chapter_only=False,
         refresh_mode="balanced",
+        model_routing_mode=None,
     ):
         raise RuntimeError("boom")
 
@@ -115,6 +117,7 @@ def test_api_chronicle_releases_lock_on_exception(monkeypatch):
         force_refresh=False,
         chapter_only=False,
         refresh_mode="balanced",
+        model_routing_mode=None,
     ):
         return {"ok": True}
 

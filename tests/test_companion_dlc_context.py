@@ -11,6 +11,11 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.companion import Companion
+from backend.core.model_routing import (
+    GEMINI_FLASH_LITE_MODEL,
+    GEMINI_FLASH_MODEL,
+    clear_model_state,
+)
 
 
 class _DummyClient:
@@ -43,8 +48,10 @@ def _situation() -> dict:
 
 @pytest.fixture
 def companion(monkeypatch):
+    clear_model_state()
     monkeypatch.setattr("backend.core.companion.genai.Client", _DummyClient)
-    return Companion(save_path=None, api_key="test-key", auto_precompute=False)
+    yield Companion(save_path=None, api_key="test-key", auto_precompute=False)
+    clear_model_state()
 
 
 def test_apply_precomputed_briefing_uses_metadata_for_dlc_prompt_context(companion):
@@ -260,7 +267,87 @@ def test_ask_precomputed_injects_policy_block_but_uses_normal_advisor_path(compa
     )
 
     assert answer == "President, our naval ledgers remain estimates rather than certainties."
+    assert captured["model"] == "gemini-3-flash-preview"
     assert "NAVAL CAPACITY RESPONSE POLICY:" in captured["system_instruction"]
     assert "Response state: estimated." in captured["system_instruction"]
     assert "cannot confirm whether the empire is over naval cap" in captured["system_instruction"]
+    assert companion.get_call_stats()["model"] == "gemini-3-flash-preview"
     assert companion.get_call_stats()["tools_used"] == ["ask_precomputed_no_tools"]
+
+
+def test_ask_precomputed_allows_model_override(companion):
+    briefing_json = json.dumps({"meta": {"date": "2230.07.01", "version": "Corvus v4.2.4"}})
+    captured = {}
+
+    def _fake_generate_content(*, model, contents, config):
+        captured["model"] = model
+        captured["contents"] = contents
+        captured["system_instruction"] = config.system_instruction
+        return SimpleNamespace(text="A different model answered this.")
+
+    companion.client.models.generate_content = _fake_generate_content
+
+    companion.apply_precomputed_briefing(
+        save_path=None,
+        briefing_json=briefing_json,
+        game_date="2230.07.01",
+        identity=_identity(),
+        situation=_situation(),
+        metadata={"version": "Corvus v4.2.4", "required_dlcs": [], "missing_dlcs": []},
+    )
+
+    answer, _elapsed = companion.ask_precomputed(
+        question="Summarize our position.",
+        session_key="override-model",
+        model_name="gemma-4-31b-it",
+    )
+
+    assert answer == "A different model answered this."
+    assert captured["model"] == "gemma-4-31b-it"
+    assert companion.get_call_stats()["model"] == "gemma-4-31b-it"
+
+
+def test_ask_precomputed_routes_to_flash_lite_when_flash_hits_quota(companion):
+    clear_model_state()
+    briefing_json = json.dumps({"meta": {"date": "2230.07.01", "version": "Corvus v4.2.4"}})
+    calls: list[str] = []
+
+    def _fake_generate_content(*, model, contents, config):
+        calls.append(model)
+        if model == GEMINI_FLASH_MODEL:
+            raise RuntimeError(
+                "429 RESOURCE_EXHAUSTED Quota exceeded for quotaId': "
+                "'GenerateRequestsPerMinutePerProjectPerModel-FreeTier', quotaValue': '5'. "
+                "Please retry in 42s"
+            )
+        return SimpleNamespace(text="Gemini Flash-Lite answered after Flash hit quota.")
+
+    companion.client.models.generate_content = _fake_generate_content
+
+    companion.apply_precomputed_briefing(
+        save_path=None,
+        briefing_json=briefing_json,
+        game_date="2230.07.01",
+        identity=_identity(),
+        situation=_situation(),
+        metadata={"version": "Corvus v4.2.4", "required_dlcs": [], "missing_dlcs": []},
+    )
+
+    try:
+        answer, _elapsed = companion.ask_precomputed(
+            question="Summarize our position.",
+            session_key="route-on-quota",
+        )
+    finally:
+        clear_model_state()
+
+    stats = companion.get_call_stats()
+    assert answer == "Gemini Flash-Lite answered after Flash hit quota."
+    assert calls == [GEMINI_FLASH_MODEL, GEMINI_FLASH_LITE_MODEL]
+    assert stats["model"] == GEMINI_FLASH_LITE_MODEL
+    assert stats["model_display"] == "Gemini Flash-Lite"
+    assert stats["routing"]["fallback"] is True
+    assert stats["routing"]["final_model_display"] == "Gemini Flash-Lite"
+    assert (
+        stats["routing"]["notice"] == "Gemini Flash is cooling down. Routing via Gemini Flash-Lite."
+    )

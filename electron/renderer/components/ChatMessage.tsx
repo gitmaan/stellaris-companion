@@ -4,12 +4,15 @@ import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import { HUDMicro } from './hud/HUDText'
+import type { ModelRoutingEvent } from '../hooks/useBackend'
 
 interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
   timestamp?: Date
   responseTimeMs?: number
+  modelDisplay?: string
+  modelRouting?: ModelRoutingEvent | null
   isError?: boolean
   onReport?: () => void
 }
@@ -81,7 +84,16 @@ const markdownComponents: Components = {
  * ChatMessage - Data Log Style
  */
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMessage(
-  { role, content, timestamp, responseTimeMs, isError, onReport }: ChatMessageProps,
+  {
+    role,
+    content,
+    timestamp,
+    responseTimeMs,
+    modelDisplay,
+    modelRouting,
+    isError,
+    onReport,
+  }: ChatMessageProps,
   ref,
 ) {
   const formatTime = (date: Date) => {
@@ -92,6 +104,15 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
 
   const headerColor = isError ? 'text-accent-red' : isUser ? 'text-accent-cyan' : 'text-accent-teal'
   const bodyTextSize = role === 'assistant' ? 'text-base' : 'text-sm'
+  const finalModelDisplay = modelRouting?.final_model_display || modelDisplay
+  const routingNotice = modelRouting?.fallback
+    ? modelRouting.notice || `Routing via ${finalModelDisplay || 'Gemini Flash-Lite'}.`
+    : null
+  const modelReadout = routingNotice
+    ? `ROUTING VIA ${finalModelDisplay || 'GEMINI FLASH-LITE'}`
+    : finalModelDisplay
+      ? `MODEL: ${finalModelDisplay}`
+      : null
 
   return (
     <motion.div
@@ -136,10 +157,18 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
         </div>
 
         {/* Footer Metadata (Tech Readout) */}
-        {!isUser && !isError && (responseTimeMs !== undefined || !!onReport) && (
+        {!isUser && !isError && (responseTimeMs !== undefined || !!modelReadout || !!onReport) && (
           <div className="flex items-center gap-4 mt-2 pt-1 border-t border-white/5 opacity-50 group-hover:opacity-100 transition-opacity">
               {responseTimeMs !== undefined && (
                 <HUDMicro>LATENCY: {(responseTimeMs / 1000).toFixed(3)}s</HUDMicro>
+              )}
+              {modelReadout && (
+                <HUDMicro
+                  className={routingNotice ? 'text-accent-yellow/80' : undefined}
+                  title={routingNotice || undefined}
+                >
+                  {modelReadout}
+                </HUDMicro>
               )}
               {onReport && (
                 <button

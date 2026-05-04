@@ -6,6 +6,9 @@ export const DEFAULT_UI_THEME: UiTheme = 'stellaris-cyan'
 export const CHRONICLE_REFRESH_MODE_VALUES = ['balanced', 'enhanced'] as const
 export type ChronicleRefreshMode = (typeof CHRONICLE_REFRESH_MODE_VALUES)[number]
 export const DEFAULT_CHRONICLE_REFRESH_MODE: ChronicleRefreshMode = 'balanced'
+export const MODEL_ROUTING_MODE_VALUES = ['quality_first', 'conserve'] as const
+export type ModelRoutingMode = (typeof MODEL_ROUTING_MODE_VALUES)[number]
+export const DEFAULT_MODEL_ROUTING_MODE: ModelRoutingMode = 'quality_first'
 
 export function normalizeUiTheme(rawValue: unknown): UiTheme {
   if (typeof rawValue !== 'string') return DEFAULT_UI_THEME
@@ -22,6 +25,16 @@ export function normalizeChronicleRefreshMode(rawValue: unknown): ChronicleRefre
     : DEFAULT_CHRONICLE_REFRESH_MODE
 }
 
+export function normalizeModelRoutingMode(rawValue: unknown): ModelRoutingMode {
+  if (typeof rawValue !== 'string') return DEFAULT_MODEL_ROUTING_MODE
+  const normalized = rawValue.replace(/-/g, '_')
+  if (normalized === 'auto' || normalized === 'flash_first') return 'quality_first'
+  if (normalized === 'quota_saver' || normalized === 'lite_first' || normalized === 'flash_lite_first') return 'conserve'
+  return (MODEL_ROUTING_MODE_VALUES as readonly string[]).includes(normalized)
+    ? normalized as ModelRoutingMode
+    : DEFAULT_MODEL_ROUTING_MODE
+}
+
 export interface Settings {
   googleApiKey: string
   googleApiKeySet: boolean
@@ -34,6 +47,7 @@ export interface Settings {
   uiScale: number
   uiTheme: UiTheme
   chronicleRefreshMode: ChronicleRefreshMode
+  modelRoutingMode: ModelRoutingMode
 }
 
 export interface UseSettingsResult {
@@ -63,6 +77,7 @@ export function useSettings(): UseSettingsResult {
       const loaded = await window.electronAPI.getSettings() as Settings & {
         uiTheme?: unknown
         chronicleRefreshMode?: unknown
+        modelRoutingMode?: unknown
       }
       const parsedUiScale = Number(loaded.uiScale)
       const normalized: Settings = {
@@ -71,6 +86,7 @@ export function useSettings(): UseSettingsResult {
         uiScale: Number.isFinite(parsedUiScale) ? parsedUiScale : 1,
         uiTheme: normalizeUiTheme(loaded.uiTheme),
         chronicleRefreshMode: normalizeChronicleRefreshMode(loaded.chronicleRefreshMode),
+        modelRoutingMode: normalizeModelRoutingMode(loaded.modelRoutingMode),
       }
       setSettings(normalized)
       setError(null)

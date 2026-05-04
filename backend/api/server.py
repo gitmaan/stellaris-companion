@@ -32,6 +32,8 @@ class ChatRequest(BaseModel):
 
     message: str
     session_key: str = "default"
+    model: str | None = None
+    model_routing_mode: str | None = None
 
 
 class RecapRequest(BaseModel):
@@ -39,6 +41,7 @@ class RecapRequest(BaseModel):
 
     session_id: str
     style: str = "summary"  # "summary" (deterministic) or "dramatic" (LLM-powered)
+    model_routing_mode: str | None = None
 
 
 class ChronicleRequest(BaseModel):
@@ -48,6 +51,7 @@ class ChronicleRequest(BaseModel):
     force_refresh: bool = False
     chapter_only: bool = False
     refresh_mode: str = "balanced"
+    model_routing_mode: str | None = None
 
 
 class RegenerateChapterRequest(BaseModel):
@@ -57,6 +61,7 @@ class RegenerateChapterRequest(BaseModel):
     chapter_number: int
     confirm: bool = False
     regeneration_instructions: str | None = None
+    model_routing_mode: str | None = None
 
 
 class AdvisorCustomRequest(BaseModel):
@@ -534,17 +539,27 @@ def create_app() -> FastAPI:
         start_time = time.time()
         save_id, _ = _resolve_current_save_id(request)
         scoped_session_key = _scope_chat_session_key(save_id=save_id, client_key=body.session_key)
+        requested_model = (body.model or "").strip()[:120] or None
         response_text, elapsed = companion.ask_precomputed(
             question=body.message,
             session_key=scoped_session_key,
             save_id=save_id,
+            model_name=requested_model,
+            model_routing_mode=body.model_routing_mode,
         )
         response_time_ms = int((time.time() - start_time) * 1000)
+        call_stats = companion.get_call_stats()
+        response_model = call_stats.get("model") or companion.get_advisor_model()
 
         return {
             "text": response_text,
             "game_date": precompute_status.get("game_date"),
             "response_time_ms": response_time_ms,
+            "model": response_model,
+            "model_display": call_stats.get("model_display"),
+            "requested_model": call_stats.get("requested_model"),
+            "requested_model_display": call_stats.get("requested_model_display"),
+            "model_routing": call_stats.get("routing"),
         }
 
     @app.get("/api/status", dependencies=[Depends(verify_token)])
@@ -821,12 +836,13 @@ def create_app() -> FastAPI:
         # Use ChronicleGenerator for both styles
         from backend.core.chronicle import ChronicleGenerator
 
-        generator = ChronicleGenerator(db=db)
+        generator = ChronicleGenerator(db=db, model_routing_mode=body.model_routing_mode)
 
         try:
             result = generator.generate_recap(
                 session_id=body.session_id,
                 style=body.style,
+                model_routing_mode=body.model_routing_mode,
             )
             result["date_range"] = date_range
             return result
@@ -884,7 +900,7 @@ def create_app() -> FastAPI:
 
         from backend.core.chronicle import ChronicleGenerator
 
-        generator = ChronicleGenerator(db=db)
+        generator = ChronicleGenerator(db=db, model_routing_mode=body.model_routing_mode)
 
         try:
             result = generator.generate_chronicle(
@@ -892,6 +908,7 @@ def create_app() -> FastAPI:
                 force_refresh=body.force_refresh,
                 chapter_only=body.chapter_only,
                 refresh_mode=body.refresh_mode,
+                model_routing_mode=body.model_routing_mode,
             )
             return result
         except ValueError as e:
@@ -935,7 +952,7 @@ def create_app() -> FastAPI:
 
         from backend.core.chronicle import ChronicleGenerator
 
-        generator = ChronicleGenerator(db=db)
+        generator = ChronicleGenerator(db=db, model_routing_mode=body.model_routing_mode)
 
         try:
             result = generator.regenerate_chapter(
@@ -943,6 +960,7 @@ def create_app() -> FastAPI:
                 chapter_number=body.chapter_number,
                 confirm=body.confirm,
                 regeneration_instructions=body.regeneration_instructions,
+                model_routing_mode=body.model_routing_mode,
             )
             return result
         except ValueError as e:

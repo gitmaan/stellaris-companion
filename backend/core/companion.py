@@ -29,12 +29,26 @@ except ImportError:
 
 from backend.core.conversation import ConversationManager
 from backend.core.json_utils import json_dumps
+from backend.core.model_routing import (
+    GEMINI_FLASH_MODEL,
+    classify_model_error,
+    display_model_name,
+    fallback_notice,
+    get_model_unavailable_event,
+    is_model_temporarily_unavailable,
+    mark_model_failure,
+    normalize_model_routing_mode,
+    route_event_payload,
+    route_models_for,
+)
 from backend.core.utils import compute_save_hash_from_briefing
 from stellaris_companion.personality import build_optimized_prompt
 from stellaris_save_extractor import SaveExtractor
 
 # Configure dedicated logger for companion performance metrics
 logger = logging.getLogger("stellaris.companion")
+
+DEFAULT_ADVISOR_MODEL = GEMINI_FLASH_MODEL
 
 
 # Fallback system prompt (used if personality generation fails)
@@ -73,6 +87,8 @@ class Companion:
         api_key: str | None = None,
         *,
         auto_precompute: bool = True,
+        advisor_model: str = DEFAULT_ADVISOR_MODEL,
+        model_routing_mode: str | None = None,
     ):
         """Initialize the companion.
 
@@ -88,6 +104,12 @@ class Companion:
         self.client = genai.Client(api_key=self.api_key)
         self._thinking_level = "dynamic"
         self._auto_precompute = bool(auto_precompute)
+        self.advisor_model = (
+            str(advisor_model or DEFAULT_ADVISOR_MODEL).strip() or DEFAULT_ADVISOR_MODEL
+        )
+        self.model_routing_mode = normalize_model_routing_mode(
+            model_routing_mode or os.environ.get("STELLARIS_MODEL_ROUTING_MODE")
+        )
 
         # Initialize save-related attributes
         self.save_path: Path | None = None
@@ -106,6 +128,9 @@ class Companion:
             "wall_time_ms": 0.0,
             "response_length": 0,
             "payload_sizes": {},
+            "model": self.advisor_model,
+            "model_display": display_model_name(self.advisor_model),
+            "routing": None,
         }
 
         # Save state tracking
@@ -363,6 +388,10 @@ class Companion:
                 - payload_sizes: dict mapping tool names to response sizes in bytes
         """
         return self._last_call_stats.copy()
+
+    def get_advisor_model(self) -> str:
+        """Return the default advisor model for chat requests."""
+        return self.advisor_model
 
     def get_precompute_status(self) -> dict[str, Any]:
         """Get current Phase 4 precompute cache status (safe for UI display)."""
@@ -899,9 +928,13 @@ class Companion:
         session_key: str,
         save_id: str | None = None,
         history_context: str | None = None,
+        model_name: str | None = None,
+        model_routing_mode: str | None = None,
     ) -> tuple[str, float]:
         """Ask a question using the fully precomputed briefing (no tools)."""
         start_time = time.time()
+        explicit_model = str(model_name).strip() if model_name else None
+        selected_model = explicit_model or self.advisor_model or DEFAULT_ADVISOR_MODEL
 
         cleaned_question = (question or "").strip()
         if len(cleaned_question) > self._max_prompt_question_chars:
@@ -952,11 +985,68 @@ class Companion:
             if self._thinking_level != "dynamic":
                 cfg.thinking_config = types.ThinkingConfig(thinking_level=self._thinking_level)
 
-            response = self.client.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=user_prompt,
-                config=cfg,
+            candidate_models = route_models_for(
+                mode=model_routing_mode or self.model_routing_mode,
+                purpose="advisor",
+                explicit_model=explicit_model,
             )
+            if not candidate_models:
+                candidate_models = [selected_model]
+
+            requested_model = candidate_models[0]
+            response = None
+            final_model = requested_model
+            route_event = None
+            last_error: Exception | None = None
+
+            for index, candidate_model in enumerate(candidate_models):
+                fallback_model = (
+                    candidate_models[index + 1] if index + 1 < len(candidate_models) else None
+                )
+                if fallback_model and is_model_temporarily_unavailable(candidate_model):
+                    route_event = get_model_unavailable_event(
+                        requested_model=requested_model,
+                        skipped_model=candidate_model,
+                        final_model=fallback_model,
+                    )
+                    continue
+
+                try:
+                    response = self.client.models.generate_content(
+                        model=candidate_model,
+                        contents=user_prompt,
+                        config=cfg,
+                    )
+                    final_model = candidate_model
+                    if route_event and route_event.final_model != final_model:
+                        route_event.final_model = final_model
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    failure = classify_model_error(exc)
+                    if failure and fallback_model:
+                        mark_model_failure(candidate_model, failure)
+                        route_event = route_event or get_model_unavailable_event(
+                            requested_model=requested_model,
+                            skipped_model=candidate_model,
+                            final_model=fallback_model,
+                        )
+                        if route_event:
+                            route_event.reason = failure.reason
+                            route_event.error = failure.message[:500]
+                            route_event.notice = fallback_notice(
+                                candidate_model,
+                                fallback_model,
+                                reason=failure.reason,
+                            )
+                        continue
+                    raise
+
+            if response is None:
+                if last_error is not None:
+                    raise last_error
+                raise RuntimeError("No advisor model was available")
+
             response_text_raw = response.text or "Could not generate a response."
             response_text = response_text_raw
 
@@ -977,6 +1067,11 @@ class Companion:
                     "prompt_total": len(user_prompt),
                     "save_memory_summary": len(save_memory_summary or ""),
                 },
+                "model": final_model,
+                "model_display": display_model_name(final_model),
+                "requested_model": requested_model,
+                "requested_model_display": display_model_name(requested_model),
+                "routing": route_event_payload(route_event),
             }
 
             self._conversations.record_turn(
@@ -1004,6 +1099,9 @@ class Companion:
                 "response_length": 0,
                 "payload_sizes": {"briefing_json": len(briefing_json)},
                 "error": str(e),
+                "model": selected_model,
+                "model_display": display_model_name(selected_model),
+                "routing": None,
             }
             return f"Error: {str(e)}", elapsed
 
