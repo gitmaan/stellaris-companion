@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import ErrorBoundary from './components/ErrorBoundary'
 import OnboardingModal from './components/OnboardingModal'
 import ReportIssueModal from './components/ReportIssueModal'
@@ -9,14 +10,18 @@ import { useAnnouncements } from './hooks/useAnnouncements'
 import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
   DEFAULT_MODEL_ROUTING_MODE,
+  DEFAULT_RESOLVED_LANGUAGE,
   DEFAULT_UI_THEME,
   normalizeChronicleRefreshMode,
   normalizeModelRoutingMode,
+  normalizeResolvedLanguage,
   normalizeUiTheme,
   type ChronicleRefreshMode,
   type ModelRoutingMode,
+  type ResolvedLanguage,
   type UiTheme,
 } from './hooks/useSettings'
+import { isRtlLanguage } from './i18n/languages'
 import { AnnouncementPanel } from './components/AnnouncementPanel'
 import { HUDContainer } from './components/hud/HUDContainer'
 import { HUDNavBar } from './components/hud/HUDNavBar'
@@ -29,12 +34,6 @@ import SettingsPage from './pages/SettingsPage'
 
 type Tab = 'chat' | 'chronicle' | 'settings'
 
-const tabs: { id: Tab; label: string; icon: string }[] = [
-  { id: 'chat', label: 'Advisor', icon: '◈' },
-  { id: 'chronicle', label: 'Chronicle', icon: '◇' },
-  { id: 'settings', label: 'Config', icon: '⚙' },
-]
-
 // Shared transition for tab crossfade
 const tabTransition = {
   duration: 0.3,
@@ -42,6 +41,7 @@ const tabTransition = {
 }
 
 function App() {
+  const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('chat')
   const [uiTheme, setUiTheme] = useState<UiTheme>(DEFAULT_UI_THEME)
   const [chronicleRefreshMode, setChronicleRefreshMode] = useState<ChronicleRefreshMode>(
@@ -49,6 +49,9 @@ function App() {
   )
   const [modelRoutingMode, setModelRoutingMode] = useState<ModelRoutingMode>(
     DEFAULT_MODEL_ROUTING_MODE,
+  )
+  const [resolvedLanguage, setResolvedLanguage] = useState<ResolvedLanguage>(
+    DEFAULT_RESOLVED_LANGUAGE,
   )
   // Onboarding: null = checking, true = done, false = show modal
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null)
@@ -67,15 +70,18 @@ function App() {
         uiTheme?: unknown
         chronicleRefreshMode?: unknown
         modelRoutingMode?: unknown
+        resolvedLanguage?: unknown
       }
       const loadedTheme = normalizeUiTheme(loadedSettings?.uiTheme)
       const loadedChronicleRefreshMode = normalizeChronicleRefreshMode(
         loadedSettings?.chronicleRefreshMode,
       )
       const loadedModelRoutingMode = normalizeModelRoutingMode(loadedSettings?.modelRoutingMode)
+      const loadedResolvedLanguage = normalizeResolvedLanguage(loadedSettings?.resolvedLanguage)
       setUiTheme(loadedTheme)
       setChronicleRefreshMode(loadedChronicleRefreshMode)
       setModelRoutingMode(loadedModelRoutingMode)
+      setResolvedLanguage(loadedResolvedLanguage)
     }).catch(() => {
       // Keep default theme when settings can't be loaded.
     })
@@ -84,6 +90,18 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', uiTheme)
   }, [uiTheme])
+
+  useEffect(() => {
+    void i18n.changeLanguage(resolvedLanguage)
+    document.documentElement.lang = resolvedLanguage
+    document.documentElement.dir = isRtlLanguage(resolvedLanguage) ? 'rtl' : 'ltr'
+  }, [i18n, resolvedLanguage])
+
+  const tabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'chat', label: t('app.tabs.chat'), icon: '◈' },
+    { id: 'chronicle', label: t('app.tabs.chronicle'), icon: '◇' },
+    { id: 'settings', label: t('app.tabs.settings'), icon: '⚙' },
+  ]
 
   // Error reporting
   const {
@@ -253,6 +271,7 @@ function App() {
                         onThemeChange={setUiTheme}
                         onChronicleRefreshModeChange={setChronicleRefreshMode}
                         onModelRoutingModeChange={setModelRoutingMode}
+                        onLanguageChange={setResolvedLanguage}
                       />
                     )}
                   </div>

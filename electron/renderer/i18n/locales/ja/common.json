@@ -1,0 +1,332 @@
+{
+  "app": {
+    "tabs": {
+      "chat": "顧問",
+      "chronicle": "年代記",
+      "settings": "設定"
+    }
+  },
+  "common": {
+    "apply": "適用",
+    "applying": "適用中...",
+    "browse": "参照",
+    "close": "閉じる",
+    "dismiss": "閉じる",
+    "downloadedReady": "ダウンロード完了。インストールできます。",
+    "later": "あとで",
+    "loading": "読み込み中...",
+    "new": "新規",
+    "reportIssue": "問題を報告",
+    "retry": "再試行",
+    "retrying": "再試行中...",
+    "unknownDate": "不明な日付"
+  },
+  "status": {
+    "ready": "システムオンライン",
+    "analyzing": "帝国を調査中...",
+    "analyzingWithStage": "調査中 ({{stage}})...",
+    "connecting": "接続中...",
+    "noSave": "リンク待機中",
+    "notConfigured": "設定が必要",
+    "disconnected": "オフライン",
+    "unknownEmpire": "不明な帝国",
+    "stages": {
+      "waiting_for_stable_save": "セーブ検出中",
+      "parsing_t0": "セーブ読み込み中",
+      "precomputing_t2": "分析中",
+      "persisting": "保存中"
+    }
+  },
+  "languages": {
+    "system": "システム設定",
+    "en": "English",
+    "de": "Deutsch",
+    "fr": "Francais",
+    "es": "Espanol",
+    "pt-BR": "Portugues (Brasil)",
+    "ja": "日本語",
+    "zh-Hans": "简体中文",
+    "en-XA": "擬似ロケール"
+  },
+  "chat": {
+    "input": {
+      "placeholder": "どのような支援が必要ですか?",
+      "transmitting": "送信中...",
+      "advisorInfo": "顧問情報",
+      "sending": "送信中",
+      "send": "送信"
+    },
+    "message": {
+      "latency": "遅延: {{seconds}}s",
+      "report": "報告",
+      "reportTitle": "この応答を報告",
+      "blockedLink": "HTTP(S) 以外のリンクをブロックしました"
+    },
+    "errors": {
+      "briefingNotReady": "顧問はまだセーブファイルを分析しています。{{seconds}} 秒後にもう一度お試しください。",
+      "unexpected": "予期しないエラーが発生しました"
+    },
+    "newChat": "新しいチャット",
+    "welcome": {
+      "title": "銀河ヘルプデスク",
+      "ready": "ファイルを開きました // リクエストを送信してください",
+      "scanning": "初期化中 // 帝国データをスキャン中",
+      "scanningShort": "帝国データをスキャン中...",
+      "suggested": "おすすめの質問"
+    },
+    "loading": {
+      "universal": [
+        "キュレーターに照会中",
+        "状況を調査中",
+        "センサーデータを分析中",
+        "アノマリーを処理中",
+        "状況報告を作成中",
+        "シミュレーションを実行中",
+        "アーカイブにアクセス中",
+        "星図を照合中",
+        "終盤の処理落ちが収まるのを待機中",
+        "没落帝国に気づかれていないか確認中",
+        "シュラウドに照会中",
+        "かつてあったものは、これからもある",
+        "正しいフォルダを検索中...",
+        "\"緊急\" として分類中...",
+        "ファイルを取得中...",
+        "記録を照合中...",
+        "お待ちください...",
+        "転送中...",
+        "監督官に確認中..."
+      ],
+      "machine": [
+        "指令を処理中",
+        "ネットワークが思考中",
+        "最適結果を計算中",
+        "サブルーチンに照会中"
+      ],
+      "hiveMind": [
+        "集合意識が検討中",
+        "上位意識と同期中",
+        "情報を同化中",
+        "合意を形成中"
+      ]
+    },
+    "suggestions": {
+      "strategic": [
+        "何を研究すべきですか?",
+        "私は遅れていますか?",
+        "何を見落としていそうですか?",
+        "この段階の統治者は何を考えるべきですか?",
+        "我が帝国は競争相手と比べてどうですか?",
+        "備えられていない最大のリスクは何ですか?"
+      ],
+      "tactical": [
+        "なぜ経済が赤字なのですか?",
+        "惑星には何を建てるべきですか?",
+        "なぜ全員が我々を嫌うのですか?",
+        "今すぐ戦争に勝てますか?",
+        "我が艦隊は通用しますか?",
+        "戦略的に脆弱な場所はどこですか?"
+      ],
+      "wildcards": [
+        "我が帝国を辛口評価して",
+        "王位を継いだばかりの私に帝国を説明して",
+        "銀河情勢演説をして",
+        "ライバルは我々をどう評しますか?"
+      ],
+      "roast": "我が帝国を辛口評価して"
+    }
+  },
+  "chronicle": {
+    "page": {
+      "openSidebar": "サイドバーを開く",
+      "dismiss": "閉じる",
+      "loadingArchives": "アーカイブを読み込み中...",
+      "retrieving": "年代記を取得中...",
+      "emptyTitle": "年代記はまだありません",
+      "emptyBody": "ゲームを進めて歴史を積み重ねましょう。帝国が時代を進むにつれて、年代記は自動的に生成されます。",
+      "noSession": "このセーブのセッションが見つかりません"
+    },
+    "sidebar": {
+      "empireArchives": "帝国アーカイブ",
+      "closeSidebar": "サイドバーを閉じる",
+      "noHistory": "ゲーム履歴はまだありません",
+      "chapters": "章",
+      "loading": "読み込み中...",
+      "noChapters": "章はまだありません",
+      "noChaptersHelp": "十分なイベントがある状態で約5年進めるか、重要イベントを起こすと最初の章が生成されます。",
+      "regenerating": "章を再生成中...",
+      "staleTooltip": "以前の章が再生成されました - 文脈が古い可能性があります",
+      "finalizedTooltip": "確定済みの章",
+      "currentEra": "現在の時代",
+      "narrator": "語り手",
+      "export": "エクスポート",
+      "events": "イベント",
+      "latest": "最新",
+      "pending_one": "{{count}} 章が保留中",
+      "pending_other": "{{count}} 章が保留中",
+      "generateMore": "さらに章を生成"
+    },
+    "content": {
+      "title": "{{empireName}}の年代記",
+      "selectChapter": "内容を表示する章を選択してください。",
+      "rewriting": "歴史を書き換え中...",
+      "chapter": "第{{number}}章",
+      "staleTooltip": "以前の章が再生成されました - 文脈が古い可能性があります",
+      "finalizedTooltip": "確定済みの章",
+      "regenerateWarning": "この章を再生成すると、後続の章が古い可能性ありとしてマークされます。この操作はAPI呼び出しを使用します。",
+      "regenPlaceholder": "何を変更しますか？（任意）",
+      "confirmRegenerate": "再生成を確認",
+      "cancel": "キャンセル",
+      "regenerateTitle": "この章を再生成",
+      "regenerateChapter": "章を再生成",
+      "summary": "要約",
+      "currentEra": "現在の時代",
+      "storyContinues": "物語は続く...",
+      "present": "現在",
+      "eventsInEra_one": "この時代のイベント {{count}} 件",
+      "eventsInEra_other": "この時代のイベント {{count}} 件"
+    },
+    "narrator": {
+      "title": "語り手",
+      "subtitle": "年代記のスタイル指示",
+      "close": "語り手パネルを閉じる",
+      "instructions": "語り手への指示（任意）",
+      "placeholder": "語り手のスタイルやトーンを説明...",
+      "tryStyle": "スタイルを試す",
+      "applySuccess": "適用しました - 次回生成から反映されます",
+      "applyError": "適用に失敗しました",
+      "applying": "適用中...",
+      "apply": "適用",
+      "selectSave": "この年代記の語り手をカスタマイズするにはセーブを選択してください。",
+      "examples": {
+        "deadpan": "淡々とした自然ドキュメンタリー",
+        "bureaucratic": "惨事を事務的に記述する官僚レポート",
+        "tabloid": "銀河タブロイド - ドラマ、噂、スキャンダル",
+        "propaganda": "国営メディアのプロパガンダ放送",
+        "pr": "熱意が過剰な帝国広報部",
+        "earnings": "銀河征服を四半期決算のように淡々と報告"
+      }
+    }
+  },
+  "settings": {
+    "loading": "設定を初期化中...",
+    "eyebrow": "SYS // CONFIG_01",
+    "title": "設定",
+    "textSize": "文字サイズ",
+    "colorTheme": "カラーテーマ",
+    "language": "言語",
+    "themePreset": "テーマプリセット",
+    "languageHint": "UI + 顧問",
+    "systemAlert": "システム警告",
+    "saveSuccess": "設定を保存しました // 適用済み",
+    "sections": {
+      "intelligence": "情報アップリンク",
+      "data": "データ取り込み",
+      "communications": "通信リレー",
+      "diagnostics": "診断"
+    },
+    "panels": {
+      "geminiAccess": "Gemini モデルアクセス",
+      "saveSource": "セーブファイルの場所",
+      "discordLink": "Discord 接続"
+    },
+    "api": {
+      "label": "API キー",
+      "placeholderSet": "••••••••••••••••",
+      "placeholderEmpty": "キーを入力",
+      "status": "状態:",
+      "active": "有効",
+      "missing": "未設定",
+      "generateKey": "キーを生成 >"
+    },
+    "chronicleRefresh": {
+      "label": "年代記の更新",
+      "balanced": "バランス",
+      "enhanced": "強化",
+      "balancedTag": "無料枠向け",
+      "enhancedTag": "高頻度更新",
+      "balancedHelp": "Gemini の使用量を抑えます。無料枠と安定した更新に適した既定値です。",
+      "enhancedHelp": "年代記表示中の現在時代の更新を速くします。Gemini 呼び出しが増えます。",
+      "aria": "更新モードを {{mode}} に設定",
+      "toastError": "年代記の更新モードを変更できませんでした。もう一度お試しください。",
+      "toastSuccess": "年代記の更新モードを {{mode}} に設定しました。"
+    },
+    "modelRouting": {
+      "label": "モデルルーティング",
+      "qualityFirst": "品質優先",
+      "conserve": "クォータ節約",
+      "qualityFirstHelp": "Gemini Flash を優先し、クォータが必要な場合にフォールバックします。",
+      "conserveHelp": "顧問チャットで軽量モデルを使い、Gemini 使用量を減らします。",
+      "toastError": "モデルルーティングを更新できませんでした。もう一度お試しください。",
+      "toastSuccess": "モデルルーティングを {{mode}} に設定しました。"
+    },
+    "saveData": {
+      "directoryLabel": "ディレクトリパス",
+      "placeholder": "自動検出",
+      "target": "対象: Stellaris セーブゲームディレクトリ (ローカル)"
+    },
+    "discord": {
+      "loading": "ハンドシェイク確立中...",
+      "signalStrong": "信号: 強",
+      "inviteBot": "BOT を招待",
+      "terminate": "切断",
+      "relay": "リレー: {{state}}",
+      "description": "サブスペース通信を有効にして、Discord オーバーレイから顧問に質問します。",
+      "connect": "Discord に接続",
+      "connecting": "開始中...",
+      "errorPrefix": "ERR:"
+    },
+    "feedback": {
+      "label": "システム報告",
+      "body": "分析用に詳細ログを送信します。"
+    },
+    "actionBar": {
+      "unsaved": "未保存の変更",
+      "ready": "システム準備完了",
+      "committing": "適用中...",
+      "apply": "変更を適用"
+    },
+    "toasts": {
+      "textSizeError": "文字サイズを更新できませんでした。もう一度お試しください。",
+      "textSizeSuccess": "文字サイズを {{percent}}% に設定しました。",
+      "themeError": "カラーテーマを更新できませんでした。もう一度お試しください。",
+      "themeSuccess": "テーマを {{theme}} に設定しました。",
+      "languageError": "言語を更新できませんでした。もう一度お試しください。",
+      "languageSuccess": "言語を {{language}} に設定しました。"
+    },
+    "discordErrors": {
+      "cancelled": "認証がキャンセルされました。",
+      "expired": "セッションが期限切れです。再接続してください。",
+      "auth": "認証に失敗しました。",
+      "connection": "接続エラーです。ネットワークを確認してください。",
+      "generic": "システムエラーです。再試行してください。"
+    }
+  },
+  "update": {
+    "title": "更新があります",
+    "installingBody": "更新を適用して再起動しています。macOS では少し時間がかかる場合があります。",
+    "readyBody": "新しいバージョンをインストールできます。アプリを再起動して更新を適用してください。",
+    "whatsNew": "新機能",
+    "downloading": "ダウンロード中",
+    "applying": "更新を適用中...",
+    "checking": "更新を確認中...",
+    "applyingButton": "更新を適用中...",
+    "downloadingButton": "ダウンロード中... {{progress}}%",
+    "installRestart": "インストールして再起動",
+    "installError": "更新のインストールに失敗しました"
+  },
+  "announcements": {
+    "title": "通信",
+    "newCount": "{{count}} 件の新着",
+    "active": "有効な通信 ({{count}})",
+    "dismissAll": "すべて閉じる",
+    "markRead": "既読にする",
+    "empty": "通信はありません",
+    "severity": {
+      "info": "情報",
+      "warning": "警告",
+      "known_issue": "既知の問題",
+      "update": "更新",
+      "tip": "ヒント"
+    }
+  }
+}

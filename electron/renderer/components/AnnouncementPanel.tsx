@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import type { Announcement } from '../hooks/useBackend'
 
 const SEVERITY_PRIORITY: Record<Announcement['severity'], number> = {
@@ -80,6 +81,7 @@ function AnnouncementCard({
   announcement,
   onDismiss,
 }: AnnouncementCardProps) {
+  const { t } = useTranslation()
   const config = SEVERITY_CONFIG[announcement.severity] || SEVERITY_CONFIG.info
 
   return (
@@ -94,7 +96,7 @@ function AnnouncementCard({
           <div className="mb-1.5 flex items-center gap-2">
             <span className={`${config.text} text-xs`}>{config.icon}</span>
             <span className={`${config.text} font-mono text-[10px] tracking-[0.14em] uppercase`}>
-              {config.label}
+              {t(`announcements.severity.${announcement.severity}`)}
             </span>
             <span className="font-mono text-[10px] tracking-[0.12em] text-text-muted uppercase">
               {formatPublishedDate(announcement.publishedAt)}
@@ -125,7 +127,7 @@ function AnnouncementCard({
           onClick={() => onDismiss(announcement.id)}
           className="flex-none px-2 py-1 border border-white/20 rounded-sm font-mono text-[10px] tracking-[0.12em] uppercase text-text-secondary hover:text-text-primary hover:border-white/40 transition-colors"
         >
-          Dismiss
+          {t('common.dismiss')}
         </button>
       </div>
     </div>
@@ -151,6 +153,7 @@ export function AnnouncementPanel({
   onDismissAll,
   onMarkRead,
 }: AnnouncementPanelProps) {
+  const { t } = useTranslation()
   const reduceMotion = useReducedMotion()
 
   const activeItems = useMemo(() => sortAnnouncements(announcements), [announcements])
@@ -202,11 +205,11 @@ export function AnnouncementPanel({
             <div className="flex items-center gap-2">
               <span className="text-accent-cyan text-xs">{'\u25C8'}</span>
               <span className="font-mono text-[11px] tracking-[0.16em] text-text-secondary uppercase">
-                Transmissions
+                {t('announcements.title')}
               </span>
               {unreadCount > 0 && (
                 <span className="px-1.5 py-0.5 bg-accent-cyan/20 border border-accent-cyan/30 rounded-sm font-mono text-[10px] text-accent-cyan tracking-wider">
-                  {unreadCount} NEW
+                  {t('announcements.newCount', { count: unreadCount })}
                 </span>
               )}
             </div>
@@ -215,7 +218,7 @@ export function AnnouncementPanel({
               onClick={onClose}
               className="px-2 py-1 border border-white/20 rounded-sm font-mono text-[10px] tracking-[0.12em] uppercase text-text-secondary hover:text-text-primary hover:border-white/40 transition-colors"
             >
-              Close
+              {t('common.close')}
             </button>
           </div>
 
@@ -225,7 +228,7 @@ export function AnnouncementPanel({
                 onClick={onMarkRead}
                 className="px-2.5 py-1 border border-white/20 rounded-sm font-mono text-[10px] tracking-[0.12em] uppercase text-text-secondary hover:text-text-primary hover:border-white/40 transition-colors"
               >
-                Mark all read
+                {t('announcements.markRead')}
               </button>
             )}
             {activeItems.length > 0 && (
@@ -233,7 +236,7 @@ export function AnnouncementPanel({
                 onClick={() => onDismissAll(activeItems.map((item) => item.id))}
                 className="px-2.5 py-1 border border-white/20 rounded-sm font-mono text-[10px] tracking-[0.12em] uppercase text-text-secondary hover:text-text-primary hover:border-white/40 transition-colors"
               >
-                Dismiss all
+                {t('announcements.dismissAll')}
               </button>
             )}
           </div>
@@ -241,7 +244,7 @@ export function AnnouncementPanel({
           <div className="max-h-[60vh] overflow-y-auto custom-scrollbar p-3 space-y-3">
             <div className="space-y-2">
               <div className="font-mono text-[10px] text-text-muted tracking-[0.14em] uppercase">
-                Active transmissions ({activeItems.length})
+                {t('announcements.active', { count: activeItems.length, defaultValue: 'Active transmissions ({{count}})' })}
               </div>
               {activeItems.length > 0 ? (
                 activeItems.map((announcement, idx) => (
@@ -260,7 +263,7 @@ export function AnnouncementPanel({
               ) : (
                 <div className="p-3 border border-white/10 rounded-sm bg-black/30">
                   <p className="font-mono text-xs text-text-muted uppercase tracking-[0.12em]">
-                    No active transmissions.
+                    {t('announcements.empty')}
                   </p>
                 </div>
               )}

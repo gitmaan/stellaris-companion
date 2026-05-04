@@ -1,0 +1,332 @@
+{
+  "app": {
+    "tabs": {
+      "chat": "Berater",
+      "chronicle": "Chronik",
+      "settings": "Konfig"
+    }
+  },
+  "common": {
+    "apply": "Anwenden",
+    "applying": "Wird angewendet...",
+    "browse": "Durchsuchen",
+    "close": "Schliessen",
+    "dismiss": "Ausblenden",
+    "downloadedReady": "Heruntergeladen. Bereit zur Installation.",
+    "later": "Spater",
+    "loading": "Laden...",
+    "new": "Neu",
+    "reportIssue": "Problem melden",
+    "retry": "Erneut versuchen",
+    "retrying": "Wiederhole...",
+    "unknownDate": "Unbekanntes Datum"
+  },
+  "status": {
+    "ready": "SYSTEME ONLINE",
+    "analyzing": "IMPERIUM WIRD SONDIERT...",
+    "analyzingWithStage": "SONDIERUNG ({{stage}})...",
+    "connecting": "VERBINDE...",
+    "noSave": "WARTE AUF LINK",
+    "notConfigured": "KONFIG ERFORDERLICH",
+    "disconnected": "OFFLINE",
+    "unknownEmpire": "UNBEKANNTES IMPERIUM",
+    "stages": {
+      "waiting_for_stable_save": "SPEICHERSTAND ERKENNEN",
+      "parsing_t0": "SPEICHERSTAND LESEN",
+      "precomputing_t2": "ANALYSE",
+      "persisting": "SPEICHERN"
+    }
+  },
+  "languages": {
+    "system": "Systemstandard",
+    "en": "English",
+    "de": "Deutsch",
+    "fr": "Francais",
+    "es": "Espanol",
+    "pt-BR": "Portugues (Brasil)",
+    "ja": "日本語",
+    "zh-Hans": "简体中文",
+    "en-XA": "Pseudo"
+  },
+  "chat": {
+    "input": {
+      "placeholder": "WIE KOENNEN WIR HELFEN?",
+      "transmitting": "UEBERTRAGE...",
+      "advisorInfo": "Beraterinfo",
+      "sending": "SENDET",
+      "send": "SENDEN"
+    },
+    "message": {
+      "latency": "LATENZ: {{seconds}}s",
+      "report": "MELDEN",
+      "reportTitle": "Diese Antwort melden",
+      "blockedLink": "Nicht-HTTP(S)-Link blockiert"
+    },
+    "errors": {
+      "briefingNotReady": "Der Berater analysiert deine Speicherdatei noch. Bitte versuche es in {{seconds}} Sekunden erneut.",
+      "unexpected": "Ein unerwarteter Fehler ist aufgetreten"
+    },
+    "newChat": "Neuer Chat",
+    "welcome": {
+      "title": "Galaktischer Helpdesk",
+      "ready": "DEINE DATEI IST GEOEFFNET // ANFRAGE SENDEN",
+      "scanning": "INITIALISIERUNG // IMPERIUMSDATEN WERDEN GESCANNT",
+      "scanningShort": "Imperiumsdaten werden gescannt...",
+      "suggested": "Vorgeschlagene Anfragen"
+    },
+    "loading": {
+      "universal": [
+        "Konsultiere die Kuratoren",
+        "Lage wird sondiert",
+        "Sensordaten werden analysiert",
+        "Anomalie wird verarbeitet",
+        "Lagebericht wird erstellt",
+        "Simulationen laufen",
+        "Archive werden abgefragt",
+        "Sternenkarten werden abgeglichen",
+        "Warte auf das Ende des Late-Game-Lags",
+        "Pruefe, ob das Gefallene Reich etwas bemerkt hat",
+        "Konsultiere den Schleier",
+        "Was war, wird sein",
+        "Suche den richtigen Ordner...",
+        "Ablage unter \"Dringend\"...",
+        "Akte wird geholt...",
+        "Unterlagen werden abgeglichen...",
+        "Bitte warten...",
+        "Verbindung wird weitergeleitet...",
+        "Vorgesetzter wird konsultiert..."
+      ],
+      "machine": [
+        "Direktive wird verarbeitet",
+        "Das Netzwerk erwagt",
+        "Optimales Ergebnis wird berechnet",
+        "Subroutinen werden abgefragt"
+      ],
+      "hiveMind": [
+        "Das Kollektiv erwagt",
+        "Synchronisiere mit dem Ueberbewusstsein",
+        "Informationen werden assimiliert",
+        "Konsens bildet sich"
+      ]
+    },
+    "suggestions": {
+      "strategic": [
+        "Was sollte ich erforschen?",
+        "Falle ich zurueck?",
+        "Was vernachlaessige ich wahrscheinlich?",
+        "Woran sollte ein Herrscher in dieser Phase denken?",
+        "Wie steht unser Reich im Vergleich zur Konkurrenz da?",
+        "Auf welches groesste Risiko sind wir nicht vorbereitet?"
+      ],
+      "tactical": [
+        "Warum ist meine Wirtschaft im Minus?",
+        "Was sollte ich auf meinen Planeten bauen?",
+        "Warum hassen uns alle?",
+        "Koennten wir jetzt einen Krieg gewinnen?",
+        "Kann unsere Flotte mithalten?",
+        "Wo sind wir strategisch verwundbar?"
+      ],
+      "wildcards": [
+        "Roaste mein Reich",
+        "Erklaere mein Reich, als haette ich gerade den Thron bestiegen",
+        "Gib mir eine Rede zur Lage der Galaxie",
+        "Was wuerden unsere Rivalen ueber uns sagen?"
+      ],
+      "roast": "Roaste mein Reich"
+    }
+  },
+  "chronicle": {
+    "page": {
+      "openSidebar": "Seitenleiste oeffnen",
+      "dismiss": "Ausblenden",
+      "loadingArchives": "Archive werden geladen...",
+      "retrieving": "Chronik wird abgerufen...",
+      "emptyTitle": "Noch keine Chronik",
+      "emptyBody": "Spiele weiter und sammle Geschichte. Chroniken werden automatisch erzeugt, waehrend dein Reich durch die Zeitalter voranschreitet.",
+      "noSession": "Keine Sitzung fuer diesen Speicherstand gefunden"
+    },
+    "sidebar": {
+      "empireArchives": "Reichsarchive",
+      "closeSidebar": "Seitenleiste schliessen",
+      "noHistory": "Noch keine Spielhistorie",
+      "chapters": "Kapitel",
+      "loading": "Wird geladen...",
+      "noChapters": "Noch keine Kapitel",
+      "noChaptersHelp": "Spiele etwa 5 Jahre mit genug Ereignissen oder erreiche ein grosses Ereignis, um dein erstes Kapitel zu erzeugen.",
+      "regenerating": "Kapitel wird neu erzeugt...",
+      "staleTooltip": "Ein frueheres Kapitel wurde neu erzeugt - Kontext kann veraltet sein",
+      "finalizedTooltip": "Finalisiertes Kapitel",
+      "currentEra": "Aktuelle Aera",
+      "narrator": "Erzaehler",
+      "export": "Exportieren",
+      "events": "Ereignisse",
+      "latest": "Neueste",
+      "pending_one": "{{count}} Kapitel ausstehend",
+      "pending_other": "{{count}} Kapitel ausstehend",
+      "generateMore": "Weitere Kapitel erzeugen"
+    },
+    "content": {
+      "title": "Die Chroniken von {{empireName}}",
+      "selectChapter": "Waehle ein Kapitel, um seinen Inhalt anzuzeigen.",
+      "rewriting": "Geschichte wird neu geschrieben...",
+      "chapter": "Kapitel {{number}}",
+      "staleTooltip": "Ein frueheres Kapitel wurde neu erzeugt - Kontext kann veraltet sein",
+      "finalizedTooltip": "Finalisiertes Kapitel",
+      "regenerateWarning": "Wenn dieses Kapitel neu erzeugt wird, koennen spaetere Kapitel als moeglicherweise veraltet markiert werden. Diese Aktion nutzt einen API-Aufruf.",
+      "regenPlaceholder": "Was soll sich aendern? (optional)",
+      "confirmRegenerate": "Neu erzeugen bestaetigen",
+      "cancel": "Abbrechen",
+      "regenerateTitle": "Dieses Kapitel neu erzeugen",
+      "regenerateChapter": "Kapitel neu erzeugen",
+      "summary": "Zusammenfassung",
+      "currentEra": "Die aktuelle Aera",
+      "storyContinues": "Die Geschichte geht weiter...",
+      "present": "Gegenwart",
+      "eventsInEra_one": "{{count}} Ereignis in dieser Aera",
+      "eventsInEra_other": "{{count}} Ereignisse in dieser Aera"
+    },
+    "narrator": {
+      "title": "Erzaehler",
+      "subtitle": "Stilanweisungen fuer die Chronik",
+      "close": "Erzaehlerpanel schliessen",
+      "instructions": "Erzaehleranweisungen (optional)",
+      "placeholder": "Beschreibe Stil oder Ton des Erzaehlers...",
+      "tryStyle": "Stil ausprobieren",
+      "applySuccess": "Angewendet - gilt ab der naechsten Generierung",
+      "applyError": "Anwenden fehlgeschlagen",
+      "applying": "Wird angewendet...",
+      "apply": "Anwenden",
+      "selectSave": "Waehle einen Speicherstand, um den Erzaehler fuer diese Chronik anzupassen.",
+      "examples": {
+        "deadpan": "Trockene Naturdokumentation",
+        "bureaucratic": "Buerokratische Berichte, die Graeuel beilaufig beschreiben",
+        "tabloid": "Galaktisches Boulevardblatt - Drama, Geruechte und Skandale",
+        "propaganda": "Propagandasendung staatlicher Medien",
+        "pr": "Uebertrieben begeisterte imperiale PR-Abteilung",
+        "earnings": "Trockener Quartalsbericht, aber fuer galaktische Eroberung"
+      }
+    }
+  },
+  "settings": {
+    "loading": "KONFIGURATION WIRD INITIALISIERT...",
+    "eyebrow": "SYS // CONFIG_01",
+    "title": "KONFIGURATION",
+    "textSize": "Textgroesse",
+    "colorTheme": "Farbschema",
+    "language": "Sprache",
+    "themePreset": "THEMENPROFIL",
+    "languageHint": "UI + BERATER",
+    "systemAlert": "SYSTEMALARM",
+    "saveSuccess": "KONFIGURATION GESPEICHERT // EINSTELLUNGEN ANGEWENDET",
+    "sections": {
+      "intelligence": "AUFKLAERUNGS-UPLINK",
+      "data": "DATENAUFNAHME",
+      "communications": "KOMMUNIKATIONSRELAIS",
+      "diagnostics": "DIAGNOSE"
+    },
+    "panels": {
+      "geminiAccess": "GEMINI-MODELLZUGRIFF",
+      "saveSource": "SPEICHERDATEI-QUELLE",
+      "discordLink": "DISCORD-VERBINDUNG"
+    },
+    "api": {
+      "label": "API-SCHLUESSEL",
+      "placeholderSet": "••••••••••••••••",
+      "placeholderEmpty": "SCHLUESSEL EINGEBEN",
+      "status": "STATUS:",
+      "active": "AKTIV",
+      "missing": "FEHLT",
+      "generateKey": "SCHLUESSEL ERSTELLEN >"
+    },
+    "chronicleRefresh": {
+      "label": "CHRONIK-AKTUALISIERUNG",
+      "balanced": "Ausgewogen",
+      "enhanced": "Erweitert",
+      "balancedTag": "FREE-TIER STANDARD",
+      "enhancedTag": "REAKTIVER",
+      "balancedHelp": "Geringere Gemini-Nutzung. Beste Standardeinstellung fuer Free Tier und stabilere Cliffhanger-Updates.",
+      "enhancedHelp": "Schnellere Story-Updates der aktuellen Aera in der Chronik. Nutzt mehr Gemini-Aufrufe.",
+      "aria": "Aktualisierungsmodus auf {{mode}} setzen",
+      "toastError": "Chronik-Aktualisierungsmodus konnte nicht geaendert werden. Bitte erneut versuchen.",
+      "toastSuccess": "Chronik-Aktualisierungsmodus auf {{mode}} gesetzt."
+    },
+    "modelRouting": {
+      "label": "MODELL-ROUTING",
+      "qualityFirst": "Qualitaet zuerst",
+      "conserve": "Kontingent sparen",
+      "qualityFirstHelp": "Gemini Flash bevorzugen und nur bei Kontingentbedarf ausweichen.",
+      "conserveHelp": "Leichtere Modelle fuer Berater-Chat nutzen, um Gemini-Kontingent zu sparen.",
+      "toastError": "Modell-Routing konnte nicht geaendert werden. Bitte erneut versuchen.",
+      "toastSuccess": "Modell-Routing auf {{mode}} gesetzt."
+    },
+    "saveData": {
+      "directoryLabel": "VERZEICHNISPFAD",
+      "placeholder": "AUTO-ERKENNUNG",
+      "target": "ZIEL: STELLARIS-SPEICHERDATEI-VERZEICHNIS (LOKAL)"
+    },
+    "discord": {
+      "loading": "HANDSHAKE WIRD HERGESTELLT...",
+      "signalStrong": "SIGNAL: STARK",
+      "inviteBot": "BOT EINLADEN",
+      "terminate": "TRENNEN",
+      "relay": "RELAIS: {{state}}",
+      "description": "Aktiviere Subraumkommunikation, um den Berater ueber Discord-Overlay zu befragen.",
+      "connect": "DISCORD VERBINDEN",
+      "connecting": "INITIIERE...",
+      "errorPrefix": "ERR:"
+    },
+    "feedback": {
+      "label": "SYSTEMBERICHTE",
+      "body": "Detaillierte Logs zur Analyse senden."
+    },
+    "actionBar": {
+      "unsaved": "UNGESPEICHERTE AENDERUNGEN",
+      "ready": "SYSTEM BEREIT",
+      "committing": "UEBERNEHME...",
+      "apply": "AENDERUNGEN ANWENDEN"
+    },
+    "toasts": {
+      "textSizeError": "Textgroesse konnte nicht geaendert werden. Bitte erneut versuchen.",
+      "textSizeSuccess": "Textgroesse auf {{percent}}% gesetzt.",
+      "themeError": "Farbschema konnte nicht geaendert werden. Bitte erneut versuchen.",
+      "themeSuccess": "Theme auf {{theme}} gesetzt.",
+      "languageError": "Sprache konnte nicht geaendert werden. Bitte erneut versuchen.",
+      "languageSuccess": "Sprache auf {{language}} gesetzt."
+    },
+    "discordErrors": {
+      "cancelled": "Autorisierung abgebrochen.",
+      "expired": "Sitzung abgelaufen. Erneute Verbindung erforderlich.",
+      "auth": "Autorisierung fehlgeschlagen.",
+      "connection": "Verbindungsfehler. Netzwerk pruefen.",
+      "generic": "Systemfehler. Erneut versuchen."
+    }
+  },
+  "update": {
+    "title": "Update verfuegbar",
+    "installingBody": "Update wird angewendet und die App neu gestartet. Auf macOS kann das etwas dauern.",
+    "readyBody": "Eine neue Version ist installationsbereit. Starte die App neu, um das Update anzuwenden.",
+    "whatsNew": "Neuigkeiten",
+    "downloading": "Wird heruntergeladen",
+    "applying": "Update wird angewendet...",
+    "checking": "Suche nach Updates...",
+    "applyingButton": "Update wird angewendet...",
+    "downloadingButton": "Download... {{progress}}%",
+    "installRestart": "Installieren & Neustarten",
+    "installError": "Update konnte nicht installiert werden"
+  },
+  "announcements": {
+    "title": "Uebertragungen",
+    "newCount": "{{count}} NEU",
+    "active": "Aktive Uebertragungen ({{count}})",
+    "dismissAll": "Alle ausblenden",
+    "markRead": "Als gelesen markieren",
+    "empty": "Keine Uebertragungen",
+    "severity": {
+      "info": "INFO",
+      "warning": "WARNUNG",
+      "known_issue": "BEKANNTES PROBLEM",
+      "update": "UPDATE",
+      "tip": "TIPP"
+    }
+  }
+}

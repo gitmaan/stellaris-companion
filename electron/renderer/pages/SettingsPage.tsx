@@ -1,16 +1,23 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
+  DEFAULT_LANGUAGE,
   DEFAULT_MODEL_ROUTING_MODE,
   DEFAULT_UI_THEME,
   normalizeChronicleRefreshMode,
+  normalizeLanguage,
   normalizeModelRoutingMode,
+  normalizeResolvedLanguage,
   normalizeUiTheme,
   type ChronicleRefreshMode,
+  type LanguageSetting,
   type ModelRoutingMode,
+  type ResolvedLanguage,
   type UiTheme,
   useSettings,
 } from '../hooks/useSettings'
+import { LANGUAGE_OPTIONS } from '../i18n/languages'
 import { useDiscord } from '../hooks/useDiscord'
 import { HUDHeader, HUDSectionTitle, HUDMicro, HUDLabel } from '../components/hud/HUDText'
 import { HUDPanel } from '../components/hud/HUDPanel'
@@ -22,13 +29,13 @@ import { useToast } from '../components/Toast'
 /**
  * DISC-017: Convert technical error messages to user-friendly messages.
  */
-function getUserFriendlyErrorMessage(error: string | null): string | null {
+function getUserFriendlyErrorMessage(error: string | null, t: (key: string) => string): string | null {
   if (!error) return null
-  if (error.toLowerCase().includes('cancel') || error.includes('Authorization timeout')) return 'Authorization cancelled.'
-  if (error.includes('expired')) return 'Session expired. Reconnect required.'
-  if (error.toLowerCase().includes('auth')) return 'Authorization failed.'
-  if (error.includes('connect')) return 'Connection error. Check network.'
-  return 'System error. Retry.'
+  if (error.toLowerCase().includes('cancel') || error.includes('Authorization timeout')) return t('settings.discordErrors.cancelled')
+  if (error.includes('expired')) return t('settings.discordErrors.expired')
+  if (error.toLowerCase().includes('auth')) return t('settings.discordErrors.auth')
+  if (error.includes('connect')) return t('settings.discordErrors.connection')
+  return t('settings.discordErrors.generic')
 }
 
 interface SettingsPageProps {
@@ -36,6 +43,7 @@ interface SettingsPageProps {
   onThemeChange?: (theme: UiTheme) => void
   onChronicleRefreshModeChange?: (mode: ChronicleRefreshMode) => void
   onModelRoutingModeChange?: (mode: ModelRoutingMode) => void
+  onLanguageChange?: (language: ResolvedLanguage) => void
 }
 
 const UI_SCALE_OPTIONS = [
@@ -57,32 +65,14 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'command-amber': 'Command Amber',
 }
 
-const CHRONICLE_REFRESH_MODE_LABELS: Record<ChronicleRefreshMode, string> = {
-  balanced: 'Balanced',
-  enhanced: 'Enhanced',
-}
-
-const CHRONICLE_REFRESH_MODE_HELPERS: Record<ChronicleRefreshMode, string> = {
-  balanced: 'Lower Gemini usage. Best default for free tier and steadier cliffhanger updates.',
-  enhanced: 'Faster current-era story updates while viewing Chronicle. Uses more Gemini calls.',
-}
-
-const MODEL_ROUTING_MODE_LABELS: Record<ModelRoutingMode, string> = {
-  quality_first: 'Quality First',
-  conserve: 'Quota Saver',
-}
-
-const MODEL_ROUTING_MODE_HELPERS: Record<ModelRoutingMode, string> = {
-  quality_first: 'Uses Gemini Flash first for Advisor and Chronicle, then falls back to Gemini 3.1 Flash-Lite Preview.',
-  conserve: 'Uses Gemini 3.1 Flash-Lite Preview for Advisor to save Gemini Flash quota for Chronicle writing.',
-}
-
 function SettingsPage({
   onReportIssue,
   onThemeChange,
   onChronicleRefreshModeChange,
   onModelRoutingModeChange,
+  onLanguageChange,
 }: SettingsPageProps) {
+  const { t } = useTranslation()
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
   const { showToast } = useToast()
 
@@ -110,6 +100,8 @@ function SettingsPage({
     DEFAULT_MODEL_ROUTING_MODE,
   )
   const [modelRoutingModeSaving, setModelRoutingModeSaving] = useState(false)
+  const [language, setLanguage] = useState<LanguageSetting>(DEFAULT_LANGUAGE)
+  const [languageSaving, setLanguageSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -132,14 +124,18 @@ function SettingsPage({
         settings.chronicleRefreshMode,
       )
       const normalizedModelRoutingMode = normalizeModelRoutingMode(settings.modelRoutingMode)
+      const normalizedLanguage = normalizeLanguage(settings.language)
+      const normalizedResolvedLanguage = normalizeResolvedLanguage(settings.resolvedLanguage)
       setUiTheme(normalizedTheme)
       setChronicleRefreshMode(normalizedChronicleRefreshMode)
       setModelRoutingMode(normalizedModelRoutingMode)
+      setLanguage(normalizedLanguage)
       onThemeChange?.(normalizedTheme)
       onChronicleRefreshModeChange?.(normalizedChronicleRefreshMode)
       onModelRoutingModeChange?.(normalizedModelRoutingMode)
+      onLanguageChange?.(normalizedResolvedLanguage)
     }
-  }, [onChronicleRefreshModeChange, onModelRoutingModeChange, onThemeChange, settings])
+  }, [onChronicleRefreshModeChange, onLanguageChange, onModelRoutingModeChange, onThemeChange, settings])
 
   useEffect(() => {
     if (!settings) return
@@ -188,7 +184,7 @@ function SettingsPage({
       setUiScale(previousScale)
       showToast({
         type: 'error',
-        message: 'Failed to update text size. Please try again.',
+        message: t('settings.toasts.textSizeError'),
         duration: 4000,
       })
       return
@@ -196,7 +192,7 @@ function SettingsPage({
 
     showToast({
       type: 'success',
-      message: `Text size set to ${Math.round(nextScale * 100)}%.`,
+      message: t('settings.toasts.textSizeSuccess', { percent: Math.round(nextScale * 100) }),
       duration: 1800,
     })
   }
@@ -218,7 +214,7 @@ function SettingsPage({
       onThemeChange?.(previousTheme)
       showToast({
         type: 'error',
-        message: 'Failed to update color theme. Please try again.',
+        message: t('settings.toasts.themeError'),
         duration: 4000,
       })
       return
@@ -226,7 +222,7 @@ function SettingsPage({
 
     showToast({
       type: 'success',
-      message: `Theme set to ${UI_THEME_LABELS[nextTheme]}.`,
+      message: t('settings.toasts.themeSuccess', { theme: UI_THEME_LABELS[nextTheme] }),
       duration: 1800,
     })
   }
@@ -248,7 +244,7 @@ function SettingsPage({
       onChronicleRefreshModeChange?.(previousMode)
       showToast({
         type: 'error',
-        message: 'Failed to update Chronicle refresh mode. Please try again.',
+        message: t('settings.chronicleRefresh.toastError'),
         duration: 4000,
       })
       return
@@ -256,7 +252,9 @@ function SettingsPage({
 
     showToast({
       type: 'success',
-      message: `Chronicle refresh mode set to ${CHRONICLE_REFRESH_MODE_LABELS[nextMode]}.`,
+      message: t('settings.chronicleRefresh.toastSuccess', {
+        mode: t(`settings.chronicleRefresh.${nextMode}`),
+      }),
       duration: 1800,
     })
   }
@@ -278,7 +276,7 @@ function SettingsPage({
       onModelRoutingModeChange?.(previousMode)
       showToast({
         type: 'error',
-        message: 'Failed to update model routing. Please try again.',
+        message: t('settings.modelRouting.toastError'),
         duration: 4000,
       })
       return
@@ -286,7 +284,51 @@ function SettingsPage({
 
     showToast({
       type: 'success',
-      message: `Model routing set to ${MODEL_ROUTING_MODE_LABELS[nextMode]}.`,
+      message: t('settings.modelRouting.toastSuccess', {
+        mode: t(`settings.modelRouting.${nextMode === 'quality_first' ? 'qualityFirst' : 'conserve'}`),
+      }),
+      duration: 1800,
+    })
+  }
+
+  const handleLanguageChange = async (rawValue: string) => {
+    const nextLanguage = normalizeLanguage(rawValue)
+    if (nextLanguage === language) return
+
+    const previousLanguage = language
+    setLanguage(nextLanguage)
+    setLanguageSaving(true)
+
+    const success = await saveSettings({ language: nextLanguage })
+    setLanguageSaving(false)
+
+    if (!success) {
+      setLanguage(previousLanguage)
+      showToast({
+        type: 'error',
+        message: t('settings.toasts.languageError'),
+        duration: 4000,
+      })
+      return
+    }
+
+    try {
+      const loaded = await window.electronAPI?.getSettings()
+      const loadedLanguage = normalizeLanguage((loaded as { language?: unknown } | undefined)?.language)
+      const loadedResolved = normalizeResolvedLanguage(
+        (loaded as { resolvedLanguage?: unknown } | undefined)?.resolvedLanguage,
+      )
+      setLanguage(loadedLanguage)
+      onLanguageChange?.(loadedResolved)
+    } catch {
+      onLanguageChange?.(normalizeResolvedLanguage(nextLanguage))
+    }
+
+    showToast({
+      type: 'success',
+      message: t('settings.toasts.languageSuccess', {
+        language: t(`languages.${nextLanguage}`),
+      }),
       duration: 1800,
     })
   }
@@ -303,12 +345,29 @@ function SettingsPage({
     }
   }
 
+  const languageOptions = LANGUAGE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(`languages.${option.value}`),
+  }))
+
+  const chronicleModeLabel = (mode: ChronicleRefreshMode) =>
+    t(`settings.chronicleRefresh.${mode}`)
+
+  const chronicleModeHelper = (mode: ChronicleRefreshMode) =>
+    t(`settings.chronicleRefresh.${mode}Help`)
+
+  const modelRoutingLabel = (mode: ModelRoutingMode) =>
+    t(`settings.modelRouting.${mode === 'quality_first' ? 'qualityFirst' : 'conserve'}`)
+
+  const modelRoutingHelper = (mode: ModelRoutingMode) =>
+    t(`settings.modelRouting.${mode === 'quality_first' ? 'qualityFirstHelp' : 'conserveHelp'}`)
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
            <div className="w-12 h-12 border-t-2 border-l-2 border-accent-cyan rounded-full animate-spin" />
-           <HUDMicro className="animate-pulse">INITIALIZING CONFIGURATION...</HUDMicro>
+           <HUDMicro className="animate-pulse">{t('settings.loading')}</HUDMicro>
         </div>
       </div>
     )
@@ -321,32 +380,44 @@ function SettingsPage({
         {/* Header Area */}
         <div className="flex items-end justify-between mb-8">
             <div>
-                <HUDMicro className="mb-1 text-accent-cyan">SYS // CONFIG_01</HUDMicro>
-                <HUDHeader size="xl">CONFIGURATION</HUDHeader>
+                <HUDMicro className="mb-1 text-accent-cyan">{t('settings.eyebrow')}</HUDMicro>
+                <HUDHeader size="xl">{t('settings.title')}</HUDHeader>
             </div>
-            <div className="w-[420px] max-w-[60%] grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="w-[640px] max-w-[68%] grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <HUDSelect
-                  label="Text Size"
+                  label={t('settings.textSize')}
                   value={String(uiScale)}
                   disabled={uiScaleSaving}
                   onChange={(e) => void handleUiScaleChange(e.target.value)}
                   options={UI_SCALE_OPTIONS}
                 />
                 <HUDMicro className="block mt-1 text-right">
-                  {uiScaleSaving ? 'APPLYING...' : 'CMD/CTRL +/-/0'}
+                  {uiScaleSaving ? t('common.applying') : 'CMD/CTRL +/-/0'}
                 </HUDMicro>
               </div>
               <div>
                 <HUDSelect
-                  label="Color Theme"
+                  label={t('settings.colorTheme')}
                   value={uiTheme}
                   disabled={uiThemeSaving}
                   onChange={(e) => void handleUiThemeChange(e.target.value)}
                   options={UI_THEME_OPTIONS}
                 />
                 <HUDMicro className="block mt-1 text-right">
-                  {uiThemeSaving ? 'APPLYING...' : 'THEME PRESET'}
+                  {uiThemeSaving ? t('common.applying') : t('settings.themePreset')}
+                </HUDMicro>
+              </div>
+              <div>
+                <HUDSelect
+                  label={t('settings.language')}
+                  value={language}
+                  disabled={languageSaving}
+                  onChange={(e) => void handleLanguageChange(e.target.value)}
+                  options={languageOptions}
+                />
+                <HUDMicro className="block mt-1 text-right">
+                  {languageSaving ? t('common.applying') : t('settings.languageHint')}
                 </HUDMicro>
               </div>
             </div>
@@ -357,7 +428,7 @@ function SettingsPage({
             <HUDPanel variant="alert" className="mb-6 flex items-center gap-4" decoration="scanline">
                 <span className="text-accent-red text-xl">⚠</span>
                 <div>
-                    <HUDLabel className="text-accent-red">SYSTEM ALERT</HUDLabel>
+                    <HUDLabel className="text-accent-red">{t('settings.systemAlert')}</HUDLabel>
                     <p className="text-accent-red/80 font-mono text-sm">{error}</p>
                 </div>
             </HUDPanel>
@@ -367,7 +438,7 @@ function SettingsPage({
             <HUDPanel variant="primary" className="mb-6 border-accent-green/50" decoration="scanline">
                 <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-accent-green shadow-glow-green" />
-                    <span className="font-mono text-accent-green text-sm">CONFIGURATION SAVED // SETTINGS APPLIED</span>
+                    <span className="font-mono text-accent-green text-sm">{t('settings.saveSuccess')}</span>
                 </div>
             </HUDPanel>
         )}
@@ -380,19 +451,19 @@ function SettingsPage({
                 
                 {/* API Section */}
                 <section>
-                    <HUDSectionTitle number="01">INTELLIGENCE UPLINK</HUDSectionTitle>
-                    <HUDPanel decoration="tech" title="GEMINI MODEL ACCESS">
+                    <HUDSectionTitle number="01">{t('settings.sections.intelligence')}</HUDSectionTitle>
+                    <HUDPanel decoration="tech" title={t('settings.panels.geminiAccess')}>
                         <div className="space-y-4 pt-2">
                              <HUDInput 
-                                label="API KEY TOKEN"
+                                label={t('settings.api.label')}
                                 type="password"
                                 value={googleApiKey}
                                 onChange={(e) => setGoogleApiKey(e.target.value)}
-                                placeholder={settings?.googleApiKeySet ? '••••••••••••••••' : 'ENTER KEY'}
+                                placeholder={settings?.googleApiKeySet ? t('settings.api.placeholderSet') : t('settings.api.placeholderEmpty')}
                              />
                              <div className="flex justify-between items-center">
                                  <span className="font-mono text-xs text-white/30">
-                                     STATUS: {settings?.googleApiKeySet ? <span className="text-accent-green">ACTIVE</span> : <span className="text-accent-yellow">MISSING</span>}
+                                     {t('settings.api.status')} {settings?.googleApiKeySet ? <span className="text-accent-green">{t('settings.api.active')}</span> : <span className="text-accent-yellow">{t('settings.api.missing')}</span>}
                                  </span>
                                  <a 
                                     href="https://aistudio.google.com/app/apikey" 
@@ -400,14 +471,14 @@ function SettingsPage({
                                     rel="noreferrer"
                                     className="font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
                                  >
-                                     GENERATE KEY &gt;
+                                     {t('settings.api.generateKey')}
                                  </a>
                              </div>
                              <div className="border-t border-white/10 pt-4 space-y-3">
                                  <div className="flex items-center justify-between gap-3">
-                                     <HUDLabel>MODEL ROUTING</HUDLabel>
+                                     <HUDLabel>{t('settings.modelRouting.label')}</HUDLabel>
                                      {modelRoutingModeSaving && (
-                                       <HUDMicro className="text-right">APPLYING...</HUDMicro>
+                                       <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
                                      )}
                                  </div>
 
@@ -420,7 +491,7 @@ function SettingsPage({
                                          type="button"
                                          disabled={modelRoutingModeSaving}
                                          aria-pressed={isSelected}
-                                         aria-label={`Set model routing to ${MODEL_ROUTING_MODE_LABELS[mode]}`}
+                                         aria-label={t('settings.modelRouting.toastSuccess', { mode: modelRoutingLabel(mode) })}
                                          onClick={() => void handleModelRoutingModeChange(mode)}
                                          className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
                                            isSelected
@@ -429,7 +500,7 @@ function SettingsPage({
                                          } disabled:opacity-50 disabled:cursor-not-allowed`}
                                        >
                                          <div className="font-display text-[11px] uppercase tracking-[0.18em]">
-                                           {MODEL_ROUTING_MODE_LABELS[mode]}
+                                           {modelRoutingLabel(mode)}
                                          </div>
                                          <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
                                            {mode === 'quality_first' ? 'FLASH FIRST' : 'FLASH-LITE ADVISOR'}
@@ -440,15 +511,15 @@ function SettingsPage({
                                  </div>
 
                                  <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
-                                   {MODEL_ROUTING_MODE_HELPERS[modelRoutingMode]}
+                                   {modelRoutingHelper(modelRoutingMode)}
                                  </HUDMicro>
                              </div>
 
                              <div className="border-t border-white/10 pt-4 space-y-3">
                                  <div className="flex items-center justify-between gap-3">
-                                     <HUDLabel>CHRONICLE REFRESH</HUDLabel>
+                                     <HUDLabel>{t('settings.chronicleRefresh.label')}</HUDLabel>
                                      {chronicleRefreshModeSaving && (
-                                       <HUDMicro className="text-right">APPLYING...</HUDMicro>
+                                       <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
                                      )}
                                  </div>
 
@@ -461,7 +532,7 @@ function SettingsPage({
                                          type="button"
                                          disabled={chronicleRefreshModeSaving}
                                          aria-pressed={isSelected}
-                                         aria-label={`Set refresh mode to ${CHRONICLE_REFRESH_MODE_LABELS[mode]}`}
+                                         aria-label={t('settings.chronicleRefresh.aria', { mode: chronicleModeLabel(mode) })}
                                          onClick={() => void handleChronicleRefreshModeChange(mode)}
                                          className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
                                            isSelected
@@ -470,10 +541,10 @@ function SettingsPage({
                                          } disabled:opacity-50 disabled:cursor-not-allowed`}
                                        >
                                          <div className="font-display text-[11px] uppercase tracking-[0.18em]">
-                                           {CHRONICLE_REFRESH_MODE_LABELS[mode]}
+                                           {chronicleModeLabel(mode)}
                                          </div>
                                          <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
-                                           {mode === 'balanced' ? 'FREE-TIER DEFAULT' : 'MORE RESPONSIVE'}
+                                           {mode === 'balanced' ? t('settings.chronicleRefresh.balancedTag') : t('settings.chronicleRefresh.enhancedTag')}
                                          </div>
                                        </button>
                                      )
@@ -481,7 +552,7 @@ function SettingsPage({
                                  </div>
 
                                  <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
-                                   {CHRONICLE_REFRESH_MODE_HELPERS[chronicleRefreshMode]}
+                                   {chronicleModeHelper(chronicleRefreshMode)}
                                  </HUDMicro>
                              </div>
                         </div>
@@ -490,24 +561,24 @@ function SettingsPage({
 
                 {/* Save Data Section */}
                 <section>
-                    <HUDSectionTitle number="02">DATA INGESTION</HUDSectionTitle>
-                    <HUDPanel decoration="brackets" title="SAVE FILE SOURCE">
+                    <HUDSectionTitle number="02">{t('settings.sections.data')}</HUDSectionTitle>
+                    <HUDPanel decoration="brackets" title={t('settings.panels.saveSource')}>
                          <div className="space-y-4 pt-2">
                              <div className="flex gap-2 items-end">
                                  <HUDInput 
                                     className="flex-1"
-                                    label="DIRECTORY PATH"
+                                    label={t('settings.saveData.directoryLabel')}
                                     value={saveDir}
                                     onChange={(e) => setSaveDir(e.target.value)}
-                                    placeholder="AUTO-DETECT"
+                                    placeholder={t('settings.saveData.placeholder')}
                                     readOnly
                                  />
                                  <HUDButton variant="secondary" onClick={handleBrowse} className="mb-[1px]">
-                                     BROWSE
+                                     {t('common.browse')}
                                  </HUDButton>
                              </div>
                              <HUDMicro className="block mt-2">
-                                 TARGET: STELLARIS SAVE GAME DIRECTORY (LOCAL)
+                                 {t('settings.saveData.target')}
                              </HUDMicro>
                          </div>
                     </HUDPanel>
@@ -520,13 +591,13 @@ function SettingsPage({
                 
                 {/* Discord Section */}
                 <section>
-                    <HUDSectionTitle number="03">COMMUNICATIONS RELAY</HUDSectionTitle>
-                    <HUDPanel decoration="scanline" variant={discordStatus?.connected ? 'primary' : 'secondary'} title="DISCORD LINK">
+                    <HUDSectionTitle number="03">{t('settings.sections.communications')}</HUDSectionTitle>
+                    <HUDPanel decoration="scanline" variant={discordStatus?.connected ? 'primary' : 'secondary'} title={t('settings.panels.discordLink')}>
                         <div className="space-y-4 pt-2">
                             {discordLoading ? (
                                 <div className="flex items-center gap-3 py-4 opacity-50">
                                     <div className="w-4 h-4 border border-accent-cyan border-t-transparent rounded-full animate-spin" />
-                                    <HUDMicro>ESTABLISHING HANDSHAKE...</HUDMicro>
+                                    <HUDMicro>{t('settings.discord.loading')}</HUDMicro>
                                 </div>
                             ) : discordStatus?.connected ? (
                                 <>
@@ -536,7 +607,7 @@ function SettingsPage({
                                         </div>
                                         <div>
                                             <div className="font-display text-sm tracking-wide text-white">{discordStatus?.username}</div>
-                                            <HUDMicro className="text-accent-green">SIGNAL: STRONG</HUDMicro>
+                                            <HUDMicro className="text-accent-green">{t('settings.discord.signalStrong')}</HUDMicro>
                                         </div>
                                     </div>
                                     
@@ -546,20 +617,22 @@ function SettingsPage({
                                             onClick={() => window.open('https://discord.com/oauth2/authorize?client_id=1460412463282524231&scope=bot+applications.commands&permissions=0', '_blank')}
                                             className="text-[10px]"
                                         >
-                                            INVITE BOT
+                                            {t('settings.discord.inviteBot')}
                                         </HUDButton>
                                         <HUDButton variant="danger" onClick={handleDisconnectDiscord} className="text-[10px]">
-                                            TERMINATE
+                                            {t('settings.discord.terminate')}
                                         </HUDButton>
                                     </div>
 
                                     {/* Relay Status */}
                                     {discordRelayStatus && (
                                         <div className="flex items-center justify-between border-t border-white/10 pt-3 mt-1">
-                                            <span className="font-mono text-[10px] text-white/50">RELAY: {discordRelayStatus.state.toUpperCase()}</span>
+                                            <span className="font-mono text-[10px] text-white/50">
+                                              {t('settings.discord.relay', { state: discordRelayStatus.state.toUpperCase() })}
+                                            </span>
                                             {discordRelayStatus.state === 'error' && (
                                                 <button onClick={handleRetryConnection} disabled={retrying} className="text-accent-yellow hover:underline text-[10px] font-mono">
-                                                    {retrying ? 'RETRYING...' : 'RETRY'}
+                                                    {retrying ? t('common.retrying') : t('common.retry')}
                                                 </button>
                                             )}
                                         </div>
@@ -568,7 +641,7 @@ function SettingsPage({
                             ) : (
                                 <>
                                     <p className="font-mono text-xs text-white/60 leading-relaxed">
-                                        Enable subspace communications to query advisor via Discord overlay.
+                                        {t('settings.discord.description')}
                                     </p>
                                     <HUDButton 
                                         variant="primary" 
@@ -576,14 +649,14 @@ function SettingsPage({
                                         disabled={discordConnecting}
                                         className="w-full"
                                     >
-                                        {discordConnecting ? 'INITIATING...' : 'CONNECT DISCORD'}
+                                        {discordConnecting ? t('settings.discord.connecting') : t('settings.discord.connect')}
                                     </HUDButton>
                                 </>
                             )}
                             
                             {discordError && (
                                 <p className="text-accent-red text-xs font-mono border-l-2 border-accent-red pl-2">
-                                    ERR: {getUserFriendlyErrorMessage(discordError)}
+                                    {t('settings.discord.errorPrefix')} {getUserFriendlyErrorMessage(discordError, t)}
                                 </p>
                             )}
                         </div>
@@ -592,14 +665,14 @@ function SettingsPage({
 
                 {/* Feedback Section */}
                 <section>
-                    <HUDSectionTitle number="04">DIAGNOSTICS</HUDSectionTitle>
+                    <HUDSectionTitle number="04">{t('settings.sections.diagnostics')}</HUDSectionTitle>
                     <div className="flex gap-4 items-center p-4 border border-white/10 bg-white/5 rounded-sm">
                         <div className="flex-1">
-                             <HUDLabel className="block mb-1">SYSTEM REPORTING</HUDLabel>
-                             <p className="font-mono text-xs text-white/40">Submit detailed logs for analysis.</p>
+                             <HUDLabel className="block mb-1">{t('settings.feedback.label')}</HUDLabel>
+                             <p className="font-mono text-xs text-white/40">{t('settings.feedback.body')}</p>
                         </div>
                         <HUDButton variant="secondary" onClick={onReportIssue}>
-                            REPORT ISSUE
+                            {t('common.reportIssue')}
                         </HUDButton>
                     </div>
                 </section>
@@ -611,7 +684,7 @@ function SettingsPage({
              <div className="bg-black/80 backdrop-blur-md border border-accent-cyan/30 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center gap-6">
                  <div className="flex items-center gap-2">
                      <div className={`w-2 h-2 rounded-full ${hasChanges ? 'bg-accent-yellow animate-pulse' : 'bg-white/20'}`} />
-                     <HUDMicro>{hasChanges ? 'UNSAVED CHANGES' : 'SYSTEM READY'}</HUDMicro>
+                     <HUDMicro>{hasChanges ? t('settings.actionBar.unsaved') : t('settings.actionBar.ready')}</HUDMicro>
                  </div>
                  <div className="h-4 w-px bg-white/10" />
                  <HUDButton 
@@ -620,7 +693,7 @@ function SettingsPage({
                     disabled={saving || !hasChanges}
                     className="min-w-[140px]"
                  >
-                     {saving ? 'COMMITTING...' : 'APPLY CHANGES'}
+                     {saving ? t('settings.actionBar.committing') : t('settings.actionBar.apply')}
                  </HUDButton>
              </div>
         </div>

@@ -1,0 +1,332 @@
+{
+  "app": {
+    "tabs": {
+      "chat": "Advisor",
+      "chronicle": "Chronicle",
+      "settings": "Config"
+    }
+  },
+  "common": {
+    "apply": "Apply",
+    "applying": "Applying...",
+    "browse": "Browse",
+    "close": "Close",
+    "dismiss": "Dismiss",
+    "downloadedReady": "Downloaded. Ready to install.",
+    "later": "Later",
+    "loading": "Loading...",
+    "new": "New",
+    "reportIssue": "Report Issue",
+    "retry": "Retry",
+    "retrying": "Retrying...",
+    "unknownDate": "Unknown date"
+  },
+  "status": {
+    "ready": "SYSTEMS ONLINE",
+    "analyzing": "SURVEYING EMPIRE...",
+    "analyzingWithStage": "SURVEYING ({{stage}})...",
+    "connecting": "CONNECTING...",
+    "noSave": "AWAITING LINK",
+    "notConfigured": "CONFIG REQUIRED",
+    "disconnected": "OFFLINE",
+    "unknownEmpire": "UNKNOWN EMPIRE",
+    "stages": {
+      "waiting_for_stable_save": "DETECTING SAVE",
+      "parsing_t0": "READING SAVE",
+      "precomputing_t2": "ANALYZING",
+      "persisting": "SAVING"
+    }
+  },
+  "languages": {
+    "system": "System default",
+    "en": "English",
+    "de": "Deutsch",
+    "fr": "Francais",
+    "es": "Espanol",
+    "pt-BR": "Portugues (Brasil)",
+    "ja": "日本語",
+    "zh-Hans": "简体中文",
+    "en-XA": "Pseudo"
+  },
+  "chat": {
+    "input": {
+      "placeholder": "HOW CAN WE HELP?",
+      "transmitting": "TRANSMITTING...",
+      "advisorInfo": "Advisor Info",
+      "sending": "SENDING",
+      "send": "SEND"
+    },
+    "message": {
+      "latency": "LATENCY: {{seconds}}s",
+      "report": "REPORT",
+      "reportTitle": "Report this response",
+      "blockedLink": "Blocked non-http(s) link"
+    },
+    "errors": {
+      "briefingNotReady": "The advisor is still analyzing your save file. Please try again in {{seconds}} seconds.",
+      "unexpected": "An unexpected error occurred"
+    },
+    "newChat": "New Chat",
+    "welcome": {
+      "title": "Galactic Helpdesk",
+      "ready": "YOUR FILE IS OPEN // SUBMIT YOUR REQUEST",
+      "scanning": "INITIALIZING // SCANNING EMPIRE DATA",
+      "scanningShort": "Scanning empire data...",
+      "suggested": "Suggested Inquiries"
+    },
+    "loading": {
+      "universal": [
+        "Consulting the Curators",
+        "Surveying the situation",
+        "Analyzing sensor data",
+        "Processing anomaly",
+        "Compiling situation report",
+        "Running simulations",
+        "Accessing the archives",
+        "Cross-referencing star charts",
+        "Waiting for end-game lag to clear",
+        "Checking if the Fallen Empire noticed",
+        "Consulting the Shroud",
+        "What was, will be",
+        "Locating the correct folder...",
+        "Filing this under \"Urgent\"...",
+        "Pulling your file...",
+        "Cross-referencing your records...",
+        "Please hold...",
+        "Transferring you now...",
+        "Consulting a supervisor..."
+      ],
+      "machine": [
+        "Processing directive",
+        "The network ponders",
+        "Calculating optimal outcome",
+        "Querying subroutines"
+      ],
+      "hiveMind": [
+        "The collective considers",
+        "Syncing with the overmind",
+        "Assimilating information",
+        "Consensus forming"
+      ]
+    },
+    "suggestions": {
+      "strategic": [
+        "What should I be researching?",
+        "Am I falling behind?",
+        "What am I probably neglecting?",
+        "What should a ruler at this stage be thinking about?",
+        "How does our empire compare to the competition?",
+        "What's the biggest risk we're not preparing for?"
+      ],
+      "tactical": [
+        "Why is my economy in the red?",
+        "What should I be building on my planets?",
+        "Why does everyone hate us?",
+        "Could we win a war right now?",
+        "Can our navy hold its own?",
+        "Where are we strategically vulnerable?"
+      ],
+      "wildcards": [
+        "Roast my empire",
+        "Explain my empire like I just took the throne",
+        "Give me a state of the galaxy address",
+        "What would our rivals say about us?"
+      ],
+      "roast": "Roast my empire"
+    }
+  },
+  "chronicle": {
+    "page": {
+      "openSidebar": "Open sidebar",
+      "dismiss": "Dismiss",
+      "loadingArchives": "Loading Archives...",
+      "retrieving": "Retrieving Chronicle...",
+      "emptyTitle": "No Chronicle Yet",
+      "emptyBody": "Play your game and accumulate history. Chronicles are generated automatically as your empire progresses through the ages.",
+      "noSession": "No session found for this save"
+    },
+    "sidebar": {
+      "empireArchives": "Empire Archives",
+      "closeSidebar": "Close sidebar",
+      "noHistory": "No game history yet",
+      "chapters": "Chapters",
+      "loading": "Loading...",
+      "noChapters": "No chapters yet",
+      "noChaptersHelp": "Play around 5 years with enough events, or hit a major event, to generate your first chapter.",
+      "regenerating": "Regenerating chapter...",
+      "staleTooltip": "Earlier chapter was regenerated - context may be outdated",
+      "finalizedTooltip": "Finalized chapter",
+      "currentEra": "Current Era",
+      "narrator": "Narrator",
+      "export": "Export",
+      "events": "Events",
+      "latest": "Latest",
+      "pending_one": "{{count}} chapter pending",
+      "pending_other": "{{count}} chapters pending",
+      "generateMore": "Generate more chapters"
+    },
+    "content": {
+      "title": "The Chronicles of {{empireName}}",
+      "selectChapter": "Select a chapter to view its content.",
+      "rewriting": "Rewriting history...",
+      "chapter": "Chapter {{number}}",
+      "staleTooltip": "Earlier chapter was regenerated - context may be outdated",
+      "finalizedTooltip": "Finalized chapter",
+      "regenerateWarning": "Regenerating this chapter will mark later chapters as potentially stale. This action uses an API call.",
+      "regenPlaceholder": "What should change? (optional)",
+      "confirmRegenerate": "Confirm Regenerate",
+      "cancel": "Cancel",
+      "regenerateTitle": "Regenerate this chapter",
+      "regenerateChapter": "Regenerate Chapter",
+      "summary": "Summary",
+      "currentEra": "The Current Era",
+      "storyContinues": "The Story Continues...",
+      "present": "Present",
+      "eventsInEra_one": "{{count}} event in this era",
+      "eventsInEra_other": "{{count}} events in this era"
+    },
+    "narrator": {
+      "title": "Narrator",
+      "subtitle": "Chronicle style instructions",
+      "close": "Close narrator panel",
+      "instructions": "Narrator Instructions (Optional)",
+      "placeholder": "Describe the narrator's style or tone...",
+      "tryStyle": "Try a style",
+      "applySuccess": "Applied - takes effect on next generation",
+      "applyError": "Failed to apply",
+      "applying": "Applying...",
+      "apply": "Apply",
+      "selectSave": "Select a save to customize the narrator for this chronicle.",
+      "examples": {
+        "deadpan": "Deadpan nature documentary",
+        "bureaucratic": "Bureaucratic reports that casually describe atrocities",
+        "tabloid": "Galactic tabloid - drama, rumors, and scandal",
+        "propaganda": "Propaganda broadcast from state media",
+        "pr": "Overly enthusiastic imperial PR department",
+        "earnings": "Dry corporate quarterly earnings, but for galactic conquest"
+      }
+    }
+  },
+  "settings": {
+    "loading": "INITIALIZING CONFIGURATION...",
+    "eyebrow": "SYS // CONFIG_01",
+    "title": "CONFIGURATION",
+    "textSize": "Text Size",
+    "colorTheme": "Color Theme",
+    "language": "Language",
+    "themePreset": "THEME PRESET",
+    "languageHint": "UI + ADVISOR",
+    "systemAlert": "SYSTEM ALERT",
+    "saveSuccess": "CONFIGURATION SAVED // SETTINGS APPLIED",
+    "sections": {
+      "intelligence": "INTELLIGENCE UPLINK",
+      "data": "DATA INGESTION",
+      "communications": "COMMUNICATIONS RELAY",
+      "diagnostics": "DIAGNOSTICS"
+    },
+    "panels": {
+      "geminiAccess": "GEMINI MODEL ACCESS",
+      "saveSource": "SAVE FILE SOURCE",
+      "discordLink": "DISCORD LINK"
+    },
+    "api": {
+      "label": "API KEY TOKEN",
+      "placeholderSet": "••••••••••••••••",
+      "placeholderEmpty": "ENTER KEY",
+      "status": "STATUS:",
+      "active": "ACTIVE",
+      "missing": "MISSING",
+      "generateKey": "GENERATE KEY >"
+    },
+    "chronicleRefresh": {
+      "label": "CHRONICLE REFRESH",
+      "balanced": "Balanced",
+      "enhanced": "Enhanced",
+      "balancedTag": "FREE-TIER DEFAULT",
+      "enhancedTag": "MORE RESPONSIVE",
+      "balancedHelp": "Lower Gemini usage. Best default for free tier and steadier cliffhanger updates.",
+      "enhancedHelp": "Faster current-era story updates while viewing Chronicle. Uses more Gemini calls.",
+      "aria": "Set refresh mode to {{mode}}",
+      "toastError": "Failed to update Chronicle refresh mode. Please try again.",
+      "toastSuccess": "Chronicle refresh mode set to {{mode}}."
+    },
+    "modelRouting": {
+      "label": "MODEL ROUTING",
+      "qualityFirst": "Quality first",
+      "conserve": "Conserve quota",
+      "qualityFirstHelp": "Prefer Gemini Flash, then fall back when quota requires it.",
+      "conserveHelp": "Use lighter models for advisor chat to reduce Gemini usage.",
+      "toastError": "Failed to update model routing. Please try again.",
+      "toastSuccess": "Model routing set to {{mode}}."
+    },
+    "saveData": {
+      "directoryLabel": "DIRECTORY PATH",
+      "placeholder": "AUTO-DETECT",
+      "target": "TARGET: STELLARIS SAVE GAME DIRECTORY (LOCAL)"
+    },
+    "discord": {
+      "loading": "ESTABLISHING HANDSHAKE...",
+      "signalStrong": "SIGNAL: STRONG",
+      "inviteBot": "INVITE BOT",
+      "terminate": "TERMINATE",
+      "relay": "RELAY: {{state}}",
+      "description": "Enable subspace communications to query advisor via Discord overlay.",
+      "connect": "CONNECT DISCORD",
+      "connecting": "INITIATING...",
+      "errorPrefix": "ERR:"
+    },
+    "feedback": {
+      "label": "SYSTEM REPORTING",
+      "body": "Submit detailed logs for analysis."
+    },
+    "actionBar": {
+      "unsaved": "UNSAVED CHANGES",
+      "ready": "SYSTEM READY",
+      "committing": "COMMITTING...",
+      "apply": "APPLY CHANGES"
+    },
+    "toasts": {
+      "textSizeError": "Failed to update text size. Please try again.",
+      "textSizeSuccess": "Text size set to {{percent}}%.",
+      "themeError": "Failed to update color theme. Please try again.",
+      "themeSuccess": "Theme set to {{theme}}.",
+      "languageError": "Failed to update language. Please try again.",
+      "languageSuccess": "Language set to {{language}}."
+    },
+    "discordErrors": {
+      "cancelled": "Authorization cancelled.",
+      "expired": "Session expired. Reconnect required.",
+      "auth": "Authorization failed.",
+      "connection": "Connection error. Check network.",
+      "generic": "System error. Retry."
+    }
+  },
+  "update": {
+    "title": "Update Available",
+    "installingBody": "Applying update and relaunching. This can take a little while on macOS.",
+    "readyBody": "A new version is ready to install. Restart the app to apply the update.",
+    "whatsNew": "What's New",
+    "downloading": "Downloading",
+    "applying": "Applying update...",
+    "checking": "Checking for updates...",
+    "applyingButton": "Applying Update...",
+    "downloadingButton": "Downloading... {{progress}}%",
+    "installRestart": "Install & Restart",
+    "installError": "Failed to install update"
+  },
+  "announcements": {
+    "title": "Transmissions",
+    "newCount": "{{count}} NEW",
+    "active": "Active transmissions ({{count}})",
+    "dismissAll": "Dismiss all",
+    "markRead": "Mark read",
+    "empty": "No transmissions",
+    "severity": {
+      "info": "INFO",
+      "warning": "WARNING",
+      "known_issue": "KNOWN ISSUE",
+      "update": "UPDATE",
+      "tip": "TIP"
+    }
+  }
+}

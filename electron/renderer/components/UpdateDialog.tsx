@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 
 interface UpdateState {
   available: boolean
@@ -90,6 +91,7 @@ function extractReleaseHighlights(releaseNotes?: string, maxHighlights = 5): str
 }
 
 export default function UpdateDialog() {
+  const { t } = useTranslation()
   const [update, setUpdate] = useState<UpdateState>({
     available: false,
     checking: false,
@@ -203,7 +205,7 @@ export default function UpdateDialog() {
         setUpdate(prev => ({
           ...prev,
           installing: false,
-          error: result?.error || 'Failed to install update',
+          error: result?.error || t('update.installError'),
         }))
       }
     } catch (err) {
@@ -211,7 +213,7 @@ export default function UpdateDialog() {
       setUpdate(prev => ({
         ...prev,
         installing: false,
-        error: 'Failed to install update',
+        error: t('update.installError'),
       }))
     }
   }
@@ -262,7 +264,7 @@ export default function UpdateDialog() {
             {/* Header */}
             <div className="mb-6">
               <h2 className="text-xl font-bold text-accent-cyan mb-1 tracking-wide">
-                Update Available
+                {t('update.title')}
               </h2>
               <p className="text-text-secondary text-sm">
                 Stellaris Companion {update.version}
@@ -283,18 +285,18 @@ export default function UpdateDialog() {
               <div className="mb-6">
                 {update.installing ? (
                   <p className="text-text-primary text-sm mb-4">
-                    Applying update and relaunching. This can take a little while on macOS.
+                    {t('update.installingBody')}
                   </p>
                 ) : (
                   <p className="text-text-primary text-sm mb-4">
-                    A new version is ready to install. Restart the app to apply the update.
+                    {t('update.readyBody')}
                   </p>
                 )}
 
                 {releaseHighlights.length > 0 && !update.installing && (
                   <div className="mb-4 p-3 bg-bg-tertiary/40 border border-border/50 rounded-md">
                     <p className="text-[11px] text-accent-cyan font-semibold uppercase tracking-wider">
-                      What&apos;s New
+                      {t('update.whatsNew')}
                     </p>
                     <ul className="mt-2 space-y-1.5">
                       {releaseHighlights.map((item, idx) => (
@@ -311,7 +313,7 @@ export default function UpdateDialog() {
                 {update.downloading && (
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-text-secondary">Downloading</span>
+                      <span className="text-xs text-text-secondary">{t('update.downloading')}</span>
                       <span className="text-xs text-accent-cyan font-semibold">{update.progress}%</span>
                     </div>
                     <div className="w-full h-2 bg-bg-tertiary rounded-full overflow-hidden border border-border/50">
@@ -331,7 +333,7 @@ export default function UpdateDialog() {
                 {update.progress === 100 && !update.downloading && (
                   <div className="mb-4 p-3 bg-accent-green/10 border border-accent-green/40 rounded-md">
                     <p className="text-accent-green text-xs font-semibold">
-                      ✓ Downloaded. Ready to install.
+                      ✓ {t('common.downloadedReady')}
                     </p>
                   </div>
                 )}
@@ -339,13 +341,13 @@ export default function UpdateDialog() {
                 {update.installing && (
                   <div className="mb-4 p-3 bg-accent-cyan/10 border border-accent-cyan/40 rounded-md">
                     <p className="text-accent-cyan text-xs font-semibold">
-                      Applying update...
+                      {t('update.applying')}
                     </p>
                   </div>
                 )}
 
                 {update.checking && !update.installing && !update.downloading && (
-                  <p className="text-xs text-text-secondary">Checking for updates...</p>
+                  <p className="text-xs text-text-secondary">{t('update.checking')}</p>
                 )}
               </div>
             )}
@@ -357,7 +359,7 @@ export default function UpdateDialog() {
                 disabled={update.installing}
                 className="flex-1 px-4 py-2.5 bg-bg-tertiary hover:bg-bg-elevated border border-border rounded text-text-primary text-sm font-semibold uppercase tracking-wider transition-colors"
               >
-                {update.error ? 'Close' : 'Later'}
+                {update.error ? t('common.close') : t('common.later')}
               </button>
 
               {!update.error && (
@@ -370,10 +372,10 @@ export default function UpdateDialog() {
                   }}
                 >
                   {update.installing
-                    ? 'Applying Update...'
+                    ? t('update.applyingButton')
                     : update.downloading
-                      ? `Downloading... ${update.progress}%`
-                      : 'Install & Restart'}
+                      ? t('update.downloadingButton', { progress: update.progress })
+                      : t('update.installRestart')}
                 </button>
               )}
             </div>

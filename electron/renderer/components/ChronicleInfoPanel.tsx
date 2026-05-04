@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import PersonIcon from './PersonIcon'
 
 interface ChronicleInfoPanelProps {
@@ -9,11 +10,21 @@ interface ChronicleInfoPanelProps {
   selectedSaveId: string | null
 }
 
+const STYLE_EXAMPLE_KEYS = [
+  'chronicle.narrator.examples.deadpan',
+  'chronicle.narrator.examples.bureaucratic',
+  'chronicle.narrator.examples.tabloid',
+  'chronicle.narrator.examples.propaganda',
+  'chronicle.narrator.examples.pr',
+  'chronicle.narrator.examples.earnings',
+]
+
 export default function ChronicleInfoPanel({
   isOpen,
   onClose,
   selectedSaveId,
 }: ChronicleInfoPanelProps) {
+  const { t } = useTranslation()
   const panelTransition = {
     type: 'spring' as const,
     stiffness: 420,
@@ -89,13 +100,13 @@ export default function ChronicleInfoPanel({
       const res = await window.electronAPI.backend.setChronicleCustom(customInstructions)
       if (res && typeof res === 'object' && 'ok' in res && res.ok) {
         setCustomInstructions((res.data.custom_instructions || '') as string)
-        setSaveResult({ ok: true, message: 'Applied — takes effect on next generation' })
+        setSaveResult({ ok: true, message: t('chronicle.narrator.applySuccess') })
       } else {
-        const message = (res as any)?.error || 'Failed to apply'
+        const message = (res as any)?.error || t('chronicle.narrator.applyError')
         setSaveResult({ ok: false, message })
       }
     } catch (e) {
-      setSaveResult({ ok: false, message: e instanceof Error ? e.message : 'Failed to apply' })
+      setSaveResult({ ok: false, message: e instanceof Error ? e.message : t('chronicle.narrator.applyError') })
     } finally {
       setSaving(false)
     }
@@ -170,10 +181,10 @@ export default function ChronicleInfoPanel({
                     <PersonIcon className="w-5 h-5 text-accent-cyan" />
                     <div>
                       <h2 className="font-display text-text-primary text-lg tracking-wider uppercase leading-tight">
-                        Narrator
+                        {t('chronicle.narrator.title')}
                       </h2>
                       <p className="text-xs text-text-secondary">
-                        Chronicle style instructions
+                        {t('chronicle.narrator.subtitle')}
                       </p>
                     </div>
                   </div>
@@ -181,7 +192,7 @@ export default function ChronicleInfoPanel({
                     type="button"
                     onClick={onClose}
                     className="text-text-secondary hover:text-text-primary transition-colors text-lg leading-none px-2 py-1 rounded hover:bg-bg-tertiary/60"
-                    aria-label="Close narrator panel"
+                    aria-label={t('chronicle.narrator.close')}
                   >
                     x
                   </button>
@@ -193,12 +204,12 @@ export default function ChronicleInfoPanel({
                 <div className="stellaris-panel rounded-lg p-4">
                   <p className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-3 flex items-center gap-2">
                     <span className="text-accent-cyan/60">◇</span>
-                    Narrator Instructions (Optional)
+                    {t('chronicle.narrator.instructions')}
                   </p>
                   <textarea
                     value={customInstructions}
                     onChange={(e) => setCustomInstructions(e.target.value)}
-                    placeholder="Describe the narrator's style or tone..."
+                    placeholder={t('chronicle.narrator.placeholder')}
                     maxLength={500}
                     rows={4}
                     disabled={!hasSave}
@@ -207,26 +218,22 @@ export default function ChronicleInfoPanel({
 
                   {!customInstructions && (
                     <div className="mt-3">
-                      <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">Try a style</p>
+                      <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">{t('chronicle.narrator.tryStyle')}</p>
                       <div className="flex flex-wrap gap-1.5">
-                        {[
-                          'Deadpan nature documentary',
-                          'Bureaucratic reports that casually describe atrocities',
-                          'Galactic tabloid \u2014 drama, rumors, and scandal',
-                          'Propaganda broadcast from state media',
-                          'Overly enthusiastic imperial PR department',
-                          'Dry corporate quarterly earnings, but for galactic conquest',
-                        ].map((example) => (
-                          <button
-                            key={example}
-                            type="button"
-                            disabled={!hasSave}
-                            onClick={() => setCustomInstructions(example)}
-                            className="px-2.5 py-1.5 text-xs text-text-secondary border border-border/60 rounded bg-bg-primary/30 hover:text-accent-cyan hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-150 text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            {example}
-                          </button>
-                        ))}
+                        {STYLE_EXAMPLE_KEYS.map((exampleKey) => {
+                          const example = t(exampleKey)
+                          return (
+                            <button
+                              key={exampleKey}
+                              type="button"
+                              disabled={!hasSave}
+                              onClick={() => setCustomInstructions(example)}
+                              className="px-2.5 py-1.5 text-xs text-text-secondary border border-border/60 rounded bg-bg-primary/30 hover:text-accent-cyan hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-150 text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {example}
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   )}
@@ -242,7 +249,7 @@ export default function ChronicleInfoPanel({
                           : 'bg-bg-tertiary/50 border-border text-text-secondary opacity-50 cursor-not-allowed'
                       }`}
                     >
-                      {saving ? 'Applying...' : 'Apply'}
+                      {saving ? t('chronicle.narrator.applying') : t('chronicle.narrator.apply')}
                     </button>
                   </div>
 
@@ -260,7 +267,7 @@ export default function ChronicleInfoPanel({
 
                   {!hasSave && (
                     <p className="text-xs text-text-secondary mt-3">
-                      Select a save to customize the narrator for this chronicle.
+                      {t('chronicle.narrator.selectSave')}
                     </p>
                   )}
                 </div>

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { ChronicleChapter, CurrentEra } from '../hooks/useBackend'
 import Tooltip from './Tooltip'
 import PersonIcon from './PersonIcon'
@@ -65,6 +66,7 @@ function ChronicleChapterList({
   collapsed = false,
   onToggleCollapse,
 }: ChronicleChapterListProps) {
+  const { t } = useTranslation()
   const isRegenerating = regeneratingChapter !== null
   const selectedSave = saves.find(s => s.save_id === selectedSaveId)
 
@@ -83,13 +85,13 @@ function ChronicleChapterList({
       <div className="p-4">
         <div className="text-xs text-text-secondary uppercase tracking-wider mb-2 font-semibold flex items-center gap-2">
           <span className="text-accent-cyan">◆</span>
-          Empire Archives
+          {t('chronicle.sidebar.empireArchives')}
           {onToggleCollapse && (
             <button
               type="button"
               onClick={onToggleCollapse}
               className="ml-auto w-5 h-5 flex items-center justify-center rounded text-text-secondary hover:text-accent-cyan transition-colors duration-150"
-              title="Close sidebar"
+              title={t('chronicle.sidebar.closeSidebar')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
@@ -118,7 +120,7 @@ function ChronicleChapterList({
         ) : (
           <div className="flex items-center gap-2 p-2.5 bg-bg-tertiary/50 border border-border rounded-md opacity-60">
             <span className="text-text-secondary text-base">◇</span>
-            <span className="text-sm font-medium text-text-secondary">No game history yet</span>
+            <span className="text-sm font-medium text-text-secondary">{t('chronicle.sidebar.noHistory')}</span>
           </div>
         )}
       </div>
@@ -127,19 +129,19 @@ function ChronicleChapterList({
       <nav className="flex-1 overflow-y-auto py-3">
         <h3 className="px-4 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
           <span className="text-accent-cyan/60">◇</span>
-          Chapters
+          {t('chronicle.sidebar.chapters')}
         </h3>
 
         {loading && chapters.length === 0 ? (
           <div className="py-4 px-4 text-text-secondary text-sm flex items-center gap-2">
             <span className="w-3 h-3 border border-accent-cyan border-t-transparent rounded-full animate-spin-loader" />
-            Loading...
+            {t('chronicle.sidebar.loading')}
           </div>
         ) : chapters.length === 0 && !currentEra ? (
           <div className="py-4 px-4">
-            <p className="text-text-secondary text-sm mb-2">No chapters yet</p>
+            <p className="text-text-secondary text-sm mb-2">{t('chronicle.sidebar.noChapters')}</p>
             <p className="text-text-muted text-xs">
-              Play around 5 years with enough events, or hit a major event, to generate your first chapter.
+              {t('chronicle.sidebar.noChaptersHelp')}
             </p>
           </div>
         ) : (
@@ -178,18 +180,18 @@ function ChronicleChapterList({
                   </span>
                   <span className="flex items-center gap-1 text-[11px]">
                     {isThisRegenerating ? (
-                      <Tooltip content="Regenerating chapter..." position="left">
+                      <Tooltip content={t('chronicle.sidebar.regenerating')} position="left">
                         <span className="text-accent-yellow animate-spin-loader inline-block">⟳</span>
                       </Tooltip>
                     ) : (
                       <>
                         {chapter.context_stale && (
-                          <Tooltip content="Earlier chapter was regenerated — context may be outdated" position="bottom">
+                          <Tooltip content={t('chronicle.sidebar.staleTooltip')} position="bottom">
                             <span className="text-accent-yellow ">⚠</span>
                           </Tooltip>
                         )}
                         {chapter.is_finalized && (
-                          <Tooltip content="Finalized chapter" position="left">
+                          <Tooltip content={t('chronicle.sidebar.finalizedTooltip')} position="left">
                             <span className="text-accent-cyan/60 ">◆</span>
                           </Tooltip>
                         )}
@@ -221,7 +223,7 @@ function ChronicleChapterList({
                       ? 'text-text-primary font-medium'
                       : 'text-text-secondary'
                   }`}>
-                    Current Era
+                    {t('chronicle.sidebar.currentEra')}
                   </span>
                 </motion.li>
               </>
@@ -243,7 +245,7 @@ function ChronicleChapterList({
             <div className="absolute bottom-0 left-0 w-1.5 h-1.5 border-l border-b border-accent-cyan/50 group-hover:border-accent-cyan/80 transition-colors" />
             <div className="absolute bottom-0 right-0 w-1.5 h-1.5 border-r border-b border-accent-cyan/50 group-hover:border-accent-cyan/80 transition-colors" />
             <PersonIcon className="w-4 h-4" />
-            <span className="text-xs uppercase tracking-wider font-semibold">Narrator</span>
+            <span className="text-xs uppercase tracking-wider font-semibold">{t('chronicle.sidebar.narrator')}</span>
           </button>
         </div>
       )}
@@ -264,7 +266,7 @@ function ChronicleChapterList({
               <path d="M8 2v8m0 0l-3-3m3 3l3-3" />
               <path d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2" />
             </svg>
-            <span className="text-xs uppercase tracking-wider font-semibold">Export</span>
+            <span className="text-xs uppercase tracking-wider font-semibold">{t('chronicle.sidebar.export')}</span>
           </button>
         </div>
       )}
@@ -272,16 +274,16 @@ function ChronicleChapterList({
       {/* Stats footer */}
       <div className="p-4 flex flex-col gap-2">
         <div className="flex justify-between text-xs">
-          <span className="text-text-secondary uppercase tracking-wider">Events</span>
+          <span className="text-text-secondary uppercase tracking-wider">{t('chronicle.sidebar.events')}</span>
           <span className="text-text-primary font-mono">{eventCount.toLocaleString()}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="text-text-secondary uppercase tracking-wider">Chapters</span>
+          <span className="text-text-secondary uppercase tracking-wider">{t('chronicle.sidebar.chapters')}</span>
           <span className="text-text-primary font-mono">{chapters.length}</span>
         </div>
         {selectedSave && (
           <div className="flex justify-between text-xs">
-            <span className="text-text-secondary uppercase tracking-wider">Latest</span>
+            <span className="text-text-secondary uppercase tracking-wider">{t('chronicle.sidebar.latest')}</span>
             <span className="text-accent-cyan font-mono">{selectedSave.last_date}</span>
           </div>
         )}
@@ -295,13 +297,13 @@ function ChronicleChapterList({
             {pendingChapters}
           </span>
           <span className="flex-1 text-xs text-text-secondary">
-            {pendingChapters === 1 ? 'chapter' : 'chapters'} pending
+            {t('chronicle.sidebar.pending', { count: pendingChapters })}
           </span>
           <button
             className="w-8 h-8 border border-accent-yellow/50 rounded bg-accent-yellow/10 text-accent-yellow text-sm cursor-pointer flex items-center justify-center transition-all duration-200 hover:bg-accent-yellow/20 hover:shadow-glow-yellow disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onRefresh}
             disabled={loading}
-            title="Generate more chapters"
+            title={t('chronicle.sidebar.generateMore')}
           >
             {loading ? (
               <span className="w-3 h-3 border border-accent-yellow border-t-transparent rounded-full animate-spin-loader" />

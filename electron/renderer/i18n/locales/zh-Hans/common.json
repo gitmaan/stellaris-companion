@@ -1,0 +1,332 @@
+{
+  "app": {
+    "tabs": {
+      "chat": "顾问",
+      "chronicle": "编年史",
+      "settings": "配置"
+    }
+  },
+  "common": {
+    "apply": "应用",
+    "applying": "正在应用...",
+    "browse": "浏览",
+    "close": "关闭",
+    "dismiss": "忽略",
+    "downloadedReady": "已下载。可以安装。",
+    "later": "稍后",
+    "loading": "加载中...",
+    "new": "新",
+    "reportIssue": "报告问题",
+    "retry": "重试",
+    "retrying": "正在重试...",
+    "unknownDate": "未知日期"
+  },
+  "status": {
+    "ready": "系统在线",
+    "analyzing": "正在扫描帝国...",
+    "analyzingWithStage": "正在扫描 ({{stage}})...",
+    "connecting": "正在连接...",
+    "noSave": "等待连接",
+    "notConfigured": "需要配置",
+    "disconnected": "离线",
+    "unknownEmpire": "未知帝国",
+    "stages": {
+      "waiting_for_stable_save": "正在检测存档",
+      "parsing_t0": "正在读取存档",
+      "precomputing_t2": "正在分析",
+      "persisting": "正在保存"
+    }
+  },
+  "languages": {
+    "system": "系统默认",
+    "en": "English",
+    "de": "Deutsch",
+    "fr": "Francais",
+    "es": "Espanol",
+    "pt-BR": "Portugues (Brasil)",
+    "ja": "日本語",
+    "zh-Hans": "简体中文",
+    "en-XA": "伪本地化"
+  },
+  "chat": {
+    "input": {
+      "placeholder": "需要什么帮助？",
+      "transmitting": "正在传输...",
+      "advisorInfo": "顾问信息",
+      "sending": "发送中",
+      "send": "发送"
+    },
+    "message": {
+      "latency": "延迟：{{seconds}}s",
+      "report": "报告",
+      "reportTitle": "报告此回复",
+      "blockedLink": "已阻止非 HTTP(S) 链接"
+    },
+    "errors": {
+      "briefingNotReady": "顾问仍在分析你的存档。请在 {{seconds}} 秒后重试。",
+      "unexpected": "发生意外错误"
+    },
+    "newChat": "新聊天",
+    "welcome": {
+      "title": "银河服务台",
+      "ready": "你的文件已打开 // 提交请求",
+      "scanning": "正在初始化 // 正在扫描帝国数据",
+      "scanningShort": "正在扫描帝国数据...",
+      "suggested": "建议提问"
+    },
+    "loading": {
+      "universal": [
+        "正在咨询策展人",
+        "正在评估局势",
+        "正在分析传感器数据",
+        "正在处理异常现象",
+        "正在编制形势报告",
+        "正在运行模拟",
+        "正在访问档案",
+        "正在交叉核对星图",
+        "等待后期卡顿结束",
+        "检查失落帝国是否注意到了",
+        "正在咨询虚境",
+        "曾经如此，未来亦然",
+        "正在查找正确文件夹...",
+        "正在归档为“紧急”...",
+        "正在调取你的档案...",
+        "正在交叉核对记录...",
+        "请稍候...",
+        "正在转接...",
+        "正在咨询主管..."
+      ],
+      "machine": [
+        "正在处理指令",
+        "网络正在思考",
+        "正在计算最优结果",
+        "正在查询子程序"
+      ],
+      "hiveMind": [
+        "集体正在考虑",
+        "正在与主巢同步",
+        "正在同化信息",
+        "共识正在形成"
+      ]
+    },
+    "suggestions": {
+      "strategic": [
+        "我应该研究什么？",
+        "我落后了吗？",
+        "我可能忽视了什么？",
+        "这个阶段的统治者应该思考什么？",
+        "我们的帝国和竞争者相比如何？",
+        "我们没有准备好的最大风险是什么？"
+      ],
+      "tactical": [
+        "为什么我的经济是赤字？",
+        "我应该在星球上建造什么？",
+        "为什么所有人都讨厌我们？",
+        "我们现在能赢一场战争吗？",
+        "我们的海军撑得住吗？",
+        "我们的战略弱点在哪里？"
+      ],
+      "wildcards": [
+        "吐槽我的帝国",
+        "像我刚登基一样解释我的帝国",
+        "给我一份银河局势演说",
+        "我们的对手会怎么评价我们？"
+      ],
+      "roast": "吐槽我的帝国"
+    }
+  },
+  "chronicle": {
+    "page": {
+      "openSidebar": "打开侧边栏",
+      "dismiss": "关闭",
+      "loadingArchives": "正在加载档案...",
+      "retrieving": "正在获取编年史...",
+      "emptyTitle": "尚无编年史",
+      "emptyBody": "继续游戏并积累历史。随着你的帝国跨越时代，编年史会自动生成。",
+      "noSession": "未找到此存档的会话"
+    },
+    "sidebar": {
+      "empireArchives": "帝国档案",
+      "closeSidebar": "关闭侧边栏",
+      "noHistory": "尚无游戏历史",
+      "chapters": "章节",
+      "loading": "正在加载...",
+      "noChapters": "尚无章节",
+      "noChaptersHelp": "在有足够事件的情况下游玩约 5 年，或触发重大事件，即可生成第一章。",
+      "regenerating": "正在重新生成章节...",
+      "staleTooltip": "较早章节已重新生成 - 上下文可能已过时",
+      "finalizedTooltip": "已定稿章节",
+      "currentEra": "当前时代",
+      "narrator": "叙述者",
+      "export": "导出",
+      "events": "事件",
+      "latest": "最新",
+      "pending_one": "{{count}} 个章节待处理",
+      "pending_other": "{{count}} 个章节待处理",
+      "generateMore": "生成更多章节"
+    },
+    "content": {
+      "title": "{{empireName}}编年史",
+      "selectChapter": "选择一个章节以查看内容。",
+      "rewriting": "正在改写历史...",
+      "chapter": "第 {{number}} 章",
+      "staleTooltip": "较早章节已重新生成 - 上下文可能已过时",
+      "finalizedTooltip": "已定稿章节",
+      "regenerateWarning": "重新生成此章节会将后续章节标记为可能过时。此操作会使用一次 API 调用。",
+      "regenPlaceholder": "需要改变什么？（可选）",
+      "confirmRegenerate": "确认重新生成",
+      "cancel": "取消",
+      "regenerateTitle": "重新生成此章节",
+      "regenerateChapter": "重新生成章节",
+      "summary": "摘要",
+      "currentEra": "当前时代",
+      "storyContinues": "故事仍在继续...",
+      "present": "现在",
+      "eventsInEra_one": "此时代有 {{count}} 个事件",
+      "eventsInEra_other": "此时代有 {{count}} 个事件"
+    },
+    "narrator": {
+      "title": "叙述者",
+      "subtitle": "编年史风格指令",
+      "close": "关闭叙述者面板",
+      "instructions": "叙述者指令（可选）",
+      "placeholder": "描述叙述者的风格或语气...",
+      "tryStyle": "尝试一种风格",
+      "applySuccess": "已应用 - 将在下次生成时生效",
+      "applyError": "应用失败",
+      "applying": "正在应用...",
+      "apply": "应用",
+      "selectSave": "选择一个存档以自定义此编年史的叙述者。",
+      "examples": {
+        "deadpan": "冷面自然纪录片",
+        "bureaucratic": "以公文口吻随意描述暴行",
+        "tabloid": "银河小报 - 戏剧、流言与丑闻",
+        "propaganda": "来自国营媒体的宣传播报",
+        "pr": "过分热情的帝国公关部门",
+        "earnings": "像季度财报一样冷静汇报银河征服"
+      }
+    }
+  },
+  "settings": {
+    "loading": "正在初始化配置...",
+    "eyebrow": "SYS // CONFIG_01",
+    "title": "配置",
+    "textSize": "文字大小",
+    "colorTheme": "颜色主题",
+    "language": "语言",
+    "themePreset": "主题预设",
+    "languageHint": "界面 + 顾问",
+    "systemAlert": "系统警报",
+    "saveSuccess": "配置已保存 // 设置已应用",
+    "sections": {
+      "intelligence": "情报上行链路",
+      "data": "数据摄取",
+      "communications": "通信中继",
+      "diagnostics": "诊断"
+    },
+    "panels": {
+      "geminiAccess": "Gemini 模型访问",
+      "saveSource": "存档来源",
+      "discordLink": "Discord 连接"
+    },
+    "api": {
+      "label": "API 密钥",
+      "placeholderSet": "••••••••••••••••",
+      "placeholderEmpty": "输入密钥",
+      "status": "状态：",
+      "active": "已启用",
+      "missing": "缺失",
+      "generateKey": "生成密钥 >"
+    },
+    "chronicleRefresh": {
+      "label": "编年史刷新",
+      "balanced": "均衡",
+      "enhanced": "增强",
+      "balancedTag": "免费额度默认",
+      "enhancedTag": "更快响应",
+      "balancedHelp": "减少 Gemini 使用量。适合免费额度，并提供更稳定的悬念更新。",
+      "enhancedHelp": "查看编年史时更快更新当前时代故事。会使用更多 Gemini 调用。",
+      "aria": "将刷新模式设置为 {{mode}}",
+      "toastError": "无法更新编年史刷新模式。请重试。",
+      "toastSuccess": "编年史刷新模式已设置为 {{mode}}。"
+    },
+    "modelRouting": {
+      "label": "模型路由",
+      "qualityFirst": "质量优先",
+      "conserve": "节省额度",
+      "qualityFirstHelp": "优先使用 Gemini Flash，在额度需要时回退。",
+      "conserveHelp": "顾问聊天使用较轻量模型以减少 Gemini 使用量。",
+      "toastError": "无法更新模型路由。请重试。",
+      "toastSuccess": "模型路由已设置为 {{mode}}。"
+    },
+    "saveData": {
+      "directoryLabel": "目录路径",
+      "placeholder": "自动检测",
+      "target": "目标：STELLARIS 存档目录（本地）"
+    },
+    "discord": {
+      "loading": "正在建立握手...",
+      "signalStrong": "信号：强",
+      "inviteBot": "邀请机器人",
+      "terminate": "断开",
+      "relay": "中继：{{state}}",
+      "description": "启用子空间通信，通过 Discord 覆盖层查询顾问。",
+      "connect": "连接 Discord",
+      "connecting": "正在启动...",
+      "errorPrefix": "ERR:"
+    },
+    "feedback": {
+      "label": "系统报告",
+      "body": "提交详细日志用于分析。"
+    },
+    "actionBar": {
+      "unsaved": "有未保存更改",
+      "ready": "系统就绪",
+      "committing": "正在提交...",
+      "apply": "应用更改"
+    },
+    "toasts": {
+      "textSizeError": "无法更新文字大小。请重试。",
+      "textSizeSuccess": "文字大小已设置为 {{percent}}%。",
+      "themeError": "无法更新颜色主题。请重试。",
+      "themeSuccess": "主题已设置为 {{theme}}。",
+      "languageError": "无法更新语言。请重试。",
+      "languageSuccess": "语言已设置为 {{language}}。"
+    },
+    "discordErrors": {
+      "cancelled": "授权已取消。",
+      "expired": "会话已过期。需要重新连接。",
+      "auth": "授权失败。",
+      "connection": "连接错误。请检查网络。",
+      "generic": "系统错误。请重试。"
+    }
+  },
+  "update": {
+    "title": "有可用更新",
+    "installingBody": "正在应用更新并重新启动。在 macOS 上可能需要一些时间。",
+    "readyBody": "新版本已准备好安装。重启应用以应用更新。",
+    "whatsNew": "更新内容",
+    "downloading": "正在下载",
+    "applying": "正在应用更新...",
+    "checking": "正在检查更新...",
+    "applyingButton": "正在应用更新...",
+    "downloadingButton": "正在下载... {{progress}}%",
+    "installRestart": "安装并重启",
+    "installError": "安装更新失败"
+  },
+  "announcements": {
+    "title": "传输",
+    "newCount": "{{count}} 条新消息",
+    "active": "活跃传输 ({{count}})",
+    "dismissAll": "全部忽略",
+    "markRead": "标为已读",
+    "empty": "没有传输",
+    "severity": {
+      "info": "信息",
+      "warning": "警告",
+      "known_issue": "已知问题",
+      "update": "更新",
+      "tip": "提示"
+    }
+  }
+}

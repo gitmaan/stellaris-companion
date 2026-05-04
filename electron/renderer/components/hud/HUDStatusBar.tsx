@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BackendStatusEvent } from '../../hooks/useBackend'
 import { HUDLabel, HUDValue } from './HUDText'
 
@@ -25,24 +26,26 @@ function getConnectionStatus(payload: BackendStatusEvent | null): ConnectionStat
   return payload.precompute_ready ? 'ready' : 'analyzing'
 }
 
-const STAGE_LABELS: Record<string, string> = {
-  waiting_for_stable_save: 'DETECTING SAVE',
-  parsing_t0: 'READING SAVE',
-  precomputing_t2: 'ANALYZING',
-  persisting: 'SAVING',
+function getStageLabel(
+  stage: string | null,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string | null {
+  if (!stage) return null
+  const stageKey = stage.replace(/-/g, '_')
+  return t(`status.stages.${stageKey}`, { defaultValue: '' }) || null
 }
 
-function getStatusLabel(status: ConnectionStatus, stage: string | null): string {
+function getStatusLabel(status: ConnectionStatus, stage: string | null, t: (key: string, options?: Record<string, unknown>) => string): string {
   switch (status) {
-    case 'ready': return 'SYSTEMS ONLINE'
+    case 'ready': return t('status.ready')
     case 'analyzing': {
-      const label = stage ? STAGE_LABELS[stage] : null
-      return label ? `SURVEYING (${label})…` : 'SURVEYING EMPIRE…'
+      const label = getStageLabel(stage, t)
+      return label ? t('status.analyzingWithStage', { stage: label }) : t('status.analyzing')
     }
-    case 'connecting': return 'CONNECTING...'
-    case 'no-save': return 'AWAITING LINK'
-    case 'not-configured': return 'CONFIG REQUIRED'
-    case 'disconnected': return 'OFFLINE'
+    case 'connecting': return t('status.connecting')
+    case 'no-save': return t('status.noSave')
+    case 'not-configured': return t('status.notConfigured')
+    case 'disconnected': return t('status.disconnected')
   }
 }
 
@@ -68,6 +71,7 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
   transmissionsUnread = 0,
   onToggleTransmissions,
 }) => {
+  const { t } = useTranslation()
   const [state, setState] = useState<StatusState>({
     connectionStatus: 'connecting',
     empireName: null,
@@ -97,7 +101,7 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
   }, [])
 
   const statusColor = statusColors[state.connectionStatus]
-  const statusLabel = getStatusLabel(state.connectionStatus, state.stage)
+  const statusLabel = getStatusLabel(state.connectionStatus, state.stage, t)
 
   return (
     <div className="flex justify-between items-start px-6 pt-4 title-bar-drag-region status-bar z-50 pointer-events-none">
@@ -105,7 +109,7 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
       <div className="flex items-center gap-3 pointer-events-auto">
         <div className="w-2 h-2 bg-accent-cyan rounded-full shadow-glow-sm" />
         <h2 className="font-display font-bold text-sm tracking-wide text-text-primary uppercase">
-          {state.empireName ?? 'UNKNOWN EMPIRE'}
+          {state.empireName ?? t('status.unknownEmpire')}
         </h2>
         {state.gameDate && (
           <>
@@ -125,11 +129,11 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
                 ? 'border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
                 : 'border-white/15 bg-black/30 text-text-secondary hover:text-text-primary hover:border-white/35'
             }`}
-            title="Transmissions"
+            title={t('announcements.title')}
           >
             <span className="text-[10px]">{'\u25C8'}</span>
             <span className="font-mono text-[10px] tracking-[0.14em] uppercase">
-              Transmissions
+              {t('announcements.title')}
             </span>
             {transmissionsUnread > 0 && (
               <span className="w-1.5 h-1.5 rounded-full bg-accent-cyan shadow-glow-dot animate-pulse" />

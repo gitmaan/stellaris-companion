@@ -34,6 +34,7 @@ class ChatRequest(BaseModel):
     session_key: str = "default"
     model: str | None = None
     model_routing_mode: str | None = None
+    language: str | None = None
 
 
 class RecapRequest(BaseModel):
@@ -42,6 +43,7 @@ class RecapRequest(BaseModel):
     session_id: str
     style: str = "summary"  # "summary" (deterministic) or "dramatic" (LLM-powered)
     model_routing_mode: str | None = None
+    language: str | None = None
 
 
 class ChronicleRequest(BaseModel):
@@ -52,6 +54,7 @@ class ChronicleRequest(BaseModel):
     chapter_only: bool = False
     refresh_mode: str = "balanced"
     model_routing_mode: str | None = None
+    language: str | None = None
 
 
 class RegenerateChapterRequest(BaseModel):
@@ -62,6 +65,7 @@ class RegenerateChapterRequest(BaseModel):
     confirm: bool = False
     regeneration_instructions: str | None = None
     model_routing_mode: str | None = None
+    language: str | None = None
 
 
 class AdvisorCustomRequest(BaseModel):
@@ -546,6 +550,7 @@ def create_app() -> FastAPI:
             save_id=save_id,
             model_name=requested_model,
             model_routing_mode=body.model_routing_mode,
+            language=body.language,
         )
         response_time_ms = int((time.time() - start_time) * 1000)
         call_stats = companion.get_call_stats()
@@ -843,6 +848,7 @@ def create_app() -> FastAPI:
                 session_id=body.session_id,
                 style=body.style,
                 model_routing_mode=body.model_routing_mode,
+                language=body.language,
             )
             result["date_range"] = date_range
             return result
@@ -886,8 +892,12 @@ def create_app() -> FastAPI:
         save_id = (
             db.get_save_id_for_session(body.session_id) or session.get("save_id") or body.session_id
         )
+        from backend.core.language import normalize_language
+
+        language = normalize_language(body.language)
+        in_flight_key = f"{save_id}:{language}"
         with _chronicle_in_flight_lock:
-            if save_id in _chronicle_in_flight:
+            if in_flight_key in _chronicle_in_flight:
                 raise HTTPException(
                     status_code=409,
                     detail={
@@ -896,7 +906,7 @@ def create_app() -> FastAPI:
                         "retry_after_ms": 2000,
                     },
                 )
-            _chronicle_in_flight.add(save_id)
+            _chronicle_in_flight.add(in_flight_key)
 
         from backend.core.chronicle import ChronicleGenerator
 
@@ -909,6 +919,7 @@ def create_app() -> FastAPI:
                 chapter_only=body.chapter_only,
                 refresh_mode=body.refresh_mode,
                 model_routing_mode=body.model_routing_mode,
+                language=language,
             )
             return result
         except ValueError as e:
@@ -920,7 +931,7 @@ def create_app() -> FastAPI:
             )
         finally:
             with _chronicle_in_flight_lock:
-                _chronicle_in_flight.discard(save_id)
+                _chronicle_in_flight.discard(in_flight_key)
 
     @app.post("/api/chronicle/regenerate-chapter", dependencies=[Depends(verify_token)])
     def regenerate_chapter(
@@ -961,6 +972,7 @@ def create_app() -> FastAPI:
                 confirm=body.confirm,
                 regeneration_instructions=body.regeneration_instructions,
                 model_routing_mode=body.model_routing_mode,
+                language=body.language,
             )
             return result
         except ValueError as e:

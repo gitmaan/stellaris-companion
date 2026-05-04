@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
+from backend.core.language import build_language_policy, localized_text, normalize_language
 from backend.core.model_routing import (
     GEMINI_FLASH_MODEL,
     classify_model_error,
@@ -360,6 +361,7 @@ class ChronicleGenerator:
         chapter_only: bool = False,
         refresh_mode: str = DEFAULT_CHRONICLE_REFRESH_MODE,
         model_routing_mode: str | None = None,
+        language: str | None = None,
     ) -> dict[str, Any]:
         """Generate an incremental chronicle for the session.
 
@@ -381,11 +383,13 @@ class ChronicleGenerator:
         self._model_route_events = []
         if model_routing_mode:
             self.model_routing_mode = normalize_model_routing_mode(model_routing_mode)
+        output_language = normalize_language(language)
         refresh_mode = normalize_chronicle_refresh_mode(refresh_mode)
 
         # Load existing chapters data
-        cached = self.db.get_chronicle_by_save_id(save_id)
+        cached = self.db.get_chronicle_by_save_id(save_id, language=output_language)
         chapters_data = self._load_chapters_data(cached)
+        chapters_data["language"] = output_language
 
         # Load persistent custom instructions for this save
         custom_instructions = self.db.get_chronicle_custom_instructions(save_id)
@@ -393,7 +397,7 @@ class ChronicleGenerator:
         # Get current state
         snapshot_range = self.db.get_snapshot_range_for_save(save_id)
         if not snapshot_range.get("snapshot_count"):
-            return self._empty_chronicle_response()
+            return self._empty_chronicle_response(language=output_language)
 
         current_date = snapshot_range.get("last_game_date")
         current_snapshot_id = snapshot_range.get("last_snapshot_id")
@@ -436,6 +440,7 @@ class ChronicleGenerator:
                     briefing=briefing,
                     trigger=trigger,
                     custom_instructions=custom_instructions,
+                    language=output_language,
                 )
                 if not finalized:
                     break
@@ -541,6 +546,7 @@ class ChronicleGenerator:
                     briefing=briefing,
                     current_date=current_date,
                     custom_instructions=custom_instructions,
+                    language=output_language,
                 )
 
                 if current_era and current_snapshot_id is not None:
@@ -549,6 +555,7 @@ class ChronicleGenerator:
                         "start_snapshot_id": era_start_snapshot_id,
                         "last_snapshot_id": current_snapshot_id,
                         "generated_at": datetime.now(timezone.utc).isoformat(),
+                        "language": output_language,
                         "current_era": current_era,
                     }
                     logger.debug(
@@ -573,6 +580,7 @@ class ChronicleGenerator:
             chapters_json=json_dumps(chapters_data),
             event_count=event_count,
             snapshot_count=snapshot_count,
+            language=output_language,
         )
 
         # Build response
@@ -739,6 +747,7 @@ class ChronicleGenerator:
         confirm: bool = False,
         regeneration_instructions: str | None = None,
         model_routing_mode: str | None = None,
+        language: str | None = None,
     ) -> dict[str, Any]:
         """Regenerate a specific finalized chapter.
 
@@ -750,12 +759,13 @@ class ChronicleGenerator:
         self._model_route_events = []
         if model_routing_mode:
             self.model_routing_mode = normalize_model_routing_mode(model_routing_mode)
+        output_language = normalize_language(language)
 
         save_id = self.db.get_save_id_for_session(session_id)
         if not save_id:
             raise ValueError(f"No save_id for session: {session_id}")
 
-        cached = self.db.get_chronicle_by_save_id(save_id)
+        cached = self.db.get_chronicle_by_save_id(save_id, language=output_language)
         if not cached:
             raise ValueError(f"No chronicle found for save: {save_id}")
 
@@ -796,6 +806,7 @@ class ChronicleGenerator:
             end_date=chapter["end_date"],
             custom_instructions=custom_instructions,
             regeneration_instructions=regeneration_instructions,
+            language=output_language,
         )
 
         # Update the chapter
@@ -823,6 +834,7 @@ class ChronicleGenerator:
             chapters_json=json_dumps(chapters_data),
             event_count=len(all_events),
             snapshot_count=snapshot_range.get("snapshot_count", 0),
+            language=output_language,
         )
 
         return {
@@ -839,6 +851,7 @@ class ChronicleGenerator:
         style: str = "summary",
         max_events: int = 30,
         model_routing_mode: str | None = None,
+        language: str | None = None,
     ) -> dict[str, Any]:
         """Generate a recap for the session.
 
@@ -848,6 +861,7 @@ class ChronicleGenerator:
         self._model_route_events = []
         if model_routing_mode:
             self.model_routing_mode = normalize_model_routing_mode(model_routing_mode)
+        output_language = normalize_language(language)
 
         if style == "summary":
             from backend.core.reporting import build_session_report_text
@@ -860,12 +874,12 @@ class ChronicleGenerator:
 
         if not data["events"]:
             return {
-                "recap": "No events to recap. The story has yet to begin.",
+                "recap": localized_text("no_events_recap", output_language),
                 "style": "dramatic",
                 "events_summarized": 0,
             }
 
-        prompt = self._build_recap_prompt(data)
+        prompt = self._build_recap_prompt(data, language=output_language)
 
         response = self._generate_content_with_routing(
             contents=prompt,
@@ -1185,6 +1199,7 @@ class ChronicleGenerator:
         briefing: dict[str, Any],
         trigger: str | None,
         custom_instructions: str | None = None,
+        language: str = "en",
     ) -> bool:
         """Generate and finalize a new chapter.
 
@@ -1274,6 +1289,7 @@ class ChronicleGenerator:
             start_date=start_date,
             end_date=end_date,
             custom_instructions=custom_instructions,
+            language=language,
         )
 
         # Add the new chapter
@@ -1312,6 +1328,7 @@ class ChronicleGenerator:
         end_date: str,
         custom_instructions: str | None = None,
         regeneration_instructions: str | None = None,
+        language: str = "en",
     ) -> dict[str, str]:
         """Generate chapter content using Gemini structured output."""
         identity = briefing.get("identity", {})
@@ -1369,11 +1386,19 @@ The player has specifically requested these changes for this regeneration:
 Incorporate this guidance while maintaining narrative consistency.
 """
 
+        language_policy = build_language_policy(
+            language,
+            structured_json=True,
+            user_visible_fields=("title", "epigraph", "sections.text", "attribution", "summary"),
+        )
+
         prompt = f"""You are the Royal Chronicler of {empire_name}.
 
 === CHRONICLER'S VOICE ===
 {voice}
 {custom_section}
+{language_policy}
+
 === PREVIOUS CHAPTERS ===
 {previous_context}
 {diplomatic_section}{geographic_section}
@@ -1467,6 +1492,7 @@ Do NOT fabricate events not in the event list.
         briefing: dict[str, Any],
         current_date: str | None,
         custom_instructions: str | None = None,
+        language: str = "en",
     ) -> dict[str, Any] | None:
         """Generate the current era narrative (not finalized)."""
         chapters = chapters_data.get("chapters", [])
@@ -1536,11 +1562,19 @@ Do NOT fabricate events not in the event list.
 {custom_instructions.strip()}
 """
 
+        language_policy = build_language_policy(
+            language,
+            structured_json=True,
+            user_visible_fields=("sections.text", "attribution"),
+        )
+
         prompt = f"""You are the Royal Chronicler of {empire_name}.
 
 === CHRONICLER'S VOICE ===
 {voice}
 {era_custom_section}
+{language_policy}
+
 === PREVIOUS CHAPTERS ===
 {previous_context}
 {diplomatic_section}{geographic_section}
@@ -1591,7 +1625,7 @@ Do NOT give advice. You are a historian, not an advisor.
                 "events_covered": len(events),
             }
         except Exception:
-            fallback_text = "The current era unfolds...\n\nThe story continues..."
+            fallback_text = localized_text("current_era_fallback", language)
             return {
                 "start_date": era_start_date,
                 "sections": [{"type": "prose", "text": fallback_text, "attribution": ""}],
@@ -1621,14 +1655,14 @@ Do NOT give advice. You are a historian, not an advisor.
 
         return "\n".join(lines)
 
-    def _empty_chronicle_response(self) -> dict[str, Any]:
+    def _empty_chronicle_response(self, *, language: str = "en") -> dict[str, Any]:
         """Return empty chronicle response."""
         return {
             "chapters": [],
             "current_era": None,
             "pending_chapters": 0,
             "message": None,
-            "chronicle": "No events recorded yet. The chronicle awaits the first chapters of history.",
+            "chronicle": localized_text("no_events_chronicle", language),
             "cached": False,
             "event_count": 0,
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -1832,7 +1866,7 @@ End with "The Story Continues..." about the current situation.
         else:
             return "Write with epic gravitas befitting a galactic chronicle."
 
-    def _build_recap_prompt(self, data: dict[str, Any]) -> str:
+    def _build_recap_prompt(self, data: dict[str, Any], *, language: str = "en") -> str:
         """Build a shorter recap prompt for recent events."""
         briefing = data["briefing"]
         identity = briefing.get("identity", {})
@@ -1841,7 +1875,11 @@ End with "The Story Continues..." about the current situation.
         events_text = self._format_events(data["events"])
         state_text = self._summarize_state(briefing)
 
+        language_policy = build_language_policy(language)
+
         return f"""You are the Royal Chronicler of {empire_name}. Write a dramatic "Previously on..." recap.
+
+{language_policy}
 
 {state_text}
 

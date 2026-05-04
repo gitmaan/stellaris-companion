@@ -31,6 +31,7 @@ class _DummyCompanion:
         history_context: str | None = None,
         model_name: str | None = None,
         model_routing_mode: str | None = None,
+        language: str | None = None,
     ) -> tuple[str, float]:
         self._last_model = model_name or self._last_model
         self.last_request = {
@@ -39,6 +40,7 @@ class _DummyCompanion:
             "save_id": save_id,
             "model_name": model_name,
             "model_routing_mode": model_routing_mode,
+            "language": language,
         }
         return "Test response", 0.01
 
@@ -113,3 +115,22 @@ def test_api_chat_passes_model_routing_mode(monkeypatch):
     assert resp.status_code == 200
     assert companion.last_request is not None
     assert companion.last_request["model_routing_mode"] == "conserve"
+
+
+def test_api_chat_passes_language(monkeypatch):
+    app, companion = _make_app(monkeypatch)
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/chat",
+            headers=_auth_headers(),
+            json={
+                "message": "Test question",
+                "session_key": "chat-123",
+                "language": "fr",
+            },
+        )
+
+    assert resp.status_code == 200
+    assert companion.last_request is not None
+    assert companion.last_request["language"] == "fr"

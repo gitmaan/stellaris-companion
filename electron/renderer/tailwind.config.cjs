@@ -58,9 +58,9 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['Rajdhani', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'],
+        sans: ['Rajdhani', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Noto Sans', 'Noto Sans CJK SC', 'Hiragino Sans', 'Yu Gothic', 'Helvetica', 'Arial', 'sans-serif'],
         mono: ['JetBrains Mono', 'SF Mono', 'Consolas', 'Liberation Mono', 'Menlo', 'monospace'],
-        display: ['Orbitron', 'Rajdhani', 'sans-serif'],
+        display: ['Orbitron', 'Rajdhani', 'Noto Sans', 'Noto Sans CJK SC', 'Hiragino Sans', 'Yu Gothic', 'sans-serif'],
       },
       fontSize: {
         xs: '0.75rem',

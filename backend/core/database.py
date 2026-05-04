@@ -227,6 +227,61 @@ class GameDatabase:
                 """,
                 "CREATE INDEX IF NOT EXISTS idx_advisor_memory_updated ON advisor_memory(updated_at);",
             ],
+            8: [
+                # Language-scope chronicle caches so changing UI language does not
+                # reuse prose generated in a different language.
+                """
+                CREATE TABLE cached_chronicles_new (
+                    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+                    session_id TEXT NOT NULL DEFAULT '',
+                    save_id TEXT,
+                    language TEXT NOT NULL DEFAULT 'en',
+                    chronicle_text TEXT NOT NULL,
+                    chapters_json TEXT,
+                    event_count INTEGER NOT NULL,
+                    snapshot_count INTEGER NOT NULL,
+                    generated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    chronicle_custom_instructions TEXT
+                );
+                """,
+                """
+                INSERT INTO cached_chronicles_new
+                    (id, session_id, save_id, language, chronicle_text, chapters_json,
+                     event_count, snapshot_count, generated_at, chronicle_custom_instructions)
+                SELECT
+                    id, session_id, save_id, 'en', chronicle_text, chapters_json,
+                    event_count, snapshot_count, generated_at, chronicle_custom_instructions
+                FROM cached_chronicles;
+                """,
+                "DROP TABLE cached_chronicles;",
+                "ALTER TABLE cached_chronicles_new RENAME TO cached_chronicles;",
+                "CREATE INDEX IF NOT EXISTS idx_cached_chronicles_session ON cached_chronicles(session_id);",
+                "CREATE INDEX IF NOT EXISTS idx_cached_chronicles_save ON cached_chronicles(save_id);",
+                "CREATE INDEX IF NOT EXISTS idx_cached_chronicles_save_language ON cached_chronicles(save_id, language);",
+            ],
+            9: [
+                # Language-scope advisor memory so prior generated advice does not
+                # leak into prompts for another output language.
+                """
+                CREATE TABLE advisor_memory_new (
+                    save_id TEXT NOT NULL,
+                    language TEXT NOT NULL DEFAULT 'en',
+                    summary_text TEXT,
+                    last_game_date TEXT,
+                    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+                    PRIMARY KEY (save_id, language)
+                );
+                """,
+                """
+                INSERT INTO advisor_memory_new
+                    (save_id, language, summary_text, last_game_date, updated_at)
+                SELECT save_id, 'en', summary_text, last_game_date, updated_at
+                FROM advisor_memory;
+                """,
+                "DROP TABLE advisor_memory;",
+                "ALTER TABLE advisor_memory_new RENAME TO advisor_memory;",
+                "CREATE INDEX IF NOT EXISTS idx_advisor_memory_updated ON advisor_memory(updated_at);",
+            ],
         }
 
         current = self.get_schema_version()
@@ -1122,12 +1177,18 @@ class GameDatabase:
             ).fetchall()
             return [dict(r) for r in rows]
 
-    def get_cached_chronicle(self, session_id: str) -> dict[str, Any] | None:
+    def get_cached_chronicle(
+        self, session_id: str, *, language: str = "en"
+    ) -> dict[str, Any] | None:
         """Get cached chronicle if it exists."""
         with self._lock:
             row = self._conn.execute(
-                "SELECT * FROM cached_chronicles WHERE session_id = ?",
-                (session_id,),
+                """
+                SELECT * FROM cached_chronicles
+                WHERE session_id = ? AND language = ?
+                ORDER BY generated_at DESC LIMIT 1
+                """,
+                (session_id, language),
             ).fetchone()
             return dict(row) if row else None
 
@@ -1157,31 +1218,60 @@ class GameDatabase:
         snapshot_count: int,
         chapters_json: str | None = None,
         save_id: str | None = None,
+        language: str = "en",
     ) -> None:
         """Insert or update cached chronicle."""
         with self._lock:
-            self._conn.execute(
-                """
-                INSERT INTO cached_chronicles
-                    (id, session_id, chronicle_text, chapters_json, event_count, snapshot_count, save_id)
-                VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(session_id) DO UPDATE SET
-                    chronicle_text = excluded.chronicle_text,
-                    chapters_json = excluded.chapters_json,
-                    event_count = excluded.event_count,
-                    snapshot_count = excluded.snapshot_count,
-                    save_id = COALESCE(excluded.save_id, save_id),
-                    generated_at = datetime('now')
-                """,
-                (
-                    session_id,
-                    chronicle_text,
-                    chapters_json,
-                    event_count,
-                    snapshot_count,
-                    save_id,
-                ),
-            )
+            if save_id:
+                existing = self._conn.execute(
+                    "SELECT id FROM cached_chronicles WHERE save_id = ? AND language = ?",
+                    (save_id, language),
+                ).fetchone()
+            else:
+                existing = self._conn.execute(
+                    "SELECT id FROM cached_chronicles WHERE session_id = ? AND language = ?",
+                    (session_id, language),
+                ).fetchone()
+
+            if existing:
+                self._conn.execute(
+                    """
+                    UPDATE cached_chronicles
+                    SET chronicle_text = ?,
+                        chapters_json = ?,
+                        event_count = ?,
+                        snapshot_count = ?,
+                        save_id = COALESCE(?, save_id),
+                        generated_at = datetime('now')
+                    WHERE id = ?
+                    """,
+                    (
+                        chronicle_text,
+                        chapters_json,
+                        event_count,
+                        snapshot_count,
+                        save_id,
+                        existing["id"],
+                    ),
+                )
+            else:
+                self._conn.execute(
+                    """
+                    INSERT INTO cached_chronicles
+                        (id, session_id, chronicle_text, chapters_json, event_count,
+                         snapshot_count, save_id, language)
+                    VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        session_id,
+                        chronicle_text,
+                        chapters_json,
+                        event_count,
+                        snapshot_count,
+                        save_id,
+                        language,
+                    ),
+                )
 
     # --- Incremental Chronicle Support ---
 
@@ -1194,14 +1284,19 @@ class GameDatabase:
             ).fetchone()
             return row["save_id"] if row else None
 
-    def get_chronicle_by_save_id(self, save_id: str) -> dict[str, Any] | None:
+    def get_chronicle_by_save_id(
+        self,
+        save_id: str,
+        *,
+        language: str = "en",
+    ) -> dict[str, Any] | None:
         """Get cached chronicle by save_id (cross-session)."""
         with self._lock:
             row = self._conn.execute(
                 """SELECT * FROM cached_chronicles
-                   WHERE save_id = ?
+                   WHERE save_id = ? AND language = ?
                    ORDER BY generated_at DESC LIMIT 1""",
-                (save_id,),
+                (save_id, language),
             ).fetchone()
             return dict(row) if row else None
 
@@ -1212,7 +1307,7 @@ class GameDatabase:
                 """
                 SELECT chronicle_custom_instructions
                 FROM cached_chronicles
-                WHERE save_id = ?
+                WHERE save_id = ? AND chronicle_custom_instructions IS NOT NULL
                 ORDER BY generated_at DESC LIMIT 1;
                 """,
                 (save_id,),
@@ -1227,7 +1322,7 @@ class GameDatabase:
         value = (text or "").strip()
         value = value[:500]
         with self._lock:
-            # Check if a row exists for this save_id
+            # Update all language-scoped rows for this save_id.
             existing = self._conn.execute(
                 "SELECT id FROM cached_chronicles WHERE save_id = ?",
                 (save_id,),
@@ -1253,7 +1348,7 @@ class GameDatabase:
                     (save_id, value if value else None),
                 )
 
-    def get_advisor_memory_summary(self, save_id: str) -> str | None:
+    def get_advisor_memory_summary(self, save_id: str, *, language: str = "en") -> str | None:
         """Get persisted save-scoped advisor memory summary."""
         if not save_id:
             return None
@@ -1262,10 +1357,10 @@ class GameDatabase:
                 """
                 SELECT summary_text
                 FROM advisor_memory
-                WHERE save_id = ?
+                WHERE save_id = ? AND language = ?
                 LIMIT 1;
                 """,
-                (save_id,),
+                (save_id, language),
             ).fetchone()
             if not row:
                 return None
@@ -1276,6 +1371,7 @@ class GameDatabase:
         self,
         *,
         save_id: str,
+        language: str = "en",
         summary_text: str | None,
         last_game_date: str | None = None,
     ) -> None:
@@ -1286,14 +1382,14 @@ class GameDatabase:
         with self._lock:
             self._conn.execute(
                 """
-                INSERT INTO advisor_memory (save_id, summary_text, last_game_date, updated_at)
-                VALUES (?, ?, ?, strftime('%s','now'))
-                ON CONFLICT(save_id) DO UPDATE SET
+                INSERT INTO advisor_memory (save_id, language, summary_text, last_game_date, updated_at)
+                VALUES (?, ?, ?, ?, strftime('%s','now'))
+                ON CONFLICT(save_id, language) DO UPDATE SET
                     summary_text = excluded.summary_text,
                     last_game_date = COALESCE(excluded.last_game_date, advisor_memory.last_game_date),
                     updated_at = strftime('%s','now');
                 """,
-                (save_id, cleaned if cleaned else None, last_game_date),
+                (save_id, language, cleaned if cleaned else None, last_game_date),
             )
 
     def get_all_events_by_save_id(self, *, save_id: str) -> list[dict[str, Any]]:
@@ -1467,13 +1563,14 @@ class GameDatabase:
         chapters_json: str,
         event_count: int,
         snapshot_count: int,
+        language: str = "en",
     ) -> None:
         """Insert or update chronicle keyed by save_id."""
         with self._lock:
             # Check if chronicle exists for this save_id
             existing_by_save = self._conn.execute(
-                "SELECT id FROM cached_chronicles WHERE save_id = ?",
-                (save_id,),
+                "SELECT id FROM cached_chronicles WHERE save_id = ? AND language = ?",
+                (save_id, language),
             ).fetchone()
 
             if existing_by_save:
@@ -1486,7 +1583,7 @@ class GameDatabase:
                         snapshot_count = ?,
                         session_id = ?,
                         generated_at = datetime('now')
-                    WHERE save_id = ?
+                    WHERE save_id = ? AND language = ?
                     """,
                     (
                         chronicle_text,
@@ -1495,13 +1592,17 @@ class GameDatabase:
                         snapshot_count,
                         session_id,
                         save_id,
+                        language,
                     ),
                 )
             else:
                 # Check if there's a legacy record for this session_id (without save_id)
                 existing_by_session = self._conn.execute(
-                    "SELECT id FROM cached_chronicles WHERE session_id = ?",
-                    (session_id,),
+                    """
+                    SELECT id FROM cached_chronicles
+                    WHERE session_id = ? AND language = ? AND (save_id IS NULL OR save_id = '')
+                    """,
+                    (session_id, language),
                 ).fetchone()
 
                 if existing_by_session:
@@ -1510,20 +1611,23 @@ class GameDatabase:
                         """
                         UPDATE cached_chronicles
                         SET save_id = ?,
+                            language = ?,
                             chronicle_text = ?,
                             chapters_json = ?,
                             event_count = ?,
                             snapshot_count = ?,
                             generated_at = datetime('now')
-                        WHERE session_id = ?
+                        WHERE session_id = ? AND language = ?
                         """,
                         (
                             save_id,
+                            language,
                             chronicle_text,
                             chapters_json,
                             event_count,
                             snapshot_count,
                             session_id,
+                            language,
                         ),
                     )
                 else:
@@ -1531,12 +1635,13 @@ class GameDatabase:
                     self._conn.execute(
                         """
                         INSERT INTO cached_chronicles
-                            (id, session_id, save_id, chronicle_text, chapters_json, event_count, snapshot_count)
-                        VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?)
+                            (id, session_id, save_id, language, chronicle_text, chapters_json, event_count, snapshot_count)
+                        VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             session_id,
                             save_id,
+                            language,
                             chronicle_text,
                             chapters_json,
                             event_count,

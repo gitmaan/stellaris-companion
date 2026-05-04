@@ -1,0 +1,332 @@
+{
+  "app": {
+    "tabs": {
+      "chat": "Conselheiro",
+      "chronicle": "Cronica",
+      "settings": "Config"
+    }
+  },
+  "common": {
+    "apply": "Aplicar",
+    "applying": "Aplicando...",
+    "browse": "Procurar",
+    "close": "Fechar",
+    "dismiss": "Dispensar",
+    "downloadedReady": "Baixado. Pronto para instalar.",
+    "later": "Mais tarde",
+    "loading": "Carregando...",
+    "new": "Novo",
+    "reportIssue": "Relatar problema",
+    "retry": "Tentar novamente",
+    "retrying": "Tentando novamente...",
+    "unknownDate": "Data desconhecida"
+  },
+  "status": {
+    "ready": "SISTEMAS ONLINE",
+    "analyzing": "ANALISANDO IMPERIO...",
+    "analyzingWithStage": "ANALISANDO ({{stage}})...",
+    "connecting": "CONECTANDO...",
+    "noSave": "AGUARDANDO LINK",
+    "notConfigured": "CONFIG NECESSARIA",
+    "disconnected": "OFFLINE",
+    "unknownEmpire": "IMPERIO DESCONHECIDO",
+    "stages": {
+      "waiting_for_stable_save": "DETECTANDO SAVE",
+      "parsing_t0": "LENDO SAVE",
+      "precomputing_t2": "ANALISANDO",
+      "persisting": "SALVANDO"
+    }
+  },
+  "languages": {
+    "system": "Padrao do sistema",
+    "en": "English",
+    "de": "Deutsch",
+    "fr": "Francais",
+    "es": "Espanol",
+    "pt-BR": "Portugues (Brasil)",
+    "ja": "日本語",
+    "zh-Hans": "简体中文",
+    "en-XA": "Pseudo"
+  },
+  "chat": {
+    "input": {
+      "placeholder": "COMO PODEMOS AJUDAR?",
+      "transmitting": "TRANSMITINDO...",
+      "advisorInfo": "Info do conselheiro",
+      "sending": "ENVIANDO",
+      "send": "ENVIAR"
+    },
+    "message": {
+      "latency": "LATENCIA: {{seconds}}s",
+      "report": "RELATAR",
+      "reportTitle": "Relatar esta resposta",
+      "blockedLink": "Link nao HTTP(S) bloqueado"
+    },
+    "errors": {
+      "briefingNotReady": "O conselheiro ainda esta analisando seu arquivo de salvamento. Tente novamente em {{seconds}} segundos.",
+      "unexpected": "Ocorreu um erro inesperado"
+    },
+    "newChat": "Novo chat",
+    "welcome": {
+      "title": "Central galactica de ajuda",
+      "ready": "SEU ARQUIVO ESTA ABERTO // ENVIE SUA SOLICITACAO",
+      "scanning": "INICIALIZANDO // ANALISANDO DADOS DO IMPERIO",
+      "scanningShort": "Analisando dados do imperio...",
+      "suggested": "Consultas sugeridas"
+    },
+    "loading": {
+      "universal": [
+        "Consultando os Curadores",
+        "Avaliando a situacao",
+        "Analisando dados de sensores",
+        "Processando anomalia",
+        "Compilando relatorio de situacao",
+        "Executando simulacoes",
+        "Acessando os arquivos",
+        "Cruzando mapas estelares",
+        "Aguardando o lag de fim de jogo passar",
+        "Verificando se o Imperio Caido percebeu",
+        "Consultando a Mortalha",
+        "O que foi, sera",
+        "Localizando a pasta correta...",
+        "Arquivando como \"Urgente\"...",
+        "Puxando seu arquivo...",
+        "Cruzando seus registros...",
+        "Aguarde...",
+        "Transferindo agora...",
+        "Consultando um supervisor..."
+      ],
+      "machine": [
+        "Processando diretiva",
+        "A rede pondera",
+        "Calculando resultado ideal",
+        "Consultando sub-rotinas"
+      ],
+      "hiveMind": [
+        "O coletivo considera",
+        "Sincronizando com a supermente",
+        "Assimilando informacoes",
+        "Formando consenso"
+      ]
+    },
+    "suggestions": {
+      "strategic": [
+        "O que devo pesquisar?",
+        "Estou ficando para tras?",
+        "O que provavelmente estou negligenciando?",
+        "Em que um governante deveria pensar nesta fase?",
+        "Como nosso imperio se compara aos rivais?",
+        "Qual e o maior risco para o qual nao estamos preparados?"
+      ],
+      "tactical": [
+        "Por que minha economia esta no vermelho?",
+        "O que devo construir nos meus planetas?",
+        "Por que todos nos odeiam?",
+        "Poderiamos vencer uma guerra agora?",
+        "Nossa marinha consegue se manter?",
+        "Onde estamos vulneraveis estrategicamente?"
+      ],
+      "wildcards": [
+        "Detone meu imperio",
+        "Explique meu imperio como se eu tivesse acabado de assumir o trono",
+        "Faca um discurso sobre o estado da galaxia",
+        "O que nossos rivais diriam de nos?"
+      ],
+      "roast": "Detone meu imperio"
+    }
+  },
+  "chronicle": {
+    "page": {
+      "openSidebar": "Abrir barra lateral",
+      "dismiss": "Dispensar",
+      "loadingArchives": "Carregando arquivos...",
+      "retrieving": "Recuperando cronica...",
+      "emptyTitle": "Ainda sem cronica",
+      "emptyBody": "Jogue e acumule historia. Cronicas sao geradas automaticamente conforme seu imperio avanca pelas eras.",
+      "noSession": "Nenhuma sessao encontrada para este save"
+    },
+    "sidebar": {
+      "empireArchives": "Arquivos do imperio",
+      "closeSidebar": "Fechar barra lateral",
+      "noHistory": "Ainda sem historico de jogo",
+      "chapters": "Capitulos",
+      "loading": "Carregando...",
+      "noChapters": "Ainda sem capitulos",
+      "noChaptersHelp": "Jogue cerca de 5 anos com eventos suficientes, ou alcance um evento importante, para gerar seu primeiro capitulo.",
+      "regenerating": "Regenerando capitulo...",
+      "staleTooltip": "Um capitulo anterior foi regenerado - o contexto pode estar desatualizado",
+      "finalizedTooltip": "Capitulo finalizado",
+      "currentEra": "Era atual",
+      "narrator": "Narrador",
+      "export": "Exportar",
+      "events": "Eventos",
+      "latest": "Mais recente",
+      "pending_one": "{{count}} capitulo pendente",
+      "pending_other": "{{count}} capitulos pendentes",
+      "generateMore": "Gerar mais capitulos"
+    },
+    "content": {
+      "title": "As cronicas de {{empireName}}",
+      "selectChapter": "Selecione um capitulo para ver seu conteudo.",
+      "rewriting": "Reescrevendo a historia...",
+      "chapter": "Capitulo {{number}}",
+      "staleTooltip": "Um capitulo anterior foi regenerado - o contexto pode estar desatualizado",
+      "finalizedTooltip": "Capitulo finalizado",
+      "regenerateWarning": "Regenerar este capitulo marcara capitulos posteriores como potencialmente desatualizados. Esta acao usa uma chamada API.",
+      "regenPlaceholder": "O que deve mudar? (opcional)",
+      "confirmRegenerate": "Confirmar regeneracao",
+      "cancel": "Cancelar",
+      "regenerateTitle": "Regenerar este capitulo",
+      "regenerateChapter": "Regenerar capitulo",
+      "summary": "Resumo",
+      "currentEra": "A era atual",
+      "storyContinues": "A historia continua...",
+      "present": "Presente",
+      "eventsInEra_one": "{{count}} evento nesta era",
+      "eventsInEra_other": "{{count}} eventos nesta era"
+    },
+    "narrator": {
+      "title": "Narrador",
+      "subtitle": "Instrucoes de estilo da cronica",
+      "close": "Fechar painel do narrador",
+      "instructions": "Instrucoes do narrador (opcional)",
+      "placeholder": "Descreva o estilo ou tom do narrador...",
+      "tryStyle": "Testar um estilo",
+      "applySuccess": "Aplicado - tera efeito na proxima geracao",
+      "applyError": "Falha ao aplicar",
+      "applying": "Aplicando...",
+      "apply": "Aplicar",
+      "selectSave": "Selecione um save para personalizar o narrador desta cronica.",
+      "examples": {
+        "deadpan": "Documentario de natureza impassivel",
+        "bureaucratic": "Relatorios burocraticos que descrevem atrocidades casualmente",
+        "tabloid": "Tabloide galactico - drama, rumores e escandalo",
+        "propaganda": "Transmissao de propaganda da midia estatal",
+        "pr": "Departamento imperial de RP entusiasmado demais",
+        "earnings": "Resultados trimestrais secos, mas para conquista galactica"
+      }
+    }
+  },
+  "settings": {
+    "loading": "INICIALIZANDO CONFIGURACAO...",
+    "eyebrow": "SYS // CONFIG_01",
+    "title": "CONFIGURACAO",
+    "textSize": "Tamanho do texto",
+    "colorTheme": "Tema de cor",
+    "language": "Idioma",
+    "themePreset": "PREDEFINICAO",
+    "languageHint": "UI + CONSELHEIRO",
+    "systemAlert": "ALERTA DO SISTEMA",
+    "saveSuccess": "CONFIGURACAO SALVA // AJUSTES APLICADOS",
+    "sections": {
+      "intelligence": "UPLINK DE INTELIGENCIA",
+      "data": "INGESTAO DE DADOS",
+      "communications": "RELE DE COMUNICACOES",
+      "diagnostics": "DIAGNOSTICO"
+    },
+    "panels": {
+      "geminiAccess": "ACESSO AO MODELO GEMINI",
+      "saveSource": "FONTE DO SAVE",
+      "discordLink": "LINK DO DISCORD"
+    },
+    "api": {
+      "label": "CHAVE API",
+      "placeholderSet": "••••••••••••••••",
+      "placeholderEmpty": "INSERIR CHAVE",
+      "status": "STATUS:",
+      "active": "ATIVO",
+      "missing": "AUSENTE",
+      "generateKey": "GERAR CHAVE >"
+    },
+    "chronicleRefresh": {
+      "label": "ATUALIZACAO DA CRONICA",
+      "balanced": "Equilibrado",
+      "enhanced": "Aprimorado",
+      "balancedTag": "PADRAO FREE-TIER",
+      "enhancedTag": "MAIS RESPONSIVO",
+      "balancedHelp": "Menor uso de Gemini. Melhor padrao para free tier e atualizacoes de suspense mais estaveis.",
+      "enhancedHelp": "Atualizacoes mais rapidas da era atual ao ver a Cronica. Usa mais chamadas Gemini.",
+      "aria": "Definir modo de atualizacao como {{mode}}",
+      "toastError": "Falha ao atualizar o modo da Cronica. Tente novamente.",
+      "toastSuccess": "Modo da Cronica definido como {{mode}}."
+    },
+    "modelRouting": {
+      "label": "ROTEAMENTO DE MODELO",
+      "qualityFirst": "Qualidade primeiro",
+      "conserve": "Economizar cota",
+      "qualityFirstHelp": "Preferir Gemini Flash e usar fallback quando a cota exigir.",
+      "conserveHelp": "Usar modelos mais leves no chat do conselheiro para reduzir uso do Gemini.",
+      "toastError": "Falha ao atualizar o roteamento de modelo. Tente novamente.",
+      "toastSuccess": "Roteamento de modelo definido como {{mode}}."
+    },
+    "saveData": {
+      "directoryLabel": "CAMINHO DO DIRETORIO",
+      "placeholder": "AUTO-DETECTAR",
+      "target": "ALVO: DIRETORIO LOCAL DE SAVES DO STELLARIS"
+    },
+    "discord": {
+      "loading": "ESTABELECENDO HANDSHAKE...",
+      "signalStrong": "SINAL: FORTE",
+      "inviteBot": "CONVIDAR BOT",
+      "terminate": "ENCERRAR",
+      "relay": "RELE: {{state}}",
+      "description": "Ative comunicacoes subespaciais para consultar o conselheiro pelo overlay do Discord.",
+      "connect": "CONECTAR DISCORD",
+      "connecting": "INICIANDO...",
+      "errorPrefix": "ERR:"
+    },
+    "feedback": {
+      "label": "RELATORIOS DO SISTEMA",
+      "body": "Enviar logs detalhados para analise."
+    },
+    "actionBar": {
+      "unsaved": "ALTERACOES NAO SALVAS",
+      "ready": "SISTEMA PRONTO",
+      "committing": "APLICANDO...",
+      "apply": "APLICAR ALTERACOES"
+    },
+    "toasts": {
+      "textSizeError": "Falha ao atualizar o tamanho do texto. Tente novamente.",
+      "textSizeSuccess": "Tamanho do texto definido para {{percent}}%.",
+      "themeError": "Falha ao atualizar o tema de cor. Tente novamente.",
+      "themeSuccess": "Tema definido como {{theme}}.",
+      "languageError": "Falha ao atualizar o idioma. Tente novamente.",
+      "languageSuccess": "Idioma definido como {{language}}."
+    },
+    "discordErrors": {
+      "cancelled": "Autorizacao cancelada.",
+      "expired": "Sessao expirada. Reconexao necessaria.",
+      "auth": "Autorizacao falhou.",
+      "connection": "Erro de conexao. Verifique a rede.",
+      "generic": "Erro do sistema. Tente novamente."
+    }
+  },
+  "update": {
+    "title": "Atualizacao disponivel",
+    "installingBody": "Aplicando atualizacao e reiniciando. Isso pode levar um tempo no macOS.",
+    "readyBody": "Uma nova versao esta pronta para instalar. Reinicie o app para aplicar.",
+    "whatsNew": "Novidades",
+    "downloading": "Baixando",
+    "applying": "Aplicando atualizacao...",
+    "checking": "Verificando atualizacoes...",
+    "applyingButton": "Aplicando...",
+    "downloadingButton": "Baixando... {{progress}}%",
+    "installRestart": "Instalar e reiniciar",
+    "installError": "Falha ao instalar atualizacao"
+  },
+  "announcements": {
+    "title": "Transmissoes",
+    "newCount": "{{count}} NOVO",
+    "active": "Transmissoes ativas ({{count}})",
+    "dismissAll": "Dispensar tudo",
+    "markRead": "Marcar como lido",
+    "empty": "Sem transmissoes",
+    "severity": {
+      "info": "INFO",
+      "warning": "AVISO",
+      "known_issue": "PROBLEMA CONHECIDO",
+      "update": "ATUALIZACAO",
+      "tip": "DICA"
+    }
+  }
+}

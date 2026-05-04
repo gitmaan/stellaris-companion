@@ -29,6 +29,7 @@ except ImportError:
 
 from backend.core.conversation import ConversationManager
 from backend.core.json_utils import json_dumps
+from backend.core.language import build_language_policy, localized_text, normalize_language
 from backend.core.model_routing import (
     GEMINI_FLASH_MODEL,
     classify_model_error,
@@ -654,7 +655,7 @@ class Companion:
             cleaned = cleaned[:limit].rstrip() + "..."
         return cleaned
 
-    def _load_save_memory_summary(self, *, save_id: str | None) -> str | None:
+    def _load_save_memory_summary(self, *, save_id: str | None, language: str = "en") -> str | None:
         """Load persisted save-scoped memory summary (best effort)."""
         if not save_id:
             return None
@@ -662,7 +663,7 @@ class Companion:
             from backend.core.database import get_default_db
 
             db = get_default_db()
-            summary = db.get_advisor_memory_summary(save_id)
+            summary = db.get_advisor_memory_summary(save_id, language=language)
             if not summary:
                 return None
             return summary[: self._max_save_memory_chars]
@@ -676,6 +677,7 @@ class Companion:
         question: str,
         answer: str,
         game_date: str | None,
+        language: str = "en",
     ) -> None:
         """Append a compact memory entry and persist per-save summary."""
         if not save_id:
@@ -690,7 +692,7 @@ class Companion:
             from backend.core.database import get_default_db
 
             db = get_default_db()
-            existing = db.get_advisor_memory_summary(save_id) or ""
+            existing = db.get_advisor_memory_summary(save_id, language=language) or ""
             lines = [ln.strip() for ln in existing.splitlines() if ln.strip()]
 
             # Keep recent continuity, then append current turn.
@@ -704,6 +706,7 @@ class Companion:
 
             db.upsert_advisor_memory_summary(
                 save_id=save_id,
+                language=language,
                 summary_text="\n".join(lines),
                 last_game_date=game_date,
             )
@@ -930,9 +933,12 @@ class Companion:
         history_context: str | None = None,
         model_name: str | None = None,
         model_routing_mode: str | None = None,
+        language: str | None = None,
     ) -> tuple[str, float]:
         """Ask a question using the fully precomputed briefing (no tools)."""
         start_time = time.time()
+        output_language = normalize_language(language)
+        language_scoped_session_key = f"{session_key}:lang:{output_language}"
         explicit_model = str(model_name).strip() if model_name else None
         selected_model = explicit_model or self.advisor_model or DEFAULT_ADVISOR_MODEL
 
@@ -943,15 +949,21 @@ class Companion:
         briefing_json, game_date, data_note = self._get_best_briefing_json()
         if not briefing_json:
             return (
-                "No precomputed game state is available yet. Please wait for a save to be processed.",
+                localized_text("no_precomputed_state", output_language),
                 0.0,
             )
 
-        save_memory_summary = self._load_save_memory_summary(save_id=save_id)
+        if data_note:
+            data_note = localized_text("loaded_from_cache", output_language)
+
+        save_memory_summary = self._load_save_memory_summary(
+            save_id=save_id,
+            language=output_language,
+        )
 
         # Build prompt with sliding-window history (Phase 4)
         user_prompt = self._conversations.build_prompt(
-            session_key=session_key,
+            session_key=language_scoped_session_key,
             briefing_json=briefing_json,
             game_date=game_date,
             question=cleaned_question,
@@ -962,11 +974,12 @@ class Companion:
 
         ask_system_prompt = (
             f"{self.system_prompt}\n\n"
+            f"{build_language_policy(output_language)}\n\n"
             "ASK MODE (NO TOOLS):\n"
             "- You are given the complete current game state as JSON in the user message.\n"
             "- Do NOT call tools or ask to call tools.\n"
             "- ALL numbers and factual claims must come from the JSON.\n"
-            "- If a value is missing, say 'unknown' and suggest what to check in-game.\n"
+            "- If a value is missing, say so in the requested language and suggest what to check in-game.\n"
             "- Be a strategic ADVISOR: interpret, prioritize, and recommend next actions.\n"
         )
         naval_cap_policy_block = self._build_naval_capacity_policy_block(
@@ -1047,7 +1060,9 @@ class Companion:
                     raise last_error
                 raise RuntimeError("No advisor model was available")
 
-            response_text_raw = response.text or "Could not generate a response."
+            response_text_raw = response.text or localized_text(
+                "could_not_generate", output_language
+            )
             response_text = response_text_raw
 
             # Deterministic disclaimer on stale/cache fallback.
@@ -1075,7 +1090,7 @@ class Companion:
             }
 
             self._conversations.record_turn(
-                session_key=session_key,
+                session_key=language_scoped_session_key,
                 question=cleaned_question,
                 answer=response_text,
                 game_date=game_date,
@@ -1085,6 +1100,7 @@ class Companion:
                 question=cleaned_question,
                 answer=response_text_raw,
                 game_date=game_date,
+                language=output_language,
             )
 
             return response_text, elapsed

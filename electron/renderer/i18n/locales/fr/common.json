@@ -1,0 +1,332 @@
+{
+  "app": {
+    "tabs": {
+      "chat": "Conseiller",
+      "chronicle": "Chronique",
+      "settings": "Config"
+    }
+  },
+  "common": {
+    "apply": "Appliquer",
+    "applying": "Application...",
+    "browse": "Parcourir",
+    "close": "Fermer",
+    "dismiss": "Masquer",
+    "downloadedReady": "Telecharge. Pret a installer.",
+    "later": "Plus tard",
+    "loading": "Chargement...",
+    "new": "Nouveau",
+    "reportIssue": "Signaler un probleme",
+    "retry": "Reessayer",
+    "retrying": "Nouvelle tentative...",
+    "unknownDate": "Date inconnue"
+  },
+  "status": {
+    "ready": "SYSTEMES EN LIGNE",
+    "analyzing": "ANALYSE DE L'EMPIRE...",
+    "analyzingWithStage": "ANALYSE ({{stage}})...",
+    "connecting": "CONNEXION...",
+    "noSave": "EN ATTENTE DE LIEN",
+    "notConfigured": "CONFIG REQUISE",
+    "disconnected": "HORS LIGNE",
+    "unknownEmpire": "EMPIRE INCONNU",
+    "stages": {
+      "waiting_for_stable_save": "DETECTION SAUVEGARDE",
+      "parsing_t0": "LECTURE SAUVEGARDE",
+      "precomputing_t2": "ANALYSE",
+      "persisting": "ENREGISTREMENT"
+    }
+  },
+  "languages": {
+    "system": "Langue du systeme",
+    "en": "English",
+    "de": "Deutsch",
+    "fr": "Francais",
+    "es": "Espanol",
+    "pt-BR": "Portugues (Brasil)",
+    "ja": "日本語",
+    "zh-Hans": "简体中文",
+    "en-XA": "Pseudo"
+  },
+  "chat": {
+    "input": {
+      "placeholder": "COMMENT POUVONS-NOUS AIDER ?",
+      "transmitting": "TRANSMISSION...",
+      "advisorInfo": "Infos conseiller",
+      "sending": "ENVOI",
+      "send": "ENVOYER"
+    },
+    "message": {
+      "latency": "LATENCE : {{seconds}}s",
+      "report": "SIGNALER",
+      "reportTitle": "Signaler cette reponse",
+      "blockedLink": "Lien non HTTP(S) bloque"
+    },
+    "errors": {
+      "briefingNotReady": "Le conseiller analyse encore votre sauvegarde. Reessayez dans {{seconds}} secondes.",
+      "unexpected": "Une erreur inattendue est survenue"
+    },
+    "newChat": "Nouveau chat",
+    "welcome": {
+      "title": "Assistance galactique",
+      "ready": "VOTRE FICHIER EST OUVERT // ENVOYEZ VOTRE DEMANDE",
+      "scanning": "INITIALISATION // ANALYSE DES DONNEES DE L'EMPIRE",
+      "scanningShort": "Analyse des donnees de l'empire...",
+      "suggested": "Questions suggerees"
+    },
+    "loading": {
+      "universal": [
+        "Consultation des Conservateurs",
+        "Evaluation de la situation",
+        "Analyse des donnees capteurs",
+        "Traitement de l'anomalie",
+        "Compilation du rapport de situation",
+        "Execution des simulations",
+        "Acces aux archives",
+        "Croisement des cartes stellaires",
+        "Attente de la fin du lag de fin de partie",
+        "Verification de l'attention d'un empire dechu",
+        "Consultation du Suaire",
+        "Ce qui fut sera",
+        "Recherche du bon dossier...",
+        "Classement en \"Urgent\"...",
+        "Recuperation de votre dossier...",
+        "Croisement de vos archives...",
+        "Veuillez patienter...",
+        "Transfert en cours...",
+        "Consultation d'un superviseur..."
+      ],
+      "machine": [
+        "Traitement de la directive",
+        "Le reseau delibere",
+        "Calcul du resultat optimal",
+        "Interrogation des sous-routines"
+      ],
+      "hiveMind": [
+        "Le collectif reflechit",
+        "Synchronisation avec le surmental",
+        "Assimilation des informations",
+        "Formation du consensus"
+      ]
+    },
+    "suggestions": {
+      "strategic": [
+        "Que devrais-je rechercher ?",
+        "Suis-je en train de prendre du retard ?",
+        "Qu'est-ce que je neglige probablement ?",
+        "A quoi un souverain devrait-il penser a ce stade ?",
+        "Comment notre empire se compare-t-il aux autres ?",
+        "Quel est le plus grand risque auquel nous ne sommes pas prepares ?"
+      ],
+      "tactical": [
+        "Pourquoi mon economie est-elle dans le rouge ?",
+        "Que devrais-je construire sur mes planetes ?",
+        "Pourquoi tout le monde nous deteste ?",
+        "Pourrions-nous gagner une guerre maintenant ?",
+        "Notre flotte peut-elle tenir le choc ?",
+        "Ou sommes-nous vulnerables strategiquement ?"
+      ],
+      "wildcards": [
+        "Moque-toi de mon empire",
+        "Explique mon empire comme si je venais de monter sur le trone",
+        "Donne-moi un discours sur l'etat de la galaxie",
+        "Que diraient nos rivaux de nous ?"
+      ],
+      "roast": "Moque-toi de mon empire"
+    }
+  },
+  "chronicle": {
+    "page": {
+      "openSidebar": "Ouvrir la barre laterale",
+      "dismiss": "Masquer",
+      "loadingArchives": "Chargement des archives...",
+      "retrieving": "Recuperation de la chronique...",
+      "emptyTitle": "Aucune chronique",
+      "emptyBody": "Jouez votre partie et accumulez de l'histoire. Les chroniques sont generees automatiquement quand votre empire traverse les ages.",
+      "noSession": "Aucune session trouvee pour cette sauvegarde"
+    },
+    "sidebar": {
+      "empireArchives": "Archives de l'empire",
+      "closeSidebar": "Fermer la barre laterale",
+      "noHistory": "Aucun historique de partie",
+      "chapters": "Chapitres",
+      "loading": "Chargement...",
+      "noChapters": "Aucun chapitre",
+      "noChaptersHelp": "Jouez environ 5 ans avec assez d'evenements, ou declenchez un evenement majeur, pour generer votre premier chapitre.",
+      "regenerating": "Regeneration du chapitre...",
+      "staleTooltip": "Un chapitre precedent a ete regenere - le contexte peut etre obsolescent",
+      "finalizedTooltip": "Chapitre finalise",
+      "currentEra": "Ere actuelle",
+      "narrator": "Narrateur",
+      "export": "Exporter",
+      "events": "Evenements",
+      "latest": "Dernier",
+      "pending_one": "{{count}} chapitre en attente",
+      "pending_other": "{{count}} chapitres en attente",
+      "generateMore": "Generer plus de chapitres"
+    },
+    "content": {
+      "title": "Les chroniques de {{empireName}}",
+      "selectChapter": "Selectionnez un chapitre pour afficher son contenu.",
+      "rewriting": "Reecriture de l'histoire...",
+      "chapter": "Chapitre {{number}}",
+      "staleTooltip": "Un chapitre precedent a ete regenere - le contexte peut etre obsolescent",
+      "finalizedTooltip": "Chapitre finalise",
+      "regenerateWarning": "Regenerer ce chapitre marquera les chapitres suivants comme potentiellement obsolescents. Cette action utilise un appel API.",
+      "regenPlaceholder": "Que faut-il changer ? (optionnel)",
+      "confirmRegenerate": "Confirmer la regeneration",
+      "cancel": "Annuler",
+      "regenerateTitle": "Regenerer ce chapitre",
+      "regenerateChapter": "Regenerer le chapitre",
+      "summary": "Resume",
+      "currentEra": "L'ere actuelle",
+      "storyContinues": "L'histoire continue...",
+      "present": "Present",
+      "eventsInEra_one": "{{count}} evenement dans cette ere",
+      "eventsInEra_other": "{{count}} evenements dans cette ere"
+    },
+    "narrator": {
+      "title": "Narrateur",
+      "subtitle": "Instructions de style pour la chronique",
+      "close": "Fermer le panneau narrateur",
+      "instructions": "Instructions du narrateur (optionnel)",
+      "placeholder": "Decrivez le style ou le ton du narrateur...",
+      "tryStyle": "Essayer un style",
+      "applySuccess": "Applique - prendra effet a la prochaine generation",
+      "applyError": "Echec de l'application",
+      "applying": "Application...",
+      "apply": "Appliquer",
+      "selectSave": "Selectionnez une sauvegarde pour personnaliser le narrateur de cette chronique.",
+      "examples": {
+        "deadpan": "Documentaire animalier impassible",
+        "bureaucratic": "Rapports bureaucratiques decrivant des atrocites avec detachement",
+        "tabloid": "Tabloid galactique - drame, rumeurs et scandales",
+        "propaganda": "Emission de propagande des medias d'Etat",
+        "pr": "Service RP imperial beaucoup trop enthousiaste",
+        "earnings": "Resultats trimestriels tres secs, mais pour la conquete galactique"
+      }
+    }
+  },
+  "settings": {
+    "loading": "INITIALISATION DE LA CONFIGURATION...",
+    "eyebrow": "SYS // CONFIG_01",
+    "title": "CONFIGURATION",
+    "textSize": "Taille du texte",
+    "colorTheme": "Theme couleur",
+    "language": "Langue",
+    "themePreset": "PRESELECTION",
+    "languageHint": "UI + CONSEILLER",
+    "systemAlert": "ALERTE SYSTEME",
+    "saveSuccess": "CONFIGURATION ENREGISTREE // PARAMETRES APPLIQUES",
+    "sections": {
+      "intelligence": "LIAISON DE RENSEIGNEMENT",
+      "data": "INGESTION DES DONNEES",
+      "communications": "RELAIS COMMUNICATIONS",
+      "diagnostics": "DIAGNOSTIC"
+    },
+    "panels": {
+      "geminiAccess": "ACCES AU MODELE GEMINI",
+      "saveSource": "SOURCE DE SAUVEGARDE",
+      "discordLink": "LIEN DISCORD"
+    },
+    "api": {
+      "label": "CLE API",
+      "placeholderSet": "••••••••••••••••",
+      "placeholderEmpty": "ENTRER LA CLE",
+      "status": "ETAT :",
+      "active": "ACTIF",
+      "missing": "MANQUANT",
+      "generateKey": "GENERER UNE CLE >"
+    },
+    "chronicleRefresh": {
+      "label": "ACTUALISATION CHRONIQUE",
+      "balanced": "Equilibree",
+      "enhanced": "Amelioree",
+      "balancedTag": "FREE TIER PAR DEFAUT",
+      "enhancedTag": "PLUS REACTIVE",
+      "balancedHelp": "Utilisation Gemini reduite. Meilleur choix par defaut pour le free tier et des cliffhangers plus stables.",
+      "enhancedHelp": "Mises a jour plus rapides de l'ere actuelle dans la Chronique. Utilise plus d'appels Gemini.",
+      "aria": "Definir le mode d'actualisation sur {{mode}}",
+      "toastError": "Impossible de mettre a jour le mode d'actualisation de la Chronique. Reessayez.",
+      "toastSuccess": "Mode d'actualisation de la Chronique defini sur {{mode}}."
+    },
+    "modelRouting": {
+      "label": "ROUTAGE MODELE",
+      "qualityFirst": "Qualite d'abord",
+      "conserve": "Economiser le quota",
+      "qualityFirstHelp": "Preferer Gemini Flash, puis basculer si le quota l'exige.",
+      "conserveHelp": "Utiliser des modeles plus legers pour le chat conseiller afin de reduire l'usage Gemini.",
+      "toastError": "Impossible de mettre a jour le routage modele. Reessayez.",
+      "toastSuccess": "Routage modele defini sur {{mode}}."
+    },
+    "saveData": {
+      "directoryLabel": "CHEMIN DU DOSSIER",
+      "placeholder": "AUTO-DETECTION",
+      "target": "CIBLE : DOSSIER DES SAUVEGARDES STELLARIS (LOCAL)"
+    },
+    "discord": {
+      "loading": "ETABLISSEMENT DE LA POIGNEE DE MAIN...",
+      "signalStrong": "SIGNAL : FORT",
+      "inviteBot": "INVITER LE BOT",
+      "terminate": "TERMINER",
+      "relay": "RELAIS : {{state}}",
+      "description": "Activez les communications subspatiales pour interroger le conseiller via l'overlay Discord.",
+      "connect": "CONNECTER DISCORD",
+      "connecting": "INITIALISATION...",
+      "errorPrefix": "ERR :"
+    },
+    "feedback": {
+      "label": "RAPPORT SYSTEME",
+      "body": "Envoyer des journaux detailles pour analyse."
+    },
+    "actionBar": {
+      "unsaved": "MODIFICATIONS NON ENREGISTREES",
+      "ready": "SYSTEME PRET",
+      "committing": "VALIDATION...",
+      "apply": "APPLIQUER"
+    },
+    "toasts": {
+      "textSizeError": "Impossible de modifier la taille du texte. Reessayez.",
+      "textSizeSuccess": "Taille du texte definie sur {{percent}}%.",
+      "themeError": "Impossible de modifier le theme couleur. Reessayez.",
+      "themeSuccess": "Theme defini sur {{theme}}.",
+      "languageError": "Impossible de modifier la langue. Reessayez.",
+      "languageSuccess": "Langue definie sur {{language}}."
+    },
+    "discordErrors": {
+      "cancelled": "Autorisation annulee.",
+      "expired": "Session expiree. Reconnexion requise.",
+      "auth": "Autorisation echouee.",
+      "connection": "Erreur de connexion. Verifiez le reseau.",
+      "generic": "Erreur systeme. Reessayez."
+    }
+  },
+  "update": {
+    "title": "Mise a jour disponible",
+    "installingBody": "Application de la mise a jour et relance. Cela peut prendre un moment sur macOS.",
+    "readyBody": "Une nouvelle version est prete a installer. Redemarrez l'app pour appliquer la mise a jour.",
+    "whatsNew": "Nouveautes",
+    "downloading": "Telechargement",
+    "applying": "Application de la mise a jour...",
+    "checking": "Recherche de mises a jour...",
+    "applyingButton": "Application...",
+    "downloadingButton": "Telechargement... {{progress}}%",
+    "installRestart": "Installer et redemarrer",
+    "installError": "Impossible d'installer la mise a jour"
+  },
+  "announcements": {
+    "title": "Transmissions",
+    "newCount": "{{count}} NOUVEAU",
+    "active": "Transmissions actives ({{count}})",
+    "dismissAll": "Tout masquer",
+    "markRead": "Marquer lu",
+    "empty": "Aucune transmission",
+    "severity": {
+      "info": "INFO",
+      "warning": "AVERTISSEMENT",
+      "known_issue": "PROBLEME CONNU",
+      "update": "MISE A JOUR",
+      "tip": "ASTUCE"
+    }
+  }
+}

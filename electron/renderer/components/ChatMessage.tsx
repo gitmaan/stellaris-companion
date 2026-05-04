@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react'
 import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
+import { useTranslation } from 'react-i18next'
 import { HUDMicro } from './hud/HUDText'
 import type { ModelRoutingEvent } from '../hooks/useBackend'
 
@@ -39,15 +40,16 @@ function isSafeHttpUrl(href: string): boolean {
   }
 }
 
-const markdownComponents: Components = {
-  a: ({ href, children }) => {
+function createMarkdownComponents(blockedLinkTitle: string): Components {
+  return {
+    a: ({ href, children }) => {
     const safeHref = typeof href === 'string' && isSafeHttpUrl(href) ? href : null
 
     if (!safeHref) {
       return (
         <span
           className="text-text-secondary/70 underline decoration-dotted cursor-not-allowed"
-          title="Blocked non-http(s) link"
+          title={blockedLinkTitle}
         >
           {children}
         </span>
@@ -78,6 +80,7 @@ const markdownComponents: Components = {
       </a>
     )
   },
+  }
 }
 
 /**
@@ -96,6 +99,8 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
   }: ChatMessageProps,
   ref,
 ) {
+  const { t } = useTranslation()
+  const markdownComponents = createMarkdownComponents(t('chat.message.blockedLink'))
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
   }
@@ -160,7 +165,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
         {!isUser && !isError && (responseTimeMs !== undefined || !!modelReadout || !!onReport) && (
           <div className="flex items-center gap-4 mt-2 pt-1 border-t border-white/5 opacity-50 group-hover:opacity-100 transition-opacity">
               {responseTimeMs !== undefined && (
-                <HUDMicro>LATENCY: {(responseTimeMs / 1000).toFixed(3)}s</HUDMicro>
+                <HUDMicro>{t('chat.message.latency', { seconds: (responseTimeMs / 1000).toFixed(3) })}</HUDMicro>
               )}
               {modelReadout && (
                 <HUDMicro
@@ -175,9 +180,9 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
                   type="button"
                   onClick={onReport}
                   className="font-mono text-[10px] uppercase tracking-wide text-accent-cyan/80 hover:text-accent-cyan transition-colors"
-                  title="Report this response"
+                  title={t('chat.message.reportTitle')}
                 >
-                  Report
+                  {t('chat.message.report')}
                 </button>
               )}
           </div>

@@ -9,6 +9,21 @@ export const DEFAULT_CHRONICLE_REFRESH_MODE: ChronicleRefreshMode = 'balanced'
 export const MODEL_ROUTING_MODE_VALUES = ['quality_first', 'conserve'] as const
 export type ModelRoutingMode = (typeof MODEL_ROUTING_MODE_VALUES)[number]
 export const DEFAULT_MODEL_ROUTING_MODE: ModelRoutingMode = 'quality_first'
+export const LANGUAGE_VALUES = [
+  'system',
+  'en',
+  'de',
+  'fr',
+  'es',
+  'pt-BR',
+  'ja',
+  'zh-Hans',
+  'en-XA',
+] as const
+export type LanguageSetting = (typeof LANGUAGE_VALUES)[number]
+export type ResolvedLanguage = Exclude<LanguageSetting, 'system'>
+export const DEFAULT_LANGUAGE: LanguageSetting = 'system'
+export const DEFAULT_RESOLVED_LANGUAGE: ResolvedLanguage = 'en'
 
 export function normalizeUiTheme(rawValue: unknown): UiTheme {
   if (typeof rawValue !== 'string') return DEFAULT_UI_THEME
@@ -35,6 +50,23 @@ export function normalizeModelRoutingMode(rawValue: unknown): ModelRoutingMode {
     : DEFAULT_MODEL_ROUTING_MODE
 }
 
+export function normalizeLanguage(rawValue: unknown): LanguageSetting {
+  if (typeof rawValue !== 'string') return DEFAULT_LANGUAGE
+  const normalized = rawValue.trim()
+  if (normalized === 'pt_BR') return 'pt-BR'
+  if (normalized === 'zh-CN' || normalized === 'zh_CN' || normalized === 'zh-Hans-CN') {
+    return 'zh-Hans'
+  }
+  return (LANGUAGE_VALUES as readonly string[]).includes(normalized)
+    ? normalized as LanguageSetting
+    : DEFAULT_LANGUAGE
+}
+
+export function normalizeResolvedLanguage(rawValue: unknown): ResolvedLanguage {
+  const normalized = normalizeLanguage(rawValue)
+  return normalized === 'system' ? DEFAULT_RESOLVED_LANGUAGE : normalized
+}
+
 export interface Settings {
   googleApiKey: string
   googleApiKeySet: boolean
@@ -48,6 +80,8 @@ export interface Settings {
   uiTheme: UiTheme
   chronicleRefreshMode: ChronicleRefreshMode
   modelRoutingMode: ModelRoutingMode
+  language: LanguageSetting
+  resolvedLanguage: ResolvedLanguage
 }
 
 export interface UseSettingsResult {
@@ -78,6 +112,8 @@ export function useSettings(): UseSettingsResult {
         uiTheme?: unknown
         chronicleRefreshMode?: unknown
         modelRoutingMode?: unknown
+        language?: unknown
+        resolvedLanguage?: unknown
       }
       const parsedUiScale = Number(loaded.uiScale)
       const normalized: Settings = {
@@ -87,6 +123,8 @@ export function useSettings(): UseSettingsResult {
         uiTheme: normalizeUiTheme(loaded.uiTheme),
         chronicleRefreshMode: normalizeChronicleRefreshMode(loaded.chronicleRefreshMode),
         modelRoutingMode: normalizeModelRoutingMode(loaded.modelRoutingMode),
+        language: normalizeLanguage(loaded.language),
+        resolvedLanguage: normalizeResolvedLanguage(loaded.resolvedLanguage),
       }
       setSettings(normalized)
       setError(null)

@@ -57,6 +57,16 @@
   src: url('./fonts/JetBrainsMono.woff2') format('woff2');
 }
 
+html[lang='ja'],
+html[lang='zh-Hans'] {
+  word-break: keep-all;
+}
+
+html[lang='ja'] .tracking-tech,
+html[lang='zh-Hans'] .tracking-tech {
+  letter-spacing: 0.08em;
+}
+
 /* ============================================
    Theme Variables
    ============================================ */

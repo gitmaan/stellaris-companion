@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChronicleChapter, CurrentEra, NarrativeSection } from '../hooks/useBackend'
 import Tooltip from './Tooltip'
 
@@ -27,20 +28,21 @@ function ChronicleContent({
   regeneratingChapter,
   justRegenerated,
 }: ChronicleContentProps) {
+  const { t } = useTranslation()
   return (
     <article className="max-w-[800px] mx-auto">
       {/* Empire header */}
       <header className="text-center mb-10 relative">
         <div className="text-accent-cyan text-3xl mb-3">◈</div>
         <h1 className="font-display text-2xl tracking-[0.2em] text-text-primary uppercase">
-          The Chronicles of {empireName}
+          {t('chronicle.content.title', { empireName })}
         </h1>
         <div className="energy-line mt-4 max-w-[200px] mx-auto" />
       </header>
 
       {chapters.length === 0 && !currentEra && (
         <div className="flex items-center justify-center text-text-secondary text-sm h-[200px]">
-          <p>Select a chapter to view its content.</p>
+          <p>{t('chronicle.content.selectChapter')}</p>
         </div>
       )}
 
@@ -79,6 +81,7 @@ function ChapterBlock({
   regeneratingChapter: number | null
   justRegenerated: number | null
 }) {
+  const { t } = useTranslation()
   const isRegenerating = regeneratingChapter === chapter.number
   const wasJustRegenerated = justRegenerated === chapter.number
   const isConfirming = confirmingRegen === chapter.number
@@ -100,7 +103,7 @@ function ChapterBlock({
       {isRegenerating && (
         <div className="absolute inset-0 bg-bg-primary/90 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center gap-4 z-10">
           <div className="w-12 h-12 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin-loader shadow-glow" />
-          <p className="text-text-secondary italic text-sm">Rewriting history...</p>
+          <p className="text-text-secondary italic text-sm">{t('chronicle.content.rewriting')}</p>
         </div>
       )}
 
@@ -109,19 +112,19 @@ function ChapterBlock({
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold text-accent-cyan uppercase tracking-wider flex items-center gap-2">
             <span>◇</span>
-            Chapter {toRoman(chapter.number)}
+            {t('chronicle.content.chapter', { number: toRoman(chapter.number) })}
           </span>
           <h2 className="text-xl font-semibold text-text-primary m-0">{cleanTitle(chapter.title)}</h2>
           <span className="text-sm text-text-secondary font-mono">{chapter.start_date} – {chapter.end_date}</span>
         </div>
         <div className="flex items-center gap-2 text-lg">
           {chapter.context_stale && (
-            <Tooltip content="Earlier chapter was regenerated — context may be outdated" position="left">
+            <Tooltip content={t('chronicle.content.staleTooltip')} position="left">
               <span className="text-accent-yellow ">⚠</span>
             </Tooltip>
           )}
           {chapter.is_finalized && (
-            <Tooltip content="Finalized chapter" position="left">
+            <Tooltip content={t('chronicle.content.finalizedTooltip')} position="left">
               <span className="text-accent-cyan/60 ">◆</span>
             </Tooltip>
           )}
@@ -139,13 +142,12 @@ function ChapterBlock({
           {isConfirming ? (
             <div className="bg-accent-yellow/10 border border-accent-yellow/30 rounded-lg p-4">
               <p className="text-sm text-text-secondary mb-3 leading-relaxed">
-                Regenerating this chapter will mark later chapters as potentially stale.
-                This action uses an API call.
+                {t('chronicle.content.regenerateWarning')}
               </p>
               <textarea
                 value={regenInstructions}
                 onChange={(e) => setRegenInstructions(e.target.value)}
-                placeholder="What should change? (optional)"
+                placeholder={t('chronicle.content.regenPlaceholder')}
                 maxLength={300}
                 rows={2}
                 className="w-full px-3 py-2 mb-3 border border-accent-yellow/30 rounded-md bg-bg-primary/50 text-text-primary text-sm font-sans outline-none transition-all duration-200 focus:border-accent-yellow/60 placeholder:text-text-secondary/50 resize-none"
@@ -159,13 +161,13 @@ function ChapterBlock({
                     onRegenerate(chapter.number, instructions)
                   }}
                 >
-                  Confirm Regenerate
+                  {t('chronicle.content.confirmRegenerate')}
                 </button>
                 <button
                   className="py-2.5 px-5 border border-border rounded-md bg-bg-tertiary text-text-primary text-sm font-medium cursor-pointer transition-all duration-200 hover:bg-bg-elevated hover:border-accent-cyan/30"
                   onClick={() => { setRegenInstructions(''); onCancelRegen() }}
                 >
-                  Cancel
+                  {t('chronicle.content.cancel')}
                 </button>
                 {regenInstructions.length > 0 && (
                   <span className="text-xs text-text-secondary ml-auto">{regenInstructions.length}/300</span>
@@ -176,10 +178,10 @@ function ChapterBlock({
             <button
               className="py-2.5 px-5 border border-border rounded-md bg-bg-tertiary/50 text-text-secondary text-sm font-medium cursor-pointer transition-all duration-200 hover:bg-bg-tertiary hover:border-accent-cyan/30 hover:text-accent-cyan flex items-center gap-2"
               onClick={() => onRegenerate(chapter.number)}
-              title="Regenerate this chapter"
+              title={t('chronicle.content.regenerateTitle')}
             >
               <span>↻</span>
-              Regenerate Chapter
+              {t('chronicle.content.regenerateChapter')}
             </button>
           )}
         </div>
@@ -190,7 +192,7 @@ function ChapterBlock({
         <div className="mt-6 pt-4 border-t border-border">
           <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2 flex items-center gap-2">
             <span className="text-accent-cyan/60">◇</span>
-            Summary
+            {t('chronicle.content.summary')}
           </h4>
           <p className="text-sm text-text-secondary leading-relaxed">{chapter.summary}</p>
         </div>
@@ -203,6 +205,7 @@ function ChapterBlock({
  * Current era block at the bottom
  */
 function CurrentEraBlock({ currentEra }: { currentEra: CurrentEra }) {
+  const { t } = useTranslation()
   const renderedNarrative = useMemo(
     () => {
       if (currentEra.sections?.length) {
@@ -219,10 +222,10 @@ function CurrentEraBlock({ currentEra }: { currentEra: CurrentEra }) {
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold text-accent-yellow uppercase tracking-wider flex items-center gap-2">
             <span>⏳</span>
-            The Current Era
+            {t('chronicle.content.currentEra')}
           </span>
-          <h2 className="text-xl font-semibold text-text-primary m-0">The Story Continues...</h2>
-          <span className="text-sm text-text-secondary font-mono">{currentEra.start_date} – Present</span>
+          <h2 className="text-xl font-semibold text-text-primary m-0">{t('chronicle.content.storyContinues')}</h2>
+          <span className="text-sm text-text-secondary font-mono">{currentEra.start_date} – {t('chronicle.content.present')}</span>
         </div>
       </div>
 
@@ -232,7 +235,7 @@ function CurrentEraBlock({ currentEra }: { currentEra: CurrentEra }) {
 
       <div className="mt-6 pt-4 border-t border-border text-xs text-text-secondary flex items-center gap-2">
         <span className="text-accent-cyan">◇</span>
-        <span>{currentEra.events_covered} events in this era</span>
+        <span>{t('chronicle.content.eventsInEra', { count: currentEra.events_covered })}</span>
       </div>
     </div>
   )

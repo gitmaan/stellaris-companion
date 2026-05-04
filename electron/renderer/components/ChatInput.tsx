@@ -1,5 +1,6 @@
 import { useState, useCallback, useLayoutEffect, useEffect, useRef, KeyboardEvent } from 'react'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import Tooltip from './Tooltip'
 import PersonIcon from './PersonIcon'
 
@@ -24,6 +25,7 @@ function getViewportAwareMaxHeight() {
  * ChatInput - Text input with Cinematic HUD design
  */
 function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputProps) {
+  const { t } = useTranslation()
   const [message, setMessage] = useState('')
   const [maxTextareaHeight, setMaxTextareaHeight] = useState(() => getViewportAwareMaxHeight())
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -84,7 +86,7 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={loading ? 'TRANSMITTING...' : 'HOW CAN WE HELP?'}
+          placeholder={loading ? t('chat.input.transmitting') : t('chat.input.placeholder')}
           disabled={isDisabled}
           autoFocus
           rows={1}
@@ -93,7 +95,7 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
       </div>
 
       <div className="absolute right-3 bottom-3 z-10 flex items-center gap-2">
-        <Tooltip content="Advisor Info" position="top">
+        <Tooltip content={t('chat.input.advisorInfo')} position="top">
           <button
             type="button"
             onClick={onOpenAdvisorPanel}
@@ -118,9 +120,9 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
           }`}
         >
           {loading ? (
-            <span className="animate-pulse">SENDING</span>
+            <span className="animate-pulse">{t('chat.input.sending')}</span>
           ) : (
-            <span>TRANSMIT</span>
+            <span>{t('chat.input.send')}</span>
           )}
         </motion.button>
       </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import ChronicleChapterList from '../components/ChronicleChapterList'
 import ChronicleContent from '../components/ChronicleContent'
 import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
@@ -65,6 +66,7 @@ function ChroniclePage({
   refreshMode = DEFAULT_CHRONICLE_REFRESH_MODE,
   modelRoutingMode,
 }: ChroniclePageProps) {
+  const { t } = useTranslation()
   const backend = useBackend()
   const isMountedRef = useRef(true)
 
@@ -195,7 +197,7 @@ function ChroniclePage({
     const session = latestSessionBySaveId.get(selectedSaveId)
 
     if (!session) {
-      setError('No session found for this save')
+      setError(t('chronicle.page.noSession'))
       return
     }
 
@@ -295,6 +297,7 @@ function ChroniclePage({
     modelRoutingMode,
     refreshMode,
     selectedSaveId,
+    t,
     totalSnapshotsBySaveId,
   ])
 
@@ -677,7 +680,7 @@ function ChroniclePage({
                 transition={{ duration: 0.2 }}
                 onClick={() => setSidebarCollapsed(false)}
                 className="absolute top-3 left-3 z-10 w-7 h-7 flex items-center justify-center rounded text-text-secondary hover:text-accent-cyan transition-colors duration-150"
-                title="Open sidebar"
+                title={t('chronicle.page.openSidebar')}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
@@ -698,7 +701,7 @@ function ChroniclePage({
                   onClick={() => setError(null)}
                   className="py-1.5 px-3 border border-accent-red/50 rounded-md bg-transparent text-accent-red text-xs font-medium cursor-pointer transition-colors duration-200 hover:bg-accent-red/20"
                 >
-                  Dismiss
+                  {t('chronicle.page.dismiss')}
                 </button>
               </div>
             )}
@@ -714,12 +717,12 @@ function ChroniclePage({
             {savesLoading ? (
               <div className="flex flex-col items-center justify-center h-[300px] text-text-secondary gap-4">
                 <div className="w-10 h-10 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin-loader shadow-glow-sm" />
-                <p className="text-sm uppercase tracking-wider">Loading Archives...</p>
+                <p className="text-sm uppercase tracking-wider">{t('chronicle.page.loadingArchives')}</p>
               </div>
             ) : loading && !chronicle ? (
               <div className="flex flex-col items-center justify-center h-[300px] text-text-secondary gap-4">
                 <div className="w-10 h-10 border-2 border-accent-cyan border-t-transparent rounded-full animate-spin-loader shadow-glow-sm" />
-                <p className="text-sm uppercase tracking-wider">Retrieving Chronicle...</p>
+                <p className="text-sm uppercase tracking-wider">{t('chronicle.page.retrieving')}</p>
               </div>
             ) : chronicle ? (
               <ChronicleContent
@@ -736,11 +739,10 @@ function ChroniclePage({
               <div className="flex flex-col items-center justify-center text-center h-[400px]">
                 <div className="text-accent-cyan text-5xl mb-6">◇</div>
                 <h2 className="font-display text-text-primary text-2xl tracking-wider uppercase mb-3">
-                  No Chronicle Yet
+                  {t('chronicle.page.emptyTitle')}
                 </h2>
                 <p className="text-text-secondary max-w-md leading-relaxed text-sm">
-                  Play your game and accumulate history. Chronicles are generated
-                  automatically as your empire progresses through the ages.
+                  {t('chronicle.page.emptyBody')}
                 </p>
               </div>
             )}
