@@ -19,7 +19,7 @@ patches/
   4.2.md   Stellaris 4.2 "Corvus"
   4.3.md   Stellaris 4.3 "Cetus"
   snapshots/
-    4.3.md   compiled current-state snapshot through 4.3
+    4.3.md   compiled current-state snapshot through 4.3.5
 ```
 
 When the advisor builds its system prompt, `load_patch_notes()` in `stellaris_companion/personality.py` reads the player's game version from their save file and loads cumulative mechanics for that version. By default it prefers the latest compiled snapshot at or below the target version, then appends any later delta files. A player on v4.2 gets 4.0 + 4.1 + 4.2 concatenated. A player on v4.3 gets the compiled `snapshots/4.3.md` current-state artifact instead of raw 4.0 + 4.1 + 4.2 + 4.3 concatenation. The content is injected into the `[GAME MECHANICS]` block of the system prompt with an instruction to treat it as ground truth and never reference patches or changes.
@@ -54,7 +54,7 @@ Below the tables, standard bullets cover other 4.0 mechanics (growth, colonies, 
 
 **4.1.md and 4.2.md** use terse bullets only, since they're incremental changes building on the 4.0 baseline.
 
-**`snapshots/4.3.md`** is a compiled current-state sheet. It keeps the still-true 4.0 fundamentals, folds in relevant 4.1-4.3 mechanics, removes superseded facts, and trims low-value patch noise. This keeps the prompt cumulative without paying for repeated legacy text every advisor call.
+**`snapshots/4.3.md`** is a compiled current-state sheet. It keeps the still-true 4.0 fundamentals, folds in relevant 4.1-4.3.5 mechanics, removes superseded facts, and trims low-value patch noise. This keeps the prompt cumulative without paying for repeated legacy text every advisor call.
 
 ### Writing rules
 
@@ -95,4 +95,4 @@ Patch file content is compiled from:
 - Dev Diaries on Steam and Paradox Forums
 - Stellaris Wiki patch pages
 - Community guides (e.g. Paradox Forums economy threads)
-- Hotfix patch notes (4.0.13, 4.1.5, 4.2.2-4.2.4)
+- Hotfix patch notes (4.0.13, 4.1.5, 4.2.2-4.2.4, 4.3.1-4.3.5)
