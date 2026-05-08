@@ -516,16 +516,16 @@ function SettingsPage({
   }
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar pr-2 pb-12">
-      <div className="max-w-4xl mx-auto pt-4">
+    <div className="h-full overflow-y-auto custom-scrollbar pr-2 pb-28">
+      <div className="max-w-4xl mx-auto pt-2">
         
         {/* Header Area */}
-        <div className="flex items-end justify-between mb-8">
-            <div>
+        <div className="mb-6 space-y-4">
+            <div className="min-w-0">
                 <HUDMicro className="mb-1 text-accent-cyan">{t('settings.eyebrow')}</HUDMicro>
-                <HUDHeader size="xl">{t('settings.title')}</HUDHeader>
+                <HUDHeader size="xl" className="leading-none break-words">{t('settings.title')}</HUDHeader>
             </div>
-            <div className="w-[640px] max-w-[68%] grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <HUDSelect
                   label={t('settings.textSize')}
@@ -594,7 +594,7 @@ function SettingsPage({
                 {/* API Section */}
                 <section>
                     <HUDSectionTitle number="01">{t('settings.sections.intelligence')}</HUDSectionTitle>
-                    <HUDPanel decoration="tech" title={t('settings.panels.geminiAccess')}>
+                    <HUDPanel decoration="tech" title={t('settings.panels.geminiAccess')} quiet>
                         <div className="space-y-4 pt-2">
                              <HUDInput 
                                 label={t('settings.api.label')}
@@ -623,7 +623,7 @@ function SettingsPage({
                                        <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
                                      )}
                                  </div>
-                                 <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                 <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
                                    {t('settings.geminiQuota.description')}
                                  </HUDMicro>
 
@@ -640,7 +640,7 @@ function SettingsPage({
                                          onClick={() => void handleGeminiQuotaModeChange(mode)}
                                          className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
                                            isSelected
-                                             ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
+                                             ? 'border border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
                                              : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
                                          } disabled:opacity-50 disabled:cursor-not-allowed`}
                                        >
@@ -655,7 +655,7 @@ function SettingsPage({
                                    })}
                                  </div>
 
-                                 <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                 <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
                                    {geminiQuotaHelper(geminiQuotaMode)}
                                  </HUDMicro>
 
@@ -692,7 +692,7 @@ function SettingsPage({
                                                onClick={() => void handleModelRoutingModeChange(mode)}
                                                className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
                                                  isSelected
-                                                   ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
+                                                   ? 'border border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
                                                    : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
                                                } disabled:opacity-50 disabled:cursor-not-allowed`}
                                              >
@@ -709,7 +709,7 @@ function SettingsPage({
                                          })}
                                        </div>
 
-                                       <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                       <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
                                          {modelRoutingHelper(modelRoutingMode)}
                                        </HUDMicro>
                                      </div>
@@ -735,7 +735,7 @@ function SettingsPage({
                                                onClick={() => void handleChronicleRefreshModeChange(mode)}
                                                className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
                                                  isSelected
-                                                   ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
+                                                   ? 'border border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
                                                    : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
                                                } disabled:opacity-50 disabled:cursor-not-allowed`}
                                              >
@@ -750,7 +750,7 @@ function SettingsPage({
                                          })}
                                        </div>
 
-                                       <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                       <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
                                          {chronicleModeHelper(chronicleRefreshMode)}
                                        </HUDMicro>
                                      </div>
@@ -764,7 +764,7 @@ function SettingsPage({
                 {/* Save Data Section */}
                 <section>
                     <HUDSectionTitle number="02">{t('settings.sections.data')}</HUDSectionTitle>
-                    <HUDPanel decoration="brackets" title={t('settings.panels.saveSource')}>
+                    <HUDPanel decoration="brackets" title={t('settings.panels.saveSource')} quiet>
                          <div className="space-y-4 pt-2">
                              <div className="flex gap-2 items-end">
                                  <HUDInput 
@@ -797,6 +797,7 @@ function SettingsPage({
                       decoration="tech"
                       variant={mcpRelayReady ? 'primary' : 'secondary'}
                       title={t('settings.panels.mcpRelay')}
+                      quiet
                     >
                         <div className="space-y-4 pt-2">
                             <div className="border border-white/10 bg-white/5 p-3 rounded-sm space-y-2">
@@ -837,7 +838,7 @@ function SettingsPage({
 
                             <div className="border-t border-white/10 pt-3 space-y-1">
                               <HUDLabel>{t('settings.mcpRelay.otherApps')}</HUDLabel>
-                              <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                              <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
                                 {t('settings.mcpRelay.otherAppsHelp')}
                               </HUDMicro>
                             </div>
@@ -921,7 +922,7 @@ function SettingsPage({
                 {/* Discord Section */}
                 <section>
                     <HUDSectionTitle number="04">{t('settings.sections.communications')}</HUDSectionTitle>
-                    <HUDPanel decoration="scanline" variant={discordStatus?.connected ? 'primary' : 'secondary'} title={t('settings.panels.discordLink')}>
+                    <HUDPanel decoration="scanline" variant={discordStatus?.connected ? 'primary' : 'secondary'} title={t('settings.panels.discordLink')} quiet>
                         <div className="space-y-4 pt-2">
                             {discordLoading ? (
                                 <div className="flex items-center gap-3 py-4 opacity-50">
@@ -995,7 +996,7 @@ function SettingsPage({
                 {/* Feedback Section */}
                 <section>
                     <HUDSectionTitle number="05">{t('settings.sections.diagnostics')}</HUDSectionTitle>
-                    <div className="flex gap-4 items-center p-4 border border-white/10 bg-white/5 rounded-sm">
+                    <div className="flex gap-4 items-center p-4 border border-white/5 bg-black/15 rounded-sm">
                         <div className="flex-1">
                              <HUDLabel className="block mb-1">{t('settings.feedback.label')}</HUDLabel>
                              <p className="font-mono text-xs text-white/40">{t('settings.feedback.body')}</p>
@@ -1009,8 +1010,8 @@ function SettingsPage({
         </div>
 
         {/* Floating Action Bar */}
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
-             <div className="bg-black/80 backdrop-blur-md border border-accent-cyan/30 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(0,0,0,0.5)] flex items-center gap-6">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
+             <div className="bg-black/70 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full shadow-[0_0_16px_rgba(0,0,0,0.35)] flex items-center gap-4">
                  <div className="flex items-center gap-2">
                      <div className={`w-2 h-2 rounded-full ${hasChanges ? 'bg-accent-yellow animate-pulse' : 'bg-white/20'}`} />
                      <HUDMicro>{hasChanges ? t('settings.actionBar.unsaved') : t('settings.actionBar.ready')}</HUDMicro>
@@ -1020,7 +1021,7 @@ function SettingsPage({
                     variant="primary" 
                     onClick={handleSave} 
                     disabled={saving || !hasChanges}
-                    className="min-w-[140px]"
+                    className="min-w-[132px] px-4 py-1.5 text-[10px]"
                  >
                      {saving ? t('settings.actionBar.committing') : t('settings.actionBar.apply')}
                  </HUDButton>
