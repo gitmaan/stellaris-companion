@@ -25,6 +25,7 @@ import { HUDInput } from '../components/hud/HUDInput'
 import { HUDButton } from '../components/hud/HUDButton'
 import { HUDSelect } from '../components/hud/HUDForm'
 import { useToast } from '../components/Toast'
+import type { McpRelayHealthResult, McpRelayStatus } from '../global'
 
 /**
  * DISC-017: Convert technical error messages to user-friendly messages.
@@ -104,6 +105,11 @@ function SettingsPage({
   const [languageSaving, setLanguageSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [mcpRelayStatus, setMcpRelayStatus] = useState<McpRelayStatus | null>(null)
+  const [mcpRelayHealth, setMcpRelayHealth] = useState<McpRelayHealthResult | null>(null)
+  const [mcpRelayLoading, setMcpRelayLoading] = useState(false)
+  const [mcpRelayChecking, setMcpRelayChecking] = useState(false)
+  const [mcpRelayInstalling, setMcpRelayInstalling] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -144,6 +150,26 @@ function SettingsPage({
     setHasChanges(hasApiKeyChange || hasPathChange)
   }, [googleApiKey, saveDir, settings])
 
+  useEffect(() => {
+    let cancelled = false
+    const loadMcpRelayStatus = async () => {
+      if (!window.electronAPI?.mcpRelay?.status) return
+      setMcpRelayLoading(true)
+      try {
+        const status = await window.electronAPI.mcpRelay.status()
+        if (!cancelled) setMcpRelayStatus(status)
+      } catch {
+        if (!cancelled) setMcpRelayStatus(null)
+      } finally {
+        if (!cancelled) setMcpRelayLoading(false)
+      }
+    }
+    void loadMcpRelayStatus()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const handleBrowse = async () => {
     const selectedPath = await showFolderDialog()
     if (selectedPath) setSaveDir(selectedPath)
@@ -166,6 +192,79 @@ function SettingsPage({
 
   const handleConnectDiscord = async () => { await connectDiscord() }
   const handleDisconnectDiscord = async () => { await disconnectDiscord() }
+
+  const refreshMcpRelayStatus = async () => {
+    if (!window.electronAPI?.mcpRelay?.status) return null
+    const status = await window.electronAPI.mcpRelay.status()
+    setMcpRelayStatus(status)
+    return status
+  }
+
+  const handleMcpRelayHealthCheck = async () => {
+    if (!window.electronAPI?.mcpRelay?.healthCheck) return
+    setMcpRelayChecking(true)
+    try {
+      const result = await window.electronAPI.mcpRelay.healthCheck()
+      setMcpRelayHealth(result)
+      showToast({
+        type: result.ok ? 'success' : 'error',
+        message: result.ok ? t('settings.mcpRelay.healthSuccess') : result.message,
+        duration: result.ok ? 2200 : 5000,
+      })
+      await refreshMcpRelayStatus()
+    } catch (e) {
+      const message = e instanceof Error ? e.message : t('settings.mcpRelay.healthError')
+      setMcpRelayHealth({ ok: false, message })
+      showToast({ type: 'error', message, duration: 5000 })
+    } finally {
+      setMcpRelayChecking(false)
+    }
+  }
+
+  const handleCopyMcpRelayText = async (text: string | undefined, label: string) => {
+    if (!text || !window.electronAPI?.copyToClipboard) return
+    const result = await window.electronAPI.copyToClipboard(text)
+    showToast({
+      type: result?.success ? 'success' : 'error',
+      message: result?.success
+        ? t('settings.mcpRelay.copySuccess', { target: label })
+        : t('settings.mcpRelay.copyError'),
+      duration: result?.success ? 1800 : 4000,
+    })
+  }
+
+  const handleInstallClaudeDesktop = async () => {
+    if (!window.electronAPI?.mcpRelay?.installClaudeDesktop) return
+    const confirmed = window.confirm(t('settings.mcpRelay.installConfirm'))
+    if (!confirmed) return
+    setMcpRelayInstalling(true)
+    try {
+      const result = await window.electronAPI.mcpRelay.installClaudeDesktop()
+      if (result.status) setMcpRelayStatus(result.status)
+      if (!result.success) {
+        showToast({
+          type: 'error',
+          message: result.error || t('settings.mcpRelay.installError'),
+          duration: 6000,
+        })
+        return
+      }
+      showToast({
+        type: 'success',
+        message: t('settings.mcpRelay.installSuccess'),
+        duration: 2500,
+      })
+      await refreshMcpRelayStatus()
+    } catch (e) {
+      showToast({
+        type: 'error',
+        message: e instanceof Error ? e.message : t('settings.mcpRelay.installError'),
+        duration: 6000,
+      })
+    } finally {
+      setMcpRelayInstalling(false)
+    }
+  }
 
   const [retrying, setRetrying] = useState(false)
   const handleUiScaleChange = async (rawValue: string) => {
@@ -361,6 +460,18 @@ function SettingsPage({
 
   const modelRoutingHelper = (mode: ModelRoutingMode) =>
     t(`settings.modelRouting.${mode === 'quality_first' ? 'qualityFirstHelp' : 'conserveHelp'}`)
+
+  const mcpRelayReady = Boolean(mcpRelayStatus?.databaseExists)
+  const mcpRelayConfigured = Boolean(mcpRelayStatus?.claudeDesktop?.configured)
+  const mcpRelayCurrent = Boolean(mcpRelayStatus?.claudeDesktop?.current)
+  const mcpRelayStatusLabel = mcpRelayLoading
+    ? t('settings.mcpRelay.loading')
+    : mcpRelayReady
+      ? t('settings.mcpRelay.ready')
+      : t('settings.mcpRelay.noDatabase')
+  const claudeDesktopStatusLabel = mcpRelayConfigured
+    ? (mcpRelayCurrent ? t('settings.mcpRelay.installed') : t('settings.mcpRelay.installedNeedsRefresh'))
+    : t('settings.mcpRelay.notInstalled')
 
   if (loading) {
     return (
@@ -588,10 +699,119 @@ function SettingsPage({
 
             {/* Column 2: Comms & Feedback */}
             <div className="space-y-8">
+                {/* MCP Relay Section */}
+                <section>
+                    <HUDSectionTitle number="03">{t('settings.sections.mcpRelay')}</HUDSectionTitle>
+                    <HUDPanel
+                      decoration="tech"
+                      variant={mcpRelayReady ? 'primary' : 'secondary'}
+                      title={t('settings.panels.mcpRelay')}
+                    >
+                        <div className="space-y-4 pt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="border border-white/10 bg-black/20 p-3 rounded-sm">
+                                    <HUDMicro className="block text-white/35">{t('settings.mcpRelay.relay')}</HUDMicro>
+                                    <div className={`mt-1 font-display text-sm tracking-wider ${mcpRelayReady ? 'text-accent-green' : 'text-accent-yellow'}`}>
+                                      {mcpRelayStatusLabel}
+                                    </div>
+                                </div>
+                                <div className="border border-white/10 bg-black/20 p-3 rounded-sm">
+                                    <HUDMicro className="block text-white/35">{t('settings.mcpRelay.claudeDesktop')}</HUDMicro>
+                                    <div className={`mt-1 font-display text-sm tracking-wider ${mcpRelayConfigured ? 'text-accent-green' : 'text-text-secondary'}`}>
+                                      {claudeDesktopStatusLabel}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="border border-white/10 bg-white/5 p-3 rounded-sm space-y-2">
+                                <div className="flex items-center justify-between gap-3">
+                                  <HUDLabel>{t('settings.mcpRelay.localEndpoint')}</HUDLabel>
+                                  <HUDMicro>{mcpRelayStatus?.language?.toUpperCase() || 'EN'}</HUDMicro>
+                                </div>
+                                <p className="font-mono text-[10px] leading-relaxed text-white/45 break-all">
+                                  {mcpRelayStatus?.dbPath || t('settings.mcpRelay.loading')}
+                                </p>
+                                {mcpRelayHealth && (
+                                  <p className={`font-mono text-[10px] leading-relaxed ${mcpRelayHealth.ok ? 'text-accent-green' : 'text-accent-red'}`}>
+                                    {mcpRelayHealth.message}
+                                  </p>
+                                )}
+                                {mcpRelayStatus?.claudeDesktop?.error && (
+                                  <p className="font-mono text-[10px] leading-relaxed text-accent-red">
+                                    {mcpRelayStatus.claudeDesktop.error}
+                                  </p>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <HUDButton
+                                  variant="secondary"
+                                  onClick={() => void handleMcpRelayHealthCheck()}
+                                  disabled={mcpRelayChecking}
+                                  className="px-3 text-[9px]"
+                                >
+                                  {mcpRelayChecking ? t('settings.mcpRelay.checking') : t('settings.mcpRelay.runCheck')}
+                                </HUDButton>
+                                <HUDButton
+                                  variant="primary"
+                                  onClick={() => void handleInstallClaudeDesktop()}
+                                  disabled={mcpRelayInstalling || !mcpRelayStatus}
+                                  className="px-3 text-[9px]"
+                                >
+                                  {mcpRelayInstalling ? t('settings.mcpRelay.installing') : t('settings.mcpRelay.installClaude')}
+                                </HUDButton>
+                                <HUDButton
+                                  variant="secondary"
+                                  onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.claudeDesktop, 'Claude Desktop')}
+                                  disabled={!mcpRelayStatus}
+                                  className="px-3 text-[9px]"
+                                >
+                                  {t('settings.mcpRelay.copyClaude')}
+                                </HUDButton>
+                                <HUDButton
+                                  variant="secondary"
+                                  onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.claudeCode, 'Claude Code')}
+                                  disabled={!mcpRelayStatus}
+                                  className="px-3 text-[9px]"
+                                >
+                                  {t('settings.mcpRelay.copyClaudeCode')}
+                                </HUDButton>
+                                <HUDButton
+                                  variant="secondary"
+                                  onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.codex, 'Codex')}
+                                  disabled={!mcpRelayStatus}
+                                  className="px-3 text-[9px]"
+                                >
+                                  {t('settings.mcpRelay.copyCodex')}
+                                </HUDButton>
+                                <HUDButton
+                                  variant="secondary"
+                                  onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.genericJson, 'MCP JSON')}
+                                  disabled={!mcpRelayStatus}
+                                  className="px-3 text-[9px]"
+                                >
+                                  {t('settings.mcpRelay.copyMcpJson')}
+                                </HUDButton>
+                                <HUDButton
+                                  variant="ghost"
+                                  onClick={() => void window.electronAPI?.mcpRelay?.openClaudeConfigFolder?.()}
+                                  disabled={!mcpRelayStatus?.claudeDesktop?.configPath}
+                                  className="px-3 text-[9px]"
+                                >
+                                  {t('settings.mcpRelay.revealConfig')}
+                                </HUDButton>
+                            </div>
+
+                            <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                              {t('settings.mcpRelay.privacy')}
+                            </HUDMicro>
+                        </div>
+                    </HUDPanel>
+                </section>
                 
                 {/* Discord Section */}
                 <section>
-                    <HUDSectionTitle number="03">{t('settings.sections.communications')}</HUDSectionTitle>
+                    <HUDSectionTitle number="04">{t('settings.sections.communications')}</HUDSectionTitle>
                     <HUDPanel decoration="scanline" variant={discordStatus?.connected ? 'primary' : 'secondary'} title={t('settings.panels.discordLink')}>
                         <div className="space-y-4 pt-2">
                             {discordLoading ? (
@@ -665,7 +885,7 @@ function SettingsPage({
 
                 {/* Feedback Section */}
                 <section>
-                    <HUDSectionTitle number="04">{t('settings.sections.diagnostics')}</HUDSectionTitle>
+                    <HUDSectionTitle number="05">{t('settings.sections.diagnostics')}</HUDSectionTitle>
                     <div className="flex gap-4 items-center p-4 border border-white/10 bg-white/5 rounded-sm">
                         <div className="flex-1">
                              <HUDLabel className="block mb-1">{t('settings.feedback.label')}</HUDLabel>

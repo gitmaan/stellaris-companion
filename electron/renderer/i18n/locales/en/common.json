@@ -221,12 +221,14 @@
     "sections": {
       "intelligence": "INTELLIGENCE UPLINK",
       "data": "DATA INGESTION",
+      "mcpRelay": "MCP RELAY",
       "communications": "COMMUNICATIONS RELAY",
       "diagnostics": "DIAGNOSTICS"
     },
     "panels": {
       "geminiAccess": "GEMINI MODEL ACCESS",
       "saveSource": "SAVE FILE SOURCE",
+      "mcpRelay": "LOCAL AI CHANNELS",
       "discordLink": "DISCORD LINK"
     },
     "api": {
@@ -274,6 +276,34 @@
       "connect": "CONNECT DISCORD",
       "connecting": "INITIATING...",
       "errorPrefix": "ERR:"
+    },
+    "mcpRelay": {
+      "loading": "SCANNING...",
+      "ready": "READY",
+      "noDatabase": "NO CAMPAIGN CACHE",
+      "installed": "INSTALLED",
+      "installedNeedsRefresh": "REFRESH AVAILABLE",
+      "notInstalled": "NOT INSTALLED",
+      "relay": "RELAY",
+      "claudeDesktop": "CLAUDE DESKTOP",
+      "localEndpoint": "LOCAL ARCHIVE",
+      "runCheck": "RUN CHECK",
+      "checking": "CHECKING...",
+      "installClaude": "INSTALL CLAUDE",
+      "installing": "INSTALLING...",
+      "copyClaude": "COPY CLAUDE",
+      "copyClaudeCode": "COPY CLAUDE CODE",
+      "copyCodex": "COPY CODEX",
+      "copyMcpJson": "COPY MCP JSON",
+      "revealConfig": "REVEAL CONFIG",
+      "privacy": "LOCAL STDIO MCP // NO CLOUD RELAY // CHRONICLE SAVES REQUIRE EXPLICIT USER INTENT",
+      "healthSuccess": "MCP Relay responded successfully.",
+      "healthError": "MCP Relay health check failed.",
+      "copySuccess": "{{target}} setup copied.",
+      "copyError": "Failed to copy setup.",
+      "installConfirm": "Install the Stellaris Companion MCP Relay into Claude Desktop's local config? This will create or update Claude's claude_desktop_config.json file.",
+      "installSuccess": "Claude Desktop MCP Relay installed. Restart Claude Desktop to load it.",
+      "installError": "Failed to install Claude Desktop MCP Relay."
     },
     "feedback": {
       "label": "SYSTEM REPORTING",

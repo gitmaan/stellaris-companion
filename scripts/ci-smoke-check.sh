@@ -15,6 +15,15 @@ die() {
 
 echo "== CI Smoke Check =="
 echo "target=${TARGET}"
+if [[ -n "${PYTHON_BIN:-}" ]]; then
+  command -v "${PYTHON_BIN}" >/dev/null 2>&1 || die "missing Python command: ${PYTHON_BIN}"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN=python3
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN=python
+else
+  die "missing Python command"
+fi
 
 # Renderer output (bundled into app.asar)
 [[ -f "electron/renderer/dist/index.html" ]] || die "missing renderer entrypoint: electron/renderer/dist/index.html"
@@ -26,8 +35,17 @@ fi
 [[ -d "dist-python/stellaris-backend" ]] || die "missing Python bundle dir: dist-python/stellaris-backend/"
 if [[ "${TARGET}" == "windows-x64" ]]; then
   [[ -f "dist-python/stellaris-backend/stellaris-backend.exe" ]] || die "missing Python exe: dist-python/stellaris-backend/stellaris-backend.exe"
+  BACKEND_EXE="dist-python/stellaris-backend/stellaris-backend.exe"
 else
   [[ -f "dist-python/stellaris-backend/stellaris-backend" ]] || die "missing Python executable: dist-python/stellaris-backend/stellaris-backend"
+  BACKEND_EXE="dist-python/stellaris-backend/stellaris-backend"
+fi
+
+"${PYTHON_BIN}" scripts/smoke_mcp_stdio.py "${BACKEND_EXE}" || die "bundled backend did not pass MCP stdio smoke test"
+
+# Claude Desktop MCPB extension package
+if ! find "electron/dist/mcpb" -type f -name "stellaris-companion-mcp-relay-*.mcpb" -print -quit | grep -q .; then
+  die "missing Claude Desktop MCPB package in electron/dist/mcpb/"
 fi
 
 # Rust parser binary (copied into bin/ at repo root)

@@ -26,6 +26,8 @@ const { registerBackendIpcHandlers } = require('./main/ipc/backend')
 const { registerSettingsIpcHandlers } = require('./main/ipc/settings')
 const { registerExportIpcHandlers } = require('./main/ipc/export')
 const { registerAnnouncementsIpcHandlers } = require('./main/ipc/announcements')
+const { registerMcpRelayIpcHandlers } = require('./main/ipc/mcpRelay')
+const { createMcpRelayService } = require('./main/mcpRelay')
 const { createDiscordOAuth } = require('./main/discord/oauth')
 const { createDiscordRelay } = require('./main/discord/relay')
 const { registerDiscordIpcHandlers } = require('./main/ipc/discord')
@@ -1462,6 +1464,19 @@ registerExportIpcHandlers({
   dialog,
   getMainWindow: () => mainWindow,
   app,
+})
+
+const mcpRelayService = createMcpRelayService({
+  app,
+  getPythonPath,
+  getResolvedLanguage: getResolvedLanguageSetting,
+})
+
+registerMcpRelayIpcHandlers({
+  ipcMain,
+  validateSender,
+  shell,
+  mcpRelayService,
 })
 
 // =============================================================================

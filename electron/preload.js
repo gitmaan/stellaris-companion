@@ -56,6 +56,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url) => ipcRenderer.invoke('open-external', { url }),
   exportChronicle: (html, defaultFilename) => ipcRenderer.invoke('export-chronicle', { html, defaultFilename }),
   getBackendLogTail: (opts) => ipcRenderer.invoke('get-backend-log-tail', opts || {}),
+  mcpRelay: {
+    status: () => ipcRenderer.invoke('mcp-relay:status'),
+    healthCheck: () => ipcRenderer.invoke('mcp-relay:health-check'),
+    installClaudeDesktop: () => ipcRenderer.invoke('mcp-relay:install-claude-desktop'),
+    openClaudeConfigFolder: () => ipcRenderer.invoke('mcp-relay:open-claude-config-folder'),
+  },
 
   // Backend (proxied through main process which adds auth header)
   backend: {

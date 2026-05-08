@@ -4,6 +4,8 @@ productName: Stellaris Companion
 directories:
   output: dist
 
+beforePack: scripts/beforePack.js
+
 files:
   - main.js
   - main/**/*
@@ -75,3 +77,6 @@ publish:
   owner: gitmaan
   repo: stellaris-companion
   releaseType: release
+
+releaseInfo:
+  releaseNotesFile: release-notes.md

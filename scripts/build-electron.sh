@@ -14,6 +14,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 echo "Building Electron app..."
+echo "Cleaning previous Electron artifacts..."
+rm -rf electron/dist
 
 # Check if Python backend exists
 if [ ! -d "dist-python" ]; then
@@ -54,6 +56,9 @@ cd ..
 # Build the Electron app
 echo "Running electron-builder..."
 npm run build:electron
+
+echo "Packaging Claude Desktop MCPB extension..."
+npm run build:mcpb
 
 echo "Electron app build complete!"
 echo "Output: electron/dist/"

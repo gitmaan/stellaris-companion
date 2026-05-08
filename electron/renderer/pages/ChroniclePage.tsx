@@ -123,6 +123,7 @@ function ChroniclePage({
   const queuedForceRefreshRef = useRef(false)
   const chronicleRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastAutoSavesRefreshAtRef = useRef(0)
+  const lastFocusChronicleRefreshAtRef = useRef(0)
   const lastSeenIngestionUpdatedAtRef = useRef<number | null>(null)
   const didInitChapterSelectionRef = useRef(false)
   const pendingVisibleChronicleRefreshRef = useRef(false)
@@ -461,10 +462,19 @@ function ChroniclePage({
   }, [isActive, refreshVisibleChronicleAfterResume])
 
   // When the user returns to the app, run one visible refresh so current era
-  // can advance once meaningful new events have accumulated.
+  // can advance and external Chronicle edits saved through MCP are picked up.
   useEffect(() => {
     const handleVisible = () => {
+      const hadPendingRefresh = pendingVisibleChronicleRefreshRef.current
       processPendingVisibleChronicleRefresh()
+      if (hadPendingRefresh) return
+      if (!isActive) return
+      if (!isDocumentVisible()) return
+
+      const now = Date.now()
+      if (now - lastFocusChronicleRefreshAtRef.current < 2000) return
+      lastFocusChronicleRefreshAtRef.current = now
+      void refreshVisibleChronicleAfterResume()
     }
 
     document.addEventListener('visibilitychange', handleVisible)
@@ -473,7 +483,7 @@ function ChroniclePage({
       document.removeEventListener('visibilitychange', handleVisible)
       window.removeEventListener('focus', handleVisible)
     }
-  }, [processPendingVisibleChronicleRefresh])
+  }, [isActive, processPendingVisibleChronicleRefresh, refreshVisibleChronicleAfterResume])
 
   useEffect(() => {
     processPendingVisibleChronicleRefresh()

@@ -1,0 +1,117 @@
+{
+  "manifest_version": "0.3",
+  "name": "stellaris-companion-mcp-relay",
+  "display_name": "Stellaris Companion MCP Relay",
+  "version": "0.0.0",
+  "description": "Connect Claude Desktop to your local Stellaris Companion campaign archive and Chronicle tools.",
+  "long_description": "Stellaris Companion MCP Relay lets Claude Desktop read your local campaign context from Stellaris Companion and help with strategy, recent events, and Chronicle drafting. Chronicle save, update, create, and undo tools are available only when you explicitly ask Claude to save or apply a Chronicle change back to the app. The relay runs locally over stdio and does not edit Stellaris save files.",
+  "author": {
+    "name": "Stellaris Companion"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gitmaan/stellaris-companion"
+  },
+  "homepage": "https://github.com/gitmaan/stellaris-companion",
+  "support": "https://github.com/gitmaan/stellaris-companion/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ],
+      "env": {
+        "STELLARIS_COMPANION_APP_PATH": "${user_config.stellaris_companion_path}",
+        "STELLARIS_COMPANION_USER_DATA_DIR": "${user_config.user_data_dir}",
+        "STELLARIS_COMPANION_LANGUAGE": "${user_config.language}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "get_active_campaign",
+      "description": "Check which Stellaris Companion campaign is currently cached locally."
+    },
+    {
+      "name": "get_strategy_context",
+      "description": "Read a rich Advisor Briefing for strategy questions about the current campaign."
+    },
+    {
+      "name": "get_recent_events",
+      "description": "Read recent local campaign dispatches and notable events."
+    },
+    {
+      "name": "get_empire_briefing",
+      "description": "Read selected sections of the cached empire briefing for follow-up detail."
+    },
+    {
+      "name": "get_cached_chronicle",
+      "description": "Read the cached Chronicle archive without generating new prose."
+    },
+    {
+      "name": "get_chronicle_source_material",
+      "description": "Read source material and style guidance for drafting Chronicle prose in chat."
+    },
+    {
+      "name": "save_chronicle_current_era",
+      "description": "Save a current-era Chronicle draft back to Stellaris Companion after explicit user save intent."
+    },
+    {
+      "name": "update_chronicle_chapter",
+      "description": "Update an existing Chronicle chapter after explicit user save/apply intent."
+    },
+    {
+      "name": "create_chronicle_chapter",
+      "description": "Create a new Chronicle chapter after explicit user create/save intent."
+    },
+    {
+      "name": "undo_chronicle_edit",
+      "description": "Undo the most recent Chronicle edit made through this local MCP relay."
+    }
+  ],
+  "tools_generated": false,
+  "prompts_generated": false,
+  "keywords": [
+    "stellaris",
+    "game",
+    "strategy",
+    "chronicle",
+    "local",
+    "mcp"
+  ],
+  "license": "MIT",
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": [
+      "darwin",
+      "win32"
+    ],
+    "runtimes": {
+      "node": ">=16.0.0"
+    }
+  },
+  "user_config": {
+    "stellaris_companion_path": {
+      "type": "directory",
+      "title": "Stellaris Companion app location",
+      "description": "Optional. Leave blank for the default install location, or select the Stellaris Companion app/folder. Developers can select a local source checkout for testing.",
+      "required": false
+    },
+    "user_data_dir": {
+      "type": "directory",
+      "title": "Stellaris Companion data folder",
+      "description": "Optional. Leave blank unless your Stellaris Companion database is stored somewhere custom.",
+      "required": false
+    },
+    "language": {
+      "type": "string",
+      "title": "Language",
+      "description": "Language code for cached Advisor and Chronicle content.",
+      "default": "en",
+      "required": false
+    }
+  }
+}

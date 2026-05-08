@@ -9,12 +9,13 @@
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
     "dev:renderer": "cd renderer && npm run dev",
     "dev:electron": "NODE_ENV=development electron .",
-    "build": "npm run build:renderer && npm run build:electron",
+    "build": "../scripts/build-all.sh",
     "build:renderer": "cd renderer && npm run build",
     "build:electron": "electron-builder",
+    "build:mcpb": "python3 ../scripts/package_mcpb.py",
     "test:e2e": "npm run build:renderer && playwright test",
     "test:e2e:headed": "npm run build:renderer && playwright test --headed",
-    "publish": "npm run build:renderer && electron-builder --publish always",
+    "publish": "../scripts/publish-electron.sh",
     "start": "electron ."
   },
   "dependencies": {

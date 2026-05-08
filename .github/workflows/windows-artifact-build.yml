@@ -71,6 +71,10 @@ jobs:
           VITE_REPORT_ENDPOINT: ${{ vars.VITE_REPORT_ENDPOINT }}
         run: npm run build
 
+      - name: Package Claude Desktop MCPB
+        working-directory: electron
+        run: npm run build:mcpb
+
       - name: CI smoke check (packaging inputs)
         shell: bash
         run: |
@@ -90,5 +94,6 @@ jobs:
             electron/dist/*.exe
             electron/dist/*.blockmap
             electron/dist/latest*.yml
+            electron/dist/mcpb/*.mcpb
           if-no-files-found: error
           retention-days: 14

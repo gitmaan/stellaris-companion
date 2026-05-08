@@ -26,6 +26,9 @@ dependencies = [
     "orjson>=3.9.0",
 ]
 
+[project.scripts]
+stellaris-companion-mcp = "backend.mcp.server:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",

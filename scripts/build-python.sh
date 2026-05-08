@@ -14,6 +14,17 @@ cd "$PROJECT_ROOT"
 
 echo "Building Python backend..."
 
+if [ -n "${PYTHON_BIN:-}" ]; then
+    :
+elif command -v python3 &> /dev/null; then
+    PYTHON_BIN=python3
+elif command -v python &> /dev/null; then
+    PYTHON_BIN=python
+else
+    echo "Error: Python not found"
+    exit 1
+fi
+
 # Check for virtual environment
 if [ -d "venv" ]; then
     echo "Activating virtual environment..."
@@ -23,7 +34,7 @@ fi
 # Check if PyInstaller is installed
 if ! command -v pyinstaller &> /dev/null; then
     echo "PyInstaller not found. Installing..."
-    pip install pyinstaller
+    "$PYTHON_BIN" -m pip install pyinstaller
 fi
 
 # Clean previous build artifacts
@@ -41,6 +52,8 @@ echo "Moving output to dist-python..."
 mkdir -p dist-python
 if [ -d "dist/stellaris-backend" ]; then
     mv dist/stellaris-backend dist-python/
+    echo "Writing backend build metadata..."
+    "$PYTHON_BIN" scripts/backend_build_info.py stamp dist-python/stellaris-backend
     echo "Built: dist-python/stellaris-backend/"
 else
     echo "Error: Build output not found"

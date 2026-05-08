@@ -123,6 +123,23 @@ Examples:
         default=None,
         help="Parent process PID (when launched by Electron). If the parent exits, this backend will exit too.",
     )
+    parser.add_argument(
+        "--mcp",
+        action="store_true",
+        help="Run the local MCP stdio server instead of the Electron HTTP backend.",
+    )
+    parser.add_argument(
+        "--db-path",
+        type=str,
+        default=None,
+        help="History database path to use with --mcp (defaults to STELLARIS_DB_PATH or stellaris_history.db).",
+    )
+    parser.add_argument(
+        "--language",
+        type=str,
+        default="en",
+        help="Language scope to use with --mcp cached content (default: en).",
+    )
     return parser.parse_args()
 
 
@@ -398,6 +415,15 @@ def validate_environment() -> None:
 def main() -> None:
     """Main entry point for the Electron backend."""
     args = parse_args()
+
+    if args.mcp:
+        from backend.mcp.server import run_stdio_server
+
+        run_stdio_server(
+            db_path=args.db_path,
+            language=args.language,
+        )
+        return
 
     logger.info("Stellaris Companion Electron Backend starting...")
 

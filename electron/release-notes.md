@@ -1,0 +1,4 @@
+- Added MCP Relay so Claude Desktop and other local MCP clients can read your current campaign context.
+- Added Chronicle save, edit, create, and undo support for external drafts after you explicitly choose to save them.
+- Added a Settings health check and setup helpers for local AI clients.
+- Improved packaged build checks so stale backends are caught before release.

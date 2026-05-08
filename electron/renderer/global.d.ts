@@ -20,6 +20,58 @@ import type {
 } from './hooks/useBackend'
 import type { ChronicleRefreshMode, ModelRoutingMode } from './hooks/useSettings'
 
+export interface McpRelayHealthResult {
+  ok: boolean
+  message: string
+  durationMs?: number
+  toolCount?: number
+  toolNames?: string[]
+  stderr?: string
+}
+
+export interface McpRelayStatus {
+  serverName: string
+  dbPath: string
+  databaseExists: boolean
+  logDir: string
+  language: string
+  command: string
+  args: string[]
+  env: Record<string, string>
+  snippets: {
+    claudeDesktop: string
+    claudeCode: string
+    codex: string
+    genericJson: string
+  }
+  claudeDesktop: {
+    configPath: string
+    configExists: boolean
+    configured: boolean
+    current?: boolean
+    serverName?: string | null
+    error?: string | null
+    mcpb?: {
+      settingsDir: string
+      configPath: string | null
+      configExists: boolean
+      configured: boolean
+      current?: boolean
+      enabled?: boolean
+      appPath?: string | null
+      error?: string | null
+    }
+  }
+}
+
+export interface McpRelayInstallResult {
+  success: boolean
+  configPath?: string
+  serverName?: string
+  error?: string
+  status?: McpRelayStatus
+}
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -73,6 +125,12 @@ declare global {
       openExternal: (url: string) => Promise<{ success: boolean }>
       exportChronicle: (html: string, defaultFilename: string) => Promise<{ success: boolean; filePath?: string; error?: string } | null>
       getBackendLogTail: (opts?: { maxBytes?: number }) => Promise<{ ok: true; data: string } | { ok: false; error: string }>
+      mcpRelay: {
+        status: () => Promise<McpRelayStatus>
+        healthCheck: () => Promise<McpRelayHealthResult>
+        installClaudeDesktop: () => Promise<McpRelayInstallResult>
+        openClaudeConfigFolder: () => Promise<{ success: boolean }>
+      }
       // Backend status events
       onBackendStatus: (callback: (status: BackendStatusEvent) => void) => () => void
       // Updates
