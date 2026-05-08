@@ -156,7 +156,7 @@ const store = new Store({
     uiScale: 1,
     uiTheme: 'stellaris-cyan',
     chronicleRefreshMode: 'balanced',
-    modelRoutingMode: 'quality_first',
+    modelRoutingMode: 'conserve',
     language: 'system',
     hasCompletedOnboarding: false,
     // Window state persistence
@@ -225,7 +225,7 @@ const DEFAULT_UI_THEME = 'stellaris-cyan'
 const CHRONICLE_REFRESH_MODE_PRESETS = ['balanced', 'enhanced']
 const DEFAULT_CHRONICLE_REFRESH_MODE = 'balanced'
 const MODEL_ROUTING_MODE_PRESETS = ['quality_first', 'conserve']
-const DEFAULT_MODEL_ROUTING_MODE = 'quality_first'
+const DEFAULT_MODEL_ROUTING_MODE = 'conserve'
 const LANGUAGE_PRESETS = ['system', 'en', 'de', 'fr', 'es', 'pt-BR', 'ja', 'zh-Hans', 'en-XA']
 const DEFAULT_LANGUAGE = 'system'
 const DEFAULT_RESOLVED_LANGUAGE = 'en'

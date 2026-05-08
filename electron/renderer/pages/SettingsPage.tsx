@@ -66,6 +66,18 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'command-amber': 'Command Amber',
 }
 
+type GeminiQuotaMode = 'standard' | 'higher'
+
+const GEMINI_QUOTA_MODES: GeminiQuotaMode[] = ['standard', 'higher']
+
+function quotaModeToRoutingMode(mode: GeminiQuotaMode): ModelRoutingMode {
+  return mode === 'higher' ? 'quality_first' : 'conserve'
+}
+
+function routingModeToQuotaMode(mode: ModelRoutingMode): GeminiQuotaMode {
+  return mode === 'quality_first' ? 'higher' : 'standard'
+}
+
 function SettingsPage({
   onReportIssue,
   onThemeChange,
@@ -390,6 +402,10 @@ function SettingsPage({
     })
   }
 
+  const handleGeminiQuotaModeChange = async (nextQuotaMode: GeminiQuotaMode) => {
+    await handleModelRoutingModeChange(quotaModeToRoutingMode(nextQuotaMode))
+  }
+
   const handleLanguageChange = async (rawValue: string) => {
     const nextLanguage = normalizeLanguage(rawValue)
     if (nextLanguage === language) return
@@ -461,17 +477,32 @@ function SettingsPage({
   const modelRoutingHelper = (mode: ModelRoutingMode) =>
     t(`settings.modelRouting.${mode === 'quality_first' ? 'qualityFirstHelp' : 'conserveHelp'}`)
 
+  const geminiQuotaMode = routingModeToQuotaMode(modelRoutingMode)
+  const geminiQuotaLabel = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}`)
+  const geminiQuotaTag = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}Tag`)
+  const geminiQuotaHelper = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}Help`)
+
   const mcpRelayReady = Boolean(mcpRelayStatus?.databaseExists)
   const mcpRelayConfigured = Boolean(mcpRelayStatus?.claudeDesktop?.configured)
   const mcpRelayCurrent = Boolean(mcpRelayStatus?.claudeDesktop?.current)
-  const mcpRelayStatusLabel = mcpRelayLoading
-    ? t('settings.mcpRelay.loading')
+  const mcpRelaySummary = mcpRelayLoading
+    ? t('settings.mcpRelay.loadingSummary')
     : mcpRelayReady
-      ? t('settings.mcpRelay.ready')
-      : t('settings.mcpRelay.noDatabase')
+      ? t('settings.mcpRelay.readySummary')
+      : t('settings.mcpRelay.noDatabaseSummary')
   const claudeDesktopStatusLabel = mcpRelayConfigured
     ? (mcpRelayCurrent ? t('settings.mcpRelay.installed') : t('settings.mcpRelay.installedNeedsRefresh'))
     : t('settings.mcpRelay.notInstalled')
+  const claudeDesktopStatusClass = mcpRelayConfigured
+    ? (mcpRelayCurrent ? 'text-accent-green' : 'text-accent-yellow')
+    : 'text-text-secondary'
+  const claudeDesktopActionLabel = mcpRelayInstalling
+    ? t('settings.mcpRelay.installing')
+    : mcpRelayCurrent
+      ? t('settings.mcpRelay.claudeConnected')
+      : mcpRelayConfigured
+        ? t('settings.mcpRelay.updateClaude')
+        : t('settings.mcpRelay.connectClaude')
 
   if (loading) {
     return (
@@ -587,23 +618,26 @@ function SettingsPage({
                              </div>
                              <div className="border-t border-white/10 pt-4 space-y-3">
                                  <div className="flex items-center justify-between gap-3">
-                                     <HUDLabel>{t('settings.modelRouting.label')}</HUDLabel>
+                                     <HUDLabel>{t('settings.geminiQuota.label')}</HUDLabel>
                                      {modelRoutingModeSaving && (
                                        <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
                                      )}
                                  </div>
+                                 <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                   {t('settings.geminiQuota.description')}
+                                 </HUDMicro>
 
                                  <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
-                                   {(['quality_first', 'conserve'] as const).map((mode) => {
-                                     const isSelected = modelRoutingMode === mode
+                                   {GEMINI_QUOTA_MODES.map((mode) => {
+                                     const isSelected = geminiQuotaMode === mode
                                      return (
                                        <button
                                          key={mode}
                                          type="button"
                                          disabled={modelRoutingModeSaving}
                                          aria-pressed={isSelected}
-                                         aria-label={t('settings.modelRouting.toastSuccess', { mode: modelRoutingLabel(mode) })}
-                                         onClick={() => void handleModelRoutingModeChange(mode)}
+                                         aria-label={t('settings.geminiQuota.aria', { mode: geminiQuotaLabel(mode) })}
+                                         onClick={() => void handleGeminiQuotaModeChange(mode)}
                                          className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
                                            isSelected
                                              ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
@@ -611,10 +645,10 @@ function SettingsPage({
                                          } disabled:opacity-50 disabled:cursor-not-allowed`}
                                        >
                                          <div className="font-display text-[11px] uppercase tracking-[0.18em]">
-                                           {modelRoutingLabel(mode)}
+                                           {geminiQuotaLabel(mode)}
                                          </div>
                                          <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
-                                           {mode === 'quality_first' ? 'FLASH FIRST' : 'FLASH-LITE ADVISOR'}
+                                           {geminiQuotaTag(mode)}
                                          </div>
                                        </button>
                                      )
@@ -622,49 +656,106 @@ function SettingsPage({
                                  </div>
 
                                  <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
-                                   {modelRoutingHelper(modelRoutingMode)}
+                                   {geminiQuotaHelper(geminiQuotaMode)}
                                  </HUDMicro>
-                             </div>
 
-                             <div className="border-t border-white/10 pt-4 space-y-3">
-                                 <div className="flex items-center justify-between gap-3">
-                                     <HUDLabel>{t('settings.chronicleRefresh.label')}</HUDLabel>
-                                     {chronicleRefreshModeSaving && (
-                                       <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
-                                     )}
-                                 </div>
+                                 <details className="group border-t border-white/10 pt-3">
+                                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm border border-white/10 bg-black/20 px-3 py-2 font-display text-[10px] uppercase tracking-[0.18em] text-text-secondary transition-all duration-200 hover:border-accent-cyan/40 hover:bg-accent-cyan/5 hover:text-accent-cyan">
+                                     <span className="flex items-center gap-2">
+                                       <span className="transition-transform duration-200 group-open:rotate-90">&gt;</span>
+                                       <span className="group-open:hidden">{t('settings.geminiQuota.showAdvanced')}</span>
+                                       <span className="hidden group-open:inline">{t('settings.geminiQuota.hideAdvanced')}</span>
+                                     </span>
+                                     <span className="font-mono text-[9px] tracking-[0.12em] text-white/35">
+                                       {t('settings.geminiQuota.optional')}
+                                     </span>
+                                   </summary>
+                                   <div className="mt-3 space-y-4">
+                                     <div className="space-y-3">
+                                       <div className="flex items-center justify-between gap-3">
+                                         <HUDLabel>{t('settings.modelRouting.label')}</HUDLabel>
+                                         {modelRoutingModeSaving && (
+                                           <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
+                                         )}
+                                       </div>
 
-                                 <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
-                                   {(['balanced', 'enhanced'] as const).map((mode) => {
-                                     const isSelected = chronicleRefreshMode === mode
-                                     return (
-                                       <button
-                                         key={mode}
-                                         type="button"
-                                         disabled={chronicleRefreshModeSaving}
-                                         aria-pressed={isSelected}
-                                         aria-label={t('settings.chronicleRefresh.aria', { mode: chronicleModeLabel(mode) })}
-                                         onClick={() => void handleChronicleRefreshModeChange(mode)}
-                                         className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
-                                           isSelected
-                                             ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
-                                             : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
-                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                       >
-                                         <div className="font-display text-[11px] uppercase tracking-[0.18em]">
-                                           {chronicleModeLabel(mode)}
-                                         </div>
-                                         <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
-                                           {mode === 'balanced' ? t('settings.chronicleRefresh.balancedTag') : t('settings.chronicleRefresh.enhancedTag')}
-                                         </div>
-                                       </button>
-                                     )
-                                   })}
-                                 </div>
+                                       <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
+                                         {(['quality_first', 'conserve'] as const).map((mode) => {
+                                           const isSelected = modelRoutingMode === mode
+                                           return (
+                                             <button
+                                               key={mode}
+                                               type="button"
+                                               disabled={modelRoutingModeSaving}
+                                               aria-pressed={isSelected}
+                                               aria-label={t('settings.modelRouting.toastSuccess', { mode: modelRoutingLabel(mode) })}
+                                               onClick={() => void handleModelRoutingModeChange(mode)}
+                                               className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
+                                                 isSelected
+                                                   ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
+                                                   : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
+                                               } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                             >
+                                               <div className="font-display text-[11px] uppercase tracking-[0.18em]">
+                                                 {modelRoutingLabel(mode)}
+                                               </div>
+                                               <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
+                                                 {mode === 'quality_first'
+                                                   ? t('settings.modelRouting.qualityFirstTag')
+                                                   : t('settings.modelRouting.conserveTag')}
+                                               </div>
+                                             </button>
+                                           )
+                                         })}
+                                       </div>
 
-                                 <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
-                                   {chronicleModeHelper(chronicleRefreshMode)}
-                                 </HUDMicro>
+                                       <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                         {modelRoutingHelper(modelRoutingMode)}
+                                       </HUDMicro>
+                                     </div>
+
+                                     <div className="space-y-3">
+                                       <div className="flex items-center justify-between gap-3">
+                                         <HUDLabel>{t('settings.chronicleRefresh.label')}</HUDLabel>
+                                         {chronicleRefreshModeSaving && (
+                                           <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
+                                         )}
+                                       </div>
+
+                                       <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
+                                         {(['balanced', 'enhanced'] as const).map((mode) => {
+                                           const isSelected = chronicleRefreshMode === mode
+                                           return (
+                                             <button
+                                               key={mode}
+                                               type="button"
+                                               disabled={chronicleRefreshModeSaving}
+                                               aria-pressed={isSelected}
+                                               aria-label={t('settings.chronicleRefresh.aria', { mode: chronicleModeLabel(mode) })}
+                                               onClick={() => void handleChronicleRefreshModeChange(mode)}
+                                               className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
+                                                 isSelected
+                                                   ? 'border border-accent-cyan/60 bg-accent-cyan/12 text-accent-cyan shadow-glow-sm'
+                                                   : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
+                                               } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                             >
+                                               <div className="font-display text-[11px] uppercase tracking-[0.18em]">
+                                                 {chronicleModeLabel(mode)}
+                                               </div>
+                                               <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
+                                                 {mode === 'balanced' ? t('settings.chronicleRefresh.balancedTag') : t('settings.chronicleRefresh.enhancedTag')}
+                                               </div>
+                                             </button>
+                                           )
+                                         })}
+                                       </div>
+
+                                       <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                         {chronicleModeHelper(chronicleRefreshMode)}
+                                       </HUDMicro>
+                                     </div>
+                                   </div>
+                                 </details>
                              </div>
                         </div>
                     </HUDPanel>
@@ -708,34 +799,16 @@ function SettingsPage({
                       title={t('settings.panels.mcpRelay')}
                     >
                         <div className="space-y-4 pt-2">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="border border-white/10 bg-black/20 p-3 rounded-sm">
-                                    <HUDMicro className="block text-white/35">{t('settings.mcpRelay.relay')}</HUDMicro>
-                                    <div className={`mt-1 font-display text-sm tracking-wider ${mcpRelayReady ? 'text-accent-green' : 'text-accent-yellow'}`}>
-                                      {mcpRelayStatusLabel}
-                                    </div>
-                                </div>
-                                <div className="border border-white/10 bg-black/20 p-3 rounded-sm">
-                                    <HUDMicro className="block text-white/35">{t('settings.mcpRelay.claudeDesktop')}</HUDMicro>
-                                    <div className={`mt-1 font-display text-sm tracking-wider ${mcpRelayConfigured ? 'text-accent-green' : 'text-text-secondary'}`}>
-                                      {claudeDesktopStatusLabel}
-                                    </div>
-                                </div>
-                            </div>
-
                             <div className="border border-white/10 bg-white/5 p-3 rounded-sm space-y-2">
                                 <div className="flex items-center justify-between gap-3">
-                                  <HUDLabel>{t('settings.mcpRelay.localEndpoint')}</HUDLabel>
-                                  <HUDMicro>{mcpRelayStatus?.language?.toUpperCase() || 'EN'}</HUDMicro>
+                                  <HUDLabel>{t('settings.mcpRelay.claudeDesktop')}</HUDLabel>
+                                  <div className={`font-display text-[11px] tracking-wider ${claudeDesktopStatusClass}`}>
+                                    {claudeDesktopStatusLabel}
+                                  </div>
                                 </div>
-                                <p className="font-mono text-[10px] leading-relaxed text-white/45 break-all">
-                                  {mcpRelayStatus?.dbPath || t('settings.mcpRelay.loading')}
+                                <p className="font-mono text-[10px] leading-relaxed text-white/45">
+                                  {mcpRelaySummary}
                                 </p>
-                                {mcpRelayHealth && (
-                                  <p className={`font-mono text-[10px] leading-relaxed ${mcpRelayHealth.ok ? 'text-accent-green' : 'text-accent-red'}`}>
-                                    {mcpRelayHealth.message}
-                                  </p>
-                                )}
                                 {mcpRelayStatus?.claudeDesktop?.error && (
                                   <p className="font-mono text-[10px] leading-relaxed text-accent-red">
                                     {mcpRelayStatus.claudeDesktop.error}
@@ -743,38 +816,14 @@ function SettingsPage({
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <HUDButton
-                                  variant="secondary"
-                                  onClick={() => void handleMcpRelayHealthCheck()}
-                                  disabled={mcpRelayChecking}
-                                  className="px-3 text-[9px]"
-                                >
-                                  {mcpRelayChecking ? t('settings.mcpRelay.checking') : t('settings.mcpRelay.runCheck')}
-                                </HUDButton>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <HUDButton
                                   variant="primary"
                                   onClick={() => void handleInstallClaudeDesktop()}
-                                  disabled={mcpRelayInstalling || !mcpRelayStatus}
+                                  disabled={mcpRelayInstalling || !mcpRelayStatus || mcpRelayCurrent}
                                   className="px-3 text-[9px]"
                                 >
-                                  {mcpRelayInstalling ? t('settings.mcpRelay.installing') : t('settings.mcpRelay.installClaude')}
-                                </HUDButton>
-                                <HUDButton
-                                  variant="secondary"
-                                  onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.claudeDesktop, 'Claude Desktop')}
-                                  disabled={!mcpRelayStatus}
-                                  className="px-3 text-[9px]"
-                                >
-                                  {t('settings.mcpRelay.copyClaude')}
-                                </HUDButton>
-                                <HUDButton
-                                  variant="secondary"
-                                  onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.claudeCode, 'Claude Code')}
-                                  disabled={!mcpRelayStatus}
-                                  className="px-3 text-[9px]"
-                                >
-                                  {t('settings.mcpRelay.copyClaudeCode')}
+                                  {claudeDesktopActionLabel}
                                 </HUDButton>
                                 <HUDButton
                                   variant="secondary"
@@ -782,29 +831,89 @@ function SettingsPage({
                                   disabled={!mcpRelayStatus}
                                   className="px-3 text-[9px]"
                                 >
-                                  {t('settings.mcpRelay.copyCodex')}
-                                </HUDButton>
-                                <HUDButton
-                                  variant="secondary"
-                                  onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.genericJson, 'MCP JSON')}
-                                  disabled={!mcpRelayStatus}
-                                  className="px-3 text-[9px]"
-                                >
-                                  {t('settings.mcpRelay.copyMcpJson')}
-                                </HUDButton>
-                                <HUDButton
-                                  variant="ghost"
-                                  onClick={() => void window.electronAPI?.mcpRelay?.openClaudeConfigFolder?.()}
-                                  disabled={!mcpRelayStatus?.claudeDesktop?.configPath}
-                                  className="px-3 text-[9px]"
-                                >
-                                  {t('settings.mcpRelay.revealConfig')}
+                                  {t('settings.mcpRelay.copyCodexSetup')}
                                 </HUDButton>
                             </div>
 
-                            <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
-                              {t('settings.mcpRelay.privacy')}
-                            </HUDMicro>
+                            <div className="border-t border-white/10 pt-3 space-y-1">
+                              <HUDLabel>{t('settings.mcpRelay.otherApps')}</HUDLabel>
+                              <HUDMicro className="block leading-relaxed text-white/45 normal-case tracking-[0.08em]">
+                                {t('settings.mcpRelay.otherAppsHelp')}
+                              </HUDMicro>
+                            </div>
+
+                            <details className="group">
+                              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm border border-white/10 bg-black/20 px-3 py-2 font-display text-[10px] uppercase tracking-[0.18em] text-text-secondary transition-all duration-200 hover:border-accent-cyan/40 hover:bg-accent-cyan/5 hover:text-accent-cyan">
+                                <span className="flex items-center gap-2">
+                                  <span className="transition-transform duration-200 group-open:rotate-90">&gt;</span>
+                                  <span className="group-open:hidden">{t('settings.mcpRelay.showAdvancedSetup')}</span>
+                                  <span className="hidden group-open:inline">{t('settings.mcpRelay.hideAdvancedSetup')}</span>
+                                </span>
+                                <span className="font-mono text-[9px] tracking-[0.12em] text-white/35">
+                                  {t('settings.mcpRelay.optional')}
+                                </span>
+                              </summary>
+                              <div className="mt-3 space-y-3">
+                                <div className="border border-white/10 bg-black/20 p-3 rounded-sm space-y-2">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <HUDLabel>{t('settings.mcpRelay.localEndpoint')}</HUDLabel>
+                                    <HUDMicro>{mcpRelayStatus?.language?.toUpperCase() || 'EN'}</HUDMicro>
+                                  </div>
+                                  <p className="font-mono text-[10px] leading-relaxed text-white/45 break-all">
+                                    {mcpRelayStatus?.dbPath || t('settings.mcpRelay.loading')}
+                                  </p>
+                                  {mcpRelayHealth && (
+                                    <p className={`font-mono text-[10px] leading-relaxed ${mcpRelayHealth.ok ? 'text-accent-green' : 'text-accent-red'}`}>
+                                      {mcpRelayHealth.message}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <HUDButton
+                                    variant="secondary"
+                                    onClick={() => void handleMcpRelayHealthCheck()}
+                                    disabled={mcpRelayChecking}
+                                    className="px-3 text-[9px]"
+                                  >
+                                    {mcpRelayChecking ? t('settings.mcpRelay.checking') : t('settings.mcpRelay.runCheck')}
+                                  </HUDButton>
+                                  <HUDButton
+                                    variant="secondary"
+                                    onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.claudeDesktop, 'Claude Desktop')}
+                                    disabled={!mcpRelayStatus}
+                                    className="px-3 text-[9px]"
+                                  >
+                                    {t('settings.mcpRelay.copyClaude')}
+                                  </HUDButton>
+                                  <HUDButton
+                                    variant="secondary"
+                                    onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.claudeCode, 'Claude Code')}
+                                    disabled={!mcpRelayStatus}
+                                    className="px-3 text-[9px]"
+                                  >
+                                    {t('settings.mcpRelay.copyClaudeCode')}
+                                  </HUDButton>
+                                  <HUDButton
+                                    variant="secondary"
+                                    onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.genericJson, 'MCP JSON')}
+                                    disabled={!mcpRelayStatus}
+                                    className="px-3 text-[9px]"
+                                  >
+                                    {t('settings.mcpRelay.copyMcpJson')}
+                                  </HUDButton>
+                                  <HUDButton
+                                    variant="ghost"
+                                    onClick={() => void window.electronAPI?.mcpRelay?.openClaudeConfigFolder?.()}
+                                    disabled={!mcpRelayStatus?.claudeDesktop?.configPath}
+                                    className="col-span-2 px-3 text-[9px]"
+                                  >
+                                    {t('settings.mcpRelay.revealConfig')}
+                                  </HUDButton>
+                                </div>
+                              </div>
+                            </details>
+
                         </div>
                     </HUDPanel>
                 </section>

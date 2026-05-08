@@ -23,6 +23,14 @@ def test_quality_first_routes_flash_then_flash_lite():
     ]
 
 
+def test_default_routes_like_standard_quota():
+    assert route_models_for(mode=None, purpose="advisor") == [GEMINI_FLASH_LITE_MODEL]
+    assert route_models_for(mode=None, purpose="chronicle") == [
+        GEMINI_FLASH_MODEL,
+        GEMINI_FLASH_LITE_MODEL,
+    ]
+
+
 def test_conserve_uses_flash_lite_for_advisor_but_flash_for_chronicle():
     assert route_models_for(mode="conserve", purpose="advisor") == [GEMINI_FLASH_LITE_MODEL]
     assert route_models_for(mode="conserve", purpose="chronicle") == [

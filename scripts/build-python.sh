@@ -42,6 +42,8 @@ echo "Cleaning previous build..."
 rm -rf build/stellaris-backend
 rm -rf dist/stellaris-backend
 rm -rf dist-python
+find backend stellaris_companion stellaris_save_extractor -type d -name __pycache__ -prune -exec rm -rf {} +
+find backend stellaris_companion stellaris_save_extractor -type f -name '*.pyc' -delete
 
 # Run PyInstaller with the spec file
 echo "Running PyInstaller..."

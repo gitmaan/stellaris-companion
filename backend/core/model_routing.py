@@ -19,7 +19,7 @@ GOOGLE_GEMMA_MODEL = "gemma-4-26b-a4b-it"
 
 MODEL_ROUTING_QUALITY_FIRST = "quality_first"
 MODEL_ROUTING_CONSERVE = "conserve"
-DEFAULT_MODEL_ROUTING_MODE = MODEL_ROUTING_QUALITY_FIRST
+DEFAULT_MODEL_ROUTING_MODE = MODEL_ROUTING_CONSERVE
 
 ModelPurpose = Literal["advisor", "chronicle"]
 ModelRoutingMode = Literal["quality_first", "conserve"]

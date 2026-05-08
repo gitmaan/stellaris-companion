@@ -8,7 +8,7 @@ export type ChronicleRefreshMode = (typeof CHRONICLE_REFRESH_MODE_VALUES)[number
 export const DEFAULT_CHRONICLE_REFRESH_MODE: ChronicleRefreshMode = 'balanced'
 export const MODEL_ROUTING_MODE_VALUES = ['quality_first', 'conserve'] as const
 export type ModelRoutingMode = (typeof MODEL_ROUTING_MODE_VALUES)[number]
-export const DEFAULT_MODEL_ROUTING_MODE: ModelRoutingMode = 'quality_first'
+export const DEFAULT_MODEL_ROUTING_MODE: ModelRoutingMode = 'conserve'
 export const LANGUAGE_VALUES = [
   'system',
   'en',
