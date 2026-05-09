@@ -238,7 +238,7 @@ export default function UpdateDialog() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] flex items-center justify-center"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] flex items-center justify-center overflow-y-auto p-4"
         onClick={() => {
           if (!update.installing) handleDismiss()
         }}
@@ -248,7 +248,7 @@ export default function UpdateDialog() {
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-md p-8 bg-bg-secondary border border-border rounded-lg shadow-panel-cyan-update"
+          className="relative w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto p-8 bg-bg-secondary border border-border rounded-lg shadow-panel-cyan-update"
           onClick={e => e.stopPropagation()}
         >
           {/* Corner accents */}

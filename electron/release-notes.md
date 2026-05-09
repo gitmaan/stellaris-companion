@@ -1,4 +1,5 @@
-- Added MCP Relay so Claude Desktop and other local MCP clients can read your current campaign context.
-- Added Chronicle save, edit, create, and undo support for external drafts after you explicitly choose to save them.
-- Added a Settings health check and setup helpers for local AI clients.
-- Improved packaged build checks so stale backends are caught before release.
+- Added MCP Relay so Claude Desktop and other local AI apps can use your latest campaign context for Advisor briefings.
+- Draft, revise, and save Chronicle chapters back into Stellaris Companion when you are ready.
+- Standard quota now routes Advisor chat through Gemini Flash-Lite, giving free-tier users up to 25x more daily Advisor requests under current Gemini limits.
+- Added interface language support for German, Spanish, French, Japanese, Portuguese, and Simplified Chinese.
+- Updated Stellaris 4.3 patch guidance so Advisor responses better reflect current game mechanics.

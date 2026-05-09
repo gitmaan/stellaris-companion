@@ -2,6 +2,17 @@
   "version": 1,
   "announcements": [
     {
+      "id": "release-008-ai-connections-gemini-quota",
+      "severity": "update",
+      "title": "Stellaris Companion 0.8.0 is ready",
+      "body": "Version 0.8.0 adds MCP Relay for Claude Desktop and local AI apps, stretches free Gemini Advisor usage with Flash-Lite routing, adds new interface languages, and updates Advisor guidance for Stellaris 4.3.",
+      "publishedAt": "2026-05-09T00:00:00Z",
+      "link": {
+        "label": "Open Downloads",
+        "url": "https://galacticfilingcabinet.com/#download"
+      }
+    },
+    {
       "id": "windows-004-console-window-fix",
       "severity": "update",
       "title": "Windows Fix: Background Console Window",

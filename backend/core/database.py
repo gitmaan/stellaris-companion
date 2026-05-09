@@ -1171,7 +1171,7 @@ class GameDatabase:
                 SELECT id, captured_at, game_date, event_type, summary, data_json
                 FROM events
                 WHERE session_id = ?
-                ORDER BY game_date ASC, captured_at ASC;
+                ORDER BY game_date ASC, captured_at ASC, id ASC;
                 """,
                 (session_id,),
             ).fetchall()
@@ -1404,7 +1404,7 @@ class GameDatabase:
                 FROM events e
                 JOIN sessions s ON e.session_id = s.id
                 WHERE s.save_id = ?
-                ORDER BY e.game_date ASC, e.captured_at ASC;
+                ORDER BY e.game_date ASC, e.captured_at ASC, e.id ASC;
                 """,
                 (save_id,),
             ).fetchall()
@@ -1493,7 +1493,7 @@ class GameDatabase:
                 FROM events e
                 JOIN sessions s ON e.session_id = s.id
                 WHERE {" AND ".join(conditions)}
-                ORDER BY e.game_date ASC, e.captured_at ASC;
+                ORDER BY e.game_date ASC, e.captured_at ASC, e.id ASC;
             """
             rows = self._conn.execute(query, tuple(params)).fetchall()
             return [dict(r) for r in rows]
