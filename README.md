@@ -16,6 +16,7 @@ Stellaris LLM Companion reads your save, tracks what is changing across time, an
 
 - **Actionable strategy, not generic tips**: Military, economy, diplomacy, leaders, planets, tech, and more.
 - **Chronicle mode**: Turn your campaign into a narrative history with chaptered events.
+- **Local AI app access**: Use the MCP Relay to bring your current campaign context into Claude Desktop, Codex, and other MCP-compatible clients.
 - **In-game workflow**: Ask questions through Discord overlay with `/ask` while you play.
 - **Privacy-first architecture**: Saves stay local. You bring your own API key.
 
@@ -76,6 +77,7 @@ For packaged builds, paste it in **Config** -> **INTELLIGENCE UPLINK**.
 - **History Tracking**: SQLite snapshots detect change between saves.
 - **Chronicle**: AI-generated chaptered narrative from your campaign history.
 - **Auto Save Detection**: Finds your newest save automatically.
+- **MCP Relay**: Connect Claude Desktop, Claude Code, Codex, Cursor, LM Studio, and other MCP-compatible local AI apps to the latest campaign context.
 - **Discord Integration**: Ask `/ask` in-game through Discord overlay.
 
 ## Privacy (Plain English)
@@ -83,8 +85,31 @@ For packaged builds, paste it in **Config** -> **INTELLIGENCE UPLINK**.
 - **Your `.sav` files stay on your machine.**
 - **Local processing by default**: parsing, extraction, and history storage are local.
 - **What leaves your machine**: your question + extracted game context are sent to Gemini using your own key.
+- **MCP client access**: configured local AI apps can read the extracted campaign cache through the MCP Relay.
+- **Chronicle write-back**: MCP clients can save Chronicle edits only through explicit Chronicle save/update tools, and those edits stay in the local Chronicle cache.
 - **Discord relay scope**: relay forwards `/ask` requests/responses between Discord and your local app.
 - **Issue reports are opt-in**: you review what is included before submitting.
+
+## Optional: Local AI Apps / MCP Relay
+
+Stellaris Companion can expose your current campaign context to local AI apps through the Model Context Protocol (MCP). This lets tools like Claude Desktop, Claude Code, Codex, Cursor, LM Studio, and other MCP-compatible clients answer questions using the same local campaign archive as the desktop app.
+
+What the MCP Relay provides:
+
+- **Advisor context**: active campaign status, strategic briefings, economy, military, diplomacy, territory, technology, and recent events.
+- **Chronicle context**: saved Chronicle chapters and source material for drafting new campaign prose.
+- **Chronicle save-back tools**: optional local save/update/create/undo actions for Chronicle text after you explicitly ask the AI client to save changes back to Stellaris Companion.
+
+Setup:
+
+1. Open Stellaris Companion and load or select your Stellaris save folder.
+2. Let the app ingest at least one campaign snapshot.
+3. Go to **Config** -> **AI APP CONNECTIONS**.
+4. For Claude Desktop, use **ADD TO CLAUDE** and restart Claude Desktop.
+5. For other MCP clients, copy the Codex, Claude Code, or generic MCP setup from **SHOW MANUAL MCP SETUP**.
+6. Use **RUN CHECK** if you want to confirm the local MCP server responds before opening your AI client.
+
+The MCP Relay is local-only. It reads the app's local campaign cache and does not include your Gemini API key or raw `.sav` file in MCP output.
 
 ## Optional: Discord Overlay Setup
 
@@ -118,6 +143,8 @@ For GeForce Now / cloud gaming, download your `.sav` from Steam Remote Storage a
 
 ## How It Works
 
+For in-app chat and Discord:
+
 ```text
 User Question
      |
@@ -131,9 +158,12 @@ Complete Briefing JSON (precomputed + cached)
 Strategic response
 ```
 
+The MCP Relay is different: Stellaris Companion exposes structured local campaign context, and the connected MCP client generates the response in its own chat UI.
+
 Main interfaces:
 
 - **Electron app**: primary UI for chat, chronicle, history, settings.
+- **MCP Relay**: local context bridge for Claude Desktop, Codex, and other MCP-compatible AI apps.
 - **Discord**: in-game `/ask` routed through Cloudflare relay to your local app.
 
 ## Perspective & Spoilers
