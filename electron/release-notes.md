@@ -2,4 +2,4 @@
 - Draft, revise, and save Chronicle chapters back into Stellaris Companion when you are ready.
 - Standard quota now routes Advisor chat through Gemini Flash-Lite, giving free-tier users up to 25x more daily Advisor requests under current Gemini limits.
 - Added interface language support for German, Spanish, French, Japanese, Portuguese, and Simplified Chinese.
-- Updated Stellaris 4.3 patch guidance so Advisor responses better reflect current game mechanics.
+- Updated Stellaris 4.3 guidance and fixed in-app issue reporting for release builds.
