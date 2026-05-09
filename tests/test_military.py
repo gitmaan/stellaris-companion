@@ -136,6 +136,38 @@ def test_classify_megastructure_status_uses_live_state_not_stage_suffix():
     assert extractor._normalize_megastructure_display_type("grand_archive_0") == "grand_archive"
 
 
+def test_completed_dyson_swarm_final_stage_is_complete():
+    extractor = DummyMilitaryExtractor()
+
+    assert (
+        extractor._classify_megastructure_status(
+            {"build_queue": "4294967295"},
+            "dyson_swarm_3",
+        )
+        == "complete"
+    )
+
+
+def test_dyson_swarm_upgrading_to_sphere_is_under_construction():
+    extractor = DummyMilitaryExtractor()
+
+    assert (
+        extractor._classify_megastructure_status(
+            {
+                "build_queue": "4294967295",
+                "upgrade": {
+                    "halted": "0",
+                    "indefinitely_halted": "no",
+                    "progress": "488",
+                    "upgrade_to": "dyson_sphere_2",
+                },
+            },
+            "dyson_swarm_3",
+        )
+        == "under_construction"
+    )
+
+
 @pytest.mark.integration
 def test_real_save_battle_stats_match_raw_player_participation(test_save_path):
     from stellaris_companion.rust_bridge import (
