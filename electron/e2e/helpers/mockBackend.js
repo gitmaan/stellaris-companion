@@ -56,7 +56,10 @@ function createMockChronicleBackend(options = {}) {
   let server = null
   let phase = 'initial'
   let healthUpdatedAt = 1_000
+  let publication = null
   const chronicleRequests = []
+  const publicationRequests = []
+  const publishedStoryId = options.publishedStoryId ?? '84b66f39-ccab-4d60-8d50-82b34537cb5d'
   const initialEventsCovered = options.initialEventsCovered ?? 2
   const advancedEventsCovered = options.advancedEventsCovered ?? 5
   const initialNarrative = options.initialNarrative ?? 'Old teaser.'
@@ -146,6 +149,16 @@ function createMockChronicleBackend(options = {}) {
     })
   }
 
+  const publicationPayload = () => ({
+    story_id: publishedStoryId,
+    public_url: `https://galacticfilingcabinet.com/chronicles/${publishedStoryId}`,
+    revision: publication.revision,
+    visibility: publication.visibility,
+    moderation_status: publication.visibility === 'discoverable' ? 'pending' : 'not_required',
+    published_at: publication.publishedAt,
+    updated_at: publication.updatedAt,
+  })
+
   async function handler(req, res) {
     const url = new URL(req.url, 'http://127.0.0.1')
 
@@ -174,6 +187,54 @@ function createMockChronicleBackend(options = {}) {
       })
       sendJson(res, 200, chroniclePayload(body))
       return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/chronicles') {
+      const body = await readJsonBody(req)
+      publicationRequests.push({ method: req.method, headers: req.headers, body })
+      publication = {
+        ...body,
+        revision: 1,
+        publishedAt: '2026-07-21T00:00:00.000Z',
+        updatedAt: '2026-07-21T00:00:00.000Z',
+      }
+      sendJson(res, 201, publicationPayload())
+      return
+    }
+
+    if (url.pathname === `/api/chronicles/${publishedStoryId}`) {
+      if (!publication) {
+        sendJson(res, 404, { error: { code: 'not_found', message: 'Story not found.' } })
+        return
+      }
+
+      if (req.method === 'GET') {
+        publicationRequests.push({ method: req.method, headers: req.headers, body: null })
+        sendJson(res, 200, publicationPayload())
+        return
+      }
+
+      if (req.method === 'PUT') {
+        const body = await readJsonBody(req)
+        publicationRequests.push({ method: req.method, headers: req.headers, body })
+        publication = {
+          ...publication,
+          ...body,
+          revision: publication.revision + 1,
+          updatedAt: '2026-07-21T00:01:00.000Z',
+        }
+        sendJson(res, 200, publicationPayload())
+        return
+      }
+
+      if (req.method === 'DELETE') {
+        const body = await readJsonBody(req)
+        publicationRequests.push({ method: req.method, headers: req.headers, body })
+        publication = null
+        res.writeHead(204)
+        res.end()
+        return
+      }
     }
 
     sendJson(res, 404, { error: `Unhandled ${req.method} ${url.pathname}` })
@@ -225,12 +286,27 @@ function createMockChronicleBackend(options = {}) {
     throw new Error('Timed out waiting for chronicle request')
   }
 
+  async function waitForPublicationRequest(predicate, timeoutMs = 10_000) {
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      for (const request of publicationRequests) {
+        if (predicate(request, publicationRequests)) {
+          return request
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    throw new Error('Timed out waiting for publication request')
+  }
+
   return {
     start,
     stop,
     advanceCampaign,
     waitForChronicleRequest,
+    waitForPublicationRequest,
     getChronicleRequests: () => [...chronicleRequests],
+    getPublicationRequests: () => [...publicationRequests],
   }
 }
 

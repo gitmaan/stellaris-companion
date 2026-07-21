@@ -40,6 +40,7 @@ interface ChronicleChapterListProps {
   regeneratingChapter: number | null
   onRefresh: () => void
   onOpenNarratorPanel?: () => void
+  onPublish?: () => void
   onExport?: () => void
   collapsed?: boolean
   onToggleCollapse?: () => void
@@ -62,6 +63,7 @@ function ChronicleChapterList({
   regeneratingChapter,
   onRefresh,
   onOpenNarratorPanel,
+  onPublish,
   onExport,
   collapsed = false,
   onToggleCollapse,
@@ -246,6 +248,27 @@ function ChronicleChapterList({
             <div className="absolute bottom-0 right-0 w-1.5 h-1.5 border-r border-b border-accent-cyan/50 group-hover:border-accent-cyan/80 transition-colors" />
             <PersonIcon className="w-4 h-4" />
             <span className="text-xs uppercase tracking-wider font-semibold">{t('chronicle.sidebar.narrator')}</span>
+          </button>
+        </div>
+      )}
+
+      {/* Publish button */}
+      {onPublish && (chapters.length > 0 || currentEra) && (
+        <div className="px-4 pb-2">
+          <button
+            type="button"
+            onClick={onPublish}
+            className="flex items-center gap-2 w-full px-3 py-2 border border-accent-teal/35 bg-accent-teal/5 rounded text-accent-teal/80 hover:text-accent-teal hover:border-accent-teal/65 hover:bg-accent-teal/10 transition-all duration-200 relative group"
+          >
+            <div className="absolute top-0 left-0 w-1.5 h-1.5 border-l border-t border-accent-teal/50 group-hover:border-accent-teal/80 transition-colors" />
+            <div className="absolute top-0 right-0 w-1.5 h-1.5 border-r border-t border-accent-teal/50 group-hover:border-accent-teal/80 transition-colors" />
+            <div className="absolute bottom-0 left-0 w-1.5 h-1.5 border-l border-b border-accent-teal/50 group-hover:border-accent-teal/80 transition-colors" />
+            <div className="absolute bottom-0 right-0 w-1.5 h-1.5 border-r border-b border-accent-teal/50 group-hover:border-accent-teal/80 transition-colors" />
+            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 11V3m0 0L5 6m3-3l3 3" />
+              <path d="M3 9v3a1 1 0 001 1h8a1 1 0 001-1V9" />
+            </svg>
+            <span className="text-xs uppercase tracking-wider font-semibold">{t('chronicle.sidebar.publish')}</span>
           </button>
         </div>
       )}

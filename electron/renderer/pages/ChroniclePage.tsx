@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import ChronicleChapterList from '../components/ChronicleChapterList'
 import ChronicleContent from '../components/ChronicleContent'
 import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
+import ChroniclePublishDialog from '../components/ChroniclePublishDialog'
 import { useBackend, ChronicleResponse } from '../hooks/useBackend'
 import { generateChronicleHtml } from '../lib/chronicleExport'
 import {
@@ -108,6 +109,7 @@ function ChroniclePage({
 
   // Narrator panel state
   const [narratorPanelOpen, setNarratorPanelOpen] = useState(false)
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
 
   // Sidebar collapse state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -694,6 +696,7 @@ function ChroniclePage({
           regeneratingChapter={regeneratingChapter}
           onRefresh={handleRefresh}
           onOpenNarratorPanel={() => setNarratorPanelOpen(true)}
+          onPublish={() => setPublishDialogOpen(true)}
           onExport={handleExport}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(c => !c)}
@@ -787,6 +790,13 @@ function ChroniclePage({
         isOpen={narratorPanelOpen}
         onClose={() => setNarratorPanelOpen(false)}
         selectedSaveId={selectedSaveId}
+      />
+      <ChroniclePublishDialog
+        isOpen={publishDialogOpen}
+        onClose={() => setPublishDialogOpen(false)}
+        saveId={selectedSaveId}
+        empireName={empireName}
+        chronicle={chronicle}
       />
     </div>
   )
