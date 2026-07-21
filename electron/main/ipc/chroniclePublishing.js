@@ -159,6 +159,7 @@ function createChroniclePublishingService({
     try {
       response = await fetchImpl(`${normalizedApiBaseUrl}${path}`, {
         method,
+        redirect: 'error',
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${identity.publisherSecret}`,
@@ -382,7 +383,9 @@ function normalizeApiBaseUrl(value) {
   } catch {
     throw new Error('Invalid Chronicle publishing API URL')
   }
-  if (!['https:', 'http:'].includes(parsed.protocol) || parsed.search || parsed.hash) {
+  const isLoopbackHttp = parsed.protocol === 'http:'
+    && ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname)
+  if ((parsed.protocol !== 'https:' && !isLoopbackHttp) || parsed.search || parsed.hash) {
     throw new Error('Invalid Chronicle publishing API URL')
   }
   return parsed.toString().replace(/\/$/, '')

@@ -103,6 +103,7 @@ test('publishes, updates, checks status, and deletes with an encrypted anonymous
   assert.match(store.get('chroniclePublisherId'), /^[0-9a-f-]{36}$/)
   assert.match(secrets.get('chronicle-secret'), /^[A-Za-z0-9_-]{43}$/)
   assert.equal(requests[0].init.method, 'POST')
+  assert.equal(requests[0].init.redirect, 'error')
   assert.equal('saveId' in requests[0].body, false)
   assert.equal(requests[0].body.client_publication_id, created.clientPublicationId)
 
@@ -166,4 +167,26 @@ test('rejects a service response that points outside the canonical story origin'
   await assert.rejects(service.publish(samplePublication()), (error) => (
     error instanceof ChroniclePublishingError && error.code === 'invalid_response'
   ))
+})
+
+test('allows plaintext publishing endpoints only on the local loopback interface', () => {
+  assert.throws(() => createChroniclePublishingService({
+    store: new MemoryStore(),
+    getSecret: () => null,
+    setSecret: () => {},
+    secretStoreKey: 'chronicle-secret',
+    isEncryptionAvailable: () => true,
+    fetchImpl: async () => Response.json({}),
+    apiBaseUrl: 'http://publishing.example/api/chronicles',
+  }), /Invalid Chronicle publishing API URL/)
+
+  assert.doesNotThrow(() => createChroniclePublishingService({
+    store: new MemoryStore(),
+    getSecret: () => null,
+    setSecret: () => {},
+    secretStoreKey: 'chronicle-secret',
+    isEncryptionAvailable: () => true,
+    fetchImpl: async () => Response.json({}),
+    apiBaseUrl: 'http://127.0.0.1:8792/api/chronicles',
+  }))
 })
