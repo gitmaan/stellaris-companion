@@ -15,6 +15,7 @@
     "build:mcpb": "python3 ../scripts/package_mcpb.py",
     "test:e2e": "npm run build:renderer && playwright test",
     "test:e2e:headed": "npm run build:renderer && playwright test --headed",
+    "test:chronicle-publishing": "node --test test/chronicle-publishing.test.js",
     "publish": "../scripts/publish-electron.sh",
     "start": "electron ."
   },

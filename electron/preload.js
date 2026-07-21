@@ -55,6 +55,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyToClipboard: (text) => ipcRenderer.invoke('copy-to-clipboard', { text }),
   openExternal: (url) => ipcRenderer.invoke('open-external', { url }),
   exportChronicle: (html, defaultFilename) => ipcRenderer.invoke('export-chronicle', { html, defaultFilename }),
+  chroniclePublishing: {
+    publish: (publication) => ipcRenderer.invoke('chronicle-publishing:publish', publication),
+    status: (saveId) => ipcRenderer.invoke('chronicle-publishing:status', { saveId }),
+    delete: (saveId) => ipcRenderer.invoke('chronicle-publishing:delete', { saveId }),
+  },
   getBackendLogTail: (opts) => ipcRenderer.invoke('get-backend-log-tail', opts || {}),
   mcpRelay: {
     status: () => ipcRenderer.invoke('mcp-relay:status'),

@@ -25,6 +25,10 @@ const { setupAutoUpdater, registerUpdateIpcHandlers, wireAutoUpdaterEvents } = r
 const { registerBackendIpcHandlers } = require('./main/ipc/backend')
 const { registerSettingsIpcHandlers } = require('./main/ipc/settings')
 const { registerExportIpcHandlers } = require('./main/ipc/export')
+const {
+  createChroniclePublishingService,
+  registerChroniclePublishingIpcHandlers,
+} = require('./main/ipc/chroniclePublishing')
 const { registerAnnouncementsIpcHandlers } = require('./main/ipc/announcements')
 const { registerMcpRelayIpcHandlers } = require('./main/ipc/mcpRelay')
 const { createMcpRelayService } = require('./main/mcpRelay')
@@ -108,6 +112,7 @@ const SECRET_STORE_KEYS = {
   discordToken: 'secrets.discord-token',
   discordAccessToken: 'secrets.discord-access-token',
   discordRefreshToken: 'secrets.discord-refresh-token',
+  chroniclePublisherSecret: 'secrets.chronicle-publisher-secret',
 }
 
 function encryptSecret(plaintext) {
@@ -152,6 +157,9 @@ const store = new Store({
     savePath: '',
     // Anonymous ID for rate-limiting and de-duping reports (no personal data).
     installId: '',
+    // Accountless Chronicle publishing identity and save-to-publication receipts.
+    chroniclePublisherId: '',
+    chroniclePublications: [],
     discordEnabled: false,
     uiScale: 1,
     uiTheme: 'stellaris-cyan',
@@ -1495,6 +1503,20 @@ registerExportIpcHandlers({
   dialog,
   getMainWindow: () => mainWindow,
   app,
+})
+
+const chroniclePublishingService = createChroniclePublishingService({
+  store,
+  getSecret,
+  setSecret,
+  secretStoreKey: SECRET_STORE_KEYS.chroniclePublisherSecret,
+  isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+})
+
+registerChroniclePublishingIpcHandlers({
+  ipcMain,
+  validateSender,
+  service: chroniclePublishingService,
 })
 
 const mcpRelayService = createMcpRelayService({

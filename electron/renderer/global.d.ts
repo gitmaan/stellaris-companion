@@ -72,6 +72,50 @@ export interface McpRelayInstallResult {
   status?: McpRelayStatus
 }
 
+export type ChroniclePublicationVisibility = 'unlisted' | 'discoverable'
+export type ChronicleModerationStatus = 'not_required' | 'pending' | 'approved' | 'rejected'
+
+export interface ChroniclePublicationReceipt {
+  clientPublicationId: string
+  storyId: string
+  publicUrl: string
+  title: string
+  revision: number
+  visibility: ChroniclePublicationVisibility
+  moderationStatus: ChronicleModerationStatus
+  publishedAt: string
+  updatedAt: string
+}
+
+export interface ChroniclePublicationStatus {
+  state: 'unpublished' | 'published'
+  receipt?: ChroniclePublicationReceipt
+  syncWarning?: string
+}
+
+export interface ChroniclePublicationError {
+  code: string
+  message: string
+  status?: number
+  currentRevision?: number
+}
+
+export type ChroniclePublicationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: ChroniclePublicationError }
+
+export interface ChroniclePublicationPayload {
+  saveId: string
+  title: string
+  empireName: string
+  language: string
+  visibility: ChroniclePublicationVisibility
+  document: {
+    chapters: ChronicleResponse['chapters']
+    current_era?: NonNullable<ChronicleResponse['current_era']>
+  }
+}
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -124,6 +168,11 @@ declare global {
       copyToClipboard: (text: string) => Promise<{ success: boolean }>
       openExternal: (url: string) => Promise<{ success: boolean }>
       exportChronicle: (html: string, defaultFilename: string) => Promise<{ success: boolean; filePath?: string; error?: string } | null>
+      chroniclePublishing: {
+        publish: (publication: ChroniclePublicationPayload) => Promise<ChroniclePublicationResult<ChroniclePublicationReceipt>>
+        status: (saveId: string) => Promise<ChroniclePublicationResult<ChroniclePublicationStatus>>
+        delete: (saveId: string) => Promise<ChroniclePublicationResult<{ removed: true }>>
+      }
       getBackendLogTail: (opts?: { maxBytes?: number }) => Promise<{ ok: true; data: string } | { ok: false; error: string }>
       mcpRelay: {
         status: () => Promise<McpRelayStatus>
