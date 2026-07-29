@@ -18,7 +18,11 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
-from backend.core.advisor_providers import AdvisorProviderConfig, AdvisorProviderError
+from backend.core.advisor_providers import (
+    AdvisorProviderConfig,
+    AdvisorProviderError,
+    normalize_advisor_provider,
+)
 
 _chronicle_in_flight: set[str] = set()
 _chronicle_in_flight_lock = threading.Lock()
@@ -128,9 +132,7 @@ def _raise_chronicle_value_error(error: ValueError) -> NoReturn:
         raise HTTPException(
             status_code=400,
             detail={
-                "error": (
-                    "Chronicle generation requires a Google Gemini API key. Add one in Settings."
-                ),
+                "error": "Chronicle generation requires a configured AI provider. Add one in Settings.",
                 "code": "CHRONICLE_PROVIDER_NOT_CONFIGURED",
             },
         ) from error
@@ -146,9 +148,8 @@ def _raise_provider_error(error: AdvisorProviderError) -> NoReturn:
 
 def _provider_health_fields(companion: Any | None) -> dict[str, Any]:
     """Report one selected provider for both Advisor and Chronicle."""
-    environment_config = AdvisorProviderConfig.from_environment()
-    provider = environment_config.provider
-    configured = environment_config.is_configured
+    provider: str | None = None
+    configured: bool | None = None
 
     if companion is not None:
         provider_getter = getattr(companion, "get_advisor_provider", None)
@@ -157,6 +158,20 @@ def _provider_health_fields(companion: Any | None) -> dict[str, Any]:
             provider = provider_getter() or provider
         if callable(configured_getter):
             configured = bool(configured_getter())
+
+    if provider is None or configured is None:
+        try:
+            environment_config = AdvisorProviderConfig.from_environment()
+            environment_provider = environment_config.provider
+            environment_configured = environment_config.is_configured
+        except ValueError:
+            environment_provider = normalize_advisor_provider(
+                os.environ.get("STELLARIS_ADVISOR_PROVIDER")
+            )
+            environment_configured = False
+        provider = provider or environment_provider
+        if configured is None:
+            configured = environment_configured
 
     return {
         "advisor_provider": provider,

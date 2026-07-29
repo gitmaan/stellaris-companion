@@ -131,7 +131,7 @@ def test_api_chronicle_releases_lock_on_exception(monkeypatch):
     assert second.status_code == 200
 
 
-def test_api_chronicle_returns_typed_error_without_gemini_key(monkeypatch):
+def test_api_chronicle_returns_provider_neutral_legacy_configuration_error(monkeypatch):
     server._chronicle_in_flight.clear()
 
     def missing_key(self, session_id, **kwargs):
@@ -154,7 +154,7 @@ def test_api_chronicle_returns_typed_error_without_gemini_key(monkeypatch):
 
     assert response.status_code == 400
     assert response.json()["detail"] == {
-        "error": ("Chronicle generation requires a Google Gemini API key. Add one in Settings."),
+        "error": "Chronicle generation requires a configured AI provider. Add one in Settings.",
         "code": "CHRONICLE_PROVIDER_NOT_CONFIGURED",
     }
     assert server._chronicle_in_flight == set()
@@ -208,3 +208,19 @@ def test_health_uses_selected_provider_for_chronicle(monkeypatch):
     assert payload["chronicle_provider"] == "custom"
     assert payload["advisor_configured"] is True
     assert payload["chronicle_configured"] is True
+
+
+def test_health_recovers_from_invalid_provider_url(monkeypatch):
+    monkeypatch.setenv("STELLARIS_ADVISOR_PROVIDER", "custom")
+    monkeypatch.setenv("STELLARIS_ADVISOR_BASE_URL", "not-a-url")
+    app = _make_app(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.get("/api/health", headers=_auth_headers())
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["advisor_provider"] == "custom"
+    assert payload["chronicle_provider"] == "custom"
+    assert payload["advisor_configured"] is False
+    assert payload["chronicle_configured"] is False
