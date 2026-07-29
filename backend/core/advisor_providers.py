@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import os
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -10,6 +11,7 @@ from urllib.parse import urlparse
 
 import httpx
 from google.genai import types
+from pydantic import BaseModel
 
 from backend.core.model_routing import (
     GEMINI_FLASH_MODEL,
@@ -184,11 +186,12 @@ class AdvisorProviderConfig:
 
 @dataclass(frozen=True)
 class AdvisorGenerationResult:
-    """Normalized result returned by every Advisor generation adapter."""
+    """Normalized result returned by every model-provider adapter."""
 
     text: str
     model: str
     requested_model: str
+    provider: str
     routing: dict[str, Any] | None = None
 
 
@@ -202,7 +205,7 @@ class AdvisorProviderError(RuntimeError):
 
 
 class AdvisorGenerator(Protocol):
-    """Common text-generation contract used by the Advisor."""
+    """Common generation contract shared by Advisor and Chronicle."""
 
     config: AdvisorProviderConfig
 
@@ -216,6 +219,9 @@ class AdvisorGenerator(Protocol):
         thinking_level: str = "dynamic",
         temperature: float = 1.0,
         max_output_tokens: int = 4096,
+        purpose: str = "advisor",
+        response_schema: type[BaseModel] | None = None,
+        schema_name: str | None = None,
     ) -> AdvisorGenerationResult: ...
 
 
@@ -236,11 +242,25 @@ class GeminiAdvisorGenerator:
         thinking_level: str = "dynamic",
         temperature: float = 1.0,
         max_output_tokens: int = 4096,
+        purpose: str = "advisor",
+        response_schema: type[BaseModel] | None = None,
+        schema_name: str | None = None,
     ) -> AdvisorGenerationResult:
+        del schema_name
+        config_kwargs: dict[str, Any] = {
+            "system_instruction": system_prompt,
+            "temperature": temperature,
+            "max_output_tokens": max_output_tokens,
+        }
+        if response_schema is not None:
+            config_kwargs.update(
+                {
+                    "response_mime_type": "application/json",
+                    "response_schema": response_schema,
+                }
+            )
         cfg = types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            temperature=temperature,
-            max_output_tokens=max_output_tokens,
+            **config_kwargs,
         )
         if thinking_level != "dynamic":
             cfg.thinking_config = types.ThinkingConfig(thinking_level=thinking_level)
@@ -248,7 +268,7 @@ class GeminiAdvisorGenerator:
         explicit_model = str(model or "").strip() or None
         candidate_models = route_models_for(
             mode=model_routing_mode,
-            purpose="advisor",
+            purpose=purpose,
             explicit_model=explicit_model,
         )
         if not candidate_models:
@@ -288,6 +308,7 @@ class GeminiAdvisorGenerator:
                     text=response_text,
                     model=candidate_model,
                     requested_model=requested_model,
+                    provider=self.config.provider,
                     routing=route_event_payload(route_event),
                 )
             except AdvisorProviderError:
@@ -346,8 +367,11 @@ class OpenAICompatibleAdvisorGenerator:
         thinking_level: str = "dynamic",
         temperature: float = 1.0,
         max_output_tokens: int = 4096,
+        purpose: str = "advisor",
+        response_schema: type[BaseModel] | None = None,
+        schema_name: str | None = None,
     ) -> AdvisorGenerationResult:
-        del model_routing_mode, thinking_level
+        del model_routing_mode, thinking_level, purpose
         if not self.config.is_configured:
             raise AdvisorProviderError(
                 f"{self.config.display_name} is not fully configured",
@@ -356,12 +380,41 @@ class OpenAICompatibleAdvisorGenerator:
             )
 
         requested_model = str(model or self.config.model).strip()
+        effective_user_prompt = user_prompt
+        if response_schema is not None:
+            effective_user_prompt = _with_json_schema_instruction(
+                user_prompt,
+                response_schema=response_schema,
+            )
+
         headers = {"Content-Type": "application/json"}
         if self.config.api_key:
             headers["Authorization"] = f"Bearer {self.config.api_key}"
         if self.config.provider == ADVISOR_PROVIDER_OPENROUTER:
             headers["HTTP-Referer"] = "https://github.com/gitmaan/stellaris-companion"
             headers["X-OpenRouter-Title"] = "Stellaris Companion"
+
+        request_body: dict[str, Any] = {
+            "model": requested_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": effective_user_prompt},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_output_tokens,
+            "stream": False,
+        }
+        if response_schema is not None:
+            request_body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": _structured_schema_name(response_schema, schema_name),
+                    "strict": True,
+                    "schema": response_schema.model_json_schema(),
+                },
+            }
+            if self.config.provider == ADVISOR_PROVIDER_OPENROUTER:
+                request_body["provider"] = {"require_parameters": True}
 
         client = self._client or httpx.Client(
             timeout=httpx.Timeout(self.config.timeout_seconds, connect=10.0),
@@ -372,17 +425,21 @@ class OpenAICompatibleAdvisorGenerator:
             response = client.post(
                 f"{self.config.base_url}/chat/completions",
                 headers=headers,
-                json={
-                    "model": requested_model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    "temperature": temperature,
-                    "max_tokens": max_output_tokens,
-                    "stream": False,
-                },
+                json=request_body,
             )
+            if (
+                response_schema is not None
+                and response.status_code == 400
+                and not _is_context_limit_error(_compatible_error_message(response))
+            ):
+                fallback_body = dict(request_body)
+                fallback_body.pop("response_format", None)
+                fallback_body.pop("provider", None)
+                response = client.post(
+                    f"{self.config.base_url}/chat/completions",
+                    headers=headers,
+                    json=fallback_body,
+                )
         except httpx.TimeoutException as exc:
             raise AdvisorProviderError(
                 f"{self.config.display_name} timed out while generating a response",
@@ -410,10 +467,16 @@ class OpenAICompatibleAdvisorGenerator:
                 )
             if response.status_code in {401, 403}:
                 code = "PROVIDER_AUTH_FAILED"
+            elif response.status_code == 402:
+                code = "PROVIDER_BILLING_FAILED"
+            elif response.status_code in {408, 504}:
+                code = "PROVIDER_TIMEOUT"
             elif response.status_code == 429:
                 code = "PROVIDER_RATE_LIMITED"
             elif response.status_code == 404:
                 code = "PROVIDER_MODEL_NOT_FOUND"
+            elif response.status_code == 503:
+                code = "PROVIDER_UNAVAILABLE"
             else:
                 code = "PROVIDER_REQUEST_FAILED"
             raise AdvisorProviderError(
@@ -443,6 +506,7 @@ class OpenAICompatibleAdvisorGenerator:
             text=response_text,
             model=response_model,
             requested_model=requested_model,
+            provider=self.config.provider,
         )
 
 
@@ -525,3 +589,34 @@ def _content_to_text(content: Any) -> str:
                 parts.append(item["text"])
         return "\n".join(part for part in parts if part).strip()
     return ""
+
+
+def _structured_schema_name(
+    response_schema: type[BaseModel],
+    explicit_name: str | None,
+) -> str:
+    raw_name = str(explicit_name or response_schema.__name__ or "structured_response")
+    normalized = "".join(
+        character.lower() if character.isalnum() else "_" for character in raw_name
+    )
+    normalized = "_".join(part for part in normalized.split("_") if part)
+    return (normalized or "structured_response")[:64]
+
+
+def _with_json_schema_instruction(
+    user_prompt: str,
+    *,
+    response_schema: type[BaseModel],
+) -> str:
+    schema_json = json.dumps(
+        response_schema.model_json_schema(),
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    return (
+        f"{user_prompt.rstrip()}\n\n"
+        "=== REQUIRED OUTPUT FORMAT ===\n"
+        "Return only one JSON object matching this JSON Schema. "
+        "Do not wrap it in Markdown or add commentary.\n"
+        f"{schema_json}"
+    )

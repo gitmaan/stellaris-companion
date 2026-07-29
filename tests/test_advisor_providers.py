@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from pydantic import BaseModel
 
 from backend.core.advisor_providers import (
     AdvisorProviderConfig,
@@ -17,6 +18,10 @@ from backend.core.advisor_providers import (
     normalize_base_url,
 )
 from backend.core.companion import Companion
+
+
+class StructuredProbe(BaseModel):
+    status: str
 
 
 def test_companion_starts_without_ai_credentials(monkeypatch):
@@ -167,6 +172,115 @@ def test_compatible_generator_reports_context_limit():
     assert "context window" in str(exc_info.value)
 
 
+def test_compatible_generator_requests_structured_output():
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "model": "provider/structured-model",
+                "choices": [{"message": {"content": '{"status":"CHRONICLE_READY"}'}}],
+            },
+        )
+
+    config = AdvisorProviderConfig(
+        provider="openrouter",
+        model="provider/structured-model",
+        base_url="https://openrouter.ai/api/v1",
+        api_key="secret-key",
+    )
+    generator = OpenAICompatibleAdvisorGenerator(
+        config=config,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    result = generator.generate(
+        system_prompt="Return a probe.",
+        user_prompt="Check Chronicle support.",
+        response_schema=StructuredProbe,
+        schema_name="chronicle probe",
+        purpose="chronicle",
+    )
+
+    assert StructuredProbe.model_validate_json(result.text).status == "CHRONICLE_READY"
+    assert result.provider == "openrouter"
+    assert captured["body"]["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "chronicle_probe",
+            "strict": True,
+            "schema": StructuredProbe.model_json_schema(),
+        },
+    }
+    assert captured["body"]["provider"] == {"require_parameters": True}
+    assert "Return only one JSON object" in captured["body"]["messages"][1]["content"]
+
+
+def test_compatible_generator_retries_without_schema_parameter():
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        requests.append(body)
+        if len(requests) == 1:
+            return httpx.Response(
+                400,
+                json={"error": {"message": "response_format is not supported"}},
+            )
+        return httpx.Response(
+            200,
+            json={
+                "model": "local/model",
+                "choices": [{"message": {"content": '{"status":"CHRONICLE_READY"}'}}],
+            },
+        )
+
+    config = AdvisorProviderConfig(
+        provider="ollama",
+        model="local/model",
+        base_url="http://127.0.0.1:11434/v1",
+    )
+    generator = OpenAICompatibleAdvisorGenerator(
+        config=config,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    result = generator.generate(
+        system_prompt="Return a probe.",
+        user_prompt="Check Chronicle support.",
+        response_schema=StructuredProbe,
+    )
+
+    assert StructuredProbe.model_validate_json(result.text).status == "CHRONICLE_READY"
+    assert len(requests) == 2
+    assert "response_format" in requests[0]
+    assert "response_format" not in requests[1]
+    assert "Return only one JSON object" in requests[1]["messages"][1]["content"]
+
+
+def test_compatible_generator_reports_billing_failure():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(402, json={"error": {"message": "Insufficient credits"}})
+
+    config = AdvisorProviderConfig(
+        provider="openrouter",
+        model="provider/model",
+        base_url="https://openrouter.ai/api/v1",
+        api_key="secret-key",
+    )
+    generator = OpenAICompatibleAdvisorGenerator(
+        config=config,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    with pytest.raises(AdvisorProviderError) as exc_info:
+        generator.generate(system_prompt="system", user_prompt="user")
+
+    assert exc_info.value.code == "PROVIDER_BILLING_FAILED"
+
+
 def test_openrouter_requires_api_key():
     config = AdvisorProviderConfig(
         provider="openrouter",
@@ -210,3 +324,38 @@ def test_gemini_billing_failure_is_not_retried_or_reported_as_rate_limit():
 
     assert exc_info.value.code == "PROVIDER_BILLING_FAILED"
     assert models.calls == 1
+
+
+def test_gemini_generator_accepts_chronicle_schema():
+    class CapturingModels:
+        def __init__(self):
+            self.request = None
+
+        def generate_content(self, **kwargs):
+            self.request = kwargs
+            return SimpleNamespace(text='{"status":"CHRONICLE_READY"}')
+
+    models = CapturingModels()
+    config = AdvisorProviderConfig(
+        provider="gemini",
+        model="gemini-test-model",
+        api_key="test-key",
+    )
+    generator = GeminiAdvisorGenerator(
+        config=config,
+        client=SimpleNamespace(models=models),
+    )
+
+    result = generator.generate(
+        system_prompt="Return a probe.",
+        user_prompt="Check Chronicle support.",
+        model="gemini-test-model",
+        purpose="chronicle",
+        response_schema=StructuredProbe,
+    )
+
+    assert StructuredProbe.model_validate_json(result.text).status == "CHRONICLE_READY"
+    assert result.provider == "gemini"
+    assert models.request is not None
+    assert models.request["model"] == "gemini-test-model"
+    assert models.request["config"].response_schema is StructuredProbe
