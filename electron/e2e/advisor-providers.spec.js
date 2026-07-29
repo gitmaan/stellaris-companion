@@ -6,6 +6,7 @@ const path = require('path')
 const { test, expect, _electron: electron } = require('@playwright/test')
 
 const { createMockChronicleBackend } = require('./helpers/mockBackend')
+const { getElectronLaunchArgs } = require('./helpers/electronLaunch')
 
 const electronDir = path.resolve(__dirname, '..')
 
@@ -59,7 +60,7 @@ function startProviderServer() {
 
 async function launchApp(backendPort, userDataDir) {
   return electron.launch({
-    args: [path.join(electronDir, 'main.js')],
+    args: getElectronLaunchArgs(path.join(electronDir, 'main.js')),
     env: {
       ...process.env,
       NODE_ENV: 'test',
