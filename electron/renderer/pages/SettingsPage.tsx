@@ -83,11 +83,25 @@ const ADVISOR_PROVIDER_DEFAULT_URLS: Partial<Record<AdvisorProvider, string>> = 
   openrouter: 'https://openrouter.ai/api/v1',
 }
 
+const RECOMMENDED_ADVISOR_CONTEXT_LENGTH = 32_768
+
 interface AdvisorProviderModel {
   id: string
   name: string
   contextLength?: number
   supportedParameters?: string[]
+}
+
+function formatContextLength(contextLength: number): string {
+  if (contextLength >= 1_000_000) {
+    const millions = contextLength / 1_000_000
+    return `${Number.isInteger(millions) ? millions : millions.toFixed(1)}M`
+  }
+  if (contextLength >= 1024) {
+    const thousands = contextLength / 1024
+    return `${Number.isInteger(thousands) ? thousands : thousands.toFixed(1)}K`
+  }
+  return String(contextLength)
 }
 
 type GeminiQuotaMode = 'standard' | 'higher'
@@ -711,9 +725,20 @@ function SettingsPage({
     { value: '', label: t('settings.advisor.selectModel') },
     ...visibleAdvisorModels.map((model) => ({
       value: model.id,
-      label: model.name === model.id ? model.id : `${model.name} · ${model.id}`,
+      label: [
+        model.name === model.id ? model.id : `${model.name} · ${model.id}`,
+        model.contextLength
+          ? t('settings.advisor.modelContextLabel', {
+            context: formatContextLength(model.contextLength),
+          })
+          : '',
+      ].filter(Boolean).join(' · '),
     })),
   ]
+  const selectedAdvisorContextLength = selectedAdvisorModel?.contextLength
+  const selectedAdvisorContextLabel = selectedAdvisorContextLength
+    ? formatContextLength(selectedAdvisorContextLength)
+    : ''
   const usesOllamaCloudModel = advisorProvider === 'ollama'
     && advisorModel.toLowerCase().includes(':cloud')
 
@@ -948,6 +973,29 @@ function SettingsPage({
                                      onChange={(e) => handleAdvisorModelChange(e.target.value)}
                                      placeholder={t('settings.advisor.modelPlaceholder')}
                                    />
+                                 )}
+
+                                 {advisorModel.trim() && selectedAdvisorContextLength !== undefined && (
+                                   <HUDMicro
+                                     className={`block border-l pl-2 normal-case tracking-[0.02em] ${
+                                       selectedAdvisorContextLength < RECOMMENDED_ADVISOR_CONTEXT_LENGTH
+                                         ? 'border-accent-yellow/50 text-accent-yellow/75'
+                                         : 'border-accent-green/40 text-white/55'
+                                     }`}
+                                   >
+                                     {selectedAdvisorContextLength < RECOMMENDED_ADVISOR_CONTEXT_LENGTH
+                                       ? t('settings.advisor.modelContextTooSmall', {
+                                         context: selectedAdvisorContextLabel,
+                                       })
+                                       : t('settings.advisor.modelContextDetected', {
+                                         context: selectedAdvisorContextLabel,
+                                       })}
+                                   </HUDMicro>
+                                 )}
+                                 {advisorModel.trim() && selectedAdvisorContextLength === undefined && (
+                                   <HUDMicro className="block border-l border-white/20 pl-2 normal-case tracking-[0.02em] text-white/45">
+                                     {t('settings.advisor.modelContextUnknown')}
+                                   </HUDMicro>
                                  )}
 
                                  <div className="flex flex-wrap items-center gap-3">

@@ -21,8 +21,16 @@ function startProviderServer() {
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({
           data: [
-            { id: 'local/strategist-small', name: 'Strategist Small' },
-            { id: 'local/strategist-large', name: 'Strategist Large' },
+            {
+              id: 'local/strategist-small',
+              name: 'Strategist Small',
+              context_length: 8192,
+            },
+            {
+              id: 'local/strategist-large',
+              name: 'Strategist Large',
+              context_length: 65536,
+            },
           ],
         }))
         return
@@ -111,14 +119,19 @@ test('configures a compatible Advisor provider and discovers its models', async 
 
     const modelSelect = page.getByLabel('AI MODEL')
     await expect(modelSelect).toHaveValue('local/manual-fallback')
+    await expect(page.getByText(/Context size was not reported/i)).toBeVisible()
+    await modelSelect.selectOption('local/strategist-small')
+    await expect(page.getByText(/8K context detected/i)).toBeVisible()
     await modelSelect.selectOption('local/strategist-large')
+    await expect(page.getByText(/Reported context.*64K/i)).toBeVisible()
     await page.getByRole('button', { name: 'APPLY CHANGES' }).click()
     await expect(page.getByText(/CONFIGURATION SAVED/)).toBeVisible()
 
     await expect(providerSelect).toHaveValue('custom')
     await expect(modelSelect).toHaveValue('local/strategist-large')
     await page.getByRole('button', { name: 'TEST MODEL' }).click()
-    await expect(page.getByText('READY FOR ADVISOR + CHRONICLE')).toBeVisible()
+    await expect(page.getByText('CONNECTION + JSON CHECK PASSED')).toBeVisible()
+    await expect(page.getByText(/does not validate campaign-size context/i)).toBeVisible()
     expect(provider.getLastCompletionModel()).toBe('local/strategist-large')
 
     await app.close()
