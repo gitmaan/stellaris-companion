@@ -167,9 +167,27 @@ declare global {
           apiKey?: string
         }) => Promise<{
           ok: boolean
-          models?: Array<{ id: string; name: string; contextLength?: number }>
+          models?: Array<{
+            id: string
+            name: string
+            contextLength?: number
+            supportedParameters?: string[]
+          }>
           baseUrl?: string
           provider?: string
+          error?: string
+        }>
+        testModel: (config: {
+          provider: string
+          baseUrl?: string
+          apiKey?: string
+          model: string
+        }) => Promise<{
+          ok: boolean
+          model?: string
+          baseUrl?: string
+          provider?: string
+          structuredOutput?: boolean
           error?: string
         }>
       }

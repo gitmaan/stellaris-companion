@@ -40,6 +40,7 @@ const {
   discoverAdvisorModels,
   getAdvisorProviderBaseUrl,
   normalizeAdvisorProvider,
+  testAdvisorModel,
 } = require('./main/advisorProviders')
 
 const IS_DEV = process.env.NODE_ENV === 'development'
@@ -1553,6 +1554,7 @@ registerSettingsIpcHandlers({
   saveSettings,
   getSettingsWithSecrets,
   discoverAdvisorModels,
+  testAdvisorModel,
   onSettingsSaved: async (fullSettings, changedSettings = {}) => {
     backendConfigured = true
 

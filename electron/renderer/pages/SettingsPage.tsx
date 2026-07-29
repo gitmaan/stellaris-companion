@@ -87,6 +87,7 @@ interface AdvisorProviderModel {
   id: string
   name: string
   contextLength?: number
+  supportedParameters?: string[]
 }
 
 type GeminiQuotaMode = 'standard' | 'higher'
@@ -134,6 +135,11 @@ function SettingsPage({
   const [advisorModelSearch, setAdvisorModelSearch] = useState('')
   const [advisorChecking, setAdvisorChecking] = useState(false)
   const [advisorConnection, setAdvisorConnection] = useState<{
+    ok: boolean
+    message: string
+  } | null>(null)
+  const [advisorTesting, setAdvisorTesting] = useState(false)
+  const [advisorModelTest, setAdvisorModelTest] = useState<{
     ok: boolean
     message: string
   } | null>(null)
@@ -298,7 +304,9 @@ function SettingsPage({
   const invalidateAdvisorConnection = () => {
     advisorCheckIdRef.current += 1
     setAdvisorChecking(false)
+    setAdvisorTesting(false)
     setAdvisorConnection(null)
+    setAdvisorModelTest(null)
   }
 
   const handleAdvisorProviderChange = (rawValue: string) => {
@@ -338,6 +346,7 @@ function SettingsPage({
       setAdvisorModels(models)
       if (models.length === 1) {
         setAdvisorModel(current => current || models[0].id)
+        setAdvisorModelTest(null)
       }
       setAdvisorConnection({
         ok: true,
@@ -354,6 +363,50 @@ function SettingsPage({
     } finally {
       if (checkId === advisorCheckIdRef.current) {
         setAdvisorChecking(false)
+      }
+    }
+  }
+
+  const handleAdvisorModelChange = (nextModel: string) => {
+    advisorCheckIdRef.current += 1
+    setAdvisorTesting(false)
+    setAdvisorModelTest(null)
+    setAdvisorModel(nextModel)
+  }
+
+  const handleTestAdvisorModel = async () => {
+    if (!window.electronAPI?.advisorProviders?.testModel || !advisorModel.trim()) return
+    const checkId = ++advisorCheckIdRef.current
+    const apiKey = advisorProvider === 'openrouter'
+      ? openRouterApiKey
+      : advisorProvider === 'custom'
+        ? customProviderApiKey
+        : ''
+    setAdvisorTesting(true)
+    setAdvisorModelTest(null)
+    try {
+      const result = await window.electronAPI.advisorProviders.testModel({
+        provider: advisorProvider,
+        baseUrl: advisorBaseUrl,
+        apiKey,
+        model: advisorModel,
+      })
+      if (checkId !== advisorCheckIdRef.current) return
+      setAdvisorModelTest({
+        ok: result.ok,
+        message: result.ok
+          ? t('settings.advisor.modelReady')
+          : result.error || t('settings.advisor.modelTestError'),
+      })
+    } catch (e) {
+      if (checkId !== advisorCheckIdRef.current) return
+      setAdvisorModelTest({
+        ok: false,
+        message: e instanceof Error ? e.message : t('settings.advisor.modelTestError'),
+      })
+    } finally {
+      if (checkId === advisorCheckIdRef.current) {
+        setAdvisorTesting(false)
       }
     }
   }
@@ -853,7 +906,7 @@ function SettingsPage({
                                      type="button"
                                      variant="secondary"
                                      onClick={() => void handleCheckAdvisorProvider()}
-                                     disabled={advisorChecking}
+                                     disabled={advisorChecking || advisorTesting}
                                      className="px-4 py-1.5 text-[10px]"
                                    >
                                      {advisorChecking ? t('settings.advisor.checking') : t('settings.advisor.checkConnection')}
@@ -876,21 +929,41 @@ function SettingsPage({
                                  )}
 
                                  {advisorModels.length > 0 ? (
-                                   <HUDSelect
-                                     label={t('settings.advisor.modelLabel')}
-                                     value={advisorModel}
-                                     onChange={(e) => setAdvisorModel(e.target.value)}
-                                     options={advisorModelOptions}
-                                   />
+                                     <HUDSelect
+                                       label={t('settings.advisor.modelLabel')}
+                                       value={advisorModel}
+                                       onChange={(e) => handleAdvisorModelChange(e.target.value)}
+                                       options={advisorModelOptions}
+                                     />
                                  ) : (
                                    <HUDInput
                                      label={t('settings.advisor.modelLabel')}
                                      aria-label={t('settings.advisor.modelLabel')}
                                      value={advisorModel}
-                                     onChange={(e) => setAdvisorModel(e.target.value)}
+                                     onChange={(e) => handleAdvisorModelChange(e.target.value)}
                                      placeholder={t('settings.advisor.modelPlaceholder')}
                                    />
                                  )}
+
+                                 <div className="flex flex-wrap items-center gap-3">
+                                   <HUDButton
+                                     type="button"
+                                     variant="secondary"
+                                     onClick={() => void handleTestAdvisorModel()}
+                                     disabled={advisorChecking || advisorTesting || !advisorModel.trim()}
+                                     className="px-4 py-1.5 text-[10px]"
+                                   >
+                                     {advisorTesting ? t('settings.advisor.testingModel') : t('settings.advisor.testModel')}
+                                   </HUDButton>
+                                   {advisorModelTest && (
+                                     <HUDMicro className={advisorModelTest.ok ? 'text-accent-green' : 'text-accent-red'}>
+                                       {advisorModelTest.message}
+                                     </HUDMicro>
+                                   )}
+                                 </div>
+                                 <HUDMicro className="block normal-case tracking-[0.02em] text-white/45">
+                                   {t('settings.advisor.modelTestPrivacy')}
+                                 </HUDMicro>
 
                                  {usesOllamaCloudModel && (
                                    <HUDMicro className="block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
@@ -921,33 +994,30 @@ function SettingsPage({
                                </div>
                              )}
 
-                             <div className="border-t border-white/10 pt-4">
-                             <HUDInput 
-                                label={advisorProvider === 'gemini' ? t('settings.api.label') : t('settings.advisor.chronicleKeyLabel')}
-                                type="password"
-                                value={googleApiKey}
-                                onChange={(e) => setGoogleApiKey(e.target.value)}
-                                placeholder={settings?.googleApiKeySet ? t('settings.api.placeholderSet') : t('settings.api.placeholderEmpty')}
-                             />
-                             <div className="flex justify-between items-center">
-                                 <span className="font-mono text-xs text-white/30">
-                                     {t('settings.api.status')} {settings?.googleApiKeySet ? <span className="text-accent-green">{t('settings.api.active')}</span> : <span className="text-accent-yellow">{t('settings.api.missing')}</span>}
-                                 </span>
-                                 <a 
-                                    href="https://aistudio.google.com/app/apikey" 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
-                                 >
-                                     {t('settings.api.generateKey')}
-                                 </a>
-                             </div>
-                             {advisorProvider !== 'gemini' && (
-                               <HUDMicro className="mt-2 block normal-case tracking-[0.02em] text-white/45">
-                                 {t('settings.advisor.chronicleGeminiHelp')}
-                               </HUDMicro>
+                             {advisorProvider === 'gemini' && (
+                               <div className="border-t border-white/10 pt-4">
+                                 <HUDInput
+                                    label={t('settings.api.label')}
+                                    type="password"
+                                    value={googleApiKey}
+                                    onChange={(e) => setGoogleApiKey(e.target.value)}
+                                    placeholder={settings?.googleApiKeySet ? t('settings.api.placeholderSet') : t('settings.api.placeholderEmpty')}
+                                 />
+                                 <div className="flex justify-between items-center">
+                                     <span className="font-mono text-xs text-white/30">
+                                         {t('settings.api.status')} {settings?.googleApiKeySet ? <span className="text-accent-green">{t('settings.api.active')}</span> : <span className="text-accent-yellow">{t('settings.api.missing')}</span>}
+                                     </span>
+                                     <a
+                                        href="https://aistudio.google.com/app/apikey"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
+                                     >
+                                         {t('settings.api.generateKey')}
+                                     </a>
+                                 </div>
+                               </div>
                              )}
-                             </div>
                              {advisorProvider === 'gemini' && (
                              <div className="border-t border-white/10 pt-4 space-y-3">
                                  <div className="flex items-center justify-between gap-3">

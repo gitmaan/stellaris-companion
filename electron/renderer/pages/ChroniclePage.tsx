@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import ChronicleChapterList from '../components/ChronicleChapterList'
 import ChronicleContent from '../components/ChronicleContent'
 import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
@@ -51,6 +52,53 @@ function areSessionsEquivalent(a: Session[], b: Session[]): boolean {
 
 function isDocumentVisible(): boolean {
   return typeof document === 'undefined' || document.visibilityState === 'visible'
+}
+
+function getProviderName(provider: string | null): string {
+  switch (provider) {
+    case 'ollama':
+      return 'Ollama'
+    case 'lm_studio':
+      return 'LM Studio'
+    case 'openrouter':
+      return 'OpenRouter'
+    case 'custom':
+      return 'Custom provider'
+    default:
+      return 'Gemini'
+  }
+}
+
+function getChronicleProviderErrorMessage({
+  code,
+  fallback,
+  provider,
+  t,
+}: {
+  code?: string | null
+  fallback: string
+  provider: string | null
+  t: TFunction
+}): string {
+  const providerErrorKeys: Record<string, string> = {
+    PROVIDER_UNAVAILABLE: 'providerUnavailable',
+    PROVIDER_AUTH_FAILED: 'providerAuthFailed',
+    PROVIDER_MODEL_NOT_FOUND: 'providerModelNotFound',
+    PROVIDER_RATE_LIMITED: 'providerRateLimited',
+    PROVIDER_BILLING_FAILED: 'providerBillingFailed',
+    PROVIDER_TIMEOUT: 'providerTimeout',
+    PROVIDER_CONTEXT_LIMIT: 'providerContextLimit',
+    PROVIDER_INVALID_RESPONSE: 'providerInvalidResponse',
+    PROVIDER_EMPTY_RESPONSE: 'providerEmptyResponse',
+    PROVIDER_REQUEST_FAILED: 'providerRequestFailed',
+  }
+  const errorKey = code ? providerErrorKeys[code] : null
+  if (!errorKey) return fallback
+  return String(t(`chat.errors.${errorKey}`, { provider: getProviderName(provider) }))
+}
+
+function isProviderError(code?: string | null): boolean {
+  return Boolean(code?.startsWith('PROVIDER_'))
 }
 
 /**
@@ -106,6 +154,8 @@ function ChroniclePage({
   const [savesLoading, setSavesLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorNeedsSettings, setErrorNeedsSettings] = useState(false)
+  const [chronicleProvider, setChronicleProvider] = useState<string | null>(null)
   const [chronicleConfigured, setChronicleConfigured] = useState<boolean | null>(null)
 
   // Selected chapter (null = show current era)
@@ -233,6 +283,7 @@ function ChroniclePage({
 
     setLoading(true)
     setError(null)
+    setErrorNeedsSettings(false)
 
     let shouldRetrySoon = false
     let retryAfterMs: number | null = null
@@ -256,10 +307,14 @@ function ChroniclePage({
         } else if (chronicleResult.errorCode === 'CHRONICLE_PROVIDER_NOT_CONFIGURED') {
           setChronicleConfigured(false)
           setError(null)
-          setChronicle(null)
         } else {
-          setError(chronicleResult.error)
-          setChronicle(null)
+          setError(getChronicleProviderErrorMessage({
+            code: chronicleResult.errorCode,
+            fallback: chronicleResult.error,
+            provider: chronicleProvider,
+            t,
+          }))
+          setErrorNeedsSettings(isProviderError(chronicleResult.errorCode))
         }
       } else if (chronicleResult.data) {
         setChronicle(chronicleResult.data)
@@ -308,6 +363,7 @@ function ChroniclePage({
     latestSessionBySaveId,
     modelRoutingMode,
     refreshMode,
+    chronicleProvider,
     selectedSaveId,
     t,
     totalSnapshotsBySaveId,
@@ -402,6 +458,11 @@ function ChroniclePage({
       if (!status?.connected) return
       if (typeof status.chronicle_configured === 'boolean') {
         setChronicleConfigured(status.chronicle_configured)
+      }
+      if (typeof status.chronicle_provider === 'string') {
+        setChronicleProvider(status.chronicle_provider)
+      } else if (typeof status.advisor_provider === 'string') {
+        setChronicleProvider(status.advisor_provider)
       }
 
       const selectedSession = selectedSaveId ? latestSessionBySaveId.get(selectedSaveId) : null
@@ -609,6 +670,7 @@ function ChroniclePage({
     }
     setLoading(false)
     setError(null)
+    setErrorNeedsSettings(false)
     setSelectedSaveId(saveId)
     setChronicle(null)
     setSelectedChapter(null)
@@ -655,10 +717,17 @@ function ChroniclePage({
       if (result.errorCode === 'CHRONICLE_PROVIDER_NOT_CONFIGURED') {
         setChronicleConfigured(false)
         setError(null)
+        setErrorNeedsSettings(false)
         setRegeneratingChapter(null)
         return
       }
-      setError(result.error)
+      setError(getChronicleProviderErrorMessage({
+        code: result.errorCode,
+        fallback: result.error,
+        provider: chronicleProvider,
+        t,
+      }))
+      setErrorNeedsSettings(isProviderError(result.errorCode))
       setRegeneratingChapter(null)
       return
     }
@@ -683,7 +752,16 @@ function ChroniclePage({
     }
 
     setRegeneratingChapter(null)
-  }, [backend, selectedSaveId, confirmRegen, latestSessionBySaveId, modelRoutingMode, refreshMode])
+  }, [
+    backend,
+    selectedSaveId,
+    confirmRegen,
+    latestSessionBySaveId,
+    modelRoutingMode,
+    refreshMode,
+    chronicleProvider,
+    t,
+  ])
 
   // Cancel regeneration confirmation
   const handleCancelRegen = useCallback(() => {
@@ -773,17 +851,32 @@ function ChroniclePage({
             )}
 
             {error && (
-              <div className="stellaris-panel bg-accent-red/10 border-accent-red/30 rounded-lg p-4 mb-4 flex justify-between items-center">
+              <div className="stellaris-panel bg-accent-red/10 border-accent-red/30 rounded-lg p-4 mb-4 flex flex-wrap justify-between items-center gap-3">
                 <p className="text-accent-red text-sm m-0 flex items-center gap-2">
                   <span>⚠</span>
                   {error}
                 </p>
-                <button
-                  onClick={() => setError(null)}
-                  className="py-1.5 px-3 border border-accent-red/50 rounded-md bg-transparent text-accent-red text-xs font-medium cursor-pointer transition-colors duration-200 hover:bg-accent-red/20"
-                >
-                  {t('chronicle.page.dismiss')}
-                </button>
+                <div className="flex items-center gap-2">
+                  {errorNeedsSettings && onOpenSettings && (
+                    <HUDButton
+                      type="button"
+                      variant="secondary"
+                      onClick={onOpenSettings}
+                      className="px-3 py-1.5 text-[10px]"
+                    >
+                      {t('chronicle.providerSetup.action')}
+                    </HUDButton>
+                  )}
+                  <button
+                    onClick={() => {
+                      setError(null)
+                      setErrorNeedsSettings(false)
+                    }}
+                    className="py-1.5 px-3 border border-accent-red/50 rounded-md bg-transparent text-accent-red text-xs font-medium cursor-pointer transition-colors duration-200 hover:bg-accent-red/20"
+                  >
+                    {t('chronicle.page.dismiss')}
+                  </button>
+                </div>
               </div>
             )}
 

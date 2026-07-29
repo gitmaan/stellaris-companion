@@ -12,6 +12,7 @@ const electronDir = path.resolve(__dirname, '..')
 function startProviderServer() {
   let server
   let lastAuthorization = ''
+  let lastCompletionModel = ''
   return new Promise((resolve, reject) => {
     server = http.createServer((req, res) => {
       if (req.method === 'GET' && req.url === '/v1/models') {
@@ -25,6 +26,21 @@ function startProviderServer() {
         }))
         return
       }
+      if (req.method === 'POST' && req.url === '/v1/chat/completions') {
+        lastAuthorization = req.headers.authorization || ''
+        const chunks = []
+        req.on('data', (chunk) => chunks.push(chunk))
+        req.on('end', () => {
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+          lastCompletionModel = body.model
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({
+            model: body.model,
+            choices: [{ message: { content: '{"status":"ok"}' } }],
+          }))
+        })
+        return
+      }
       res.writeHead(404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'Not found' }))
     })
@@ -34,6 +50,7 @@ function startProviderServer() {
       resolve({
         port: address.port,
         getLastAuthorization: () => lastAuthorization,
+        getLastCompletionModel: () => lastCompletionModel,
         stop: () => new Promise((done) => server.close(done)),
       })
     })
@@ -70,7 +87,7 @@ test('configures a compatible Advisor provider and discovers its models', async 
     await page.waitForLoadState('domcontentloaded')
     await page.getByRole('button', { name: /Config/i }).click()
 
-    const providerSelect = page.getByLabel('ADVISOR PROVIDER')
+    const providerSelect = page.getByLabel('AI PROVIDER')
     await expect(providerSelect).toHaveValue('gemini')
     await providerSelect.selectOption('custom')
     await expect(page.getByText(/extracted game context are sent to this provider/i)).toBeVisible()
@@ -79,19 +96,19 @@ test('configures a compatible Advisor provider and discovers its models', async 
       `http://127.0.0.1:${provider.port}/v1`,
     )
     await page.getByLabel('API KEY', { exact: true }).fill('tiny-key')
-    await page.getByLabel('ADVISOR MODEL').fill('local/manual-fallback')
+    await page.getByLabel('AI MODEL').fill('local/manual-fallback')
     await page.getByRole('button', { name: /Frequent/i }).click()
     await expect(providerSelect).toHaveValue('custom')
     await expect(page.getByPlaceholder('https://provider.example/v1')).toHaveValue(
       `http://127.0.0.1:${provider.port}/v1`,
     )
-    await expect(page.getByLabel('ADVISOR MODEL')).toHaveValue('local/manual-fallback')
+    await expect(page.getByLabel('AI MODEL')).toHaveValue('local/manual-fallback')
     await page.getByRole('button', { name: 'CHECK CONNECTION' }).click()
 
     await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
     await expect(page.getByText(/2 models available/i)).toBeVisible()
 
-    const modelSelect = page.getByLabel('ADVISOR MODEL')
+    const modelSelect = page.getByLabel('AI MODEL')
     await expect(modelSelect).toHaveValue('local/manual-fallback')
     await modelSelect.selectOption('local/strategist-large')
     await page.getByRole('button', { name: 'APPLY CHANGES' }).click()
@@ -99,6 +116,9 @@ test('configures a compatible Advisor provider and discovers its models', async 
 
     await expect(providerSelect).toHaveValue('custom')
     await expect(modelSelect).toHaveValue('local/strategist-large')
+    await page.getByRole('button', { name: 'TEST MODEL' }).click()
+    await expect(page.getByText('READY FOR ADVISOR + CHRONICLE')).toBeVisible()
+    expect(provider.getLastCompletionModel()).toBe('local/strategist-large')
 
     await app.close()
     app = await launchApp(backendPort, userDataDir)
@@ -106,9 +126,9 @@ test('configures a compatible Advisor provider and discovers its models', async 
     await reloadedPage.waitForLoadState('domcontentloaded')
     await reloadedPage.getByRole('button', { name: /Config/i }).click()
 
-    await expect(reloadedPage.getByLabel('ADVISOR PROVIDER')).toHaveValue('custom')
+    await expect(reloadedPage.getByLabel('AI PROVIDER')).toHaveValue('custom')
     await expect(reloadedPage.getByLabel('API KEY', { exact: true })).toHaveValue('****...****')
-    await reloadedPage.getByLabel('ADVISOR MODEL').fill('local/after-reload')
+    await reloadedPage.getByLabel('AI MODEL').fill('local/after-reload')
     await reloadedPage.getByRole('button', { name: 'APPLY CHANGES' }).click()
     await expect(reloadedPage.getByText(/CONFIGURATION SAVED/)).toBeVisible()
     await reloadedPage.getByRole('button', { name: 'CHECK CONNECTION' }).click()
@@ -148,7 +168,7 @@ test('turns provider failures into actionable Chat recovery', async () => {
     await expect(page.getByText(/ECONNREFUSED/i)).toHaveCount(0)
 
     await page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' }).click()
-    await expect(page.getByLabel('ADVISOR PROVIDER')).toBeVisible()
+    await expect(page.getByLabel('AI PROVIDER')).toBeVisible()
   } finally {
     await app.close()
     await backend.stop()
@@ -173,7 +193,7 @@ test('guides an unconfigured Advisor directly to provider settings', async () =>
     await expect(page.getByText(/Ollama is selected but not ready/i)).toBeVisible()
 
     await page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' }).click()
-    await expect(page.getByLabel('ADVISOR PROVIDER')).toBeVisible()
+    await expect(page.getByLabel('AI PROVIDER')).toBeVisible()
   } finally {
     await app.close()
     await backend.stop()
@@ -181,8 +201,9 @@ test('guides an unconfigured Advisor directly to provider settings', async () =>
   }
 })
 
-test('keeps existing Chronicle readable while guiding Gemini setup', async () => {
+test('keeps existing Chronicle readable while guiding provider setup', async () => {
   const backend = createMockChronicleBackend({
+    advisorProvider: 'lm_studio',
     chronicleConfigured: false,
   })
   const backendPort = await backend.start()
@@ -196,11 +217,11 @@ test('keeps existing Chronicle readable while guiding Gemini setup', async () =>
 
     await expect(page.getByText('Old teaser.')).toBeVisible()
     await expect(
-      page.getByText('GEMINI KEY REQUIRED FOR NEW CHRONICLE WRITING'),
+      page.getByText('AI PROVIDER CONNECTION REQUIRED'),
     ).toBeVisible()
 
-    await page.getByRole('button', { name: 'OPEN GEMINI SETTINGS' }).click()
-    await expect(page.getByLabel('ADVISOR PROVIDER')).toHaveValue('gemini')
+    await page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' }).click()
+    await expect(page.getByLabel('AI PROVIDER')).toBeVisible()
   } finally {
     await app.close()
     await backend.stop()

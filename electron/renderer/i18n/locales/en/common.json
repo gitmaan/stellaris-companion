@@ -162,9 +162,9 @@
       "noSession": "No session found for this save"
     },
     "providerSetup": {
-      "title": "GEMINI KEY REQUIRED FOR NEW CHRONICLE WRITING",
-      "description": "You can still read existing chapters, but generating or rewriting Chronicle content remains on Gemini.",
-      "action": "OPEN GEMINI SETTINGS"
+      "title": "AI PROVIDER CONNECTION REQUIRED",
+      "description": "You can still read existing chapters. Connect the selected provider and choose a model to generate or rewrite Chronicle content.",
+      "action": "OPEN PROVIDER SETTINGS"
     },
     "sidebar": {
       "empireArchives": "Empire Archives",
@@ -284,7 +284,7 @@
       "diagnostics": "DIAGNOSTICS"
     },
     "panels": {
-      "advisorAccess": "ADVISOR MODEL ACCESS",
+      "advisorAccess": "AI MODEL ACCESS",
       "geminiAccess": "GEMINI MODEL ACCESS",
       "saveSource": "SAVE FILE SOURCE",
       "mcpRelay": "AI APP CONNECTIONS",
@@ -300,11 +300,11 @@
       "generateKey": "GENERATE KEY >"
     },
     "advisor": {
-      "providerLabel": "ADVISOR PROVIDER",
+      "providerLabel": "AI PROVIDER",
       "apiKeyLabel": "OPENROUTER API KEY",
       "optionalApiKeyLabel": "API KEY",
       "baseUrlLabel": "SERVER URL",
-      "modelLabel": "ADVISOR MODEL",
+      "modelLabel": "AI MODEL",
       "modelPlaceholder": "ENTER MODEL ID OR CHECK CONNECTION",
       "selectModel": "Select a model",
       "searchModels": "SEARCH MODELS",
@@ -316,13 +316,16 @@
       "modelsFound": "Connected // {{count}} models available",
       "connectedNoModels": "Connected // no models returned; enter a model ID manually",
       "connectionError": "Could not check this provider.",
-      "remoteContextNotice": "Advisor questions and extracted game context are sent to this provider. Public endpoints must use HTTPS.",
-      "ollamaCloudNotice": "This Ollama cloud model processes prompts remotely rather than on this device.",
+      "testModel": "TEST MODEL",
+      "testingModel": "TESTING MODEL...",
+      "modelReady": "READY FOR ADVISOR + CHRONICLE",
+      "modelTestError": "The selected model could not complete the structured output test.",
+      "modelTestPrivacy": "The test sends no campaign data.",
+      "remoteContextNotice": "Advisor questions, Chronicle prompts, and extracted game context are sent to this provider. Public endpoints must use HTTPS.",
+      "ollamaCloudNotice": "This Ollama cloud model processes Advisor and Chronicle prompts remotely rather than on this device.",
       "showAdvanced": "SHOW ADVANCED CONNECTION",
       "hideAdvanced": "HIDE ADVANCED CONNECTION",
       "optional": "OPTIONAL",
-      "chronicleKeyLabel": "CHRONICLE GEMINI API KEY",
-      "chronicleGeminiHelp": "The selected provider powers Advisor chat. Chronicle writing remains on Gemini and is disabled without this key.",
       "providers": {
         "gemini": "GEMINI",
         "ollama": "OLLAMA",
@@ -332,10 +335,10 @@
       },
       "providerHelp": {
         "gemini": "Native Gemini access for Advisor and Chronicle.",
-        "ollama": "Uses models exposed by Ollama. Campaign briefings generally need a 32K or larger active context window.",
-        "lm_studio": "Uses models exposed by the LM Studio server. Load the model with a 32K or larger context window.",
-        "openrouter": "Uses your OpenRouter account and selected hosted model.",
-        "custom": "Connects to an OpenAI-compatible chat-completions endpoint. Compatibility is best effort."
+        "ollama": "Uses one model exposed by Ollama for Advisor and Chronicle. Campaign briefings generally need a 32K or larger active context window.",
+        "lm_studio": "Uses one model exposed by the LM Studio server for Advisor and Chronicle. Load it with a 32K or larger context window.",
+        "openrouter": "Uses your OpenRouter account and selected hosted model for Advisor and Chronicle.",
+        "custom": "Uses an OpenAI-compatible chat-completions endpoint for Advisor and Chronicle. Compatibility is best effort."
       }
     },
     "geminiQuota": {
@@ -356,10 +359,10 @@
       "label": "CHRONICLE REFRESH",
       "balanced": "Steady",
       "enhanced": "Frequent",
-      "balancedTag": "LOWER GEMINI USAGE",
+      "balancedTag": "FEWER MODEL CALLS",
       "enhancedTag": "CURRENT ERA SOONER",
-      "balancedHelp": "Refreshes less often to reduce Gemini calls. Best default for free keys.",
-      "enhancedHelp": "Updates the current-era Chronicle more often while you view it. Uses more Gemini calls.",
+      "balancedHelp": "Refreshes less often to reduce model calls. Best default for local models and usage-based providers.",
+      "enhancedHelp": "Updates the current-era Chronicle more often while you view it. Uses more model calls.",
       "aria": "Set refresh mode to {{mode}}",
       "toastError": "Failed to update Chronicle refresh mode. Please try again.",
       "toastSuccess": "Chronicle refresh mode set to {{mode}}."

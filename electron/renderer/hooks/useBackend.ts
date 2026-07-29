@@ -29,6 +29,7 @@ export interface HealthResponse {
   precompute_ready: boolean
   advisor_provider?: string | null
   advisor_configured?: boolean
+  chronicle_provider?: string | null
   chronicle_configured?: boolean
   empire_type?: EmpireType
   empire_ethics?: string[]
@@ -128,6 +129,8 @@ export interface RecapResponse {
   events_summarized: number
   date_range: string
   style?: string
+  provider?: string
+  model?: string
   model_routing?: ModelRoutingSummary | null
 }
 
@@ -149,6 +152,8 @@ export interface ChronicleChapter {
   can_regenerate: boolean
   epigraph?: string
   sections?: NarrativeSection[] | null
+  provider?: string | null
+  model?: string | null
 }
 
 export interface CurrentEra {
@@ -156,6 +161,8 @@ export interface CurrentEra {
   narrative: string
   events_covered: number
   sections?: NarrativeSection[] | null
+  provider?: string | null
+  model?: string | null
 }
 
 export interface ChronicleResponse {
@@ -187,6 +194,8 @@ export interface ModelRoutingEvent {
 
 export interface ModelRoutingSummary {
   mode?: string
+  provider?: string
+  provider_display?: string
   model?: string | null
   model_display?: string | null
   fallback?: boolean

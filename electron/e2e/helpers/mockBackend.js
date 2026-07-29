@@ -76,6 +76,7 @@ function createMockChronicleBackend(options = {}) {
     precompute_ready: true,
     advisor_provider: options.advisorProvider ?? 'gemini',
     advisor_configured: options.advisorConfigured ?? true,
+    chronicle_provider: options.chronicleProvider ?? options.advisorProvider ?? 'gemini',
     chronicle_configured: options.chronicleConfigured ?? true,
     empire_type: 'standard',
     empire_ethics: ['egalitarian', 'xenophile'],

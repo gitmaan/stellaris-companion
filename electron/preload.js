@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showFolderDialog: () => ipcRenderer.invoke('select-folder'),
   advisorProviders: {
     listModels: (config) => ipcRenderer.invoke('advisor-provider:list-models', config),
+    testModel: (config) => ipcRenderer.invoke('advisor-provider:test-model', config),
   },
 
   // Feedback reporting

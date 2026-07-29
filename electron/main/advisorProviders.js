@@ -115,6 +115,33 @@ function getAdvisorProviderLabel(provider) {
   return ADVISOR_PROVIDER_PRESETS[selected]?.label || 'Provider'
 }
 
+function buildProviderHeaders(selected, apiKey, { contentType = false } = {}) {
+  const headers = contentType
+    ? { Accept: 'application/json', 'Content-Type': 'application/json' }
+    : { Accept: 'application/json' }
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+  if (selected === 'openrouter') {
+    headers['HTTP-Referer'] = 'https://github.com/gitmaan/stellaris-companion'
+    headers['X-OpenRouter-Title'] = 'Stellaris Companion'
+  }
+  return headers
+}
+
+function providerHttpError(selected, response, payload) {
+  const providerMessage = payload?.error?.message || payload?.error || payload?.detail
+  const suffix = providerMessage ? `: ${String(providerMessage).slice(0, 300)}` : ''
+  return `${getAdvisorProviderLabel(selected)} returned HTTP ${response.status}${suffix}`
+}
+
+async function readJsonResponse(response) {
+  const rawBody = await response.text()
+  try {
+    return rawBody ? JSON.parse(rawBody) : null
+  } catch {
+    return null
+  }
+}
+
 async function discoverAdvisorModels({
   provider,
   baseUrl,
@@ -145,12 +172,7 @@ async function discoverAdvisorModels({
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
-  const headers = { Accept: 'application/json' }
-  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
-  if (selected === 'openrouter') {
-    headers['HTTP-Referer'] = 'https://github.com/gitmaan/stellaris-companion'
-    headers['X-OpenRouter-Title'] = 'Stellaris Companion'
-  }
+  const headers = buildProviderHeaders(selected, apiKey)
 
   try {
     const response = await fetchImpl(`${resolvedBaseUrl}/models`, {
@@ -159,20 +181,12 @@ async function discoverAdvisorModels({
       signal: controller.signal,
       redirect: 'error',
     })
-    const rawBody = await response.text()
-    let payload = null
-    try {
-      payload = rawBody ? JSON.parse(rawBody) : null
-    } catch {
-      payload = null
-    }
+    const payload = await readJsonResponse(response)
 
     if (!response.ok) {
-      const providerMessage = payload?.error?.message || payload?.error || payload?.detail
-      const suffix = providerMessage ? `: ${String(providerMessage).slice(0, 300)}` : ''
       return {
         ok: false,
-        error: `${getAdvisorProviderLabel(selected)} returned HTTP ${response.status}${suffix}`,
+        error: providerHttpError(selected, response, payload),
       }
     }
 
@@ -189,11 +203,15 @@ async function discoverAdvisorModels({
         : String(entry?.id || entry?.name || entry?.model || '').trim()
       if (!id || seen.has(id)) continue
       seen.add(id)
-      models.push({
+      const modelEntry = {
         id,
         name: String(entry?.name || entry?.display_name || id),
         contextLength: Number(entry?.context_length || entry?.context_window || 0) || undefined,
-      })
+      }
+      if (Array.isArray(entry?.supported_parameters)) {
+        modelEntry.supportedParameters = entry.supported_parameters.map(String)
+      }
+      models.push(modelEntry)
     }
 
     return {
@@ -215,6 +233,158 @@ async function discoverAdvisorModels({
   }
 }
 
+async function testAdvisorModel({
+  provider,
+  baseUrl,
+  apiKey,
+  model,
+  timeoutMs = 30_000,
+  fetchImpl = globalThis.fetch,
+}) {
+  const selected = normalizeAdvisorProvider(provider)
+  if (selected === 'gemini') {
+    return { ok: false, error: 'Gemini is verified when the app starts its AI connection.' }
+  }
+  if (typeof fetchImpl !== 'function') {
+    return { ok: false, error: 'Model testing is unavailable in this build.' }
+  }
+
+  let resolvedBaseUrl
+  try {
+    resolvedBaseUrl = getAdvisorProviderBaseUrl(selected, baseUrl)
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Invalid provider URL.' }
+  }
+  if (!resolvedBaseUrl) {
+    return { ok: false, error: 'Enter the provider URL before testing the model.' }
+  }
+  if (ADVISOR_PROVIDER_PRESETS[selected]?.requiresApiKey && !String(apiKey || '').trim()) {
+    return { ok: false, error: `${getAdvisorProviderLabel(selected)} requires an API key.` }
+  }
+
+  const selectedModel = String(model || '').trim()
+  if (!selectedModel) {
+    return { ok: false, error: 'Choose or enter a model before testing it.' }
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const headers = buildProviderHeaders(selected, apiKey, { contentType: true })
+  const responseSchema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      status: { type: 'string', enum: ['ok'] },
+    },
+    required: ['status'],
+  }
+  const baseBody = {
+    model: selectedModel,
+    messages: [
+      {
+        role: 'system',
+        content: 'This is a private connection test. Return only JSON matching the requested schema.',
+      },
+      {
+        role: 'user',
+        content: 'Return exactly one JSON object with status set to ok. Do not add Markdown.',
+      },
+    ],
+    temperature: 0,
+    max_tokens: 32,
+    stream: false,
+  }
+  const structuredBody = {
+    ...baseBody,
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'stellaris_connection_test',
+        strict: true,
+        schema: responseSchema,
+      },
+    },
+  }
+  if (selected === 'openrouter') {
+    structuredBody.provider = { require_parameters: true }
+  }
+
+  const send = async (body) => {
+    const response = await fetchImpl(`${resolvedBaseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+      redirect: 'error',
+    })
+    return { response, payload: await readJsonResponse(response) }
+  }
+
+  try {
+    let structuredOutput = true
+    let { response, payload } = await send(structuredBody)
+    if (response.status === 400) {
+      structuredOutput = false
+      ;({ response, payload } = await send(baseBody))
+    }
+    if (!response.ok) {
+      return { ok: false, error: providerHttpError(selected, response, payload) }
+    }
+
+    const content = payload?.choices?.[0]?.message?.content
+    const text = typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? content.map((part) => typeof part === 'string' ? part : part?.text || '').join('\n')
+        : ''
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start < 0 || end < start) {
+      return {
+        ok: false,
+        error: `${getAdvisorProviderLabel(selected)} answered, but did not return usable structured output.`,
+      }
+    }
+
+    let probe
+    try {
+      probe = JSON.parse(text.slice(start, end + 1))
+    } catch {
+      return {
+        ok: false,
+        error: `${getAdvisorProviderLabel(selected)} answered, but returned invalid JSON.`,
+      }
+    }
+    if (String(probe?.status || '').toLowerCase() !== 'ok') {
+      return {
+        ok: false,
+        error: `${getAdvisorProviderLabel(selected)} answered, but failed the structured output check.`,
+      }
+    }
+
+    return {
+      ok: true,
+      provider: selected,
+      model: String(payload?.model || selectedModel),
+      baseUrl: resolvedBaseUrl,
+      structuredOutput,
+    }
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return {
+        ok: false,
+        error: `${getAdvisorProviderLabel(selected)} did not complete the model test in time.`,
+      }
+    }
+    return {
+      ok: false,
+      error: `Could not connect to ${getAdvisorProviderLabel(selected)} at ${resolvedBaseUrl}.`,
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 module.exports = {
   ADVISOR_PROVIDER_VALUES,
   ADVISOR_PROVIDER_PRESETS,
@@ -224,4 +394,5 @@ module.exports = {
   normalizeProviderBaseUrl,
   getAdvisorProviderBaseUrl,
   discoverAdvisorModels,
+  testAdvisorModel,
 }
