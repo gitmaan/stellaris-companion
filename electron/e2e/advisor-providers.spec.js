@@ -228,3 +228,36 @@ test('keeps existing Chronicle readable while guiding provider setup', async () 
     await fs.rm(userDataDir, { recursive: true, force: true })
   }
 })
+
+test('keeps cached Chronicle readable when its provider goes offline', async () => {
+  const backend = createMockChronicleBackend({
+    advisorProvider: 'lm_studio',
+  })
+  const backendPort = await backend.start()
+  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-chronicle-error-e2e-'))
+  const app = await launchApp(backendPort, userDataDir)
+
+  try {
+    const page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    await page.getByRole('button', { name: /Chronicle/i }).click()
+    await expect(page.getByText('Old teaser.')).toBeVisible()
+    await backend.waitForChronicleRequest((request) => request.chapter_only === false)
+
+    backend.setChronicleError({
+      status: 503,
+      code: 'PROVIDER_UNAVAILABLE',
+      error: 'connect ECONNREFUSED 127.0.0.1:1234',
+    })
+    backend.advanceCampaign()
+
+    await expect(page.getByText(/LM Studio could not be reached/i)).toBeVisible()
+    await expect(page.getByText('Old teaser.')).toBeVisible()
+    await expect(page.getByText(/ECONNREFUSED/i)).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' })).toBeVisible()
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(userDataDir, { recursive: true, force: true })
+  }
+})
