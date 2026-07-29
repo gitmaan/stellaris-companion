@@ -80,6 +80,12 @@ jobs:
         working-directory: electron
         run: npm run build:renderer
 
+      - name: Configure Electron sandbox
+        working-directory: electron
+        run: |
+          sudo chown root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+
       - name: Run Electron journeys
         working-directory: electron
         run: xvfb-run --auto-servernum npx playwright test
