@@ -18,9 +18,8 @@ classifiers = [
 
 dependencies = [
     "google-genai>=1.0.0",
-    # Keep macOS PyInstaller bundles on the statically-linked wheel; newer
-    # runner-provided builds can dynamically link mismatched libssl.dylib.
-    "cryptography==46.0.4",
+    # Keep macOS PyInstaller bundles on pyca's statically-linked universal wheel.
+    "cryptography==48.0.1",
     "python-dotenv>=1.0.0",
     "watchdog>=3.0",
     "fastapi>=0.100.0",
