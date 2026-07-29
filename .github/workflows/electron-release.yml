@@ -193,6 +193,7 @@ jobs:
         with:
           files: electron/dist/mcpb/*.mcpb
           fail_on_unmatched_files: true
+          draft: true
 
       - name: Fetch notarization log on failure
         if: failure() && startsWith(matrix.name, 'mac')
@@ -228,8 +229,81 @@ jobs:
             echo "Could not find submission ID"
           fi
 
-  deploy-promo-site:
+  finalize_release:
     needs: release
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.platform == 'all')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.release-tag.outputs.tag }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve release tag
+        id: release-tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            VERSION=$(node -p "require('./electron/package.json').version")
+            TAG="v${VERSION}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download both macOS update archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release-tag.outputs.tag }}
+          VERSION: ${{ steps.release-tag.outputs.version }}
+        shell: bash
+        run: |
+          mkdir -p /tmp/mac-update
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern "Stellaris-Companion-${VERSION}-arm64-mac.zip" \
+            --dir /tmp/mac-update
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern "Stellaris-Companion-${VERSION}-mac.zip" \
+            --dir /tmp/mac-update
+
+      - name: Generate architecture-complete macOS update feed
+        env:
+          VERSION: ${{ steps.release-tag.outputs.version }}
+        run: |
+          node scripts/finalize_mac_update_manifest.js \
+            --version "$VERSION" \
+            --assets-dir /tmp/mac-update \
+            --notes electron/release-notes.md \
+            --output /tmp/mac-update/latest-mac.yml \
+            --minimum-system-version 21.0.0
+
+      - name: Upload update feed and publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release-tag.outputs.tag }}
+        shell: bash
+        run: |
+          gh release upload "$TAG" /tmp/mac-update/latest-mac.yml \
+            --repo "${{ github.repository }}" \
+            --clobber
+          gh release edit "$TAG" \
+            --repo "${{ github.repository }}" \
+            --draft=false \
+            --latest \
+            --notes-file electron/release-notes.md
+
+  deploy-promo-site:
+    needs: finalize_release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4
@@ -239,11 +313,12 @@ jobs:
       - name: Synchronize promo site release facts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.finalize_release.outputs.tag }}
         run: |
           git clone --depth 1 https://x-access-token:${{ secrets.PROMO_SITE_TOKEN }}@github.com/gitmaan/stellaris-companion-site.git /tmp/site
           cd /tmp/site
           npm ci
-          npm run release:sync -- --tag "${{ github.ref_name }}"
+          npm run release:sync -- --tag "$RELEASE_TAG"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add \
@@ -251,8 +326,8 @@ jobs:
             public/.well-known/product-facts.json \
             public/.well-known/agent-skills/index.json
           if git diff --cached --quiet; then
-            git commit --allow-empty -m "chore: rebuild for ${{ github.ref_name }}"
+            git commit --allow-empty -m "chore: rebuild for $RELEASE_TAG"
           else
-            git commit -m "chore: sync release facts for ${{ github.ref_name }}"
+            git commit -m "chore: sync release facts for $RELEASE_TAG"
           fi
           git push
