@@ -16,6 +16,7 @@ Output:
     dist/stellaris-backend.exe (Windows)
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -28,7 +29,8 @@ SPEC_ROOT = Path(SPECPATH)
 # Auto-detect macOS code signing identity (Developer ID Application)
 _codesign_identity = None
 _entitlements_file = None
-if sys.platform == 'darwin':
+_skip_codesign = os.environ.get('STELLARIS_SKIP_CODESIGN') == '1'
+if sys.platform == 'darwin' and not _skip_codesign:
     _entitlements_path = SPEC_ROOT / 'electron' / 'entitlements.mac.plist'
     if _entitlements_path.exists():
         _entitlements_file = str(_entitlements_path)
@@ -50,6 +52,8 @@ if sys.platform == 'darwin':
         print(f'PyInstaller: signing with identity {_codesign_identity}')
     else:
         print('PyInstaller: no Developer ID found, skipping code signing')
+elif sys.platform == 'darwin':
+    print('PyInstaller: STELLARIS_SKIP_CODESIGN=1, skipping code signing')
 
 a = Analysis(
     ['backend/electron_main.py'],

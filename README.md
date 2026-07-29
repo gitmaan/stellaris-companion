@@ -8,7 +8,7 @@
 
 Your empire's strategic council, on demand.
 
-Stellaris LLM Companion reads your save, tracks what is changing across time, and gives actionable strategic advice in your empire's voice. It uses Gemini 3 Flash (`gemini-3-flash-preview`) and a Rust parser for fast extraction.
+Stellaris LLM Companion reads your save, tracks what is changing across time, and gives actionable strategic advice in your empire's voice. Gemini is the default, with Ollama, LM Studio, OpenRouter, and OpenAI-compatible Advisor endpoints also supported.
 
 ![Stellaris Companion Hero Screenshot](docs/images/hero-screenshot.jpeg)
 
@@ -26,8 +26,8 @@ Stellaris LLM Companion reads your save, tracks what is changing across time, an
 
 - **Python 3.10+**
 - **Rust toolchain** (required for `stellaris-parser`)
-- **Node.js** (for Electron app)
-- **Gemini API key** from [Google AI Studio](https://aistudio.google.com/)
+- **Node.js 22.12+** (for Electron app)
+- **Gemini API key** from [Google AI Studio](https://aistudio.google.com/) when using the default Advisor or Chronicle generation
 
 ### Run the app
 
@@ -60,6 +60,12 @@ echo 'GOOGLE_API_KEY="your-key-here"' > .env
 
 For packaged builds, paste it in **Config** -> **INTELLIGENCE UPLINK**.
 
+For another Advisor provider, open **Config** -> **INTELLIGENCE UPLINK**, choose Ollama,
+LM Studio, OpenRouter, or Custom, check the connection, and select a model. Ollama and
+LM Studio must already be running and exposing their API. Full campaign briefings typically
+need an active context window of at least 32K tokens. Public custom endpoints must use HTTPS;
+HTTP is accepted for localhost and private-network model servers. Chronicle remains on Gemini.
+
 ## What you can ask
 
 - "Give me a strategic briefing"
@@ -84,7 +90,8 @@ For packaged builds, paste it in **Config** -> **INTELLIGENCE UPLINK**.
 
 - **Your `.sav` files stay on your machine.**
 - **Local processing by default**: parsing, extraction, and history storage are local.
-- **What leaves your machine**: your question + extracted game context are sent to Gemini using your own key.
+- **What leaves your machine**: Advisor questions and extracted game context are sent to the provider and model you select. Ollama and LM Studio connect through local loopback addresses by default, but Ollama cloud models process prompts remotely. OpenRouter and custom remote endpoints receive that context over the network.
+- **Chronicle provider**: Chronicle generation remains on Gemini and is disabled without a Google API key.
 - **MCP client access**: configured local AI apps can read the extracted campaign cache through the MCP Relay.
 - **Chronicle write-back**: MCP clients can save Chronicle edits only through explicit Chronicle save/update tools, and those edits stay in the local Chronicle cache.
 - **Discord relay scope**: relay forwards `/ask` requests/responses between Discord and your local app.
@@ -149,7 +156,7 @@ For in-app chat and Discord:
 User Question
      |
      v
-Gemini 3 Flash + empire-specific personality
+Selected Advisor provider + empire-specific personality
      |
      v
 Complete Briefing JSON (precomputed + cached)

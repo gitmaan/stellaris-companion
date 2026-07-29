@@ -3,6 +3,8 @@ from pathlib import Path
 
 import tomllib
 
+from backend import __version__ as backend_version
+
 
 def test_versions_match_across_python_and_electron_packages():
     """Release safety check: keep the app + backend versions in sync."""
@@ -16,4 +18,7 @@ def test_versions_match_across_python_and_electron_packages():
 
     assert python_version == electron_version, (
         f"Version mismatch: pyproject.toml={python_version} electron/package.json={electron_version}"
+    )
+    assert python_version == backend_version, (
+        f"Version mismatch: pyproject.toml={python_version} backend={backend_version}"
     )

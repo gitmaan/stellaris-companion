@@ -2,7 +2,7 @@
 Stellaris Companion Backend
 ===========================
 
-Electron app backend with Gemini-powered strategic advisor for Stellaris.
+Electron app backend with a configurable strategic advisor for Stellaris.
 """
 
-__version__ = "0.6.2"
+__version__ = "0.9.0"

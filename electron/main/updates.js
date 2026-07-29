@@ -1,4 +1,5 @@
 const IS_E2E = process.env.E2E === '1'
+const semver = require('semver')
 
 function setupAutoUpdater({ autoUpdater, app, isDev }) {
   if (IS_E2E) return
@@ -45,6 +46,7 @@ function setupAutoUpdater({ autoUpdater, app, isDev }) {
 }
 
 const updaterState = {
+  availableVersion: null,
   downloadedVersion: null,
   releaseName: null,
   releaseNotes: null,
@@ -101,16 +103,26 @@ function normalizeReleaseNotes(releaseNotes) {
   return null
 }
 
-function cacheUpdateMetadata(info) {
+function isNewerVersion(candidateVersion, currentVersion) {
+  const candidate = semver.valid(candidateVersion)
+  const current = semver.valid(currentVersion)
+  return Boolean(candidate && current && semver.gt(candidate, current))
+}
+
+function cacheUpdateMetadata(info, { downloaded = false } = {}) {
   if (!info || typeof info !== 'object') return
 
   if (typeof info.version === 'string' && info.version.length > 0) {
-    const isNewVersion = updaterState.downloadedVersion && updaterState.downloadedVersion !== info.version
+    const isNewVersion = updaterState.availableVersion && updaterState.availableVersion !== info.version
     if (isNewVersion) {
       updaterState.releaseName = null
       updaterState.releaseNotes = null
+      updaterState.downloadedVersion = null
     }
-    updaterState.downloadedVersion = info.version
+    updaterState.availableVersion = info.version
+    if (downloaded) {
+      updaterState.downloadedVersion = info.version
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(info, 'releaseName')) {
@@ -128,7 +140,7 @@ function buildUpdatePayload(info = {}) {
   const normalizedReleaseNotes = normalizeReleaseNotes(info?.releaseNotes)
 
   return {
-    version: info?.version || updaterState.downloadedVersion || undefined,
+    version: info?.version || updaterState.availableVersion || updaterState.downloadedVersion || undefined,
     releaseName: info?.releaseName || updaterState.releaseName || undefined,
     releaseNotes: normalizedReleaseNotes || updaterState.releaseNotes || undefined,
   }
@@ -151,10 +163,14 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
 
     try {
       const result = await autoUpdater.checkForUpdates()
-      cacheUpdateMetadata(result?.updateInfo)
+      const updateInfo = result?.updateInfo
+      const updateAvailable = isNewerVersion(updateInfo?.version, app.getVersion())
+      if (updateAvailable) {
+        cacheUpdateMetadata(updateInfo)
+      }
       return {
-        updateAvailable: result?.updateInfo?.version !== app.getVersion(),
-        ...buildUpdatePayload(result?.updateInfo),
+        updateAvailable,
+        ...(updateAvailable ? buildUpdatePayload(updateInfo) : {}),
       }
     } catch (err) {
       console.error('Failed to check for updates:', err)
@@ -172,6 +188,10 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
 
     if (process.windowsStore) {
       return { success: false, error: 'Updates are managed by Microsoft Store builds' }
+    }
+
+    if (!isNewerVersion(updaterState.availableVersion, app.getVersion())) {
+      return { success: false, error: 'No newer update is ready to install' }
     }
 
     if (updaterState.installing) {
@@ -197,8 +217,11 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
       }, 45000)
 
       // If we don't already have a ready update, ensure one is downloaded first.
-      if (!updaterState.downloadedVersion) {
+      if (!isNewerVersion(updaterState.downloadedVersion, app.getVersion())) {
         await autoUpdater.downloadUpdate()
+      }
+      if (!isNewerVersion(updaterState.downloadedVersion, app.getVersion())) {
+        throw new Error('The update has not finished downloading')
       }
 
       // Install is explicitly user-triggered from renderer UI.
@@ -221,12 +244,16 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
   })
 }
 
-function wireAutoUpdaterEvents({ autoUpdater, getMainWindow }) {
+function wireAutoUpdaterEvents({ autoUpdater, app, getMainWindow }) {
   autoUpdater.on('checking-for-update', () => {
     sendUpdateEvent(getMainWindow, 'update-checking')
   })
 
   autoUpdater.on('update-available', (info) => {
+    if (!isNewerVersion(info?.version, app.getVersion())) {
+      console.log('Ignoring non-newer update:', info?.version)
+      return
+    }
     cacheUpdateMetadata(info)
     console.log('Update available:', info.version)
     sendUpdateEvent(getMainWindow, 'update-available', buildUpdatePayload(info))
@@ -246,7 +273,11 @@ function wireAutoUpdaterEvents({ autoUpdater, getMainWindow }) {
   })
 
   autoUpdater.on('update-downloaded', (info) => {
-    cacheUpdateMetadata(info)
+    if (!isNewerVersion(info?.version, app.getVersion())) {
+      console.log('Ignoring non-newer downloaded update:', info?.version)
+      return
+    }
+    cacheUpdateMetadata(info, { downloaded: true })
     console.log('Update downloaded:', info.version)
     sendUpdateEvent(getMainWindow, 'update-downloaded', buildUpdatePayload(info))
     console.log('Update ready to install; awaiting explicit user action')
@@ -264,6 +295,7 @@ function wireAutoUpdaterEvents({ autoUpdater, getMainWindow }) {
 }
 
 module.exports = {
+  isNewerVersion,
   setupAutoUpdater,
   registerUpdateIpcHandlers,
   wireAutoUpdaterEvents,

@@ -2,7 +2,7 @@
 Stellaris Companion Core
 ========================
 
-Provides the Companion class — the Gemini-powered strategic advisor
+Provides the Companion class — the configurable strategic advisor
 used by the Electron app via the backend API.
 """
 
@@ -23,7 +23,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 try:
     from google import genai
-    from google.genai import types
 except ModuleNotFoundError as exc:
     if (
         "No module named" in str(exc)
@@ -35,20 +34,20 @@ except ModuleNotFoundError as exc:
         ) from exc
     raise
 
+from backend.core.advisor_providers import (
+    ADVISOR_PROVIDER_GEMINI,
+    AdvisorGenerator,
+    AdvisorProviderConfig,
+    AdvisorProviderError,
+    create_advisor_generator,
+)
 from backend.core.conversation import ConversationManager
 from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
 from backend.core.model_routing import (
     GEMINI_FLASH_MODEL,
-    classify_model_error,
     display_model_name,
-    fallback_notice,
-    get_model_unavailable_event,
-    is_model_temporarily_unavailable,
-    mark_model_failure,
     normalize_model_routing_mode,
-    route_event_payload,
-    route_models_for,
 )
 from backend.core.utils import compute_save_hash_from_briefing
 from stellaris_companion.personality import build_optimized_prompt
@@ -85,7 +84,7 @@ FACTUAL ACCURACY CONTRACT:
 
 
 class Companion:
-    """Stellaris companion powered by Gemini with precomputed briefings.
+    """Stellaris companion powered by a configurable Advisor provider.
 
     Used by the Electron app via the backend API (server.py).
     """
@@ -96,26 +95,37 @@ class Companion:
         api_key: str | None = None,
         *,
         auto_precompute: bool = True,
-        advisor_model: str = DEFAULT_ADVISOR_MODEL,
+        advisor_model: str | None = None,
+        advisor_provider: str | None = None,
+        advisor_base_url: str | None = None,
+        advisor_api_key: str | None = None,
+        advisor_generator: AdvisorGenerator | None = None,
         model_routing_mode: str | None = None,
     ):
         """Initialize the companion.
 
         Args:
             save_path: Path to the Stellaris .sav file. If None, will try to find most recent.
-            api_key: Google API key. If None, reads from GOOGLE_API_KEY env var.
+            api_key: Google API key used by the native Gemini adapter.
         """
-        # Get API key
         self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
-        if not self.api_key:
-            raise ValueError("GOOGLE_API_KEY environment variable not set")
-
-        self.client = genai.Client(api_key=self.api_key)
+        self.advisor_provider_config = AdvisorProviderConfig.from_environment(
+            provider=advisor_provider,
+            model=advisor_model,
+            base_url=advisor_base_url,
+            advisor_api_key=advisor_api_key,
+            google_api_key=self.api_key,
+        )
+        self.client = None
+        if self.advisor_provider_config.provider == ADVISOR_PROVIDER_GEMINI and self.api_key:
+            self.client = genai.Client(api_key=self.api_key)
+        self._advisor_generator = advisor_generator or create_advisor_generator(
+            config=self.advisor_provider_config,
+            gemini_client=self.client,
+        )
         self._thinking_level = "dynamic"
         self._auto_precompute = bool(auto_precompute)
-        self.advisor_model = (
-            str(advisor_model or DEFAULT_ADVISOR_MODEL).strip() or DEFAULT_ADVISOR_MODEL
-        )
+        self.advisor_model = self.advisor_provider_config.model
         self.model_routing_mode = normalize_model_routing_mode(
             model_routing_mode or os.environ.get("STELLARIS_MODEL_ROUTING_MODE")
         )
@@ -139,6 +149,7 @@ class Companion:
             "payload_sizes": {},
             "model": self.advisor_model,
             "model_display": display_model_name(self.advisor_model),
+            "provider": self.advisor_provider_config.provider,
             "routing": None,
         }
 
@@ -401,6 +412,14 @@ class Companion:
     def get_advisor_model(self) -> str:
         """Return the default advisor model for chat requests."""
         return self.advisor_model
+
+    def get_advisor_provider(self) -> str:
+        """Return the configured Advisor provider identifier."""
+        return self.advisor_provider_config.provider
+
+    def is_advisor_configured(self) -> bool:
+        """Return whether the selected Advisor provider can generate responses."""
+        return self._advisor_generator is not None
 
     def get_precompute_status(self) -> dict[str, Any]:
         """Get current Phase 4 precompute cache status (safe for UI display)."""
@@ -998,77 +1017,25 @@ class Companion:
             ask_system_prompt += f"{naval_cap_policy_block}\n"
 
         try:
-            cfg = types.GenerateContentConfig(
-                system_instruction=ask_system_prompt,
+            if self._advisor_generator is None:
+                raise AdvisorProviderError(
+                    f"{self.advisor_provider_config.display_name} is not configured for the Advisor",
+                    code="ADVISOR_PROVIDER_NOT_CONFIGURED",
+                    status_code=400,
+                )
+
+            generation = self._advisor_generator.generate(
+                system_prompt=ask_system_prompt,
+                user_prompt=user_prompt,
+                model=explicit_model,
+                model_routing_mode=model_routing_mode or self.model_routing_mode,
+                thinking_level=self._thinking_level,
                 temperature=1.0,
                 max_output_tokens=4096,
             )
-            if self._thinking_level != "dynamic":
-                cfg.thinking_config = types.ThinkingConfig(thinking_level=self._thinking_level)
-
-            candidate_models = route_models_for(
-                mode=model_routing_mode or self.model_routing_mode,
-                purpose="advisor",
-                explicit_model=explicit_model,
-            )
-            if not candidate_models:
-                candidate_models = [selected_model]
-
-            requested_model = candidate_models[0]
-            response = None
-            final_model = requested_model
-            route_event = None
-            last_error: Exception | None = None
-
-            for index, candidate_model in enumerate(candidate_models):
-                fallback_model = (
-                    candidate_models[index + 1] if index + 1 < len(candidate_models) else None
-                )
-                if fallback_model and is_model_temporarily_unavailable(candidate_model):
-                    route_event = get_model_unavailable_event(
-                        requested_model=requested_model,
-                        skipped_model=candidate_model,
-                        final_model=fallback_model,
-                    )
-                    continue
-
-                try:
-                    response = self.client.models.generate_content(
-                        model=candidate_model,
-                        contents=user_prompt,
-                        config=cfg,
-                    )
-                    final_model = candidate_model
-                    if route_event and route_event.final_model != final_model:
-                        route_event.final_model = final_model
-                    break
-                except Exception as exc:
-                    last_error = exc
-                    failure = classify_model_error(exc)
-                    if failure and fallback_model:
-                        mark_model_failure(candidate_model, failure)
-                        route_event = route_event or get_model_unavailable_event(
-                            requested_model=requested_model,
-                            skipped_model=candidate_model,
-                            final_model=fallback_model,
-                        )
-                        if route_event:
-                            route_event.reason = failure.reason
-                            route_event.error = failure.message[:500]
-                            route_event.notice = fallback_notice(
-                                candidate_model,
-                                fallback_model,
-                                reason=failure.reason,
-                            )
-                        continue
-                    raise
-
-            if response is None:
-                if last_error is not None:
-                    raise last_error
-                raise RuntimeError("No advisor model was available")
-
-            response_text_raw = response.text or localized_text(
+            requested_model = generation.requested_model
+            final_model = generation.model
+            response_text_raw = generation.text or localized_text(
                 "could_not_generate", output_language
             )
             response_text = response_text_raw
@@ -1094,7 +1061,8 @@ class Companion:
                 "model_display": display_model_name(final_model),
                 "requested_model": requested_model,
                 "requested_model_display": display_model_name(requested_model),
-                "routing": route_event_payload(route_event),
+                "provider": self.advisor_provider_config.provider,
+                "routing": generation.routing,
             }
 
             self._conversations.record_turn(
@@ -1121,12 +1089,19 @@ class Companion:
                 "tools_used": [],
                 "wall_time_ms": wall_time_ms,
                 "response_length": 0,
-                "payload_sizes": {"briefing_json": len(briefing_json)},
+                "payload_sizes": {
+                    "briefing_json": len(briefing_json),
+                    "prompt_total": len(user_prompt),
+                    "save_memory_summary": len(save_memory_summary or ""),
+                },
                 "error": str(e),
                 "model": selected_model,
                 "model_display": display_model_name(selected_model),
+                "provider": self.advisor_provider_config.provider,
                 "routing": None,
             }
+            if isinstance(e, AdvisorProviderError):
+                raise
             return f"Error: {str(e)}", elapsed
 
     def get_status_data(self) -> dict:

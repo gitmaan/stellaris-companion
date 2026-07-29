@@ -11,7 +11,11 @@ Usage:
     python backend/electron_main.py --port 8742 --host 127.0.0.1
 
 Environment Variables:
-    GOOGLE_API_KEY: Your Google API key for Gemini (required)
+    GOOGLE_API_KEY: Google API key for Gemini Advisor and Chronicle features
+    STELLARIS_ADVISOR_PROVIDER: gemini, ollama, lm_studio, openrouter, or custom
+    STELLARIS_ADVISOR_MODEL: Model identifier for non-Gemini Advisor providers
+    STELLARIS_ADVISOR_BASE_URL: OpenAI-compatible API base URL
+    STELLARIS_ADVISOR_API_KEY: Optional key for the selected compatible provider
     STELLARIS_API_TOKEN: Bearer token for API authentication (required)
     STELLARIS_DB_PATH: Path to SQLite history DB (optional)
     STELLARIS_SAVE_PATH: Path to a specific save file to load (optional)
@@ -88,7 +92,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Environment Variables:
-  GOOGLE_API_KEY        Google API key for Gemini (required)
+  GOOGLE_API_KEY        Google API key for Gemini and Chronicle features
   STELLARIS_API_TOKEN   Bearer token for API authentication (required)
   STELLARIS_DB_PATH     Path to SQLite history DB (optional)
   STELLARIS_SAVE_PATH   Path to a specific save file (optional)
@@ -399,12 +403,6 @@ def validate_environment() -> None:
     Raises:
         ValueError: If required environment variables are missing.
     """
-    if not os.environ.get("GOOGLE_API_KEY"):
-        raise ValueError(
-            "GOOGLE_API_KEY environment variable not set.\n"
-            "The Electron app should set this from the user's settings."
-        )
-
     if not os.environ.get("STELLARIS_API_TOKEN"):
         raise ValueError(
             "STELLARIS_API_TOKEN environment variable not set.\n"

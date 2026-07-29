@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import ChatMessage from '../components/ChatMessage'
 import ChatInput from '../components/ChatInput'
 import VirtualChatList from '../components/VirtualChatList'
@@ -9,6 +10,7 @@ import { useBackend, ChatResponse, EmpireType } from '../hooks/useBackend'
 import type { ModelRoutingMode } from '../hooks/useSettings'
 import { HUDHeader } from '../components/hud/HUDText'
 import { HUDPanel } from '../components/hud/HUDPanel'
+import { HUDButton } from '../components/hud/HUDButton'
 import { FolderIconG } from '../components/icons/FolderIcon'
 
 interface LoadingMessagePools {
@@ -92,6 +94,7 @@ interface Message {
   modelDisplay?: string
   modelRouting?: ChatResponse['model_routing']
   isError?: boolean
+  action?: 'settings'
 }
 
 const MAX_CHAT_MESSAGES = 300
@@ -117,6 +120,54 @@ function buildRecentTurnsForReport(messages: Message[], assistantIndex: number):
     .slice(-MAX_REPORT_CONTEXT_MESSAGES)
 }
 
+function getAdvisorProviderName(provider: string | null): string {
+  switch (provider) {
+    case 'ollama':
+      return 'Ollama'
+    case 'lm_studio':
+      return 'LM Studio'
+    case 'openrouter':
+      return 'OpenRouter'
+    case 'custom':
+      return 'Custom provider'
+    default:
+      return 'Gemini'
+  }
+}
+
+function getProviderErrorMessage({
+  code,
+  fallback,
+  provider,
+  t,
+}: {
+  code?: string | null
+  fallback: string
+  provider: string | null
+  t: TFunction
+}): { content: string; action?: 'settings' } {
+  const providerName = getAdvisorProviderName(provider)
+  const providerErrorKeys: Record<string, string> = {
+    ADVISOR_PROVIDER_NOT_CONFIGURED: 'providerNotConfigured',
+    PROVIDER_UNAVAILABLE: 'providerUnavailable',
+    PROVIDER_AUTH_FAILED: 'providerAuthFailed',
+    PROVIDER_MODEL_NOT_FOUND: 'providerModelNotFound',
+    PROVIDER_RATE_LIMITED: 'providerRateLimited',
+    PROVIDER_BILLING_FAILED: 'providerBillingFailed',
+    PROVIDER_TIMEOUT: 'providerTimeout',
+    PROVIDER_CONTEXT_LIMIT: 'providerContextLimit',
+    PROVIDER_INVALID_RESPONSE: 'providerInvalidResponse',
+    PROVIDER_EMPTY_RESPONSE: 'providerEmptyResponse',
+    PROVIDER_REQUEST_FAILED: 'providerRequestFailed',
+  }
+  const errorKey = code ? providerErrorKeys[code] : null
+  if (!errorKey) return { content: fallback }
+  return {
+    content: String(t(`chat.errors.${errorKey}`, { provider: providerName })),
+    action: 'settings',
+  }
+}
+
 /**
  * ChatPage - Main chat interface for interacting with the Stellaris advisor
  * Galactic Command Terminal aesthetic
@@ -124,6 +175,7 @@ function buildRecentTurnsForReport(messages: Message[], assistantIndex: number):
 interface ChatPageProps {
   isActive?: boolean
   modelRoutingMode?: ModelRoutingMode
+  onOpenSettings?: () => void
   onReportLlmIssue?: (llm: {
     lastPrompt?: string
     lastResponse?: string
@@ -136,6 +188,7 @@ interface ChatPageProps {
 function ChatPage({
   isActive = true,
   modelRoutingMode,
+  onOpenSettings,
   onReportLlmIssue,
 }: ChatPageProps) {
   const { t } = useTranslation()
@@ -149,6 +202,8 @@ function ChatPage({
   const [precomputeReady, setPrecomputeReady] = useState(false)
   const [empireName, setEmpireName] = useState<string | null>(null)
   const [gameDate, setGameDate] = useState<string | null>(null)
+  const [advisorConfigured, setAdvisorConfigured] = useState<boolean | null>(null)
+  const [advisorProvider, setAdvisorProvider] = useState<string | null>(null)
   const [empireEthics, setEmpireEthics] = useState<string[]>([])
   const [empireCivics, setEmpireCivics] = useState<string[]>([])
   const [empireAuthority, setEmpireAuthority] = useState<string | null>(null)
@@ -213,6 +268,12 @@ function ChatPage({
       setPrecomputeReady(!!status?.precompute_ready)
       setEmpireName(status?.empire_name ?? null)
       setGameDate(status?.game_date ?? null)
+      if (typeof status?.advisor_configured === 'boolean') {
+        setAdvisorConfigured(status.advisor_configured)
+      }
+      if (typeof status?.advisor_provider === 'string') {
+        setAdvisorProvider(status.advisor_provider)
+      }
       setEmpireEthics(Array.isArray(status?.empire_ethics) ? status.empire_ethics : [])
       setEmpireCivics(Array.isArray(status?.empire_civics) ? status.empire_civics : [])
       setEmpireAuthority(typeof status?.empire_authority === 'string' ? status.empire_authority : null)
@@ -278,15 +339,26 @@ function ChatPage({
           return
         }
 
+        const providerError = getProviderErrorMessage({
+          code: result.errorCode,
+          fallback: result.error,
+          provider: advisorProvider,
+          t,
+        })
+        if (result.errorCode === 'ADVISOR_PROVIDER_NOT_CONFIGURED') {
+          setAdvisorConfigured(false)
+        }
         const errorMessage: Message = {
           id: `error-${Date.now()}`,
           role: 'assistant',
-          content: result.error,
+          content: providerError.content,
           timestamp: new Date(),
           isError: true,
+          action: providerError.action,
         }
         setMessages(prev => capMessages([...prev, errorMessage]))
       } else if (result.data) {
+        setAdvisorConfigured(true)
         // Success - add assistant response
         const chatResponse = result.data as ChatResponse
         const assistantMessage: Message = {
@@ -319,7 +391,7 @@ function ChatPage({
         setIsLoading(false)
       }
     }
-  }, [backend, sessionKey, empireType, modelRoutingMode, loadingMessages, t])
+  }, [advisorProvider, backend, sessionKey, empireType, modelRoutingMode, loadingMessages, t])
 
   const handleNewChat = useCallback(() => {
     if (isLoading) return
@@ -344,6 +416,12 @@ function ChatPage({
           modelDisplay={message.modelDisplay}
           modelRouting={message.modelRouting}
           isError={message.isError}
+          actionLabel={
+            message.action === 'settings'
+              ? t('chat.errors.openProviderSettings')
+              : undefined
+          }
+          onAction={message.action === 'settings' ? onOpenSettings : undefined}
           onReport={
             onReportLlmIssue && message.role === 'assistant' && !message.isError
               ? () => {
@@ -379,7 +457,7 @@ function ChatPage({
     }
 
     return base
-  }, [messages, isLoading, loadingMessage, onReportLlmIssue])
+  }, [messages, isLoading, loadingMessage, onOpenSettings, onReportLlmIssue, t])
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
@@ -453,48 +531,77 @@ function ChatPage({
             <motion.div className="w-full" variants={welcomeItem}>
               <AnimatePresence mode="wait">
                 {precomputeReady ? (
-                  <motion.div
-                    key="suggestions"
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.4, ease: EASE_CURVE }}
-                  >
-                    <HUDPanel
-                      className={`w-full ${isWelcomeCompact ? 'max-h-[42vh]' : ''}`}
-                      title={t('chat.welcome.suggested', { defaultValue: 'Suggested Inquiries' })}
-                      variant="primary"
+                  advisorConfigured === false ? (
+                    <motion.div
+                      key="provider-setup"
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.4, ease: EASE_CURVE }}
                     >
-                      <div className={isWelcomeCompact ? 'max-h-[30vh] overflow-y-auto custom-scrollbar pr-1' : ''}>
-                        <motion.div
-                          key={suggestionKey}
-                          className={`grid grid-cols-1 md:grid-cols-2 ${isWelcomeCompact ? 'gap-2' : 'gap-3'}`}
-                          variants={suggestionContainer}
-                          initial="hidden"
-                          animate="show"
-                        >
-                          {visibleSuggestions.map((suggestion, idx) => (
-                            <motion.button
-                              key={suggestion}
-                              variants={suggestionItem}
-                              onClick={() => handleSend(suggestion)}
-                              className={`group relative flex items-start text-left transition-all duration-200 hover:bg-accent-cyan/5 border border-transparent hover:border-accent-cyan/20 rounded-sm ${
-                                isWelcomeCompact ? 'p-2.5' : 'p-3'
-                              }`}
-                            >
-                              <span className="font-mono text-xs text-accent-cyan/50 mr-3 opacity-50 group-hover:opacity-100 group-hover:text-accent-cyan transition-all">
-                                {String(idx + 1).padStart(2, '0')}
-                              </span>
-                              <span className={`font-mono tracking-wide text-text-primary group-hover:text-accent-cyan transition-all ${isWelcomeCompact ? 'text-[11px]' : 'text-xs'}`}>
-                                {suggestion}
-                              </span>
-                              <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-1 bg-accent-cyan/50 rounded-full opacity-0 group-hover:opacity-100 shadow-glow-sm transition-opacity" />
-                            </motion.button>
-                          ))}
-                        </motion.div>
-                      </div>
-                    </HUDPanel>
-                  </motion.div>
+                      <HUDPanel title={t('chat.providerSetup.title')} variant="secondary">
+                        <div className="flex flex-col items-start gap-4 p-1">
+                          <p className="font-mono text-sm leading-relaxed text-text-secondary">
+                            {t('chat.providerSetup.description', {
+                              provider: getAdvisorProviderName(advisorProvider),
+                            })}
+                          </p>
+                          <HUDButton
+                            type="button"
+                            variant="primary"
+                            onClick={onOpenSettings}
+                            disabled={!onOpenSettings}
+                            className="px-4"
+                          >
+                            {t('chat.errors.openProviderSettings')}
+                          </HUDButton>
+                        </div>
+                      </HUDPanel>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="suggestions"
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.4, ease: EASE_CURVE }}
+                    >
+                      <HUDPanel
+                        className={`w-full ${isWelcomeCompact ? 'max-h-[42vh]' : ''}`}
+                        title={t('chat.welcome.suggested', { defaultValue: 'Suggested Inquiries' })}
+                        variant="primary"
+                      >
+                        <div className={isWelcomeCompact ? 'max-h-[30vh] overflow-y-auto custom-scrollbar pr-1' : ''}>
+                          <motion.div
+                            key={suggestionKey}
+                            className={`grid grid-cols-1 md:grid-cols-2 ${isWelcomeCompact ? 'gap-2' : 'gap-3'}`}
+                            variants={suggestionContainer}
+                            initial="hidden"
+                            animate="show"
+                          >
+                            {visibleSuggestions.map((suggestion, idx) => (
+                              <motion.button
+                                key={suggestion}
+                                variants={suggestionItem}
+                                onClick={() => handleSend(suggestion)}
+                                className={`group relative flex items-start text-left transition-all duration-200 hover:bg-accent-cyan/5 border border-transparent hover:border-accent-cyan/20 rounded-sm ${
+                                  isWelcomeCompact ? 'p-2.5' : 'p-3'
+                                }`}
+                              >
+                                <span className="font-mono text-xs text-accent-cyan/50 mr-3 opacity-50 group-hover:opacity-100 group-hover:text-accent-cyan transition-all">
+                                  {String(idx + 1).padStart(2, '0')}
+                                </span>
+                                <span className={`font-mono tracking-wide text-text-primary group-hover:text-accent-cyan transition-all ${isWelcomeCompact ? 'text-[11px]' : 'text-xs'}`}>
+                                  {suggestion}
+                                </span>
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-1 bg-accent-cyan/50 rounded-full opacity-0 group-hover:opacity-100 shadow-glow-sm transition-opacity" />
+                              </motion.button>
+                            ))}
+                          </motion.div>
+                        </div>
+                      </HUDPanel>
+                    </motion.div>
+                  )
                 ) : (
                   <motion.div
                     key="scanning"
@@ -548,11 +655,30 @@ function ChatPage({
           </div>
         </>
       )}
-      
+
+      {advisorConfigured === false && messages.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border border-accent-yellow/40 bg-accent-yellow/5 px-4 py-3">
+          <span className="font-mono text-xs leading-relaxed text-accent-yellow/85">
+            {t('chat.providerSetup.description', {
+              provider: getAdvisorProviderName(advisorProvider),
+            })}
+          </span>
+          <HUDButton
+            type="button"
+            variant="secondary"
+            onClick={onOpenSettings}
+            disabled={!onOpenSettings}
+            className="px-3 py-1.5 text-[10px]"
+          >
+            {t('chat.errors.openProviderSettings')}
+          </HUDButton>
+        </div>
+      )}
+
       <ChatInput
         onSend={handleSend}
         loading={isLoading}
-        disabled={!precomputeReady}
+        disabled={!precomputeReady || advisorConfigured === false}
         onOpenAdvisorPanel={() => setAdvisorPanelOpen(true)}
       />
     </div>

@@ -15,6 +15,8 @@ interface ChatMessageProps {
   modelDisplay?: string
   modelRouting?: ModelRoutingEvent | null
   isError?: boolean
+  actionLabel?: string
+  onAction?: () => void
   onReport?: () => void
 }
 
@@ -95,6 +97,8 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
     modelDisplay,
     modelRouting,
     isError,
+    actionLabel,
+    onAction,
     onReport,
   }: ChatMessageProps,
   ref,
@@ -160,6 +164,16 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
               <div className="font-mono text-white/80 whitespace-pre-wrap">{content}</div>
             )}
         </div>
+
+        {isError && actionLabel && onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="mt-3 border border-accent-red/50 px-3 py-1.5 font-display text-[10px] uppercase tracking-[0.16em] text-accent-red transition-colors hover:border-accent-cyan/70 hover:bg-accent-cyan/10 hover:text-accent-cyan"
+          >
+            {actionLabel}
+          </button>
+        )}
 
         {/* Footer Metadata (Tech Readout) */}
         {!isUser && !isError && (responseTimeMs !== undefined || !!modelReadout || !!onReport) && (

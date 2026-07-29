@@ -46,6 +46,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('load-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   showFolderDialog: () => ipcRenderer.invoke('select-folder'),
+  advisorProviders: {
+    listModels: (config) => ipcRenderer.invoke('advisor-provider:list-models', config),
+  },
 
   // Feedback reporting
   getPlatformInfo: () => ({ platform: process.platform, arch: process.arch }),

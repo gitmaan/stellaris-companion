@@ -13,6 +13,7 @@ import {
   type ModelRoutingMode,
 } from '../hooks/useSettings'
 import { HUDMicro } from '../components/hud/HUDText'
+import { HUDButton } from '../components/hud/HUDButton'
 
 interface SaveInfo {
   save_id: string
@@ -60,12 +61,14 @@ interface ChroniclePageProps {
   isActive?: boolean
   refreshMode?: ChronicleRefreshMode
   modelRoutingMode?: ModelRoutingMode
+  onOpenSettings?: () => void
 }
 
 function ChroniclePage({
   isActive = true,
   refreshMode = DEFAULT_CHRONICLE_REFRESH_MODE,
   modelRoutingMode,
+  onOpenSettings,
 }: ChroniclePageProps) {
   const { t } = useTranslation()
   const backend = useBackend()
@@ -103,6 +106,7 @@ function ChroniclePage({
   const [savesLoading, setSavesLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [chronicleConfigured, setChronicleConfigured] = useState<boolean | null>(null)
 
   // Selected chapter (null = show current era)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
@@ -249,6 +253,10 @@ function ChroniclePage({
         if (chronicleResult.errorCode === 'CHRONICLE_IN_PROGRESS' && chronicleResult.retryAfterMs) {
           shouldRetrySoon = true
           retryAfterMs = chronicleResult.retryAfterMs
+        } else if (chronicleResult.errorCode === 'CHRONICLE_PROVIDER_NOT_CONFIGURED') {
+          setChronicleConfigured(false)
+          setError(null)
+          setChronicle(null)
         } else {
           setError(chronicleResult.error)
           setChronicle(null)
@@ -307,6 +315,7 @@ function ChroniclePage({
 
   const finalizePendingChaptersHidden = useCallback(async () => {
     if (isDocumentVisible()) return
+    if (chronicleConfigured === false) return
     if (!selectedSaveId) return
 
     const session = latestSessionBySaveId.get(selectedSaveId)
@@ -327,7 +336,13 @@ function ChroniclePage({
     } finally {
       hiddenChapterFinalizeInFlightRef.current = false
     }
-  }, [latestSessionBySaveId, loadChronicle, selectedSaveId, totalSnapshotsBySaveId])
+  }, [
+    chronicleConfigured,
+    latestSessionBySaveId,
+    loadChronicle,
+    selectedSaveId,
+    totalSnapshotsBySaveId,
+  ])
 
   const refreshVisibleChronicleAfterResume = useCallback(async () => {
     if (visibleCatchupInFlightRef.current) return
@@ -385,6 +400,9 @@ function ChroniclePage({
     const cleanup = window.electronAPI.onBackendStatus((status) => {
       if (!isMountedRef.current) return
       if (!status?.connected) return
+      if (typeof status.chronicle_configured === 'boolean') {
+        setChronicleConfigured(status.chronicle_configured)
+      }
 
       const selectedSession = selectedSaveId ? latestSessionBySaveId.get(selectedSaveId) : null
       const backendGameDate = status.game_date || null
@@ -634,6 +652,12 @@ function ChroniclePage({
     if (!isMountedRef.current) return
 
     if (result.error) {
+      if (result.errorCode === 'CHRONICLE_PROVIDER_NOT_CONFIGURED') {
+        setChronicleConfigured(false)
+        setError(null)
+        setRegeneratingChapter(null)
+        return
+      }
       setError(result.error)
       setRegeneratingChapter(null)
       return
@@ -726,6 +750,28 @@ function ChroniclePage({
           </AnimatePresence>
           <div ref={scrollContainerRef} className="absolute inset-0 overflow-y-auto p-6">
           <div className="relative">
+            {chronicleConfigured === false && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border border-accent-yellow/40 bg-accent-yellow/5 px-4 py-3">
+                <div className="min-w-0">
+                  <HUDMicro className="text-accent-yellow">
+                    {t('chronicle.providerSetup.title')}
+                  </HUDMicro>
+                  <p className="mt-1 max-w-2xl text-sm leading-relaxed text-text-secondary">
+                    {t('chronicle.providerSetup.description')}
+                  </p>
+                </div>
+                <HUDButton
+                  type="button"
+                  variant="secondary"
+                  onClick={onOpenSettings}
+                  disabled={!onOpenSettings}
+                  className="px-3 py-1.5 text-[10px]"
+                >
+                  {t('chronicle.providerSetup.action')}
+                </HUDButton>
+              </div>
+            )}
+
             {error && (
               <div className="stellaris-panel bg-accent-red/10 border-accent-red/30 rounded-lg p-4 mb-4 flex justify-between items-center">
                 <p className="text-accent-red text-sm m-0 flex items-center gap-2">

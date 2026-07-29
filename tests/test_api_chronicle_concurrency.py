@@ -128,3 +128,32 @@ def test_api_chronicle_releases_lock_on_exception(monkeypatch):
     with TestClient(app) as client:
         second = client.post("/api/chronicle", json={"session_id": "session-1"}, headers=headers)
     assert second.status_code == 200
+
+
+def test_api_chronicle_returns_typed_error_without_gemini_key(monkeypatch):
+    server._chronicle_in_flight.clear()
+
+    def missing_key(self, session_id, **kwargs):
+        raise ValueError("GOOGLE_API_KEY not configured")
+
+    monkeypatch.setattr(
+        ChronicleGenerator,
+        "generate_chronicle",
+        missing_key,
+        raising=True,
+    )
+    app = _make_app(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/chronicle",
+            json={"session_id": "session-1"},
+            headers=_auth_headers(),
+        )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == {
+        "error": ("Chronicle generation requires a Google Gemini API key. Add one in Settings."),
+        "code": "CHRONICLE_PROVIDER_NOT_CONFIGURED",
+    }
+    assert server._chronicle_in_flight == set()

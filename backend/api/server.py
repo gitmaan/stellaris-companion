@@ -12,7 +12,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -121,6 +121,20 @@ def _pick_latest_game_date(*values: Any) -> str | None:
     return latest_raw if latest_raw is not None else fallback_raw
 
 
+def _raise_chronicle_value_error(error: ValueError) -> NoReturn:
+    if str(error) == "GOOGLE_API_KEY not configured":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": (
+                    "Chronicle generation requires a Google Gemini API key. Add one in Settings."
+                ),
+                "code": "CHRONICLE_PROVIDER_NOT_CONFIGURED",
+            },
+        ) from error
+    raise HTTPException(status_code=400, detail={"error": str(error)}) from error
+
+
 def get_auth_token() -> str | None:
     """Get the expected auth token from environment."""
     return os.environ.get(ENV_API_TOKEN)
@@ -196,7 +210,22 @@ def create_app() -> FastAPI:
         ingestion = getattr(request.app.state, "ingestion", None)
         if ingestion is not None:
             payload = ingestion.get_health_payload()
-            return {"status": "ok", **payload}
+            companion = getattr(request.app.state, "companion", None)
+            return {
+                "status": "ok",
+                **payload,
+                "advisor_provider": (
+                    getattr(companion, "get_advisor_provider", lambda: None)()
+                    if companion is not None
+                    else None
+                ),
+                "advisor_configured": (
+                    getattr(companion, "is_advisor_configured", lambda: False)()
+                    if companion is not None
+                    else False
+                ),
+                "chronicle_configured": bool(os.environ.get("GOOGLE_API_KEY")),
+            }
 
         companion = getattr(request.app.state, "companion", None)
         if companion is None or not getattr(companion, "is_loaded", False):
@@ -206,6 +235,17 @@ def create_app() -> FastAPI:
                 "empire_name": None,
                 "game_date": None,
                 "precompute_ready": False,
+                "advisor_provider": (
+                    getattr(companion, "get_advisor_provider", lambda: None)()
+                    if companion is not None
+                    else None
+                ),
+                "advisor_configured": (
+                    getattr(companion, "is_advisor_configured", lambda: False)()
+                    if companion is not None
+                    else False
+                ),
+                "chronicle_configured": bool(os.environ.get("GOOGLE_API_KEY")),
             }
 
         precompute_status = companion.get_precompute_status()
@@ -216,6 +256,9 @@ def create_app() -> FastAPI:
             "empire_name": companion.metadata.get("name"),
             "game_date": companion.metadata.get("date"),
             "precompute_ready": precompute_status.get("ready", False),
+            "advisor_provider": getattr(companion, "get_advisor_provider", lambda: None)(),
+            "advisor_configured": getattr(companion, "is_advisor_configured", lambda: False)(),
+            "chronicle_configured": bool(os.environ.get("GOOGLE_API_KEY")),
         }
 
     @app.get("/api/ingestion-status", dependencies=[Depends(verify_token)])
@@ -544,14 +587,22 @@ def create_app() -> FastAPI:
         save_id, _ = _resolve_current_save_id(request)
         scoped_session_key = _scope_chat_session_key(save_id=save_id, client_key=body.session_key)
         requested_model = (body.model or "").strip()[:120] or None
-        response_text, elapsed = companion.ask_precomputed(
-            question=body.message,
-            session_key=scoped_session_key,
-            save_id=save_id,
-            model_name=requested_model,
-            model_routing_mode=body.model_routing_mode,
-            language=body.language,
-        )
+        from backend.core.advisor_providers import AdvisorProviderError
+
+        try:
+            response_text, elapsed = companion.ask_precomputed(
+                question=body.message,
+                session_key=scoped_session_key,
+                save_id=save_id,
+                model_name=requested_model,
+                model_routing_mode=body.model_routing_mode,
+                language=body.language,
+            )
+        except AdvisorProviderError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"error": str(exc), "code": exc.code},
+            ) from exc
         response_time_ms = int((time.time() - start_time) * 1000)
         call_stats = companion.get_call_stats()
         response_model = call_stats.get("model") or companion.get_advisor_model()
@@ -565,6 +616,8 @@ def create_app() -> FastAPI:
             "requested_model": call_stats.get("requested_model"),
             "requested_model_display": call_stats.get("requested_model_display"),
             "model_routing": call_stats.get("routing"),
+            "provider": call_stats.get("provider")
+            or getattr(companion, "get_advisor_provider", lambda: "gemini")(),
         }
 
     @app.get("/api/status", dependencies=[Depends(verify_token)])
@@ -853,7 +906,7 @@ def create_app() -> FastAPI:
             result["date_range"] = date_range
             return result
         except ValueError as e:
-            raise HTTPException(status_code=400, detail={"error": str(e)})
+            _raise_chronicle_value_error(e)
         except Exception as e:
             raise HTTPException(
                 status_code=500,
@@ -923,7 +976,7 @@ def create_app() -> FastAPI:
             )
             return result
         except ValueError as e:
-            raise HTTPException(status_code=400, detail={"error": str(e)})
+            _raise_chronicle_value_error(e)
         except Exception as e:
             raise HTTPException(
                 status_code=500,
@@ -976,7 +1029,7 @@ def create_app() -> FastAPI:
             )
             return result
         except ValueError as e:
-            raise HTTPException(status_code=400, detail={"error": str(e)})
+            _raise_chronicle_value_error(e)
         except Exception as e:
             raise HTTPException(
                 status_code=500,

@@ -344,7 +344,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
             Welcome to Stellaris Companion
           </p>
           <p className="text-sm text-text-secondary leading-relaxed">
-            We will connect your advisor in two quick steps: API access and save data link.
+            We will set up your advisor and save data link in two quick steps.
           </p>
         </div>
       </div>
@@ -378,6 +378,11 @@ function StepApiKey({
           <HUDButton variant="secondary" onClick={onBack}>
             Back
           </HUDButton>
+          {!hasKey && (
+            <HUDButton variant="secondary" onClick={onNext}>
+              Skip
+            </HUDButton>
+          )}
           <HUDButton data-onboarding-primary="true" onClick={onNext} disabled={!hasKey}>
             Next
           </HUDButton>
@@ -386,13 +391,14 @@ function StepApiKey({
     >
       <div className="mx-auto w-full max-w-2xl space-y-5">
         <div className="space-y-1">
-          <HUDLabel className="text-accent-cyan/80">Required Credential</HUDLabel>
+          <HUDLabel className="text-accent-cyan/80">Default Provider</HUDLabel>
           <h2 className="font-display text-lg tracking-[0.1em] uppercase text-text-primary">
-            Google Gemini API Key
+            Google Gemini API Key (Optional)
           </h2>
         </div>
         <p className="text-sm text-text-secondary leading-relaxed">
-          Your advisor runs on Google Gemini. You will need an API key. Setup takes about 30 seconds.
+          Gemini is the default for Advisor and Chronicle. You can skip this step and configure
+          Ollama, LM Studio, or OpenRouter from Settings.
         </p>
 
         <div className="relative">

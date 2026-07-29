@@ -254,6 +254,7 @@ function App() {
                       <ChatPage
                         isActive={isActive}
                         modelRoutingMode={modelRoutingMode}
+                        onOpenSettings={() => setActiveTab('settings')}
                         onReportLlmIssue={openLLMReportModal}
                       />
                     )}
@@ -262,6 +263,7 @@ function App() {
                         isActive={isActive}
                         refreshMode={chronicleRefreshMode}
                         modelRoutingMode={modelRoutingMode}
+                        onOpenSettings={() => setActiveTab('settings')}
                       />
                     )}
                     {tab === 'settings' && (

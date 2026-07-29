@@ -35,6 +35,12 @@ const { createMcpRelayService } = require('./main/mcpRelay')
 const { createDiscordOAuth } = require('./main/discord/oauth')
 const { createDiscordRelay } = require('./main/discord/relay')
 const { registerDiscordIpcHandlers } = require('./main/ipc/discord')
+const {
+  DEFAULT_ADVISOR_PROVIDER,
+  discoverAdvisorModels,
+  getAdvisorProviderBaseUrl,
+  normalizeAdvisorProvider,
+} = require('./main/advisorProviders')
 
 const IS_DEV = process.env.NODE_ENV === 'development'
 const IS_E2E = process.env.E2E === '1'
@@ -109,6 +115,8 @@ if (!IS_DEV && !IS_E2E) {
 // native module and eliminates architecture-mismatch crashes.
 const SECRET_STORE_KEYS = {
   googleApiKey: 'secrets.google-api-key',
+  openRouterApiKey: 'secrets.openrouter-api-key',
+  customProviderApiKey: 'secrets.custom-provider-api-key',
   discordToken: 'secrets.discord-token',
   discordAccessToken: 'secrets.discord-access-token',
   discordRefreshToken: 'secrets.discord-refresh-token',
@@ -319,6 +327,32 @@ function buildBackendEnv(settings) {
     env.GOOGLE_API_KEY = settings.googleApiKey
   }
 
+  const advisorProvider = normalizeAdvisorProvider(settings.advisorProvider)
+  delete env.STELLARIS_ADVISOR_MODEL
+  delete env.STELLARIS_ADVISOR_BASE_URL
+  delete env.STELLARIS_ADVISOR_API_KEY
+  env.STELLARIS_ADVISOR_PROVIDER = advisorProvider
+  if (settings.advisorModel) {
+    env.STELLARIS_ADVISOR_MODEL = String(settings.advisorModel).trim()
+  }
+  let advisorBaseUrl = ''
+  try {
+    advisorBaseUrl = getAdvisorProviderBaseUrl(advisorProvider, settings.advisorBaseUrl)
+  } catch (error) {
+    console.warn('Ignoring invalid Advisor provider URL:', error instanceof Error ? error.message : error)
+  }
+  if (advisorBaseUrl) {
+    env.STELLARIS_ADVISOR_BASE_URL = advisorBaseUrl
+  }
+  const advisorApiKey = advisorProvider === 'openrouter'
+    ? settings.openRouterApiKey
+    : advisorProvider === 'custom'
+      ? settings.customProviderApiKey
+      : ''
+  if (advisorApiKey) {
+    env.STELLARIS_ADVISOR_API_KEY = advisorApiKey
+  }
+
   env.STELLARIS_MODEL_ROUTING_MODE = normalizeModelRoutingMode(settings.modelRoutingMode)
 
   // Multiplayer player-empire selection. In MP saves the `player` block lists
@@ -353,11 +387,6 @@ function buildBackendEnv(settings) {
 function startPythonBackend(settings) {
   if (pythonProcess) {
     console.log('Python backend already running')
-    return
-  }
-
-  if (!settings.googleApiKey) {
-    console.log('Cannot start backend: Google API key not configured')
     return
   }
 
@@ -634,9 +663,8 @@ function startHealthCheck() {
  * @returns {string} Masked key like "abcd...wxyz" or empty if not set
  */
 function maskSecret(key) {
-  if (!key || key.length < 12) {
-    return key ? '****' : ''
-  }
+  if (!key) return ''
+  if (key.length < 12) return '****...****'
   return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`
 }
 
@@ -826,6 +854,8 @@ function stepUiScale(direction) {
  */
 function getSettings() {
   const googleApiKey = getSecret(SECRET_STORE_KEYS.googleApiKey)
+  const openRouterApiKey = getSecret(SECRET_STORE_KEYS.openRouterApiKey)
+  const customProviderApiKey = getSecret(SECRET_STORE_KEYS.customProviderApiKey)
   const discordToken = getSecret(SECRET_STORE_KEYS.discordToken)
 
   const saveDir = store.get('saveDir', '')
@@ -838,10 +868,22 @@ function getSettings() {
   const modelRoutingMode = getModelRoutingModeSetting()
   const language = getLanguageSetting()
   const resolvedLanguage = getResolvedLanguageSetting()
+  const advisorProvider = normalizeAdvisorProvider(
+    store.get('advisorProvider', DEFAULT_ADVISOR_PROVIDER),
+  )
+  const advisorModel = String(store.get('advisorModel', '') || '')
+  const advisorBaseUrl = String(store.get('advisorBaseUrl', '') || '')
 
   return {
     googleApiKey: maskSecret(googleApiKey),
     googleApiKeySet: !!googleApiKey,
+    openRouterApiKey: maskSecret(openRouterApiKey),
+    openRouterApiKeySet: !!openRouterApiKey,
+    customProviderApiKey: maskSecret(customProviderApiKey),
+    customProviderApiKeySet: !!customProviderApiKey,
+    advisorProvider,
+    advisorModel,
+    advisorBaseUrl,
     discordToken: maskSecret(discordToken),
     discordTokenSet: !!discordToken,
     saveDir,
@@ -865,6 +907,8 @@ function getSettings() {
  */
 function getSettingsWithSecrets() {
   const googleApiKey = getSecret(SECRET_STORE_KEYS.googleApiKey) || ''
+  const openRouterApiKey = getSecret(SECRET_STORE_KEYS.openRouterApiKey) || ''
+  const customProviderApiKey = getSecret(SECRET_STORE_KEYS.customProviderApiKey) || ''
   const discordToken = getSecret(SECRET_STORE_KEYS.discordToken) || ''
   const saveDir = store.get('saveDir', '')
   const playerName = store.get('playerName', '')
@@ -877,9 +921,19 @@ function getSettingsWithSecrets() {
   const modelRoutingMode = getModelRoutingModeSetting()
   const language = getLanguageSetting()
   const resolvedLanguage = getResolvedLanguageSetting()
+  const advisorProvider = normalizeAdvisorProvider(
+    store.get('advisorProvider', DEFAULT_ADVISOR_PROVIDER),
+  )
+  const advisorModel = String(store.get('advisorModel', '') || '')
+  const advisorBaseUrl = String(store.get('advisorBaseUrl', '') || '')
 
   return {
     googleApiKey,
+    openRouterApiKey,
+    customProviderApiKey,
+    advisorProvider,
+    advisorModel,
+    advisorBaseUrl,
     discordToken,
     saveDir,
     // Backwards-compat: older renderer builds may still send/expect `savePath`.
@@ -910,6 +964,26 @@ function saveSettings(settings) {
 
   if (settings.discordToken !== undefined && !settings.discordToken.includes('...')) {
     setSecret(SECRET_STORE_KEYS.discordToken, settings.discordToken || null)
+  }
+
+  if (settings.openRouterApiKey !== undefined && !settings.openRouterApiKey.includes('...')) {
+    setSecret(SECRET_STORE_KEYS.openRouterApiKey, settings.openRouterApiKey || null)
+  }
+
+  if (settings.customProviderApiKey !== undefined && !settings.customProviderApiKey.includes('...')) {
+    setSecret(SECRET_STORE_KEYS.customProviderApiKey, settings.customProviderApiKey || null)
+  }
+
+  if (settings.advisorProvider !== undefined) {
+    store.set('advisorProvider', normalizeAdvisorProvider(settings.advisorProvider))
+  }
+
+  if (settings.advisorModel !== undefined) {
+    store.set('advisorModel', String(settings.advisorModel || '').trim())
+  }
+
+  if (settings.advisorBaseUrl !== undefined) {
+    store.set('advisorBaseUrl', String(settings.advisorBaseUrl || '').trim())
   }
 
   const nextSaveDir = settings.saveDir !== undefined ? settings.saveDir : settings.savePath
@@ -1478,11 +1552,17 @@ registerSettingsIpcHandlers({
   getSettings,
   saveSettings,
   getSettingsWithSecrets,
+  discoverAdvisorModels,
   onSettingsSaved: async (fullSettings, changedSettings = {}) => {
-    backendConfigured = !!fullSettings.googleApiKey || E2E_BACKEND_CONFIGURED
+    backendConfigured = true
 
     const backendRelevantSettingsChanged =
       changedSettings.googleApiKey !== undefined ||
+      changedSettings.openRouterApiKey !== undefined ||
+      changedSettings.customProviderApiKey !== undefined ||
+      changedSettings.advisorProvider !== undefined ||
+      changedSettings.advisorModel !== undefined ||
+      changedSettings.advisorBaseUrl !== undefined ||
       changedSettings.saveDir !== undefined ||
       changedSettings.savePath !== undefined ||
       changedSettings.modelRoutingMode !== undefined ||
@@ -1547,7 +1627,7 @@ registerUpdateIpcHandlers({
     healthCheckManager.setIsQuitting(true)
   },
 })
-wireAutoUpdaterEvents({ autoUpdater, getMainWindow: () => mainWindow })
+wireAutoUpdaterEvents({ autoUpdater, app, getMainWindow: () => mainWindow })
 
 // =============================================================================
 // Onboarding IPC Handlers
@@ -1773,14 +1853,14 @@ app.whenReady().then(async () => {
 
   // Load settings (backend health already checked above)
   const settings = await getSettingsWithSecrets()
-  backendConfigured = !!settings.googleApiKey || E2E_BACKEND_CONFIGURED
+  backendConfigured = true
   phaseStart = logTiming('Load settings', phaseStart)
 
   if (backendAlreadyRunning) {
     // Already logged above
   } else if (E2E_SKIP_BACKEND_AUTOSTART) {
     console.log('E2E backend autostart disabled')
-  } else if (settings.googleApiKey) {
+  } else {
     startPythonBackend(settings)
     phaseStart = logTiming('Start Python backend (spawn)', phaseStart)
 
@@ -1792,8 +1872,6 @@ app.whenReady().then(async () => {
     } else {
       console.error('Backend failed to start')
     }
-  } else {
-    console.log('No Google API key configured, skipping backend start')
   }
 
   console.log('[TIMING] ═══════════════════════════════════════════')

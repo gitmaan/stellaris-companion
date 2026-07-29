@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  DEFAULT_ADVISOR_PROVIDER,
   DEFAULT_CHRONICLE_REFRESH_MODE,
   DEFAULT_LANGUAGE,
   DEFAULT_MODEL_ROUTING_MODE,
   DEFAULT_UI_THEME,
+  normalizeAdvisorProvider,
   normalizeChronicleRefreshMode,
   normalizeLanguage,
   normalizeModelRoutingMode,
   normalizeResolvedLanguage,
   normalizeUiTheme,
+  type AdvisorProvider,
   type ChronicleRefreshMode,
   type LanguageSetting,
   type ModelRoutingMode,
@@ -66,6 +69,26 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'command-amber': 'Command Amber',
 }
 
+const ADVISOR_PROVIDER_OPTIONS: { value: AdvisorProvider; label: string }[] = [
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'ollama', label: 'Ollama' },
+  { value: 'lm_studio', label: 'LM Studio' },
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'custom', label: 'Custom (OpenAI-compatible)' },
+]
+
+const ADVISOR_PROVIDER_DEFAULT_URLS: Partial<Record<AdvisorProvider, string>> = {
+  ollama: 'http://127.0.0.1:11434/v1',
+  lm_studio: 'http://127.0.0.1:1234/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
+}
+
+interface AdvisorProviderModel {
+  id: string
+  name: string
+  contextLength?: number
+}
+
 type GeminiQuotaMode = 'standard' | 'higher'
 
 const GEMINI_QUOTA_MODES: GeminiQuotaMode[] = ['standard', 'higher']
@@ -100,6 +123,20 @@ function SettingsPage({
   } = useDiscord()
 
   const [googleApiKey, setGoogleApiKey] = useState('')
+  const [openRouterApiKey, setOpenRouterApiKey] = useState('')
+  const [customProviderApiKey, setCustomProviderApiKey] = useState('')
+  const [advisorProvider, setAdvisorProvider] = useState<AdvisorProvider>(
+    DEFAULT_ADVISOR_PROVIDER,
+  )
+  const [advisorModel, setAdvisorModel] = useState('')
+  const [advisorBaseUrl, setAdvisorBaseUrl] = useState('')
+  const [advisorModels, setAdvisorModels] = useState<AdvisorProviderModel[]>([])
+  const [advisorModelSearch, setAdvisorModelSearch] = useState('')
+  const [advisorChecking, setAdvisorChecking] = useState(false)
+  const [advisorConnection, setAdvisorConnection] = useState<{
+    ok: boolean
+    message: string
+  } | null>(null)
   const [saveDir, setSaveDir] = useState('')
   const [playerName, setPlayerName] = useState('')
   const [uiScale, setUiScale] = useState(1)
@@ -124,9 +161,12 @@ function SettingsPage({
   const [mcpRelayChecking, setMcpRelayChecking] = useState(false)
   const [mcpRelayInstalling, setMcpRelayInstalling] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const settingsHydratedRef = useRef(false)
+  const advisorCheckIdRef = useRef(0)
 
   useEffect(() => {
     return () => {
+      advisorCheckIdRef.current += 1
       if (successTimeoutRef.current) {
         clearTimeout(successTimeoutRef.current)
       }
@@ -134,36 +174,74 @@ function SettingsPage({
   }, [])
 
   useEffect(() => {
-    if (settings) {
-      setGoogleApiKey(settings.googleApiKeySet ? settings.googleApiKey : '')
-      setSaveDir(settings.saveDir || '')
-      setPlayerName(settings.playerName || '')
-      setUiScale(settings.uiScale || 1)
-      const normalizedTheme = normalizeUiTheme(settings.uiTheme)
-      const normalizedChronicleRefreshMode = normalizeChronicleRefreshMode(
-        settings.chronicleRefreshMode,
-      )
-      const normalizedModelRoutingMode = normalizeModelRoutingMode(settings.modelRoutingMode)
-      const normalizedLanguage = normalizeLanguage(settings.language)
-      const normalizedResolvedLanguage = normalizeResolvedLanguage(settings.resolvedLanguage)
-      setUiTheme(normalizedTheme)
-      setChronicleRefreshMode(normalizedChronicleRefreshMode)
-      setModelRoutingMode(normalizedModelRoutingMode)
-      setLanguage(normalizedLanguage)
-      onThemeChange?.(normalizedTheme)
-      onChronicleRefreshModeChange?.(normalizedChronicleRefreshMode)
-      onModelRoutingModeChange?.(normalizedModelRoutingMode)
-      onLanguageChange?.(normalizedResolvedLanguage)
-    }
+    if (!settings || settingsHydratedRef.current) return
+    settingsHydratedRef.current = true
+
+    setGoogleApiKey(settings.googleApiKeySet ? settings.googleApiKey : '')
+    setOpenRouterApiKey(
+      settings.openRouterApiKeySet ? settings.openRouterApiKey : '',
+    )
+    setCustomProviderApiKey(
+      settings.customProviderApiKeySet ? settings.customProviderApiKey : '',
+    )
+    setAdvisorProvider(normalizeAdvisorProvider(settings.advisorProvider))
+    setAdvisorModel(settings.advisorModel || '')
+    setAdvisorBaseUrl(settings.advisorBaseUrl || '')
+    setSaveDir(settings.saveDir || '')
+    setPlayerName(settings.playerName || '')
+    setUiScale(settings.uiScale || 1)
+    const normalizedTheme = normalizeUiTheme(settings.uiTheme)
+    const normalizedChronicleRefreshMode = normalizeChronicleRefreshMode(
+      settings.chronicleRefreshMode,
+    )
+    const normalizedModelRoutingMode = normalizeModelRoutingMode(settings.modelRoutingMode)
+    const normalizedLanguage = normalizeLanguage(settings.language)
+    const normalizedResolvedLanguage = normalizeResolvedLanguage(settings.resolvedLanguage)
+    setUiTheme(normalizedTheme)
+    setChronicleRefreshMode(normalizedChronicleRefreshMode)
+    setModelRoutingMode(normalizedModelRoutingMode)
+    setLanguage(normalizedLanguage)
+    onThemeChange?.(normalizedTheme)
+    onChronicleRefreshModeChange?.(normalizedChronicleRefreshMode)
+    onModelRoutingModeChange?.(normalizedModelRoutingMode)
+    onLanguageChange?.(normalizedResolvedLanguage)
   }, [onChronicleRefreshModeChange, onLanguageChange, onModelRoutingModeChange, onThemeChange, settings])
 
   useEffect(() => {
     if (!settings) return
     const hasApiKeyChange = settings.googleApiKeySet ? googleApiKey !== settings.googleApiKey : googleApiKey !== ''
+    const hasOpenRouterKeyChange = settings.openRouterApiKeySet
+      ? openRouterApiKey !== settings.openRouterApiKey
+      : openRouterApiKey !== ''
+    const hasCustomProviderKeyChange = settings.customProviderApiKeySet
+      ? customProviderApiKey !== settings.customProviderApiKey
+      : customProviderApiKey !== ''
+    const hasAdvisorProviderChange = advisorProvider !== settings.advisorProvider
+    const hasAdvisorModelChange = advisorModel !== (settings.advisorModel || '')
+    const hasAdvisorBaseUrlChange = advisorBaseUrl !== (settings.advisorBaseUrl || '')
     const hasPathChange = saveDir !== (settings.saveDir || '')
     const hasPlayerNameChange = playerName !== (settings.playerName || '')
-    setHasChanges(hasApiKeyChange || hasPathChange || hasPlayerNameChange)
-  }, [googleApiKey, saveDir, playerName, settings])
+    setHasChanges(
+      hasApiKeyChange ||
+      hasOpenRouterKeyChange ||
+      hasCustomProviderKeyChange ||
+      hasAdvisorProviderChange ||
+      hasAdvisorModelChange ||
+      hasAdvisorBaseUrlChange ||
+      hasPathChange ||
+      hasPlayerNameChange,
+    )
+  }, [
+    advisorBaseUrl,
+    advisorModel,
+    advisorProvider,
+    customProviderApiKey,
+    googleApiKey,
+    openRouterApiKey,
+    playerName,
+    saveDir,
+    settings,
+  ])
 
   useEffect(() => {
     let cancelled = false
@@ -192,9 +270,21 @@ function SettingsPage({
 
   const handleSave = async () => {
     setSaveSuccess(false)
-    const settingsToSave: Record<string, string | boolean> = { saveDir, playerName }
+    const settingsToSave: Record<string, string | boolean> = {
+      saveDir,
+      playerName,
+      advisorProvider,
+      advisorModel,
+      advisorBaseUrl,
+    }
     if (!googleApiKey.includes('...')) {
       settingsToSave.googleApiKey = googleApiKey
+    }
+    if (!openRouterApiKey.includes('...')) {
+      settingsToSave.openRouterApiKey = openRouterApiKey
+    }
+    if (!customProviderApiKey.includes('...')) {
+      settingsToSave.customProviderApiKey = customProviderApiKey
     }
 
     const success = await saveSettings(settingsToSave)
@@ -202,6 +292,69 @@ function SettingsPage({
       setSaveSuccess(true)
       setHasChanges(false)
       successTimeoutRef.current = setTimeout(() => setSaveSuccess(false), 3000)
+    }
+  }
+
+  const invalidateAdvisorConnection = () => {
+    advisorCheckIdRef.current += 1
+    setAdvisorChecking(false)
+    setAdvisorConnection(null)
+  }
+
+  const handleAdvisorProviderChange = (rawValue: string) => {
+    const nextProvider = normalizeAdvisorProvider(rawValue)
+    if (nextProvider === advisorProvider) return
+    invalidateAdvisorConnection()
+    setAdvisorProvider(nextProvider)
+    setAdvisorModel('')
+    setAdvisorBaseUrl('')
+    setAdvisorModels([])
+    setAdvisorModelSearch('')
+  }
+
+  const handleCheckAdvisorProvider = async () => {
+    if (!window.electronAPI?.advisorProviders?.listModels) return
+    const checkId = ++advisorCheckIdRef.current
+    const apiKey = advisorProvider === 'openrouter'
+      ? openRouterApiKey
+      : advisorProvider === 'custom'
+        ? customProviderApiKey
+        : ''
+    setAdvisorChecking(true)
+    setAdvisorConnection(null)
+    try {
+      const result = await window.electronAPI.advisorProviders.listModels({
+        provider: advisorProvider,
+        baseUrl: advisorBaseUrl,
+        apiKey,
+      })
+      if (checkId !== advisorCheckIdRef.current) return
+      if (!result.ok) {
+        setAdvisorModels([])
+        setAdvisorConnection({ ok: false, message: result.error || t('settings.advisor.connectionError') })
+        return
+      }
+      const models = result.models || []
+      setAdvisorModels(models)
+      if (models.length === 1) {
+        setAdvisorModel(current => current || models[0].id)
+      }
+      setAdvisorConnection({
+        ok: true,
+        message: models.length
+          ? t('settings.advisor.modelsFound', { count: models.length })
+          : t('settings.advisor.connectedNoModels'),
+      })
+    } catch (e) {
+      if (checkId !== advisorCheckIdRef.current) return
+      setAdvisorConnection({
+        ok: false,
+        message: e instanceof Error ? e.message : t('settings.advisor.connectionError'),
+      })
+    } finally {
+      if (checkId === advisorCheckIdRef.current) {
+        setAdvisorChecking(false)
+      }
     }
   }
 
@@ -484,6 +637,32 @@ function SettingsPage({
   const geminiQuotaLabel = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}`)
   const geminiQuotaTag = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}Tag`)
   const geminiQuotaHelper = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}Help`)
+  const providerDefaultUrl = ADVISOR_PROVIDER_DEFAULT_URLS[advisorProvider] || ''
+  const filteredAdvisorModels = advisorModels
+    .filter((model) => {
+      const query = advisorModelSearch.trim().toLowerCase()
+      return !query || model.id.toLowerCase().includes(query) || model.name.toLowerCase().includes(query)
+    })
+    .slice(0, 200)
+  const selectedAdvisorModel = advisorModel
+    ? advisorModels.find((model) => model.id === advisorModel) || {
+      id: advisorModel,
+      name: advisorModel,
+    }
+    : undefined
+  const visibleAdvisorModels = selectedAdvisorModel
+    && !filteredAdvisorModels.some((model) => model.id === selectedAdvisorModel.id)
+    ? [selectedAdvisorModel, ...filteredAdvisorModels]
+    : filteredAdvisorModels
+  const advisorModelOptions = [
+    { value: '', label: t('settings.advisor.selectModel') },
+    ...visibleAdvisorModels.map((model) => ({
+      value: model.id,
+      label: model.name === model.id ? model.id : `${model.name} · ${model.id}`,
+    })),
+  ]
+  const usesOllamaCloudModel = advisorProvider === 'ollama'
+    && advisorModel.toLowerCase().includes(':cloud')
 
   const mcpRelayReady = Boolean(mcpRelayStatus?.databaseExists)
   const mcpRelayConfigured = Boolean(mcpRelayStatus?.claudeDesktop?.configured)
@@ -597,10 +776,154 @@ function SettingsPage({
                 {/* API Section */}
                 <section>
                     <HUDSectionTitle number="01">{t('settings.sections.intelligence')}</HUDSectionTitle>
-                    <HUDPanel decoration="tech" title={t('settings.panels.geminiAccess')} quiet>
+                    <HUDPanel decoration="tech" title={t('settings.panels.advisorAccess')} quiet>
                         <div className="space-y-4 pt-2">
+                             <HUDSelect
+                                label={t('settings.advisor.providerLabel')}
+                                value={advisorProvider}
+                                onChange={(e) => handleAdvisorProviderChange(e.target.value)}
+                                options={ADVISOR_PROVIDER_OPTIONS}
+                             />
+
+                             {advisorProvider !== 'gemini' && (
+                               <div className="space-y-4 border-t border-white/10 pt-4">
+                                 <div className="flex items-center justify-between gap-3">
+                                   <div>
+                                     <HUDLabel>{t(`settings.advisor.providers.${advisorProvider}`)}</HUDLabel>
+                                     <HUDMicro className="mt-1 block normal-case tracking-[0.02em] text-white/45">
+                                       {t(`settings.advisor.providerHelp.${advisorProvider}`)}
+                                     </HUDMicro>
+                                     {(advisorProvider === 'openrouter' || advisorProvider === 'custom') && (
+                                       <HUDMicro className="mt-2 block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
+                                         {t('settings.advisor.remoteContextNotice')}
+                                       </HUDMicro>
+                                     )}
+                                   </div>
+                                   {advisorConnection && (
+                                     <span className={`font-mono text-[10px] uppercase tracking-wider ${
+                                       advisorConnection.ok ? 'text-accent-green' : 'text-accent-red'
+                                     }`}>
+                                       {advisorConnection.ok ? t('settings.advisor.connected') : t('settings.advisor.failed')}
+                                     </span>
+                                   )}
+                                 </div>
+
+                                 {advisorProvider === 'openrouter' && (
+                                   <HUDInput
+                                     label={t('settings.advisor.apiKeyLabel')}
+                                     aria-label={t('settings.advisor.apiKeyLabel')}
+                                     type="password"
+                                     value={openRouterApiKey}
+                                     onChange={(e) => {
+                                       setOpenRouterApiKey(e.target.value)
+                                       invalidateAdvisorConnection()
+                                     }}
+                                     placeholder={settings?.openRouterApiKeySet ? t('settings.api.placeholderSet') : t('settings.api.placeholderEmpty')}
+                                   />
+                                 )}
+
+                                 {advisorProvider === 'custom' && (
+                                   <>
+                                     <HUDInput
+                                       label={t('settings.advisor.baseUrlLabel')}
+                                       aria-label={t('settings.advisor.baseUrlLabel')}
+                                       value={advisorBaseUrl}
+                                       onChange={(e) => {
+                                         setAdvisorBaseUrl(e.target.value)
+                                         invalidateAdvisorConnection()
+                                       }}
+                                       placeholder="https://provider.example/v1"
+                                     />
+                                     <HUDInput
+                                       label={t('settings.advisor.optionalApiKeyLabel')}
+                                       aria-label={t('settings.advisor.optionalApiKeyLabel')}
+                                       type="password"
+                                       value={customProviderApiKey}
+                                       onChange={(e) => {
+                                         setCustomProviderApiKey(e.target.value)
+                                         invalidateAdvisorConnection()
+                                       }}
+                                       placeholder={settings?.customProviderApiKeySet ? t('settings.api.placeholderSet') : t('settings.advisor.optional')}
+                                     />
+                                   </>
+                                 )}
+
+                                 <div className="flex flex-wrap items-center gap-3">
+                                   <HUDButton
+                                     type="button"
+                                     variant="secondary"
+                                     onClick={() => void handleCheckAdvisorProvider()}
+                                     disabled={advisorChecking}
+                                     className="px-4 py-1.5 text-[10px]"
+                                   >
+                                     {advisorChecking ? t('settings.advisor.checking') : t('settings.advisor.checkConnection')}
+                                   </HUDButton>
+                                   {advisorConnection && (
+                                     <HUDMicro className={advisorConnection.ok ? 'text-accent-green' : 'text-accent-red'}>
+                                       {advisorConnection.message}
+                                     </HUDMicro>
+                                   )}
+                                 </div>
+
+                                 {advisorModels.length > 8 && (
+                                   <HUDInput
+                                     label={t('settings.advisor.searchModels')}
+                                     aria-label={t('settings.advisor.searchModels')}
+                                     value={advisorModelSearch}
+                                     onChange={(e) => setAdvisorModelSearch(e.target.value)}
+                                     placeholder={t('settings.advisor.searchPlaceholder')}
+                                   />
+                                 )}
+
+                                 {advisorModels.length > 0 ? (
+                                   <HUDSelect
+                                     label={t('settings.advisor.modelLabel')}
+                                     value={advisorModel}
+                                     onChange={(e) => setAdvisorModel(e.target.value)}
+                                     options={advisorModelOptions}
+                                   />
+                                 ) : (
+                                   <HUDInput
+                                     label={t('settings.advisor.modelLabel')}
+                                     aria-label={t('settings.advisor.modelLabel')}
+                                     value={advisorModel}
+                                     onChange={(e) => setAdvisorModel(e.target.value)}
+                                     placeholder={t('settings.advisor.modelPlaceholder')}
+                                   />
+                                 )}
+
+                                 {usesOllamaCloudModel && (
+                                   <HUDMicro className="block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
+                                     {t('settings.advisor.ollamaCloudNotice')}
+                                   </HUDMicro>
+                                 )}
+
+                                 {advisorProvider !== 'custom' && (
+                                   <details className="group border-t border-white/10 pt-3">
+                                     <summary className="cursor-pointer list-none font-display text-[10px] uppercase tracking-[0.18em] text-text-secondary hover:text-accent-cyan">
+                                       <span className="group-open:hidden">{t('settings.advisor.showAdvanced')}</span>
+                                       <span className="hidden group-open:inline">{t('settings.advisor.hideAdvanced')}</span>
+                                     </summary>
+                                     <div className="mt-3">
+                                       <HUDInput
+                                         label={t('settings.advisor.baseUrlLabel')}
+                                         aria-label={t('settings.advisor.baseUrlLabel')}
+                                         value={advisorBaseUrl}
+                                         onChange={(e) => {
+                                           setAdvisorBaseUrl(e.target.value)
+                                           invalidateAdvisorConnection()
+                                         }}
+                                         placeholder={providerDefaultUrl}
+                                       />
+                                     </div>
+                                   </details>
+                                 )}
+                               </div>
+                             )}
+
+                             <div className="border-t border-white/10 pt-4">
                              <HUDInput 
-                                label={t('settings.api.label')}
+                                label={advisorProvider === 'gemini' ? t('settings.api.label') : t('settings.advisor.chronicleKeyLabel')}
                                 type="password"
                                 value={googleApiKey}
                                 onChange={(e) => setGoogleApiKey(e.target.value)}
@@ -619,6 +942,13 @@ function SettingsPage({
                                      {t('settings.api.generateKey')}
                                  </a>
                              </div>
+                             {advisorProvider !== 'gemini' && (
+                               <HUDMicro className="mt-2 block normal-case tracking-[0.02em] text-white/45">
+                                 {t('settings.advisor.chronicleGeminiHelp')}
+                               </HUDMicro>
+                             )}
+                             </div>
+                             {advisorProvider === 'gemini' && (
                              <div className="border-t border-white/10 pt-4 space-y-3">
                                  <div className="flex items-center justify-between gap-3">
                                      <HUDLabel>{t('settings.geminiQuota.label')}</HUDLabel>
@@ -760,6 +1090,46 @@ function SettingsPage({
                                    </div>
                                  </details>
                              </div>
+                             )}
+                             {advisorProvider !== 'gemini' && (
+                               <div className="space-y-3 border-t border-white/10 pt-4">
+                                 <div className="flex items-center justify-between gap-3">
+                                   <HUDLabel>{t('settings.chronicleRefresh.label')}</HUDLabel>
+                                   {chronicleRefreshModeSaving && (
+                                     <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
+                                   )}
+                                 </div>
+                                 <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
+                                   {(['balanced', 'enhanced'] as const).map((mode) => {
+                                     const isSelected = chronicleRefreshMode === mode
+                                     return (
+                                       <button
+                                         key={mode}
+                                         type="button"
+                                         disabled={chronicleRefreshModeSaving}
+                                         aria-pressed={isSelected}
+                                         onClick={() => void handleChronicleRefreshModeChange(mode)}
+                                         className={`rounded-sm px-3 py-2 text-left transition-all duration-200 ${
+                                           isSelected
+                                             ? 'border border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
+                                             : 'border border-transparent text-text-secondary hover:border-white/15 hover:bg-white/5'
+                                         } disabled:cursor-not-allowed disabled:opacity-50`}
+                                       >
+                                         <div className="font-display text-[11px] uppercase tracking-[0.18em]">
+                                           {chronicleModeLabel(mode)}
+                                         </div>
+                                         <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
+                                           {mode === 'balanced' ? t('settings.chronicleRefresh.balancedTag') : t('settings.chronicleRefresh.enhancedTag')}
+                                         </div>
+                                       </button>
+                                     )
+                                   })}
+                                 </div>
+                                 <HUDMicro className="block normal-case tracking-[0.02em] text-white/45">
+                                   {chronicleModeHelper(chronicleRefreshMode)}
+                                 </HUDMicro>
+                               </div>
+                             )}
                         </div>
                     </HUDPanel>
                 </section>

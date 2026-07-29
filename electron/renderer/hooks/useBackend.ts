@@ -27,6 +27,9 @@ export interface HealthResponse {
   empire_name: string | null
   game_date: string | null
   precompute_ready: boolean
+  advisor_provider?: string | null
+  advisor_configured?: boolean
+  chronicle_configured?: boolean
   empire_type?: EmpireType
   empire_ethics?: string[]
   empire_civics?: string[]
@@ -63,6 +66,7 @@ export interface ChatResponse {
   requested_model?: string
   requested_model_display?: string
   model_routing?: ModelRoutingEvent | null
+  provider?: string
 }
 
 export interface ChatRetryResponse {
