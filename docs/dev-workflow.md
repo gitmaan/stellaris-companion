@@ -5,7 +5,7 @@
 - Node.js 22.12+ + npm
 - Python 3 (recommended: venv)
 - Rust toolchain (for `stellaris-parser`)
-- Optional: a Gemini API key (`GOOGLE_API_KEY`) for Gemini Advisor and Chronicle calls
+- Optional: a Gemini API key (`GOOGLE_API_KEY`) when Gemini is selected
 
 ## Setup
 
@@ -36,9 +36,9 @@ What it does:
 - starts the Electron dev process + renderer
 
 Key env vars:
-- `GOOGLE_API_KEY` (required for Gemini Advisor and Chronicle calls)
-- `STELLARIS_ADVISOR_PROVIDER` (`gemini`, `ollama`, `lm_studio`, `openrouter`, or `custom`)
-- `STELLARIS_ADVISOR_MODEL` (required for non-Gemini Advisor providers)
+- `GOOGLE_API_KEY` (required when Gemini is selected)
+- `STELLARIS_ADVISOR_PROVIDER` (`gemini`, `ollama`, `lm_studio`, `openrouter`, or `custom`; controls Advisor and Chronicle)
+- `STELLARIS_ADVISOR_MODEL` (required for non-Gemini providers)
 - `STELLARIS_ADVISOR_BASE_URL` (optional preset override or custom API base)
 - `STELLARIS_ADVISOR_API_KEY` (required by OpenRouter; optional for custom endpoints)
 - `STELLARIS_API_TOKEN` (dev.sh will generate one if missing)

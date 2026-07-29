@@ -279,10 +279,10 @@
       "label": "CHRONIK-AKTUALISIERUNG",
       "balanced": "Ausgewogen",
       "enhanced": "Erweitert",
-      "balancedTag": "FREE-TIER STANDARD",
+      "balancedTag": "WENIGER MODELLAUFRUFE",
       "enhancedTag": "REAKTIVER",
-      "balancedHelp": "Geringere Gemini-Nutzung. Beste Standardeinstellung fuer Free Tier und stabilere Cliffhanger-Updates.",
-      "enhancedHelp": "Schnellere Story-Updates der aktuellen Aera in der Chronik. Nutzt mehr Gemini-Aufrufe.",
+      "balancedHelp": "Aktualisiert seltener, um Modellaufrufe zu reduzieren. Gute Voreinstellung fuer lokale Modelle und nutzungsbasierte Anbieter.",
+      "enhancedHelp": "Schnellere Story-Updates der aktuellen Aera in der Chronik. Nutzt mehr Modellaufrufe.",
       "aria": "Aktualisierungsmodus auf {{mode}} setzen",
       "toastError": "Chronik-Aktualisierungsmodus konnte nicht geaendert werden. Bitte erneut versuchen.",
       "toastSuccess": "Chronik-Aktualisierungsmodus auf {{mode}} gesetzt."

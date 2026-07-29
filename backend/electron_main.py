@@ -11,9 +11,9 @@ Usage:
     python backend/electron_main.py --port 8742 --host 127.0.0.1
 
 Environment Variables:
-    GOOGLE_API_KEY: Google API key for Gemini Advisor and Chronicle features
+    GOOGLE_API_KEY: Google API key when Gemini is selected
     STELLARIS_ADVISOR_PROVIDER: gemini, ollama, lm_studio, openrouter, or custom
-    STELLARIS_ADVISOR_MODEL: Model identifier for non-Gemini Advisor providers
+    STELLARIS_ADVISOR_MODEL: Model used for non-Gemini Advisor and Chronicle calls
     STELLARIS_ADVISOR_BASE_URL: OpenAI-compatible API base URL
     STELLARIS_ADVISOR_API_KEY: Optional key for the selected compatible provider
     STELLARIS_API_TOKEN: Bearer token for API authentication (required)
@@ -92,7 +92,15 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Environment Variables:
-  GOOGLE_API_KEY        Google API key for Gemini and Chronicle features
+  GOOGLE_API_KEY        Google API key when Gemini is selected
+  STELLARIS_ADVISOR_PROVIDER
+                        Provider for Advisor and Chronicle generation
+  STELLARIS_ADVISOR_MODEL
+                        Model identifier for a non-Gemini provider
+  STELLARIS_ADVISOR_BASE_URL
+                        OpenAI-compatible provider API base URL
+  STELLARIS_ADVISOR_API_KEY
+                        API key for OpenRouter or a custom provider
   STELLARIS_API_TOKEN   Bearer token for API authentication (required)
   STELLARIS_DB_PATH     Path to SQLite history DB (optional)
   STELLARIS_SAVE_PATH   Path to a specific save file (optional)

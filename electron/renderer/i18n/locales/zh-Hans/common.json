@@ -279,10 +279,10 @@
       "label": "编年史刷新",
       "balanced": "均衡",
       "enhanced": "增强",
-      "balancedTag": "免费额度默认",
+      "balancedTag": "减少模型调用",
       "enhancedTag": "更快响应",
-      "balancedHelp": "减少 Gemini 使用量。适合免费额度，并提供更稳定的悬念更新。",
-      "enhancedHelp": "查看编年史时更快更新当前时代故事。会使用更多 Gemini 调用。",
+      "balancedHelp": "降低更新频率以减少模型调用。适合本地模型和按量计费的提供商。",
+      "enhancedHelp": "查看编年史时更快更新当前时代故事。会使用更多模型调用。",
       "aria": "将刷新模式设置为 {{mode}}",
       "toastError": "无法更新编年史刷新模式。请重试。",
       "toastSuccess": "编年史刷新模式已设置为 {{mode}}。"

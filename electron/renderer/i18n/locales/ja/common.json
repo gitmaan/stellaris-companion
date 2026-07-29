@@ -279,10 +279,10 @@
       "label": "年代記の更新",
       "balanced": "バランス",
       "enhanced": "強化",
-      "balancedTag": "無料枠向け",
+      "balancedTag": "モデル呼び出し削減",
       "enhancedTag": "高頻度更新",
-      "balancedHelp": "Gemini の使用量を抑えます。無料枠と安定した更新に適した既定値です。",
-      "enhancedHelp": "年代記表示中の現在時代の更新を速くします。Gemini 呼び出しが増えます。",
+      "balancedHelp": "更新頻度を下げてモデル呼び出しを減らします。ローカルモデルや従量課金プロバイダーに適しています。",
+      "enhancedHelp": "年代記表示中の現在時代の更新を速くします。モデル呼び出しが増えます。",
       "aria": "更新モードを {{mode}} に設定",
       "toastError": "年代記の更新モードを変更できませんでした。もう一度お試しください。",
       "toastSuccess": "年代記の更新モードを {{mode}} に設定しました。"

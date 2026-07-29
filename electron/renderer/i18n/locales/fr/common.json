@@ -279,10 +279,10 @@
       "label": "ACTUALISATION CHRONIQUE",
       "balanced": "Equilibree",
       "enhanced": "Amelioree",
-      "balancedTag": "FREE TIER PAR DEFAUT",
+      "balancedTag": "MOINS D'APPELS MODELE",
       "enhancedTag": "PLUS REACTIVE",
-      "balancedHelp": "Utilisation Gemini reduite. Meilleur choix par defaut pour le free tier et des cliffhangers plus stables.",
-      "enhancedHelp": "Mises a jour plus rapides de l'ere actuelle dans la Chronique. Utilise plus d'appels Gemini.",
+      "balancedHelp": "Actualise moins souvent pour reduire les appels au modele. Bon choix pour les modeles locaux et les fournisseurs factures a l'usage.",
+      "enhancedHelp": "Mises a jour plus rapides de l'ere actuelle dans la Chronique. Utilise plus d'appels au modele.",
       "aria": "Definir le mode d'actualisation sur {{mode}}",
       "toastError": "Impossible de mettre a jour le mode d'actualisation de la Chronique. Reessayez.",
       "toastSuccess": "Mode d'actualisation de la Chronique defini sur {{mode}}."

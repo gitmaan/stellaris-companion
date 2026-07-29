@@ -258,10 +258,10 @@
       "label": "[!! CHRONICLE REFRESH !!]",
       "balanced": "[!! Balanced !!]",
       "enhanced": "[!! Enhanced !!]",
-      "balancedTag": "[!! FREE-TIER DEFAULT !!]",
+      "balancedTag": "[!! FEWER MODEL CALLS !!]",
       "enhancedTag": "[!! MORE RESPONSIVE !!]",
-      "balancedHelp": "[!! Lower Gemini usage. Best default for free tier and steadier cliffhanger updates. !!]",
-      "enhancedHelp": "[!! Faster current-era story updates while viewing Chronicle. Uses more Gemini calls. !!]",
+      "balancedHelp": "[!! Refreshes less often to reduce model calls. Best for local models and usage-based providers. !!]",
+      "enhancedHelp": "[!! Faster current-era story updates while viewing Chronicle. Uses more model calls. !!]",
       "aria": "[!! Set refresh mode to {{mode}} !!]",
       "toastError": "[!! Failed to update Chronicle refresh mode. Please try again. !!]",
       "toastSuccess": "[!! Chronicle refresh mode set to {{mode}}. !!]"
