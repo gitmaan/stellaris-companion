@@ -837,6 +837,11 @@ function SettingsPage({
                                 onChange={(e) => handleAdvisorProviderChange(e.target.value)}
                                 options={ADVISOR_PROVIDER_OPTIONS}
                              />
+                             {settings?.secretStorageAvailable === false && (
+                               <HUDMicro className="block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
+                                 {t('settings.advisor.sessionOnlySecrets')}
+                               </HUDMicro>
+                             )}
 
                              {advisorProvider !== 'gemini' && (
                                <div className="space-y-4 border-t border-white/10 pt-4">

@@ -94,6 +94,8 @@ export interface Settings {
   openRouterApiKeySet: boolean
   customProviderApiKey: string
   customProviderApiKeySet: boolean
+  secretStorageAvailable: boolean
+  secretStorageBackend: string | null
   advisorProvider: AdvisorProvider
   advisorModel: string
   advisorBaseUrl: string
@@ -167,6 +169,8 @@ export function useSettings(): UseSettingsResult {
         openRouterApiKeySet: !!loaded.openRouterApiKeySet,
         customProviderApiKey: loaded.customProviderApiKey || '',
         customProviderApiKeySet: !!loaded.customProviderApiKeySet,
+        secretStorageAvailable: loaded.secretStorageAvailable !== false,
+        secretStorageBackend: loaded.secretStorageBackend || null,
       }
       setSettings(normalized)
       setError(null)

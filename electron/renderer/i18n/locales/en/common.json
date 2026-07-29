@@ -321,6 +321,7 @@
       "modelReady": "READY FOR ADVISOR + CHRONICLE",
       "modelTestError": "The selected model could not complete the structured output test.",
       "modelTestPrivacy": "The test sends no campaign data.",
+      "sessionOnlySecrets": "Protected credential storage is unavailable. API keys work for this session but are not saved, and Chronicle publishing is disabled.",
       "remoteContextNotice": "Advisor questions, Chronicle prompts, and extracted game context are sent to this provider. Public endpoints must use HTTPS.",
       "ollamaCloudNotice": "This Ollama cloud model processes Advisor and Chronicle prompts remotely rather than on this device.",
       "showAdvanced": "SHOW ADVANCED CONNECTION",

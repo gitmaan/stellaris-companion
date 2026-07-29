@@ -21,6 +21,7 @@ const { autoUpdater } = require('electron-updater')
 const { createBackendClient } = require('./main/backendClient')
 const { createAnnouncementsService } = require('./main/announcements')
 const { createHealthCheckManager } = require('./main/healthcheck')
+const { createSecretStorage } = require('./main/secureStorage')
 const { setupAutoUpdater, registerUpdateIpcHandlers, wireAutoUpdaterEvents } = require('./main/updates')
 const { registerBackendIpcHandlers } = require('./main/ipc/backend')
 const { registerSettingsIpcHandlers } = require('./main/ipc/settings')
@@ -111,9 +112,8 @@ if (!IS_DEV && !IS_E2E) {
   }
 }
 
-// Secrets are encrypted via Electron's safeStorage API and persisted in
-// electron-store as base64 strings.  This replaces the deprecated keytar
-// native module and eliminates architecture-mismatch crashes.
+// Secrets use Electron safeStorage when the selected OS backend protects data
+// at rest. Environments without protected storage keep secrets in memory only.
 const SECRET_STORE_KEYS = {
   googleApiKey: 'secrets.google-api-key',
   openRouterApiKey: 'secrets.openrouter-api-key',
@@ -122,36 +122,6 @@ const SECRET_STORE_KEYS = {
   discordAccessToken: 'secrets.discord-access-token',
   discordRefreshToken: 'secrets.discord-refresh-token',
   chroniclePublisherSecret: 'secrets.chronicle-publisher-secret',
-}
-
-function encryptSecret(plaintext) {
-  if (!plaintext) return null
-  if (!safeStorage.isEncryptionAvailable()) return Buffer.from(plaintext).toString('base64')
-  return safeStorage.encryptString(plaintext).toString('base64')
-}
-
-function decryptSecret(stored) {
-  if (!stored) return null
-  const buf = Buffer.from(stored, 'base64')
-  if (!safeStorage.isEncryptionAvailable()) return buf.toString('utf-8')
-  try {
-    return safeStorage.decryptString(buf)
-  } catch {
-    // Data was stored without encryption or is corrupt — treat as plaintext
-    return buf.toString('utf-8')
-  }
-}
-
-function getSecret(key) {
-  return decryptSecret(store.get(key))
-}
-
-function setSecret(key, value) {
-  if (value) {
-    store.set(key, encryptSecret(value))
-  } else {
-    store.delete(key)
-  }
 }
 
 // Initialize electron-store for non-secret settings
@@ -189,6 +159,10 @@ const store = new Store({
     announcementsLastRead: 0,
   },
 })
+
+const secretStorage = createSecretStorage({ safeStorage, store })
+const getSecret = key => secretStorage.getSecret(key)
+const setSecret = (key, value) => secretStorage.setSecret(key, value)
 
 const announcementsService = createAnnouncementsService({ app, store })
 
@@ -854,6 +828,7 @@ function stepUiScale(direction) {
  * @returns {Object} Settings with masked secrets
  */
 function getSettings() {
+  const secretStorageStatus = secretStorage.getStatus()
   const googleApiKey = getSecret(SECRET_STORE_KEYS.googleApiKey)
   const openRouterApiKey = getSecret(SECRET_STORE_KEYS.openRouterApiKey)
   const customProviderApiKey = getSecret(SECRET_STORE_KEYS.customProviderApiKey)
@@ -882,6 +857,8 @@ function getSettings() {
     openRouterApiKeySet: !!openRouterApiKey,
     customProviderApiKey: maskSecret(customProviderApiKey),
     customProviderApiKeySet: !!customProviderApiKey,
+    secretStorageAvailable: secretStorageStatus.persistentEncryptionAvailable,
+    secretStorageBackend: secretStorageStatus.backend,
     advisorProvider,
     advisorModel,
     advisorBaseUrl,
@@ -907,9 +884,15 @@ function getSettings() {
  * @returns {Object} Settings with actual secret values
  */
 function getSettingsWithSecrets() {
+  const secretStorageStatus = secretStorage.getStatus()
   const googleApiKey = getSecret(SECRET_STORE_KEYS.googleApiKey) || ''
   const openRouterApiKey = getSecret(SECRET_STORE_KEYS.openRouterApiKey) || ''
   const customProviderApiKey = getSecret(SECRET_STORE_KEYS.customProviderApiKey) || ''
+  if (!secretStorageStatus.persistentEncryptionAvailable) {
+    // Remove a legacy publisher key from unprotected disk storage, retaining it
+    // only for this process. Publishing remains disabled until storage is safe.
+    getSecret(SECRET_STORE_KEYS.chroniclePublisherSecret)
+  }
   const discordToken = getSecret(SECRET_STORE_KEYS.discordToken) || ''
   const saveDir = store.get('saveDir', '')
   const playerName = store.get('playerName', '')
@@ -1593,7 +1576,7 @@ const chroniclePublishingService = createChroniclePublishingService({
   setSecret,
   secretStoreKey: SECRET_STORE_KEYS.chroniclePublisherSecret,
   // Headless Linux CI has no OS keyring; E2E data is isolated in a temporary profile.
-  isEncryptionAvailable: () => safeStorage.isEncryptionAvailable()
+  isEncryptionAvailable: () => secretStorage.getStatus().persistentEncryptionAvailable
     || (IS_E2E && process.env.E2E_FAKE_SECURE_STORAGE === '1'),
 })
 
