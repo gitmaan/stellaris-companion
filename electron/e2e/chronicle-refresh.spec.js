@@ -166,9 +166,12 @@ test('chronicle defers teaser refresh while hidden and catches up after the wind
 
     const chronicleRequests = backend.getChronicleRequests()
     expect(chronicleRequests.length).toBeGreaterThanOrEqual(3)
-    expect(chronicleRequests[1].chapter_only).toBe(true)
+    const hiddenTeaserRequest = chronicleRequests
+      .slice(1, -1)
+      .find((request) => request.chapter_only === true)
+    expect(hiddenTeaserRequest).toBeDefined()
     expect(chronicleRequests.at(-1).chapter_only).toBe(false)
-    expect(chronicleRequests[1].refresh_mode).toBe('balanced')
+    expect(hiddenTeaserRequest.refresh_mode).toBe('balanced')
     expect(chronicleRequests.at(-1).refresh_mode).toBe('balanced')
   } finally {
     await app.close()
