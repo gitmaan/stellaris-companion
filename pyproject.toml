@@ -39,7 +39,7 @@ stellaris-qa-check = "stellaris_save_extractor.qa_check:main"
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "ruff>=0.1.0",
+    "ruff==0.16.0",
     "mypy>=1.0",
 ]
 
