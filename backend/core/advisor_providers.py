@@ -325,7 +325,10 @@ class GeminiAdvisorGenerator:
                     )
                     if route_event:
                         route_event.reason = failure.reason
-                        route_event.error = failure.message[:500]
+                        route_event.error = _redact_sensitive_text(
+                            failure.message,
+                            self.config.api_key,
+                        )
                         route_event.notice = fallback_notice(
                             candidate_model,
                             fallback_model,
@@ -334,7 +337,10 @@ class GeminiAdvisorGenerator:
                     continue
                 break
 
-        message = str(last_error or "No Gemini model was available")
+        message = _redact_sensitive_text(
+            last_error or "No Gemini model was available",
+            self.config.api_key,
+        )
         if _is_context_limit_error(message):
             raise AdvisorProviderError(
                 "The selected Gemini model cannot fit the current campaign briefing "
@@ -457,7 +463,10 @@ class OpenAICompatibleAdvisorGenerator:
                 client.close()
 
         if not response.is_success:
-            error_message = _compatible_error_message(response)
+            error_message = _redact_sensitive_text(
+                _compatible_error_message(response),
+                self.config.api_key,
+            )
             if response.status_code == 413 or _is_context_limit_error(error_message):
                 raise AdvisorProviderError(
                     f"The selected {self.config.display_name} model cannot fit the "
@@ -538,6 +547,19 @@ def _compatible_error_message(response: httpx.Response) -> str:
     if error:
         return str(error)[:500]
     return f"HTTP {response.status_code}"
+
+
+def _redact_sensitive_text(value: Any, *secrets: str, limit: int = 500) -> str:
+    message = str(value)
+    candidates = {
+        candidate
+        for secret in secrets
+        for candidate in (str(secret or ""), str(secret or "").strip())
+        if candidate
+    }
+    for candidate in sorted(candidates, key=len, reverse=True):
+        message = message.replace(candidate, "[redacted]")
+    return message[:limit]
 
 
 def _is_context_limit_error(message: str) -> bool:

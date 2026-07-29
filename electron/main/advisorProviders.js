@@ -127,9 +127,20 @@ function buildProviderHeaders(selected, apiKey, { contentType = false } = {}) {
   return headers
 }
 
-function providerHttpError(selected, response, payload) {
+function redactProviderMessage(rawMessage, apiKey) {
+  let message = String(rawMessage)
+  const candidates = [...new Set([String(apiKey || ''), String(apiKey || '').trim()])]
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length)
+  for (const candidate of candidates) {
+    message = message.split(candidate).join('[redacted]')
+  }
+  return message.slice(0, 300)
+}
+
+function providerHttpError(selected, response, payload, apiKey) {
   const providerMessage = payload?.error?.message || payload?.error || payload?.detail
-  const suffix = providerMessage ? `: ${String(providerMessage).slice(0, 300)}` : ''
+  const suffix = providerMessage ? `: ${redactProviderMessage(providerMessage, apiKey)}` : ''
   return `${getAdvisorProviderLabel(selected)} returned HTTP ${response.status}${suffix}`
 }
 
@@ -186,7 +197,7 @@ async function discoverAdvisorModels({
     if (!response.ok) {
       return {
         ok: false,
-        error: providerHttpError(selected, response, payload),
+        error: providerHttpError(selected, response, payload, apiKey),
       }
     }
 
@@ -328,7 +339,7 @@ async function testAdvisorModel({
       ;({ response, payload } = await send(baseBody))
     }
     if (!response.ok) {
-      return { ok: false, error: providerHttpError(selected, response, payload) }
+      return { ok: false, error: providerHttpError(selected, response, payload, apiKey) }
     }
 
     const content = payload?.choices?.[0]?.message?.content

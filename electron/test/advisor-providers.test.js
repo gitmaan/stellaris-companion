@@ -84,6 +84,25 @@ test('OpenRouter model discovery requires a key', async () => {
   assert.match(result.error, /requires an API key/i)
 })
 
+test('model discovery redacts an echoed API key from provider errors', async () => {
+  const result = await discoverAdvisorModels({
+    provider: 'openrouter',
+    apiKey: 'very-secret-key',
+    fetchImpl: async () => ({
+      ok: false,
+      status: 401,
+      text: async () => JSON.stringify({
+        error: { message: 'Invalid token very-secret-key' },
+      }),
+    }),
+  })
+
+  assert.equal(result.ok, false)
+  assert.match(result.error, /Invalid token/)
+  assert.match(result.error, /\[redacted\]/)
+  assert.equal(result.error.includes('very-secret-key'), false)
+})
+
 test('model test sends a structured Chronicle-compatible probe', async () => {
   let capturedBody = null
   const fetchImpl = async (_url, options) => {
@@ -111,6 +130,26 @@ test('model test sends a structured Chronicle-compatible probe', async () => {
   assert.equal(capturedBody.response_format.type, 'json_schema')
   assert.deepEqual(capturedBody.provider, { require_parameters: true })
   assert.equal(capturedBody.messages[1].content.includes('campaign'), false)
+})
+
+test('model test redacts an echoed API key from provider errors', async () => {
+  const result = await testAdvisorModel({
+    provider: 'openrouter',
+    model: 'provider/model',
+    apiKey: 'very-secret-key',
+    fetchImpl: async () => ({
+      ok: false,
+      status: 401,
+      text: async () => JSON.stringify({
+        error: { message: 'Invalid token very-secret-key' },
+      }),
+    }),
+  })
+
+  assert.equal(result.ok, false)
+  assert.match(result.error, /Invalid token/)
+  assert.match(result.error, /\[redacted\]/)
+  assert.equal(result.error.includes('very-secret-key'), false)
 })
 
 test('model test retries without native response format on compatible HTTP 400', async () => {

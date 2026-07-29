@@ -126,7 +126,10 @@ def test_compatible_generator_sends_common_chat_contract():
 
 def test_compatible_generator_reports_auth_failure_without_exposing_key():
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(401, json={"error": {"message": "Invalid token"}})
+        return httpx.Response(
+            401,
+            json={"error": {"message": "Invalid token very-secret-key"}},
+        )
 
     config = AdvisorProviderConfig(
         provider="openrouter",
@@ -144,6 +147,7 @@ def test_compatible_generator_reports_auth_failure_without_exposing_key():
 
     assert exc_info.value.code == "PROVIDER_AUTH_FAILED"
     assert "Invalid token" in str(exc_info.value)
+    assert "[redacted]" in str(exc_info.value)
     assert "very-secret-key" not in str(exc_info.value)
 
 
