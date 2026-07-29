@@ -23,20 +23,18 @@ from typing import Any, Literal
 from google import genai
 from pydantic import BaseModel, Field
 
+from backend.core.advisor_providers import (
+    ADVISOR_PROVIDER_GEMINI,
+    AdvisorGenerationResult,
+    AdvisorGenerator,
+    AdvisorProviderConfig,
+    AdvisorProviderError,
+    create_advisor_generator,
+)
 from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
-from backend.core.model_routing import (
-    GEMINI_FLASH_MODEL,
-    classify_model_error,
-    display_model_name,
-    fallback_notice,
-    get_model_unavailable_event,
-    is_model_temporarily_unavailable,
-    mark_model_failure,
-    normalize_model_routing_mode,
-    route_models_for,
-)
+from backend.core.model_routing import display_model_name, normalize_model_routing_mode
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +154,39 @@ def _repair_json_string(text: str) -> str:
         i += 1
 
     return "".join(result)
+
+
+def _extract_json_object(text: str) -> str:
+    """Extract a JSON object from plain text or a fenced provider response."""
+    candidate = str(text or "").strip()
+    if candidate.startswith("```"):
+        lines = candidate.splitlines()
+        if lines:
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        candidate = "\n".join(lines).strip()
+
+    start = candidate.find("{")
+    end = candidate.rfind("}")
+    if start < 0 or end < start:
+        raise ValueError("Response did not contain a JSON object")
+    return candidate[start : end + 1]
+
+
+def _validate_structured_response(
+    text: str,
+    response_schema: type[BaseModel],
+) -> BaseModel:
+    """Validate provider JSON, repairing literal control characters once."""
+    candidate = _extract_json_object(text)
+    try:
+        return response_schema.model_validate_json(candidate)
+    except Exception as initial_error:
+        repaired = _repair_json_string(candidate)
+        if repaired == candidate:
+            raise initial_error
+        return response_schema.model_validate_json(repaired)
 
 
 # Era-ending event types that trigger chapter finalization
@@ -336,10 +367,18 @@ class ChronicleGenerator:
         api_key: str | None = None,
         *,
         model_routing_mode: str | None = None,
+        provider_config: AdvisorProviderConfig | None = None,
+        provider_generator: AdvisorGenerator | None = None,
     ):
         self.db = db
         self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
+        self.provider_config = (
+            provider_config
+            or getattr(provider_generator, "config", None)
+            or AdvisorProviderConfig.from_environment(google_api_key=self.api_key)
+        )
         self._client: genai.Client | None = None
+        self._provider_generator = provider_generator
         self.model_routing_mode = normalize_model_routing_mode(
             model_routing_mode or os.environ.get("STELLARIS_MODEL_ROUTING_MODE")
         )
@@ -348,10 +387,41 @@ class ChronicleGenerator:
     @property
     def client(self) -> genai.Client:
         if self._client is None:
-            if not self.api_key:
-                raise ValueError("GOOGLE_API_KEY not configured")
-            self._client = genai.Client(api_key=self.api_key)
+            if (
+                self.provider_config.provider != ADVISOR_PROVIDER_GEMINI
+                or not self.provider_config.api_key
+            ):
+                raise AdvisorProviderError(
+                    f"{self.provider_config.display_name} is not configured for Chronicle",
+                    code="CHRONICLE_PROVIDER_NOT_CONFIGURED",
+                    status_code=400,
+                )
+            self._client = genai.Client(api_key=self.provider_config.api_key)
         return self._client
+
+    @property
+    def provider_generator(self) -> AdvisorGenerator:
+        if self._provider_generator is None:
+            if not self.provider_config.is_configured:
+                raise AdvisorProviderError(
+                    f"{self.provider_config.display_name} is not configured for Chronicle",
+                    code="CHRONICLE_PROVIDER_NOT_CONFIGURED",
+                    status_code=400,
+                )
+            gemini_client = (
+                self.client if self.provider_config.provider == ADVISOR_PROVIDER_GEMINI else None
+            )
+            self._provider_generator = create_advisor_generator(
+                config=self.provider_config,
+                gemini_client=gemini_client,
+            )
+        if self._provider_generator is None:
+            raise AdvisorProviderError(
+                f"{self.provider_config.display_name} is not configured for Chronicle",
+                code="CHRONICLE_PROVIDER_NOT_CONFIGURED",
+                status_code=400,
+            )
+        return self._provider_generator
 
     def generate_chronicle(
         self,
@@ -604,6 +674,8 @@ class ChronicleGenerator:
                     "is_finalized": ch.get("is_finalized", True),
                     "context_stale": ch.get("context_stale", False),
                     "can_regenerate": ch.get("is_finalized", True),
+                    "provider": ch.get("provider"),
+                    "model": ch.get("model"),
                 }
                 for ch in chapters_data.get("chapters", [])
             ],
@@ -815,6 +887,8 @@ class ChronicleGenerator:
         chapter["sections"] = new_content.get("sections")
         chapter["narrative"] = new_content["narrative"]
         chapter["summary"] = new_content["summary"]
+        chapter["provider"] = new_content.get("provider")
+        chapter["model"] = new_content.get("model")
         chapter["generated_at"] = datetime.now(timezone.utc).isoformat()
         chapter["context_stale"] = False
 
@@ -891,6 +965,8 @@ class ChronicleGenerator:
             "recap": response.text,
             "style": "dramatic",
             "events_summarized": len(data["events"]),
+            "provider": response.provider,
+            "model": response.model,
             "model_routing": self._model_routing_response(),
         }
 
@@ -900,93 +976,92 @@ class ChronicleGenerator:
         contents: str,
         config: dict[str, Any],
         purpose_label: str,
-    ) -> Any:
-        """Generate content with Flash-first routing and Flash-Lite fallback on quota errors."""
-        candidate_models = route_models_for(
-            mode=self.model_routing_mode,
+    ) -> AdvisorGenerationResult:
+        """Generate Chronicle content through the selected model provider."""
+        response_schema = config.get("response_schema")
+        result = self.provider_generator.generate(
+            system_prompt=(
+                "Follow the Chronicle instructions precisely. Write as an in-universe "
+                "historian, never as a strategic advisor."
+            ),
+            user_prompt=contents,
+            model_routing_mode=self.model_routing_mode,
+            temperature=float(config.get("temperature", 1.0)),
+            max_output_tokens=int(config.get("max_output_tokens", 4096)),
             purpose="chronicle",
+            response_schema=(
+                response_schema
+                if isinstance(response_schema, type) and issubclass(response_schema, BaseModel)
+                else None
+            ),
+            schema_name=purpose_label,
         )
-        requested_model = candidate_models[0] if candidate_models else GEMINI_FLASH_MODEL
-        route_event = None
-        last_error: Exception | None = None
+        self._record_model_generation(result)
+        return result
 
-        for index, candidate_model in enumerate(candidate_models):
-            fallback_model = (
-                candidate_models[index + 1] if index + 1 < len(candidate_models) else None
+    def _generate_structured_content(
+        self,
+        *,
+        contents: str,
+        response_schema: type[BaseModel],
+        temperature: float,
+        max_output_tokens: int,
+        purpose_label: str,
+    ) -> tuple[BaseModel, AdvisorGenerationResult]:
+        """Generate and validate structured Chronicle output with one corrective retry."""
+        validation_error: Exception | None = None
+        prompt = contents
+
+        for attempt in range(2):
+            result = self._generate_content_with_routing(
+                contents=prompt,
+                config={
+                    "temperature": temperature,
+                    "max_output_tokens": max_output_tokens,
+                    "response_schema": response_schema,
+                },
+                purpose_label=purpose_label,
             )
-            if fallback_model and is_model_temporarily_unavailable(candidate_model):
-                route_event = get_model_unavailable_event(
-                    requested_model=requested_model,
-                    skipped_model=candidate_model,
-                    final_model=fallback_model,
-                )
-                continue
-
             try:
-                response = self.client.models.generate_content(
-                    model=candidate_model,
-                    contents=contents,
-                    config=config,
-                )
-                final_event = route_event or (
-                    None
-                    if candidate_model == requested_model
-                    else get_model_unavailable_event(
-                        requested_model=requested_model,
-                        skipped_model=requested_model,
-                        final_model=candidate_model,
-                    )
-                )
-                if final_event:
-                    final_event.final_model = candidate_model
-                    self._model_route_events.append(final_event.to_dict())
-                else:
-                    self._model_route_events.append(
-                        {
-                            "requested_model": requested_model,
-                            "requested_model_display": display_model_name(requested_model),
-                            "attempted_model": candidate_model,
-                            "attempted_model_display": display_model_name(candidate_model),
-                            "final_model": candidate_model,
-                            "final_model_display": display_model_name(candidate_model),
-                            "fallback": False,
-                            "reason": None,
-                            "notice": None,
-                            "error": None,
-                        }
-                    )
-                return response
+                return _validate_structured_response(result.text, response_schema), result
             except Exception as exc:
-                last_error = exc
-                failure = classify_model_error(exc)
-                if failure and fallback_model:
+                validation_error = exc
+                if attempt == 0:
                     logger.warning(
-                        "%s failed on %s; routing via %s: %s",
+                        "%s returned invalid structured output; retrying once: %s",
                         purpose_label,
-                        display_model_name(candidate_model),
-                        display_model_name(fallback_model),
                         exc,
                     )
-                    mark_model_failure(candidate_model, failure)
-                    route_event = get_model_unavailable_event(
-                        requested_model=requested_model,
-                        skipped_model=candidate_model,
-                        final_model=fallback_model,
+                    prompt = (
+                        f"{contents.rstrip()}\n\n"
+                        "Your previous response could not be validated. Return only a JSON "
+                        "object matching the requested schema. Do not include Markdown or "
+                        f"commentary. Validation issue: {str(exc)[:500]}"
                     )
-                    if route_event:
-                        route_event.reason = failure.reason
-                        route_event.error = failure.message[:500]
-                        route_event.notice = fallback_notice(
-                            candidate_model,
-                            fallback_model,
-                            reason=failure.reason,
-                        )
-                    continue
-                raise
 
-        if last_error is not None:
-            raise last_error
-        raise RuntimeError("No Chronicle model was available")
+        raise AdvisorProviderError(
+            f"{self.provider_config.display_name} could not produce valid structured "
+            f"output for {purpose_label}",
+            code="PROVIDER_INVALID_RESPONSE",
+        ) from validation_error
+
+    def _record_model_generation(self, result: AdvisorGenerationResult) -> None:
+        event = dict(result.routing or {})
+        event.setdefault("requested_model", result.requested_model)
+        event.setdefault(
+            "requested_model_display",
+            display_model_name(result.requested_model),
+        )
+        event.setdefault("attempted_model", result.model)
+        event.setdefault("attempted_model_display", display_model_name(result.model))
+        event.setdefault("final_model", result.model)
+        event.setdefault("final_model_display", display_model_name(result.model))
+        event.setdefault("fallback", result.model != result.requested_model)
+        event.setdefault("reason", None)
+        event.setdefault("notice", None)
+        event.setdefault("error", None)
+        event["provider"] = result.provider
+        self._model_route_events.append(event)
 
     def _model_routing_response(self) -> dict[str, Any]:
         events = list(self._model_route_events)
@@ -995,6 +1070,8 @@ class ChronicleGenerator:
         last_fallback = fallback_events[-1] if fallback_events else None
         return {
             "mode": self.model_routing_mode,
+            "provider": self.provider_config.provider,
+            "provider_display": self.provider_config.display_name,
             "model": last_event.get("final_model") if last_event else None,
             "model_display": last_event.get("final_model_display") if last_event else None,
             "fallback": bool(fallback_events),
@@ -1310,6 +1387,8 @@ class ChronicleGenerator:
                 "context_stale": False,
                 "trigger": trigger,
                 "event_count": len(chapter_events),
+                "provider": content.get("provider"),
+                "model": content.get("model"),
             }
         )
 
@@ -1329,8 +1408,8 @@ class ChronicleGenerator:
         custom_instructions: str | None = None,
         regeneration_instructions: str | None = None,
         language: str = "en",
-    ) -> dict[str, str]:
-        """Generate chapter content using Gemini structured output."""
+    ) -> dict[str, Any]:
+        """Generate and validate a structured Chronicle chapter."""
         identity = briefing.get("identity", {})
         empire_name = identity.get("empire_name", "Unknown Empire")
         ethics = ", ".join(identity.get("ethics", []))
@@ -1425,65 +1504,24 @@ Do NOT give advice. You are a historian, not an advisor.
 Do NOT fabricate events not in the event list.
 {regen_section}"""
 
-        try:
-            response = self._generate_content_with_routing(
-                contents=prompt,
-                config={
-                    "temperature": 1.0,
-                    "max_output_tokens": 4096,  # Increased: 500-800 word narrative + JSON overhead
-                    "response_mime_type": "application/json",
-                    "response_schema": ChapterOutput,
-                },
-                purpose_label=f"Chronicle chapter {chapter_number}",
-            )
-
-            # Parse with Pydantic for validation
-            chapter = ChapterOutput.model_validate_json(response.text)
-            sections = [s.model_dump() for s in chapter.sections]
-            return {
-                "title": chapter.title,
-                "epigraph": chapter.epigraph,
-                "sections": sections,
-                "narrative": _sections_to_text(sections, chapter.epigraph),
-                "summary": chapter.summary,
-            }
-        except Exception as e:
-            # Fallback for errors - try JSON repair as last resort
-            logger.warning("Structured output failed for chapter %d: %s", chapter_number, e)
-            try:
-                # Attempt JSON repair if we got a response
-                if hasattr(e, "__context__") and hasattr(e.__context__, "doc"):
-                    raw_text = e.__context__.doc
-                else:
-                    raw_text = getattr(response, "text", "") if "response" in dir() else ""
-
-                if raw_text:
-                    repaired = _repair_json_string(raw_text)
-                    result = json.loads(repaired)
-                    logger.info("JSON repair succeeded for chapter %d", chapter_number)
-                    sections = result.get("sections", [])
-                    epigraph = result.get("epigraph", "")
-                    narrative = result.get("narrative", "")
-                    if sections:
-                        narrative = _sections_to_text(sections, epigraph)
-                    return {
-                        "title": result.get("title", f"Chapter {chapter_number}"),
-                        "epigraph": epigraph,
-                        "sections": sections,
-                        "narrative": narrative,
-                        "summary": result.get("summary", ""),
-                    }
-            except Exception:
-                pass
-
-            error_text = f"[Generation error: {e}]"
-            return {
-                "title": f"Chapter {chapter_number}",
-                "epigraph": "",
-                "sections": [{"type": "prose", "text": error_text, "attribution": ""}],
-                "narrative": error_text,
-                "summary": "",
-            }
+        parsed, response = self._generate_structured_content(
+            contents=prompt,
+            response_schema=ChapterOutput,
+            temperature=1.0,
+            max_output_tokens=4096,
+            purpose_label=f"Chronicle chapter {chapter_number}",
+        )
+        chapter = ChapterOutput.model_validate(parsed)
+        sections = [section.model_dump() for section in chapter.sections]
+        return {
+            "title": chapter.title,
+            "epigraph": chapter.epigraph,
+            "sections": sections,
+            "narrative": _sections_to_text(sections, chapter.epigraph),
+            "summary": chapter.summary,
+            "provider": response.provider,
+            "model": response.model,
+        }
 
     def _generate_current_era(
         self,
@@ -1595,43 +1633,23 @@ End the final prose section with "The story continues..."
 Do NOT give advice. You are a historian, not an advisor.
 """
 
-        config = {
-            "temperature": 1.0,
-            "max_output_tokens": 1024,
-            "response_mime_type": "application/json",
-            "response_schema": CurrentEraOutput,
+        parsed, response = self._generate_structured_content(
+            contents=prompt,
+            response_schema=CurrentEraOutput,
+            temperature=1.0,
+            max_output_tokens=1024,
+            purpose_label="Chronicle current era",
+        )
+        era_output = CurrentEraOutput.model_validate(parsed)
+        sections = [section.model_dump() for section in era_output.sections]
+        return {
+            "start_date": era_start_date,
+            "sections": sections,
+            "narrative": _sections_to_text(sections),
+            "events_covered": len(events),
+            "provider": response.provider,
+            "model": response.model,
         }
-
-        response = None
-        try:
-            response = self._generate_content_with_routing(
-                contents=prompt,
-                config=config,
-                purpose_label="Chronicle current era",
-            )
-        except Exception as error:
-            logger.warning("Current era generation failed: %s", error)
-
-        try:
-            if response is None or not getattr(response, "text", None):
-                raise ValueError("Current era generation returned empty response")
-
-            era_output = CurrentEraOutput.model_validate_json(response.text)
-            sections = [s.model_dump() for s in era_output.sections]
-            return {
-                "start_date": era_start_date,
-                "sections": sections,
-                "narrative": _sections_to_text(sections),
-                "events_covered": len(events),
-            }
-        except Exception:
-            fallback_text = localized_text("current_era_fallback", language)
-            return {
-                "start_date": era_start_date,
-                "sections": [{"type": "prose", "text": fallback_text, "attribution": ""}],
-                "narrative": fallback_text,
-                "events_covered": len(events),
-            }
 
     def _assemble_chronicle_text(
         self,
@@ -1698,7 +1716,7 @@ Do NOT give advice. You are a historian, not an advisor.
         # Build prompt
         prompt = self._build_chronicler_prompt(data)
 
-        # Call Gemini
+        # Generate through the selected provider.
         response = self._generate_content_with_routing(
             contents=prompt,
             config={"temperature": 1.0, "max_output_tokens": 4096},
@@ -1722,6 +1740,9 @@ Do NOT give advice. You are a historian, not an advisor.
             "cached": False,
             "event_count": event_count,
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "provider": response.provider,
+            "model": response.model,
+            "model_routing": self._model_routing_response(),
         }
 
     def _get_cached_if_valid(self, session_id: str) -> dict[str, Any] | None:

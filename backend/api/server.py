@@ -18,6 +18,8 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
+from backend.core.advisor_providers import AdvisorProviderConfig, AdvisorProviderError
+
 _chronicle_in_flight: set[str] = set()
 _chronicle_in_flight_lock = threading.Lock()
 
@@ -135,6 +137,35 @@ def _raise_chronicle_value_error(error: ValueError) -> NoReturn:
     raise HTTPException(status_code=400, detail={"error": str(error)}) from error
 
 
+def _raise_provider_error(error: AdvisorProviderError) -> NoReturn:
+    raise HTTPException(
+        status_code=error.status_code,
+        detail={"error": str(error), "code": error.code},
+    ) from error
+
+
+def _provider_health_fields(companion: Any | None) -> dict[str, Any]:
+    """Report one selected provider for both Advisor and Chronicle."""
+    environment_config = AdvisorProviderConfig.from_environment()
+    provider = environment_config.provider
+    configured = environment_config.is_configured
+
+    if companion is not None:
+        provider_getter = getattr(companion, "get_advisor_provider", None)
+        configured_getter = getattr(companion, "is_advisor_configured", None)
+        if callable(provider_getter):
+            provider = provider_getter() or provider
+        if callable(configured_getter):
+            configured = bool(configured_getter())
+
+    return {
+        "advisor_provider": provider,
+        "advisor_configured": configured,
+        "chronicle_provider": provider,
+        "chronicle_configured": configured,
+    }
+
+
 def get_auth_token() -> str | None:
     """Get the expected auth token from environment."""
     return os.environ.get(ENV_API_TOKEN)
@@ -214,17 +245,7 @@ def create_app() -> FastAPI:
             return {
                 "status": "ok",
                 **payload,
-                "advisor_provider": (
-                    getattr(companion, "get_advisor_provider", lambda: None)()
-                    if companion is not None
-                    else None
-                ),
-                "advisor_configured": (
-                    getattr(companion, "is_advisor_configured", lambda: False)()
-                    if companion is not None
-                    else False
-                ),
-                "chronicle_configured": bool(os.environ.get("GOOGLE_API_KEY")),
+                **_provider_health_fields(companion),
             }
 
         companion = getattr(request.app.state, "companion", None)
@@ -235,17 +256,7 @@ def create_app() -> FastAPI:
                 "empire_name": None,
                 "game_date": None,
                 "precompute_ready": False,
-                "advisor_provider": (
-                    getattr(companion, "get_advisor_provider", lambda: None)()
-                    if companion is not None
-                    else None
-                ),
-                "advisor_configured": (
-                    getattr(companion, "is_advisor_configured", lambda: False)()
-                    if companion is not None
-                    else False
-                ),
-                "chronicle_configured": bool(os.environ.get("GOOGLE_API_KEY")),
+                **_provider_health_fields(companion),
             }
 
         precompute_status = companion.get_precompute_status()
@@ -256,9 +267,7 @@ def create_app() -> FastAPI:
             "empire_name": companion.metadata.get("name"),
             "game_date": companion.metadata.get("date"),
             "precompute_ready": precompute_status.get("ready", False),
-            "advisor_provider": getattr(companion, "get_advisor_provider", lambda: None)(),
-            "advisor_configured": getattr(companion, "is_advisor_configured", lambda: False)(),
-            "chronicle_configured": bool(os.environ.get("GOOGLE_API_KEY")),
+            **_provider_health_fields(companion),
         }
 
     @app.get("/api/ingestion-status", dependencies=[Depends(verify_token)])
@@ -587,8 +596,6 @@ def create_app() -> FastAPI:
         save_id, _ = _resolve_current_save_id(request)
         scoped_session_key = _scope_chat_session_key(save_id=save_id, client_key=body.session_key)
         requested_model = (body.model or "").strip()[:120] or None
-        from backend.core.advisor_providers import AdvisorProviderError
-
         try:
             response_text, elapsed = companion.ask_precomputed(
                 question=body.message,
@@ -857,7 +864,7 @@ def create_app() -> FastAPI:
         - "summary": Fast deterministic recap (default)
         - "dramatic": LLM-powered dramatic narrative
 
-        Note: This is a sync endpoint because the LLM client is synchronous.
+        Note: This is a sync endpoint because provider clients are synchronous.
         FastAPI runs sync endpoints in a threadpool.
         """
         db = getattr(request.app.state, "db", None)
@@ -905,6 +912,8 @@ def create_app() -> FastAPI:
             )
             result["date_range"] = date_range
             return result
+        except AdvisorProviderError as e:
+            _raise_provider_error(e)
         except ValueError as e:
             _raise_chronicle_value_error(e)
         except Exception as e:
@@ -921,7 +930,7 @@ def create_app() -> FastAPI:
         Chronicles are cached and regenerated when significant new events occur.
 
         Note: This is a sync endpoint (def, not async def) because the
-        Gemini client is synchronous. FastAPI runs sync endpoints in a
+        provider clients are synchronous. FastAPI runs sync endpoints in a
         threadpool, avoiding event loop blocking.
         """
         db = getattr(request.app.state, "db", None)
@@ -975,6 +984,8 @@ def create_app() -> FastAPI:
                 language=language,
             )
             return result
+        except AdvisorProviderError as e:
+            _raise_provider_error(e)
         except ValueError as e:
             _raise_chronicle_value_error(e)
         except Exception as e:
@@ -1028,6 +1039,8 @@ def create_app() -> FastAPI:
                 language=body.language,
             )
             return result
+        except AdvisorProviderError as e:
+            _raise_provider_error(e)
         except ValueError as e:
             _raise_chronicle_value_error(e)
         except Exception as e:

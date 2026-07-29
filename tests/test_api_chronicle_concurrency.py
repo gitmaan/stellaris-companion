@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 import backend.api.server as server
+from backend.core.advisor_providers import AdvisorProviderError
 from backend.core.chronicle import ChronicleGenerator
 
 
@@ -157,3 +158,53 @@ def test_api_chronicle_returns_typed_error_without_gemini_key(monkeypatch):
         "code": "CHRONICLE_PROVIDER_NOT_CONFIGURED",
     }
     assert server._chronicle_in_flight == set()
+
+
+def test_api_chronicle_preserves_provider_error(monkeypatch):
+    server._chronicle_in_flight.clear()
+
+    def unavailable(self, session_id, **kwargs):
+        raise AdvisorProviderError(
+            "Could not connect to LM Studio at http://127.0.0.1:1234/v1",
+            code="PROVIDER_UNAVAILABLE",
+            status_code=503,
+        )
+
+    monkeypatch.setattr(
+        ChronicleGenerator,
+        "generate_chronicle",
+        unavailable,
+        raising=True,
+    )
+    app = _make_app(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/chronicle",
+            json={"session_id": "session-1"},
+            headers=_auth_headers(),
+        )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "error": "Could not connect to LM Studio at http://127.0.0.1:1234/v1",
+        "code": "PROVIDER_UNAVAILABLE",
+    }
+    assert server._chronicle_in_flight == set()
+
+
+def test_health_uses_selected_provider_for_chronicle(monkeypatch):
+    monkeypatch.setenv("STELLARIS_ADVISOR_PROVIDER", "custom")
+    monkeypatch.setenv("STELLARIS_ADVISOR_MODEL", "local-story-model")
+    monkeypatch.setenv("STELLARIS_ADVISOR_BASE_URL", "http://127.0.0.1:8080/v1")
+    app = _make_app(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.get("/api/health", headers=_auth_headers())
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["advisor_provider"] == "custom"
+    assert payload["chronicle_provider"] == "custom"
+    assert payload["advisor_configured"] is True
+    assert payload["chronicle_configured"] is True
