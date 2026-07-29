@@ -1592,7 +1592,9 @@ const chroniclePublishingService = createChroniclePublishingService({
   getSecret,
   setSecret,
   secretStoreKey: SECRET_STORE_KEYS.chroniclePublisherSecret,
-  isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+  // Headless Linux CI has no OS keyring; E2E data is isolated in a temporary profile.
+  isEncryptionAvailable: () => safeStorage.isEncryptionAvailable()
+    || (IS_E2E && process.env.E2E_FAKE_SECURE_STORAGE === '1'),
 })
 
 registerChroniclePublishingIpcHandlers({

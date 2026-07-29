@@ -19,6 +19,7 @@ async function launchApp(backendPort, userDataDir) {
       E2E_ONBOARDING_COMPLETE: '1',
       E2E_BACKEND_CONFIGURED: '1',
       E2E_SKIP_BACKEND_AUTOSTART: '1',
+      E2E_FAKE_SECURE_STORAGE: '1',
       E2E_USER_DATA_DIR: userDataDir,
       STELLARIS_API_PORT: String(backendPort),
       STELLARIS_API_TOKEN: 'e2e-token',
