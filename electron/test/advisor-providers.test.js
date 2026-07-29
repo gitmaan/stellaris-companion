@@ -185,6 +185,42 @@ test('model test retries without native response format on compatible HTTP 400',
   assert.equal('provider' in requestBodies[1], false)
 })
 
+test('OpenRouter model test retries when no route supports schema parameters', async () => {
+  const requestBodies = []
+  const fetchImpl = async (_url, options) => {
+    requestBodies.push(JSON.parse(options.body))
+    if (requestBodies.length === 1) {
+      return {
+        ok: false,
+        status: 503,
+        text: async () => JSON.stringify({
+          error: { message: 'No available model provider meets your routing requirements' },
+        }),
+      }
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        choices: [{ message: { content: '{"status":"ok"}' } }],
+      }),
+    }
+  }
+
+  const result = await testAdvisorModel({
+    provider: 'openrouter',
+    model: 'provider/model',
+    apiKey: 'secret',
+    fetchImpl,
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.structuredOutput, false)
+  assert.equal(requestBodies.length, 2)
+  assert.equal('response_format' in requestBodies[1], false)
+  assert.equal('provider' in requestBodies[1], false)
+})
+
 test('model test rejects an answer Chronicle cannot validate', async () => {
   const result = await testAdvisorModel({
     provider: 'lm_studio',

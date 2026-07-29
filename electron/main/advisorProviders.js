@@ -334,7 +334,7 @@ async function testAdvisorModel({
   try {
     let structuredOutput = true
     let { response, payload } = await send(structuredBody)
-    if (response.status === 400) {
+    if (response.status === 400 || (selected === 'openrouter' && response.status === 503)) {
       structuredOutput = false
       ;({ response, payload } = await send(baseBody))
     }

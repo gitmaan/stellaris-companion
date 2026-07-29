@@ -435,7 +435,13 @@ class OpenAICompatibleAdvisorGenerator:
             )
             if (
                 response_schema is not None
-                and response.status_code == 400
+                and (
+                    response.status_code == 400
+                    or (
+                        self.config.provider == ADVISOR_PROVIDER_OPENROUTER
+                        and response.status_code == 503
+                    )
+                )
                 and not _is_context_limit_error(_compatible_error_message(response))
             ):
                 fallback_body = dict(request_body)

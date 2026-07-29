@@ -264,6 +264,54 @@ def test_compatible_generator_retries_without_schema_parameter():
     assert "Return only one JSON object" in requests[1]["messages"][1]["content"]
 
 
+def test_openrouter_retries_when_no_route_supports_schema():
+    requests: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        requests.append(body)
+        if len(requests) == 1:
+            return httpx.Response(
+                503,
+                json={
+                    "error": {
+                        "message": "No available model provider meets your routing requirements"
+                    }
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "model": "provider/model",
+                "choices": [{"message": {"content": '{"status":"CHRONICLE_READY"}'}}],
+            },
+        )
+
+    config = AdvisorProviderConfig(
+        provider="openrouter",
+        model="provider/model",
+        base_url="https://openrouter.ai/api/v1",
+        api_key="secret-key",
+    )
+    generator = OpenAICompatibleAdvisorGenerator(
+        config=config,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    result = generator.generate(
+        system_prompt="Return a probe.",
+        user_prompt="Check Chronicle support.",
+        response_schema=StructuredProbe,
+    )
+
+    assert StructuredProbe.model_validate_json(result.text).status == "CHRONICLE_READY"
+    assert len(requests) == 2
+    assert "response_format" in requests[0]
+    assert requests[0]["provider"] == {"require_parameters": True}
+    assert "response_format" not in requests[1]
+    assert "provider" not in requests[1]
+
+
 def test_compatible_generator_reports_billing_failure():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(402, json={"error": {"message": "Insufficient credits"}})
