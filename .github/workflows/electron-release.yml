@@ -185,15 +185,26 @@ jobs:
           security find-identity -v -p codesigning
           rm -f "$CERT_FILE"
 
-      - name: Build or publish Electron App
+      - name: Build or publish Electron App (macOS)
+        if: startsWith(matrix.name, 'mac')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ startsWith(matrix.name, 'mac') && secrets.CSC_LINK || '' }}
-          CSC_KEY_PASSWORD: ${{ startsWith(matrix.name, 'mac') && secrets.CSC_KEY_PASSWORD || '' }}
-          APPLE_ID: ${{ startsWith(matrix.name, 'mac') && secrets.APPLE_ID || '' }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ startsWith(matrix.name, 'mac') && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ startsWith(matrix.name, 'mac') && secrets.APPLE_TEAM_ID || '' }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PUBLISH_MODE: ${{ needs.setup.outputs.publish == 'true' && 'always' || 'never' }}
+          RELEASE_CHANNEL: ${{ needs.setup.outputs.channel }}
+        working-directory: electron
+        run: npx electron-builder ${{ matrix.electron_args }} --publish "$PUBLISH_MODE" --config.publish.channel="$RELEASE_CHANNEL"
+
+      - name: Build or publish Electron App
+        if: ${{ !startsWith(matrix.name, 'mac') }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PUBLISH_MODE: ${{ needs.setup.outputs.publish == 'true' && 'always' || 'never' }}
           RELEASE_CHANNEL: ${{ needs.setup.outputs.channel }}
         working-directory: electron
