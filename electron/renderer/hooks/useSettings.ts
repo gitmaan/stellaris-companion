@@ -9,6 +9,9 @@ export const DEFAULT_CHRONICLE_REFRESH_MODE: ChronicleRefreshMode = 'balanced'
 export const MODEL_ROUTING_MODE_VALUES = ['quality_first', 'conserve'] as const
 export type ModelRoutingMode = (typeof MODEL_ROUTING_MODE_VALUES)[number]
 export const DEFAULT_MODEL_ROUTING_MODE: ModelRoutingMode = 'conserve'
+export const UPDATE_CHANNEL_VALUES = ['stable', 'beta'] as const
+export type UpdateChannel = (typeof UPDATE_CHANNEL_VALUES)[number]
+export const DEFAULT_UPDATE_CHANNEL: UpdateChannel = 'stable'
 export const LANGUAGE_VALUES = [
   'system',
   'en',
@@ -50,6 +53,12 @@ export function normalizeModelRoutingMode(rawValue: unknown): ModelRoutingMode {
     : DEFAULT_MODEL_ROUTING_MODE
 }
 
+export function normalizeUpdateChannel(rawValue: unknown): UpdateChannel {
+  return (UPDATE_CHANNEL_VALUES as readonly unknown[]).includes(rawValue)
+    ? rawValue as UpdateChannel
+    : DEFAULT_UPDATE_CHANNEL
+}
+
 export function normalizeLanguage(rawValue: unknown): LanguageSetting {
   if (typeof rawValue !== 'string') return DEFAULT_LANGUAGE
   const normalized = rawValue.trim()
@@ -70,6 +79,8 @@ export function normalizeResolvedLanguage(rawValue: unknown): ResolvedLanguage {
 export interface Settings {
   googleApiKey: string
   googleApiKeySet: boolean
+  secretStorageAvailable: boolean
+  secretStorageBackend: string | null
   discordToken: string
   discordTokenSet: boolean
   saveDir: string
@@ -87,6 +98,7 @@ export interface Settings {
   modelRoutingMode: ModelRoutingMode
   language: LanguageSetting
   resolvedLanguage: ResolvedLanguage
+  updateChannel: UpdateChannel
 }
 
 export interface UseSettingsResult {
@@ -119,6 +131,9 @@ export function useSettings(): UseSettingsResult {
         modelRoutingMode?: unknown
         language?: unknown
         resolvedLanguage?: unknown
+        updateChannel?: unknown
+        secretStorageAvailable?: unknown
+        secretStorageBackend?: unknown
       }
       const parsedUiScale = Number(loaded.uiScale)
       const normalized: Settings = {
@@ -132,6 +147,11 @@ export function useSettings(): UseSettingsResult {
         modelRoutingMode: normalizeModelRoutingMode(loaded.modelRoutingMode),
         language: normalizeLanguage(loaded.language),
         resolvedLanguage: normalizeResolvedLanguage(loaded.resolvedLanguage),
+        updateChannel: normalizeUpdateChannel(loaded.updateChannel),
+        secretStorageAvailable: loaded.secretStorageAvailable === true,
+        secretStorageBackend: typeof loaded.secretStorageBackend === 'string'
+          ? loaded.secretStorageBackend
+          : null,
       }
       setSettings(normalized)
       setError(null)

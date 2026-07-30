@@ -259,12 +259,14 @@
       "intelligence": "情報アップリンク",
       "data": "データ取り込み",
       "communications": "通信リレー",
+      "updates": "ソフトウェア更新",
       "diagnostics": "診断"
     },
     "panels": {
       "geminiAccess": "Gemini モデルアクセス",
       "saveSource": "セーブファイルの場所",
-      "discordLink": "Discord 接続"
+      "discordLink": "Discord 接続",
+      "updateChannel": "更新トラック"
     },
     "api": {
       "label": "API キー",
@@ -273,7 +275,8 @@
       "status": "状態:",
       "active": "有効",
       "missing": "未設定",
-      "generateKey": "キーを生成 >"
+      "generateKey": "キーを生成 >",
+      "storageWarning": "保護された認証情報ストレージを利用できません。API キーはアプリを閉じるまでのみ保持され、年代記の公開は無効になります。"
     },
     "chronicleRefresh": {
       "label": "年代記の更新",
@@ -315,6 +318,19 @@
     "feedback": {
       "label": "システム報告",
       "body": "分析用に詳細ログを送信します。"
+    },
+    "updateChannel": {
+      "label": "リリースチャンネル",
+      "stable": "安定版",
+      "beta": "ベータ",
+      "stableTag": "推奨",
+      "betaTag": "先行アクセス",
+      "stableHelp": "日常のプレイ向けにテスト済みのリリースです。",
+      "betaHelp": "安定版の公開前に新機能と修正を試せます。",
+      "betaWarning": "ベータ版は安定性が低い場合があります。安定版への復帰は、より新しい安定版が公開された時点で有効になります。",
+      "aria": "{{channel}}更新チャンネルを使用",
+      "toastError": "更新チャンネルを変更できませんでした。もう一度お試しください。",
+      "toastSuccess": "更新チャンネルを{{channel}}に設定しました。"
     },
     "actionBar": {
       "unsaved": "未保存の変更",
