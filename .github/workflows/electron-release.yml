@@ -186,6 +186,7 @@ jobs:
           rm -f "$CERT_FILE"
 
       - name: Build or publish Electron App
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ startsWith(matrix.name, 'mac') && secrets.CSC_LINK || '' }}
