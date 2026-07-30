@@ -22,8 +22,34 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
+      channel: ${{ steps.release-metadata.outputs.channel }}
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      prerelease: ${{ steps.release-metadata.outputs.prerelease }}
+      publish: ${{ steps.release-metadata.outputs.publish }}
+      tag: ${{ steps.release-metadata.outputs.tag }}
+      version: ${{ steps.release-metadata.outputs.version }}
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate release metadata
+        id: release-metadata
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./electron/package.json').version")
+          if [ "${{ github.event_name }}" = "push" ]; then
+            node scripts/classify_release.js \
+              --version "$VERSION" \
+              --tag "${{ github.ref_name }}" \
+              --output "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/classify_release.js \
+              --version "$VERSION" \
+              --output "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - id: set-matrix
         shell: bash
         run: |
@@ -38,7 +64,7 @@ jobs:
 
   release:
     needs: setup
-    name: Release - ${{ matrix.name }}
+    name: Build - ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -51,12 +77,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # --- Rust Parser Build ---
       - name: Build Rust Parser
-        run: |
-          cd stellaris-parser
-          cargo build --release
-          cd ..
+        run: cargo build --release
+        working-directory: stellaris-parser
 
       - name: Prepare Rust Binary
         shell: bash
@@ -72,14 +95,10 @@ jobs:
             cp stellaris-parser/target/release/stellaris-parser bin/stellaris-parser-darwin-x64
           elif [[ "${{ matrix.name }}" == "linux-x64" ]]; then
             cp stellaris-parser/target/release/stellaris-parser bin/stellaris-parser-linux-x64
-          else
-            cp stellaris-parser/target/release/stellaris-parser bin/stellaris-parser
           fi
 
-          echo "Binaries in bin/:"
           ls -la bin/
 
-      # --- Python Backend Build ---
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -110,7 +129,6 @@ jobs:
           chmod +x scripts/build-python.sh
           ./scripts/build-python.sh
 
-      # --- Electron Build & Publish ---
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -119,6 +137,7 @@ jobs:
           cache-dependency-path: '**/package-lock.json'
 
       - name: Install Node Dependencies
+        shell: bash
         run: |
           cd electron
           npm ci
@@ -136,10 +155,9 @@ jobs:
         working-directory: electron
         run: npm run build:mcpb
 
-      - name: CI smoke check (inputs for packaging)
+      - name: CI smoke check
         shell: bash
-        run: |
-          bash scripts/ci-smoke-check.sh "${{ matrix.name }}"
+        run: bash scripts/ci-smoke-check.sh "${{ matrix.name }}"
 
       - name: Import code signing certificate
         if: startsWith(matrix.name, 'mac')
@@ -159,40 +177,50 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$CERT_FILE" -P "$CSC_KEY_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
-
-          echo "Imported cert into keychain. Available identities:"
+          EXISTING_KEYCHAINS=()
+          while IFS= read -r keychain; do
+            EXISTING_KEYCHAINS+=("${keychain//\"/}")
+          done < <(security list-keychains -d user)
+          security list-keychains -d user -s "$KEYCHAIN_PATH" "${EXISTING_KEYCHAINS[@]}"
           security find-identity -v -p codesigning
-
           rm -f "$CERT_FILE"
 
-      - name: Publish Electron App (mac)
-        if: startsWith(matrix.name, 'mac')
+      - name: Build or publish Electron App
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          cd electron
-          npx electron-builder ${{ matrix.electron_args }} --publish always
+          CSC_LINK: ${{ startsWith(matrix.name, 'mac') && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ startsWith(matrix.name, 'mac') && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ startsWith(matrix.name, 'mac') && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ startsWith(matrix.name, 'mac') && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ startsWith(matrix.name, 'mac') && secrets.APPLE_TEAM_ID || '' }}
+          PUBLISH_MODE: ${{ needs.setup.outputs.publish == 'true' && 'always' || 'never' }}
+          RELEASE_CHANNEL: ${{ needs.setup.outputs.channel }}
+        working-directory: electron
+        run: npx electron-builder ${{ matrix.electron_args }} --publish "$PUBLISH_MODE" --config.publish.channel="$RELEASE_CHANNEL"
 
-      - name: Publish Electron App (non-mac)
-        if: ${{ !startsWith(matrix.name, 'mac') }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd electron
-          npx electron-builder ${{ matrix.electron_args }} --publish always
-
-      - name: Publish Claude Desktop MCPB
-        if: ${{ matrix.name == 'linux-x64' && startsWith(github.ref, 'refs/tags/') }}
+      - name: Upload Claude Desktop MCPB to draft release
+        if: ${{ matrix.name == 'linux-x64' && needs.setup.outputs.publish == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.setup.outputs.tag }}
           files: electron/dist/mcpb/*.mcpb
           fail_on_unmatched_files: true
+          draft: true
+
+      - name: Upload manual build artifacts
+        if: ${{ needs.setup.outputs.publish != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: stellaris-companion-${{ needs.setup.outputs.version }}-${{ matrix.name }}
+          path: |
+            electron/dist/*.AppImage
+            electron/dist/*.blockmap
+            electron/dist/*.dmg
+            electron/dist/*.exe
+            electron/dist/*.yml
+            electron/dist/*.zip
+            electron/dist/mcpb/*.mcpb
+          if-no-files-found: error
 
       - name: Fetch notarization log on failure
         if: failure() && startsWith(matrix.name, 'mac')
@@ -202,15 +230,12 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         shell: bash
         run: |
-          echo "=== Fetching notarization history ==="
           xcrun notarytool history \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             2>&1 | head -20
 
-          echo ""
-          echo "=== Fetching log for most recent submission ==="
           SUBMISSION_ID=$(xcrun notarytool history \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
@@ -218,18 +243,110 @@ jobs:
             2>&1 | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
 
           if [ -n "$SUBMISSION_ID" ]; then
-            echo "Submission ID: $SUBMISSION_ID"
             xcrun notarytool log "$SUBMISSION_ID" \
               --apple-id "$APPLE_ID" \
               --password "$APPLE_APP_SPECIFIC_PASSWORD" \
               --team-id "$APPLE_TEAM_ID" \
               2>&1
-          else
-            echo "Could not find submission ID"
           fi
 
+  finalize_release:
+    needs: [setup, release]
+    if: needs.setup.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ needs.setup.outputs.tag }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download both macOS update archives
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.setup.outputs.tag }}
+          VERSION: ${{ needs.setup.outputs.version }}
+        shell: bash
+        run: |
+          mkdir -p /tmp/update-feed
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern "Stellaris-Companion-${VERSION}-arm64-mac.zip" \
+            --dir /tmp/update-feed
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern "Stellaris-Companion-${VERSION}-mac.zip" \
+            --dir /tmp/update-feed
+
+      - name: Generate architecture-complete macOS update feed
+        env:
+          CHANNEL: ${{ needs.setup.outputs.channel }}
+          VERSION: ${{ needs.setup.outputs.version }}
+        run: |
+          node scripts/finalize_mac_update_manifest.js \
+            --version "$VERSION" \
+            --assets-dir /tmp/update-feed \
+            --notes electron/release-notes.md \
+            --output "/tmp/update-feed/${CHANNEL}-mac.yml"
+
+      - name: Prepare Stable aliases for Beta subscribers
+        if: needs.setup.outputs.prerelease != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.setup.outputs.tag }}
+        shell: bash
+        run: |
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern "latest.yml" \
+            --pattern "latest-linux.yml" \
+            --dir /tmp/update-feed
+          cp /tmp/update-feed/latest.yml /tmp/update-feed/beta.yml
+          cp /tmp/update-feed/latest-linux.yml /tmp/update-feed/beta-linux.yml
+          cp /tmp/update-feed/latest-mac.yml /tmp/update-feed/beta-mac.yml
+
+      - name: Upload finalized update feeds
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.setup.outputs.tag }}
+        shell: bash
+        run: |
+          gh release upload "$TAG" /tmp/update-feed/*.yml \
+            --repo "${{ github.repository }}" \
+            --clobber
+
+      - name: Publish Stable release
+        if: needs.setup.outputs.prerelease != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.setup.outputs.tag }}
+        shell: bash
+        run: |
+          gh release edit "$TAG" \
+            --repo "${{ github.repository }}" \
+            --draft=false \
+            --prerelease=false \
+            --latest \
+            --notes-file electron/release-notes.md
+
+      - name: Publish Beta release
+        if: needs.setup.outputs.prerelease == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.setup.outputs.tag }}
+        shell: bash
+        run: |
+          gh release edit "$TAG" \
+            --repo "${{ github.repository }}" \
+            --draft=false \
+            --prerelease \
+            --latest=false \
+            --notes-file electron/release-notes.md
+
   deploy-promo-site:
-    needs: release
+    needs: [setup, finalize_release]
+    if: needs.setup.outputs.prerelease != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-node@v4
@@ -239,11 +356,12 @@ jobs:
       - name: Synchronize promo site release facts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.finalize_release.outputs.tag }}
         run: |
           git clone --depth 1 https://x-access-token:${{ secrets.PROMO_SITE_TOKEN }}@github.com/gitmaan/stellaris-companion-site.git /tmp/site
           cd /tmp/site
           npm ci
-          npm run release:sync -- --tag "${{ github.ref_name }}"
+          npm run release:sync -- --tag "$RELEASE_TAG"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add \
@@ -251,8 +369,8 @@ jobs:
             public/.well-known/product-facts.json \
             public/.well-known/agent-skills/index.json
           if git diff --cached --quiet; then
-            git commit --allow-empty -m "chore: rebuild for ${{ github.ref_name }}"
+            git commit --allow-empty -m "chore: rebuild for $RELEASE_TAG"
           else
-            git commit -m "chore: sync release facts for ${{ github.ref_name }}"
+            git commit -m "chore: sync release facts for $RELEASE_TAG"
           fi
           git push
