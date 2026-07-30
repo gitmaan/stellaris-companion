@@ -1,6 +1,4 @@
-- Improved compatibility with the latest Stellaris 4.4 saves.
-- Fixed multiplayer saves sometimes showing the wrong player empire.
-- Improved accuracy for population, fleets, leaders, and known empires.
-- Made save scanning, Chronicle updates, and Advisor recommendations more reliable.
-
-Special thanks to [@will-o-matic](https://github.com/will-o-matic) for reporting and helping fix these issues.
+- Let the galaxy bear witness: publish your empire's Chronicle as a shareable web story.
+- Choose Stable or Beta updates in Settings to decide when new features reach your command deck.
+- Improved update reliability across Intel and Apple silicon Macs.
+- Strengthened local credential protection and release integrity.
