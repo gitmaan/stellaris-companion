@@ -47,8 +47,12 @@ Example (backend):
 
 ```py
 raise HTTPException(
-  status_code=409,
-  detail={"error": "Chronicle generation already in progress", "code": "CHRONICLE_IN_PROGRESS", "retry_after_ms": 2000},
+    status_code=409,
+    detail={
+        "error": "Chronicle generation already in progress",
+        "code": "CHRONICLE_IN_PROGRESS",
+        "retry_after_ms": 2000,
+    },
 )
 ```
 
@@ -77,4 +81,3 @@ Only backend-proxy calls (`window.electronAPI.backend.*`) use the envelope.
 Other IPC surfaces (settings, updates, discord, announcements, onboarding) may return
 domain-specific shapes and/or send push events (`backend-status`, `update-*`,
 `discord-*`, `announcements-updated`).
-
