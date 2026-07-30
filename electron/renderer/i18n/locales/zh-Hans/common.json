@@ -259,12 +259,14 @@
       "intelligence": "情报上行链路",
       "data": "数据摄取",
       "communications": "通信中继",
+      "updates": "软件更新",
       "diagnostics": "诊断"
     },
     "panels": {
       "geminiAccess": "Gemini 模型访问",
       "saveSource": "存档来源",
-      "discordLink": "Discord 连接"
+      "discordLink": "Discord 连接",
+      "updateChannel": "更新轨道"
     },
     "api": {
       "label": "API 密钥",
@@ -273,7 +275,8 @@
       "status": "状态：",
       "active": "已启用",
       "missing": "缺失",
-      "generateKey": "生成密钥 >"
+      "generateKey": "生成密钥 >",
+      "storageWarning": "受保护的凭据存储不可用。API 密钥仅在关闭应用前可用，编年史发布功能将被禁用。"
     },
     "chronicleRefresh": {
       "label": "编年史刷新",
@@ -315,6 +318,19 @@
     "feedback": {
       "label": "系统报告",
       "body": "提交详细日志用于分析。"
+    },
+    "updateChannel": {
+      "label": "发布频道",
+      "stable": "稳定版",
+      "beta": "测试版",
+      "stableTag": "推荐",
+      "betaTag": "抢先体验",
+      "stableHelp": "经过测试，适合日常游戏的版本。",
+      "betaHelp": "在稳定版发布前体验即将推出的功能和修复。",
+      "betaWarning": "测试版的稳定性可能较低。切回稳定版将在更新的稳定版本发布后生效。",
+      "aria": "使用{{channel}}更新频道",
+      "toastError": "无法更改更新频道，请重试。",
+      "toastSuccess": "更新频道已设为{{channel}}。"
     },
     "actionBar": {
       "unsaved": "有未保存更改",

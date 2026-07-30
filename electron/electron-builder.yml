@@ -76,7 +76,7 @@ publish:
   provider: github
   owner: gitmaan
   repo: stellaris-companion
-  releaseType: release
+  releaseType: draft
 
 releaseInfo:
   releaseNotesFile: release-notes.md

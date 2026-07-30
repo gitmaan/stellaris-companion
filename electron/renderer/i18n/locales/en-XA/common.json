@@ -238,12 +238,14 @@
       "intelligence": "[!! INTELLIGENCE UPLINK !!]",
       "data": "[!! DATA INGESTION !!]",
       "communications": "[!! COMMUNICATIONS RELAY !!]",
+      "updates": "[!! SOFTWARE UPDATES !!]",
       "diagnostics": "[!! DIAGNOSTICS !!]"
     },
     "panels": {
       "geminiAccess": "[!! GEMINI MODEL ACCESS !!]",
       "saveSource": "[!! SAVE FILE SOURCE !!]",
-      "discordLink": "[!! DISCORD LINK !!]"
+      "discordLink": "[!! DISCORD LINK !!]",
+      "updateChannel": "[!! UPDATE TRACK !!]"
     },
     "api": {
       "label": "[!! API KEY TOKEN !!]",
@@ -252,7 +254,8 @@
       "status": "[!! STATUS: !!]",
       "active": "[!! ACTIVE !!]",
       "missing": "[!! MISSING !!]",
-      "generateKey": "[!! GENERATE KEY > !!]"
+      "generateKey": "[!! GENERATE KEY > !!]",
+      "storageWarning": "[!! Protected credential storage is unavailable. API keys remain available only until you close the app, and Chronicle publishing is disabled. !!]"
     },
     "chronicleRefresh": {
       "label": "[!! CHRONICLE REFRESH !!]",
@@ -294,6 +297,19 @@
     "feedback": {
       "label": "[!! SYSTEM REPORTING !!]",
       "body": "[!! Submit detailed logs for analysis. !!]"
+    },
+    "updateChannel": {
+      "label": "[!! RELEASE CHANNEL !!]",
+      "stable": "[!! Stable !!]",
+      "beta": "[!! Beta !!]",
+      "stableTag": "[!! RECOMMENDED !!]",
+      "betaTag": "[!! EARLY ACCESS !!]",
+      "stableHelp": "[!! Tested releases for everyday play. !!]",
+      "betaHelp": "[!! Preview upcoming features and fixes before their stable release. !!]",
+      "betaWarning": "[!! Beta builds may be less reliable. Returning to Stable takes effect when a newer stable release is available. !!]",
+      "aria": "[!! Use the {{channel}} update channel !!]",
+      "toastError": "[!! Failed to change the update channel. Please try again. !!]",
+      "toastSuccess": "[!! Update channel set to {{channel}}. !!]"
     },
     "actionBar": {
       "unsaved": "[!! UNSAVED CHANGES !!]",

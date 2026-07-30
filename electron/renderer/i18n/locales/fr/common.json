@@ -259,12 +259,14 @@
       "intelligence": "LIAISON DE RENSEIGNEMENT",
       "data": "INGESTION DES DONNEES",
       "communications": "RELAIS COMMUNICATIONS",
+      "updates": "MISES A JOUR LOGICIELLES",
       "diagnostics": "DIAGNOSTIC"
     },
     "panels": {
       "geminiAccess": "ACCES AU MODELE GEMINI",
       "saveSource": "SOURCE DE SAUVEGARDE",
-      "discordLink": "LIEN DISCORD"
+      "discordLink": "LIEN DISCORD",
+      "updateChannel": "CANAL DE MISE A JOUR"
     },
     "api": {
       "label": "CLE API",
@@ -273,7 +275,8 @@
       "status": "ETAT :",
       "active": "ACTIF",
       "missing": "MANQUANT",
-      "generateKey": "GENERER UNE CLE >"
+      "generateKey": "GENERER UNE CLE >",
+      "storageWarning": "Le stockage protege des identifiants est indisponible. Les cles API restent disponibles jusqu'a la fermeture de l'application et la publication de la Chronique est desactivee."
     },
     "chronicleRefresh": {
       "label": "ACTUALISATION CHRONIQUE",
@@ -315,6 +318,19 @@
     "feedback": {
       "label": "RAPPORT SYSTEME",
       "body": "Envoyer des journaux detailles pour analyse."
+    },
+    "updateChannel": {
+      "label": "CANAL DE VERSION",
+      "stable": "Stable",
+      "beta": "Beta",
+      "stableTag": "RECOMMANDE",
+      "betaTag": "ACCES ANTICIPE",
+      "stableHelp": "Versions testees pour jouer au quotidien.",
+      "betaHelp": "Decouvrez les fonctionnalites et correctifs avant leur sortie stable.",
+      "betaWarning": "Les versions beta peuvent etre moins fiables. Le retour au canal Stable prendra effet lorsqu'une version stable plus recente sera disponible.",
+      "aria": "Utiliser le canal de mise a jour {{channel}}",
+      "toastError": "Impossible de changer le canal de mise a jour. Reessayez.",
+      "toastSuccess": "Canal de mise a jour defini sur {{channel}}."
     },
     "actionBar": {
       "unsaved": "MODIFICATIONS NON ENREGISTREES",

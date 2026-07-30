@@ -21,7 +21,15 @@ const { autoUpdater } = require('electron-updater')
 const { createBackendClient } = require('./main/backendClient')
 const { createAnnouncementsService } = require('./main/announcements')
 const { createHealthCheckManager } = require('./main/healthcheck')
-const { setupAutoUpdater, registerUpdateIpcHandlers, wireAutoUpdaterEvents } = require('./main/updates')
+const { getLinuxSaveDirCandidates } = require('./main/savePaths')
+const { createSecretStorage } = require('./main/secureStorage')
+const {
+  applyUpdateChannel,
+  normalizeUpdateChannel,
+  registerUpdateIpcHandlers,
+  setupAutoUpdater,
+  wireAutoUpdaterEvents,
+} = require('./main/updates')
 const { registerBackendIpcHandlers } = require('./main/ipc/backend')
 const { registerSettingsIpcHandlers } = require('./main/ipc/settings')
 const { registerExportIpcHandlers } = require('./main/ipc/export')
@@ -62,9 +70,6 @@ if (E2E_USER_DATA_DIR) {
   }
 }
 
-// Configure electron-updater
-setupAutoUpdater({ autoUpdater, app, isDev: IS_DEV })
-
 // Global process error handlers (ELEC-xxx: diagnostics)
 // Prevent silent failures in production builds.
 let hasShownFatalErrorDialog = false
@@ -104,45 +109,14 @@ if (!IS_DEV && !IS_E2E) {
   }
 }
 
-// Secrets are encrypted via Electron's safeStorage API and persisted in
-// electron-store as base64 strings.  This replaces the deprecated keytar
-// native module and eliminates architecture-mismatch crashes.
+// Secrets use Electron safeStorage when the selected OS backend protects data
+// at rest. Environments without protected storage keep secrets in memory only.
 const SECRET_STORE_KEYS = {
   googleApiKey: 'secrets.google-api-key',
   discordToken: 'secrets.discord-token',
   discordAccessToken: 'secrets.discord-access-token',
   discordRefreshToken: 'secrets.discord-refresh-token',
   chroniclePublisherSecret: 'secrets.chronicle-publisher-secret',
-}
-
-function encryptSecret(plaintext) {
-  if (!plaintext) return null
-  if (!safeStorage.isEncryptionAvailable()) return Buffer.from(plaintext).toString('base64')
-  return safeStorage.encryptString(plaintext).toString('base64')
-}
-
-function decryptSecret(stored) {
-  if (!stored) return null
-  const buf = Buffer.from(stored, 'base64')
-  if (!safeStorage.isEncryptionAvailable()) return buf.toString('utf-8')
-  try {
-    return safeStorage.decryptString(buf)
-  } catch {
-    // Data was stored without encryption or is corrupt — treat as plaintext
-    return buf.toString('utf-8')
-  }
-}
-
-function getSecret(key) {
-  return decryptSecret(store.get(key))
-}
-
-function setSecret(key, value) {
-  if (value) {
-    store.set(key, encryptSecret(value))
-  } else {
-    store.delete(key)
-  }
 }
 
 // Initialize electron-store for non-secret settings
@@ -180,6 +154,10 @@ const store = new Store({
     announcementsLastRead: 0,
   },
 })
+
+const secretStorage = createSecretStorage({ safeStorage, store })
+const getSecret = key => secretStorage.getSecret(key)
+const setSecret = (key, value) => secretStorage.setSecret(key, value)
 
 const announcementsService = createAnnouncementsService({ app, store })
 
@@ -802,6 +780,17 @@ function getResolvedLanguageSetting() {
   return resolveLanguage(getLanguageSetting())
 }
 
+function getUpdateChannelSetting() {
+  return normalizeUpdateChannel(store.get('updateChannel'), app.getVersion())
+}
+
+setupAutoUpdater({
+  autoUpdater,
+  app,
+  isDev: IS_DEV,
+  updateChannel: getUpdateChannelSetting(),
+})
+
 function applyUiScaleToWindow(targetWindow = mainWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) return
   targetWindow.webContents.setZoomFactor(getUiScaleSetting())
@@ -827,6 +816,7 @@ function stepUiScale(direction) {
 function getSettings() {
   const googleApiKey = getSecret(SECRET_STORE_KEYS.googleApiKey)
   const discordToken = getSecret(SECRET_STORE_KEYS.discordToken)
+  const secretStorageStatus = secretStorage.getStatus()
 
   const saveDir = store.get('saveDir', '')
   const playerName = store.get('playerName', '')
@@ -838,10 +828,13 @@ function getSettings() {
   const modelRoutingMode = getModelRoutingModeSetting()
   const language = getLanguageSetting()
   const resolvedLanguage = getResolvedLanguageSetting()
+  const updateChannel = getUpdateChannelSetting()
 
   return {
     googleApiKey: maskSecret(googleApiKey),
     googleApiKeySet: !!googleApiKey,
+    secretStorageAvailable: secretStorageStatus.persistentEncryptionAvailable,
+    secretStorageBackend: secretStorageStatus.backend,
     discordToken: maskSecret(discordToken),
     discordTokenSet: !!discordToken,
     saveDir,
@@ -856,6 +849,7 @@ function getSettings() {
     modelRoutingMode,
     language,
     resolvedLanguage,
+    updateChannel,
   }
 }
 
@@ -865,6 +859,12 @@ function getSettings() {
  */
 function getSettingsWithSecrets() {
   const googleApiKey = getSecret(SECRET_STORE_KEYS.googleApiKey) || ''
+  const secretStorageStatus = secretStorage.getStatus()
+  if (!secretStorageStatus.persistentEncryptionAvailable) {
+    // Remove any legacy publisher credential from unprotected disk storage,
+    // retaining it only for this process.
+    getSecret(SECRET_STORE_KEYS.chroniclePublisherSecret)
+  }
   const discordToken = getSecret(SECRET_STORE_KEYS.discordToken) || ''
   const saveDir = store.get('saveDir', '')
   const playerName = store.get('playerName', '')
@@ -877,6 +877,7 @@ function getSettingsWithSecrets() {
   const modelRoutingMode = getModelRoutingModeSetting()
   const language = getLanguageSetting()
   const resolvedLanguage = getResolvedLanguageSetting()
+  const updateChannel = getUpdateChannelSetting()
 
   return {
     googleApiKey,
@@ -894,6 +895,7 @@ function getSettingsWithSecrets() {
     modelRoutingMode,
     language,
     resolvedLanguage,
+    updateChannel,
   }
 }
 
@@ -955,6 +957,18 @@ function saveSettings(settings) {
     store.set('language', normalizeLanguage(settings.language))
   }
 
+  if (settings.updateChannel !== undefined) {
+    const updateChannel = normalizeUpdateChannel(settings.updateChannel, app.getVersion())
+    store.set('updateChannel', updateChannel)
+    applyUpdateChannel({
+      autoUpdater,
+      app,
+      isDev: IS_DEV,
+      updateChannel,
+      checkNow: true,
+    })
+  }
+
   return { success: true }
 }
 
@@ -965,21 +979,7 @@ function getSaveDirCandidates() {
   const homedir = os.homedir()
   const candidates = []
   if (process.platform === 'linux') {
-    const localShare = path.join(homedir, '.local', 'share', 'Paradox Interactive')
-    const flatpakShare = path.join(
-      homedir,
-      '.var',
-      'app',
-      'com.valvesoftware.Steam',
-      '.local',
-      'share',
-      'Paradox Interactive',
-    )
-    candidates.push(
-      path.join(localShare, 'Stellaris', 'save games'),
-      path.join(localShare, 'Stellaris Plaza', 'save games'),
-      path.join(flatpakShare, 'Stellaris', 'save games'),
-    )
+    candidates.push(...getLinuxSaveDirCandidates(homedir))
   } else {
     let documentsPath
     try {
@@ -1510,7 +1510,9 @@ const chroniclePublishingService = createChroniclePublishingService({
   getSecret,
   setSecret,
   secretStoreKey: SECRET_STORE_KEYS.chroniclePublisherSecret,
-  isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+  // Headless Linux CI has no OS keyring; E2E data is isolated in a temporary profile.
+  isEncryptionAvailable: () => secretStorage.getStatus().persistentEncryptionAvailable
+    || (IS_E2E && process.env.E2E_FAKE_SECURE_STORAGE === '1'),
 })
 
 registerChroniclePublishingIpcHandlers({
@@ -1547,7 +1549,7 @@ registerUpdateIpcHandlers({
     healthCheckManager.setIsQuitting(true)
   },
 })
-wireAutoUpdaterEvents({ autoUpdater, getMainWindow: () => mainWindow })
+wireAutoUpdaterEvents({ autoUpdater, app, getMainWindow: () => mainWindow })
 
 // =============================================================================
 // Onboarding IPC Handlers

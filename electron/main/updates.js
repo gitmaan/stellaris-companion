@@ -1,16 +1,102 @@
+const semver = require('semver')
+
 const IS_E2E = process.env.E2E === '1'
+const UPDATE_CHANNELS = ['stable', 'beta']
+const DEFAULT_UPDATE_CHANNEL = 'stable'
 
-function setupAutoUpdater({ autoUpdater, app, isDev }) {
-  if (IS_E2E) return
-  if (isDev) return
-  if (!app?.isPackaged) return
-  if (process.windowsStore) return
+const updaterState = {
+  updateChannel: DEFAULT_UPDATE_CHANNEL,
+  availableVersion: null,
+  downloadedVersion: null,
+  releaseName: null,
+  releaseNotes: null,
+  installing: false,
+  installTimeout: null,
+}
 
-  // On macOS, running directly from a mounted .dmg (e.g. /Volumes/...) can cause
-  // updater errors. Only auto-check once installed.
-  if (process.platform === 'darwin' && process.execPath.includes('/Volumes/')) {
-    return
+function inferUpdateChannelFromVersion(version) {
+  const prerelease = semver.prerelease(version)
+  return prerelease?.[0] === 'beta' ? 'beta' : DEFAULT_UPDATE_CHANNEL
+}
+
+function normalizeUpdateChannel(value, appVersion = '') {
+  return UPDATE_CHANNELS.includes(value)
+    ? value
+    : inferUpdateChannelFromVersion(appVersion)
+}
+
+function getFeedChannel(updateChannel) {
+  return updateChannel === 'beta' ? 'beta' : 'latest'
+}
+
+function resetCachedUpdate() {
+  updaterState.availableVersion = null
+  updaterState.downloadedVersion = null
+  updaterState.releaseName = null
+  updaterState.releaseNotes = null
+  updaterState.installing = false
+  if (updaterState.installTimeout) {
+    clearTimeout(updaterState.installTimeout)
+    updaterState.installTimeout = null
   }
+}
+
+function configureUpdateChannel({ autoUpdater, updateChannel, appVersion = '' }) {
+  const normalized = normalizeUpdateChannel(updateChannel, appVersion)
+  autoUpdater.channel = getFeedChannel(normalized)
+  autoUpdater.allowPrerelease = normalized === 'beta'
+  // Setting electron-updater's channel can enable downgrades. Never replace a
+  // newer beta with an older stable build; Stable resumes at the next upgrade.
+  autoUpdater.allowDowngrade = false
+  resetCachedUpdate()
+  updaterState.updateChannel = normalized
+  return normalized
+}
+
+function canUseAutoUpdater({
+  app,
+  isDev,
+  isE2E = IS_E2E,
+  platform = process.platform,
+  execPath = process.execPath,
+  windowsStore = process.windowsStore,
+}) {
+  if (isE2E || isDev || !app?.isPackaged || windowsStore) return false
+  return !(platform === 'darwin' && execPath.includes('/Volumes/'))
+}
+
+function checkForUpdatesSafely(autoUpdater, source) {
+  try {
+    const request = autoUpdater.checkForUpdates()
+    if (request && typeof request.catch === 'function') {
+      request.catch((error) => console.error(`Auto-updater error (${source}):`, error))
+    }
+  } catch (error) {
+    console.error(`Auto-updater error (${source}):`, error)
+  }
+}
+
+function applyUpdateChannel({
+  autoUpdater,
+  app,
+  isDev,
+  updateChannel,
+  checkNow = false,
+}) {
+  const normalized = configureUpdateChannel({
+    autoUpdater,
+    updateChannel,
+    appVersion: app?.getVersion?.() || '',
+  })
+  if (checkNow && canUseAutoUpdater({ app, isDev })) {
+    checkForUpdatesSafely(autoUpdater, 'channel change')
+  }
+  return normalized
+}
+
+function setupAutoUpdater({ autoUpdater, app, isDev, updateChannel }) {
+  applyUpdateChannel({ autoUpdater, app, isDev, updateChannel })
+  if (!canUseAutoUpdater({ app, isDev })) return null
 
   // We use a custom in-app updater UX, so avoid native notifications.
   autoUpdater.autoDownload = true
@@ -21,35 +107,13 @@ function setupAutoUpdater({ autoUpdater, app, isDev }) {
     autoUpdater.autoInstallOnAppQuit = false
   }
 
-  // Avoid startup crashes on platforms/configs where update checks can throw
-  // synchronously or reject promises (network, feed parsing, etc).
-  try {
-    const p = autoUpdater.checkForUpdates()
-    if (p && typeof p.catch === 'function') {
-      p.catch((err) => console.error('Auto-updater error (startup):', err))
-    }
-  } catch (err) {
-    console.error('Auto-updater error (startup):', err)
-  }
-
-  setInterval(() => {
-    try {
-      const p = autoUpdater.checkForUpdates()
-      if (p && typeof p.catch === 'function') {
-        p.catch((err) => console.error('Auto-updater error (interval):', err))
-      }
-    } catch (err) {
-      console.error('Auto-updater error (interval):', err)
-    }
-  }, 3600000)
-}
-
-const updaterState = {
-  downloadedVersion: null,
-  releaseName: null,
-  releaseNotes: null,
-  installing: false,
-  installTimeout: null,
+  checkForUpdatesSafely(autoUpdater, 'startup')
+  const interval = setInterval(
+    () => checkForUpdatesSafely(autoUpdater, 'interval'),
+    3600000,
+  )
+  interval.unref?.()
+  return interval
 }
 
 function decodeHtmlEntities(value) {
@@ -101,16 +165,40 @@ function normalizeReleaseNotes(releaseNotes) {
   return null
 }
 
-function cacheUpdateMetadata(info) {
+function isNewerVersion(candidateVersion, currentVersion) {
+  const candidate = semver.valid(candidateVersion)
+  const current = semver.valid(currentVersion)
+  return Boolean(candidate && current && semver.gt(candidate, current))
+}
+
+function isVersionAllowedForChannel(version, updateChannel) {
+  const validVersion = semver.valid(version)
+  if (!validVersion) return false
+  const prerelease = semver.prerelease(validVersion)
+  if (updateChannel === 'stable') return prerelease === null
+  return prerelease === null || prerelease[0] === 'beta'
+}
+
+function isEligibleUpdate(candidateVersion, currentVersion) {
+  return isNewerVersion(candidateVersion, currentVersion)
+    && isVersionAllowedForChannel(candidateVersion, updaterState.updateChannel)
+}
+
+function cacheUpdateMetadata(info, { downloaded = false } = {}) {
   if (!info || typeof info !== 'object') return
 
   if (typeof info.version === 'string' && info.version.length > 0) {
-    const isNewVersion = updaterState.downloadedVersion && updaterState.downloadedVersion !== info.version
+    const isNewVersion = updaterState.availableVersion
+      && updaterState.availableVersion !== info.version
     if (isNewVersion) {
       updaterState.releaseName = null
       updaterState.releaseNotes = null
+      updaterState.downloadedVersion = null
     }
-    updaterState.downloadedVersion = info.version
+    updaterState.availableVersion = info.version
+    if (downloaded) {
+      updaterState.downloadedVersion = info.version
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(info, 'releaseName')) {
@@ -128,7 +216,7 @@ function buildUpdatePayload(info = {}) {
   const normalizedReleaseNotes = normalizeReleaseNotes(info?.releaseNotes)
 
   return {
-    version: info?.version || updaterState.downloadedVersion || undefined,
+    version: info?.version || updaterState.availableVersion || updaterState.downloadedVersion || undefined,
     releaseName: info?.releaseName || updaterState.releaseName || undefined,
     releaseNotes: normalizedReleaseNotes || updaterState.releaseNotes || undefined,
   }
@@ -140,25 +228,36 @@ function sendUpdateEvent(getMainWindow, channel, payload) {
   mainWindow.webContents.send(channel, payload)
 }
 
-function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWindow, prepareForUpdateQuit }) {
+function registerUpdateIpcHandlers({
+  ipcMain,
+  autoUpdater,
+  app,
+  isDev,
+  getMainWindow,
+  prepareForUpdateQuit,
+}) {
   ipcMain.handle('check-for-update', async () => {
-    if (IS_E2E) {
-      return { updateAvailable: false }
-    }
-    if (isDev) {
+    if (!canUseAutoUpdater({ app, isDev })) {
       return { updateAvailable: false }
     }
 
     try {
       const result = await autoUpdater.checkForUpdates()
-      cacheUpdateMetadata(result?.updateInfo)
-      return {
-        updateAvailable: result?.updateInfo?.version !== app.getVersion(),
-        ...buildUpdatePayload(result?.updateInfo),
+      const updateInfo = result?.updateInfo
+      const updateAvailable = isEligibleUpdate(updateInfo?.version, app.getVersion())
+      if (updateAvailable) {
+        cacheUpdateMetadata(updateInfo)
       }
-    } catch (err) {
-      console.error('Failed to check for updates:', err)
-      return { updateAvailable: false, error: err instanceof Error ? err.message : String(err) }
+      return {
+        updateAvailable,
+        ...(updateAvailable ? buildUpdatePayload(updateInfo) : {}),
+      }
+    } catch (error) {
+      console.error('Failed to check for updates:', error)
+      return {
+        updateAvailable: false,
+        error: error instanceof Error ? error.message : String(error),
+      }
     }
   })
 
@@ -169,11 +268,12 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
     if (isDev) {
       return { success: false, error: 'Updates disabled in development' }
     }
-
     if (process.windowsStore) {
       return { success: false, error: 'Updates are managed by Microsoft Store builds' }
     }
-
+    if (!isEligibleUpdate(updaterState.availableVersion, app.getVersion())) {
+      return { success: false, error: 'No newer update is ready to install' }
+    }
     if (updaterState.installing) {
       return { success: true, alreadyInProgress: true }
     }
@@ -196,37 +296,40 @@ function registerUpdateIpcHandlers({ ipcMain, autoUpdater, app, isDev, getMainWi
         )
       }, 45000)
 
-      // If we don't already have a ready update, ensure one is downloaded first.
-      if (!updaterState.downloadedVersion) {
+      if (!isEligibleUpdate(updaterState.downloadedVersion, app.getVersion())) {
         await autoUpdater.downloadUpdate()
       }
+      if (!isEligibleUpdate(updaterState.downloadedVersion, app.getVersion())) {
+        throw new Error('The update has not finished downloading')
+      }
 
-      // Install is explicitly user-triggered from renderer UI.
-      // Important: mark app as quitting-for-update before calling quitAndInstall.
-      // electron-updater may close windows before app's before-quit event fires.
       if (typeof prepareForUpdateQuit === 'function') {
         prepareForUpdateQuit()
       }
       autoUpdater.quitAndInstall()
       return { success: true }
-    } catch (err) {
+    } catch (error) {
       updaterState.installing = false
       if (updaterState.installTimeout) {
         clearTimeout(updaterState.installTimeout)
         updaterState.installTimeout = null
       }
-      console.error('Failed to download/install update:', err)
-      return { success: false, error: err instanceof Error ? err.message : String(err) }
+      console.error('Failed to download/install update:', error)
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
 }
 
-function wireAutoUpdaterEvents({ autoUpdater, getMainWindow }) {
+function wireAutoUpdaterEvents({ autoUpdater, app, getMainWindow }) {
   autoUpdater.on('checking-for-update', () => {
     sendUpdateEvent(getMainWindow, 'update-checking')
   })
 
   autoUpdater.on('update-available', (info) => {
+    if (!isEligibleUpdate(info?.version, app.getVersion())) {
+      console.log('Ignoring ineligible update:', info?.version)
+      return
+    }
     cacheUpdateMetadata(info)
     console.log('Update available:', info.version)
     sendUpdateEvent(getMainWindow, 'update-available', buildUpdatePayload(info))
@@ -246,25 +349,44 @@ function wireAutoUpdaterEvents({ autoUpdater, getMainWindow }) {
   })
 
   autoUpdater.on('update-downloaded', (info) => {
-    cacheUpdateMetadata(info)
+    if (!isEligibleUpdate(info?.version, app.getVersion())) {
+      console.log('Ignoring ineligible downloaded update:', info?.version)
+      return
+    }
+    cacheUpdateMetadata(info, { downloaded: true })
     console.log('Update downloaded:', info.version)
     sendUpdateEvent(getMainWindow, 'update-downloaded', buildUpdatePayload(info))
     console.log('Update ready to install; awaiting explicit user action')
   })
 
-  autoUpdater.on('error', (err) => {
+  autoUpdater.on('error', (error) => {
     updaterState.installing = false
     if (updaterState.installTimeout) {
       clearTimeout(updaterState.installTimeout)
       updaterState.installTimeout = null
     }
-    console.error('Auto-updater error:', err)
-    sendUpdateEvent(getMainWindow, 'update-error', err instanceof Error ? err.message : String(err))
+    console.error('Auto-updater error:', error)
+    sendUpdateEvent(
+      getMainWindow,
+      'update-error',
+      error instanceof Error ? error.message : String(error),
+    )
   })
 }
 
 module.exports = {
-  setupAutoUpdater,
+  DEFAULT_UPDATE_CHANNEL,
+  UPDATE_CHANNELS,
+  applyUpdateChannel,
+  canUseAutoUpdater,
+  configureUpdateChannel,
+  getFeedChannel,
+  inferUpdateChannelFromVersion,
+  isEligibleUpdate,
+  isNewerVersion,
+  isVersionAllowedForChannel,
+  normalizeUpdateChannel,
   registerUpdateIpcHandlers,
+  setupAutoUpdater,
   wireAutoUpdaterEvents,
 }

@@ -1,6 +1,6 @@
 [project]
 name = "stellaris-companion"
-version = "0.8.4"
+version = "0.8.5"
 description = "AI-powered strategic advisor for Stellaris using Gemini"
 readme = "README.md"
 license = "MIT"
@@ -20,7 +20,7 @@ dependencies = [
     "google-genai>=1.0.0",
     # Keep macOS PyInstaller bundles on the statically-linked wheel; newer
     # runner-provided builds can dynamically link mismatched libssl.dylib.
-    "cryptography==46.0.4",
+    "cryptography==48.0.1",
     "python-dotenv>=1.0.0",
     "watchdog>=3.0",
     "fastapi>=0.100.0",
