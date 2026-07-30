@@ -21,6 +21,7 @@ const { autoUpdater } = require('electron-updater')
 const { createBackendClient } = require('./main/backendClient')
 const { createAnnouncementsService } = require('./main/announcements')
 const { createHealthCheckManager } = require('./main/healthcheck')
+const { getLinuxSaveDirCandidates } = require('./main/savePaths')
 const { createSecretStorage } = require('./main/secureStorage')
 const {
   applyUpdateChannel,
@@ -978,21 +979,7 @@ function getSaveDirCandidates() {
   const homedir = os.homedir()
   const candidates = []
   if (process.platform === 'linux') {
-    const localShare = path.join(homedir, '.local', 'share', 'Paradox Interactive')
-    const flatpakShare = path.join(
-      homedir,
-      '.var',
-      'app',
-      'com.valvesoftware.Steam',
-      '.local',
-      'share',
-      'Paradox Interactive',
-    )
-    candidates.push(
-      path.join(localShare, 'Stellaris', 'save games'),
-      path.join(localShare, 'Stellaris Plaza', 'save games'),
-      path.join(flatpakShare, 'Stellaris', 'save games'),
-    )
+    candidates.push(...getLinuxSaveDirCandidates(homedir))
   } else {
     let documentsPath
     try {

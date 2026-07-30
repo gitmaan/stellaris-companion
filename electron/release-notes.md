@@ -1,4 +1,5 @@
 - Let the galaxy bear witness: publish your empire's Chronicle as a shareable web story.
+- Linux commanders using Steam Play can now have their empires discovered automatically.
 - Choose Stable or Beta updates in Settings to decide when new features reach your command deck.
 - Improved update reliability across Intel and Apple silicon Macs.
 - Strengthened local credential protection and release integrity.

@@ -39,6 +39,15 @@ def test_linux_defaults_include_steam_and_flatpak_paths(monkeypatch) -> None:
         in p
         for p in rendered
     )
+    proton_suffix = (
+        "steamapps/compatdata/281990/pfx/drive_c/users/steamuser/Documents/"
+        "Paradox Interactive/Stellaris/save games"
+    )
+    assert any(f".steam/steam/{proton_suffix}" in p for p in rendered)
+    assert any(f".local/share/Steam/{proton_suffix}" in p for p in rendered)
+    assert any(
+        f".var/app/com.valvesoftware.Steam/data/Steam/{proton_suffix}" in p for p in rendered
+    )
 
 
 def test_unknown_platform_falls_back_to_darwin_defaults(monkeypatch) -> None:

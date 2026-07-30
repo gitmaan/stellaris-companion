@@ -13,6 +13,25 @@ from pathlib import Path
 
 from .paths import get_repo_root
 
+_PROTON_SAVE_SEGMENTS = (
+    "steamapps",
+    "compatdata",
+    "281990",
+    "pfx",
+    "drive_c",
+    "users",
+    "steamuser",
+    "Documents",
+    "Paradox Interactive",
+    "Stellaris",
+    "save games",
+)
+
+
+def _proton_save_path(steam_root: Path) -> Path:
+    return steam_root.joinpath(*_PROTON_SAVE_SEGMENTS)
+
+
 # Standard Stellaris save locations by platform
 STELLARIS_SAVE_PATHS = {
     "darwin": [  # macOS
@@ -32,6 +51,13 @@ STELLARIS_SAVE_PATHS = {
         / "Paradox Interactive"
         / "Stellaris"
         / "save games",
+        # Steam Play / Proton
+        _proton_save_path(Path.home() / ".steam" / "steam"),
+        _proton_save_path(Path.home() / ".local" / "share" / "Steam"),
+        # Flatpak Steam with Proton
+        _proton_save_path(
+            Path.home() / ".var" / "app" / "com.valvesoftware.Steam" / "data" / "Steam"
+        ),
     ],
     "win32": [
         Path.home() / "Documents" / "Paradox Interactive" / "Stellaris" / "save games",
