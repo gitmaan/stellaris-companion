@@ -44,6 +44,7 @@ from backend.core.advisor_providers import (
 from backend.core.conversation import ConversationManager
 from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
+from backend.core.model_briefing import build_model_briefing_json
 from backend.core.model_routing import (
     GEMINI_FLASH_MODEL,
     display_model_name,
@@ -983,6 +984,8 @@ class Companion:
         if data_note:
             data_note = localized_text("loaded_from_cache", output_language)
 
+        model_briefing_json = build_model_briefing_json(briefing_json)
+
         save_memory_summary = self._load_save_memory_summary(
             save_id=save_id,
             language=output_language,
@@ -991,7 +994,7 @@ class Companion:
         # Build prompt with sliding-window history (Phase 4)
         user_prompt = self._conversations.build_prompt(
             session_key=language_scoped_session_key,
-            briefing_json=briefing_json,
+            briefing_json=model_briefing_json,
             game_date=game_date,
             question=cleaned_question,
             data_note=data_note,
@@ -1004,6 +1007,7 @@ class Companion:
             f"{build_language_policy(output_language)}\n\n"
             "ASK MODE (NO TOOLS):\n"
             "- You are given the complete current game state as JSON in the user message.\n"
+            "- Treat model_context as the semantic contract for interpreting that JSON.\n"
             "- Do NOT call tools or ask to call tools.\n"
             "- ALL numbers and factual claims must come from the JSON.\n"
             "- If a value is missing, say so in the requested language and suggest what to check in-game.\n"
@@ -1011,7 +1015,7 @@ class Companion:
         )
         naval_cap_policy_block = self._build_naval_capacity_policy_block(
             question=cleaned_question,
-            briefing_json=briefing_json,
+            briefing_json=model_briefing_json,
         )
         if naval_cap_policy_block:
             ask_system_prompt += f"{naval_cap_policy_block}\n"

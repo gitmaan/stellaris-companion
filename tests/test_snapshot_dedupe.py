@@ -1,6 +1,8 @@
+import json
 from pathlib import Path
 
 from backend.core.database import GameDatabase
+from backend.core.history import record_snapshot_from_briefing
 from backend.core.utils import compute_save_hash_from_briefing
 
 
@@ -107,3 +109,34 @@ def test_dedupe_skip_still_updates_session_last_game_date(tmp_path: Path) -> Non
     assert session is not None
     assert session["last_game_date"] == "2200.02.01"
     assert session["snapshot_count"] == 1
+
+
+def test_dedupe_skip_refreshes_latest_briefing_after_extractor_change(tmp_path: Path) -> None:
+    db = GameDatabase(db_path=tmp_path / "briefing-refresh.db")
+    briefing = _briefing_for_hash()
+    briefing["endgame"] = {"lgate": {"lgate_opened": True}}
+
+    inserted, _, session_id = record_snapshot_from_briefing(
+        db=db,
+        save_path=Path("/tmp/save-1.sav"),
+        save_hash="same-save",
+        briefing=briefing,
+    )
+    assert inserted is True
+
+    corrected = json.loads(json.dumps(briefing))
+    corrected["endgame"]["lgate"]["lgate_opened"] = False
+    inserted_again, snapshot_id, same_session_id = record_snapshot_from_briefing(
+        db=db,
+        save_path=Path("/tmp/save-1.sav"),
+        save_hash="same-save",
+        briefing=corrected,
+    )
+
+    assert inserted_again is False
+    assert snapshot_id is None
+    assert same_session_id == session_id
+    latest = db.get_latest_session_briefing_json(session_id=session_id)
+    assert latest is not None
+    assert json.loads(latest)["endgame"]["lgate"]["lgate_opened"] is False
+    assert db.get_snapshot_count(session_id) == 1

@@ -343,9 +343,7 @@ class EndgameMixin:
                             result["player_activation_progress"] = int(activation_progress)
 
         # Check if L-Gate has been opened using contains_tokens
-        lcluster_tokens = session.contains_tokens(
-            ["lcluster_", "l_cluster_opened", "gray_tempest_country"]
-        )
+        lcluster_tokens = session.contains_tokens(["l_cluster_opened", "gray_tempest_country"])
         lcluster_matches = lcluster_tokens.get("matches", {})
         if any(lcluster_matches.values()):
             result["lgate_opened"] = True
@@ -398,7 +396,7 @@ class EndgameMixin:
         # Check if L-Gate has been opened (look for L-Cluster access)
         # When opened, there will be bypass connections to the L-Cluster
         # Or we can check for gray_tempest/lcluster related flags
-        if re.search(r"lcluster_|l_cluster_opened|gray_tempest_country", self.gamestate):
+        if re.search(r"l_cluster_opened|gray_tempest_country", self.gamestate):
             result["lgate_opened"] = True
 
         # Also check if player has the activation tech completed
