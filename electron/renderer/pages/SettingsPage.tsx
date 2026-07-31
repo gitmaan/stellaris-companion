@@ -93,6 +93,8 @@ interface AdvisorProviderModel {
   name: string
   contextLength?: number
   supportedParameters?: string[]
+  outputModalities?: string[]
+  recommended?: boolean
 }
 
 function formatContextLength(contextLength: number): string {
@@ -150,6 +152,7 @@ function SettingsPage({
   const [advisorBaseUrl, setAdvisorBaseUrl] = useState('')
   const [advisorModels, setAdvisorModels] = useState<AdvisorProviderModel[]>([])
   const [advisorModelSearch, setAdvisorModelSearch] = useState('')
+  const [showAllAdvisorModels, setShowAllAdvisorModels] = useState(false)
   const [advisorChecking, setAdvisorChecking] = useState(false)
   const [advisorConnection, setAdvisorConnection] = useState<{
     ok: boolean
@@ -159,6 +162,7 @@ function SettingsPage({
   const [advisorModelTest, setAdvisorModelTest] = useState<{
     ok: boolean
     message: string
+    chronicleReady?: boolean
   } | null>(null)
   const [saveDir, setSaveDir] = useState('')
   const [playerName, setPlayerName] = useState('')
@@ -339,6 +343,7 @@ function SettingsPage({
     setAdvisorBaseUrl('')
     setAdvisorModels([])
     setAdvisorModelSearch('')
+    setShowAllAdvisorModels(false)
   }
 
   const handleCheckAdvisorProvider = async () => {
@@ -365,8 +370,14 @@ function SettingsPage({
       }
       const models = result.models || []
       setAdvisorModels(models)
-      if (models.length === 1) {
-        setAdvisorModel(current => current || models[0].id)
+      setShowAllAdvisorModels(false)
+      const suggestedModel = advisorProvider === 'openrouter'
+        ? models.find(model => model.recommended)
+        : models.length === 1
+          ? models[0]
+          : undefined
+      if (suggestedModel) {
+        setAdvisorModel(current => current || suggestedModel.id)
         setAdvisorModelTest(null)
       }
       setAdvisorConnection({
@@ -415,8 +426,13 @@ function SettingsPage({
       if (checkId !== advisorCheckIdRef.current) return
       setAdvisorModelTest({
         ok: result.ok,
+        chronicleReady: result.chronicleReady,
         message: result.ok
-          ? t('settings.advisor.modelReady')
+          ? result.chronicleReady === false
+            ? t('settings.advisor.modelAdvisorOnly')
+            : result.structuredOutput === false
+              ? t('settings.advisor.modelReadyPromptJson')
+              : t('settings.advisor.modelReady')
           : result.error || t('settings.advisor.modelTestError'),
       })
     } catch (e) {
@@ -743,10 +759,24 @@ function SettingsPage({
   const updateChannelLabel = (channel: UpdateChannel) =>
     t(`settings.updateChannel.${channel}`)
   const providerDefaultUrl = ADVISOR_PROVIDER_DEFAULT_URLS[advisorProvider] || ''
-  const filteredAdvisorModels = advisorModels
+  const recommendedAdvisorModels = advisorModels.filter(model => model.recommended)
+  const advisorSearchQuery = advisorModelSearch.trim().toLowerCase()
+  const advisorModelPool = advisorProvider === 'openrouter'
+    && !showAllAdvisorModels
+    && !advisorSearchQuery
+    && recommendedAdvisorModels.length
+    ? recommendedAdvisorModels
+    : advisorModels
+  const filteredAdvisorModels = advisorModelPool
     .filter((model) => {
-      const query = advisorModelSearch.trim().toLowerCase()
-      return !query || model.id.toLowerCase().includes(query) || model.name.toLowerCase().includes(query)
+      return !advisorSearchQuery
+        || model.id.toLowerCase().includes(advisorSearchQuery)
+        || model.name.toLowerCase().includes(advisorSearchQuery)
+    })
+    .sort((left, right) => {
+      const leftExact = left.id.toLowerCase() === advisorSearchQuery ? 1 : 0
+      const rightExact = right.id.toLowerCase() === advisorSearchQuery ? 1 : 0
+      return rightExact - leftExact
     })
     .slice(0, 200)
   const selectedAdvisorModel = advisorModel
@@ -764,6 +794,7 @@ function SettingsPage({
     ...visibleAdvisorModels.map((model) => ({
       value: model.id,
       label: [
+        model.recommended ? t('settings.advisor.recommended') : '',
         model.name === model.id ? model.id : `${model.name} · ${model.id}`,
         model.contextLength
           ? t('settings.advisor.modelContextLabel', {
@@ -986,7 +1017,30 @@ function SettingsPage({
                                    )}
                                  </div>
 
-                                 {advisorModels.length > 8 && (
+                                 {advisorProvider === 'openrouter' && recommendedAdvisorModels.length > 0 && (
+                                   <div className="flex flex-wrap items-center gap-3">
+                                     <HUDButton
+                                       type="button"
+                                       variant="secondary"
+                                       onClick={() => {
+                                         setShowAllAdvisorModels(current => !current)
+                                         setAdvisorModelSearch('')
+                                       }}
+                                       className="px-4 py-1.5 text-[10px]"
+                                     >
+                                       {showAllAdvisorModels
+                                         ? t('settings.advisor.showRecommendedModels')
+                                         : t('settings.advisor.showAllModels')}
+                                     </HUDButton>
+                                     {!showAllAdvisorModels && (
+                                       <HUDMicro className="text-white/45">
+                                         {t('settings.advisor.recommendedSummary')}
+                                       </HUDMicro>
+                                     )}
+                                   </div>
+                                 )}
+
+                                 {showAllAdvisorModels && advisorModels.length > 8 && (
                                    <HUDInput
                                      label={t('settings.advisor.searchModels')}
                                      aria-label={t('settings.advisor.searchModels')}
@@ -1047,7 +1101,13 @@ function SettingsPage({
                                      {advisorTesting ? t('settings.advisor.testingModel') : t('settings.advisor.testModel')}
                                    </HUDButton>
                                    {advisorModelTest && (
-                                     <HUDMicro className={advisorModelTest.ok ? 'text-accent-green' : 'text-accent-red'}>
+                                     <HUDMicro className={
+                                       !advisorModelTest.ok
+                                         ? 'text-accent-red'
+                                         : advisorModelTest.chronicleReady === false
+                                           ? 'text-accent-yellow'
+                                           : 'text-accent-green'
+                                     }>
                                        {advisorModelTest.message}
                                      </HUDMicro>
                                    )}

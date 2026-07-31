@@ -21,6 +21,12 @@ const ADVISOR_PROVIDER_PRESETS = {
   },
 }
 
+const OPENROUTER_RECOMMENDED_MODEL_IDS = new Set([
+  'google/gemini-3.1-flash-lite',
+  'deepseek/deepseek-v4-flash',
+  'anthropic/claude-sonnet-5',
+])
+
 function normalizeAdvisorProvider(rawValue) {
   if (typeof rawValue !== 'string') return DEFAULT_ADVISOR_PROVIDER
   const normalized = rawValue.trim().toLowerCase().replace(/[ -]/g, '_')
@@ -184,9 +190,12 @@ async function discoverAdvisorModels({
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   const headers = buildProviderHeaders(selected, apiKey)
+  const modelsUrl = selected === 'openrouter'
+    ? `${resolvedBaseUrl}/models?sort=top-weekly`
+    : `${resolvedBaseUrl}/models`
 
   try {
-    const response = await fetchImpl(`${resolvedBaseUrl}/models`, {
+    const response = await fetchImpl(modelsUrl, {
       method: 'GET',
       headers,
       signal: controller.signal,
@@ -213,6 +222,12 @@ async function discoverAdvisorModels({
         ? entry.trim()
         : String(entry?.id || entry?.name || entry?.model || '').trim()
       if (!id || seen.has(id)) continue
+      const outputModalities = Array.isArray(entry?.architecture?.output_modalities)
+        ? entry.architecture.output_modalities.map(String)
+        : []
+      if (id.endsWith(':batch') || (outputModalities.length && !outputModalities.includes('text'))) {
+        continue
+      }
       seen.add(id)
       const modelEntry = {
         id,
@@ -221,6 +236,10 @@ async function discoverAdvisorModels({
       }
       if (Array.isArray(entry?.supported_parameters)) {
         modelEntry.supportedParameters = entry.supported_parameters.map(String)
+      }
+      if (outputModalities.length) modelEntry.outputModalities = outputModalities
+      if (selected === 'openrouter' && OPENROUTER_RECOMMENDED_MODEL_IDS.has(id)) {
+        modelEntry.recommended = true
       }
       models.push(modelEntry)
     }
@@ -298,11 +317,14 @@ async function testAdvisorModel({
       },
       {
         role: 'user',
-        content: 'Return exactly one JSON object with status set to ok. Do not add Markdown.',
+        content: [
+          'Return exactly one JSON object with status set to ok. Do not add Markdown.',
+          'The JSON must match this schema:',
+          JSON.stringify(responseSchema),
+        ].join('\n'),
       },
     ],
-    temperature: 0,
-    max_tokens: 32,
+    max_tokens: 512,
     stream: false,
   }
   const structuredBody = {
@@ -334,7 +356,7 @@ async function testAdvisorModel({
   try {
     let structuredOutput = true
     let { response, payload } = await send(structuredBody)
-    if (response.status === 400 || (selected === 'openrouter' && response.status === 503)) {
+    if (shouldRetryWithoutSchema(selected, response, payload)) {
       structuredOutput = false
       ;({ response, payload } = await send(baseBody))
     }
@@ -352,8 +374,13 @@ async function testAdvisorModel({
     const end = text.lastIndexOf('}')
     if (start < 0 || end < start) {
       return {
-        ok: false,
-        error: `${getAdvisorProviderLabel(selected)} answered, but did not return usable structured output.`,
+        ok: true,
+        advisorReady: true,
+        chronicleReady: false,
+        provider: selected,
+        model: String(payload?.model || selectedModel),
+        baseUrl: resolvedBaseUrl,
+        structuredOutput: false,
       }
     }
 
@@ -362,14 +389,24 @@ async function testAdvisorModel({
       probe = JSON.parse(text.slice(start, end + 1))
     } catch {
       return {
-        ok: false,
-        error: `${getAdvisorProviderLabel(selected)} answered, but returned invalid JSON.`,
+        ok: true,
+        advisorReady: true,
+        chronicleReady: false,
+        provider: selected,
+        model: String(payload?.model || selectedModel),
+        baseUrl: resolvedBaseUrl,
+        structuredOutput: false,
       }
     }
     if (String(probe?.status || '').toLowerCase() !== 'ok') {
       return {
-        ok: false,
-        error: `${getAdvisorProviderLabel(selected)} answered, but failed the structured output check.`,
+        ok: true,
+        advisorReady: true,
+        chronicleReady: false,
+        provider: selected,
+        model: String(payload?.model || selectedModel),
+        baseUrl: resolvedBaseUrl,
+        structuredOutput: false,
       }
     }
 
@@ -378,6 +415,8 @@ async function testAdvisorModel({
       provider: selected,
       model: String(payload?.model || selectedModel),
       baseUrl: resolvedBaseUrl,
+      advisorReady: true,
+      chronicleReady: true,
       structuredOutput,
     }
   } catch (error) {
@@ -396,9 +435,38 @@ async function testAdvisorModel({
   }
 }
 
+function shouldRetryWithoutSchema(selected, response, payload) {
+  const message = String(payload?.error?.message || payload?.error || payload?.detail || '')
+    .toLowerCase()
+    .replaceAll('_', ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const contextMarkers = [
+    'context length',
+    'context window',
+    'maximum context',
+    'too many tokens',
+    'token limit',
+    'prompt is too long',
+    'input is too long',
+  ]
+  if (contextMarkers.some((marker) => message.includes(marker))) return false
+  if (response.status === 400 || response.status === 422) return true
+  if (selected !== 'openrouter') return false
+  if (response.status === 503) return true
+  if (response.status !== 404) return false
+  return [
+    'no endpoints can handle requested parameters',
+    'no endpoints found that can handle requested parameters',
+    'routing requirements',
+    'require parameters',
+  ].some((marker) => message.includes(marker))
+}
+
 module.exports = {
   ADVISOR_PROVIDER_VALUES,
   ADVISOR_PROVIDER_PRESETS,
+  OPENROUTER_RECOMMENDED_MODEL_IDS,
   DEFAULT_ADVISOR_PROVIDER,
   isLocalOrPrivateHost,
   normalizeAdvisorProvider,
