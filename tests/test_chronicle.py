@@ -20,6 +20,7 @@ from backend.core.chronicle import (
     ChapterOutput,
     ChronicleGenerator,
     CurrentEraOutput,
+    _chapter_narrative_scope,
     _repair_json_string,
     _sections_to_text,
     get_current_era_regen_min_new_events,
@@ -94,6 +95,27 @@ class TestRepairJsonString:
         assert result["key"] == "value"
         # Structural newlines should remain
         assert "\n" in repaired
+
+
+class TestChapterNarrativeScope:
+    def test_sparse_routine_events_keep_chapter_concise(self):
+        scope = _chapter_narrative_scope(
+            [
+                {"event_type": "leader_hired", "summary": "Hired scientist: Vara"},
+                {"event_type": "alloys_net_change", "summary": "Alloys net: +10 -> +5"},
+            ]
+        )
+
+        assert "2-3 prose sections" in scope
+        assert "200-350 words" in scope
+
+    def test_major_turning_point_allows_full_chapter(self):
+        scope = _chapter_narrative_scope(
+            [{"event_type": "war_started", "summary": "War began with the Union"}]
+        )
+
+        assert "3-5 sections" in scope
+        assert "400-650 words" in scope
 
 
 class TestSelectEventsForPrompt:
@@ -1554,9 +1576,14 @@ class TestChronicleProviderRouting:
         call = provider.generate.call_args
         assert call.kwargs["purpose"] == "chronicle"
         assert call.kwargs["response_schema"] is ChapterOutput
+        assert call.kwargs["temperature"] == 0.7
         assert "dramatize the voice, but do not invent" in call.kwargs["system_prompt"]
         assert "When a reason is" in call.kwargs["user_prompt"]
         assert "not present in the event list, leave it unexplained" in call.kwargs["user_prompt"]
+        assert "Events sharing a date establish coexistence" in call.kwargs["user_prompt"]
+        assert "Quotes and declarations are optional, never quotas" in call.kwargs["user_prompt"]
+        assert "200-350 words" in call.kwargs["user_prompt"]
+        assert "counts into strength" in call.kwargs["user_prompt"]
 
     def test_invalid_chapter_is_not_returned_as_error_prose(self, provider_config):
         provider = MagicMock()
