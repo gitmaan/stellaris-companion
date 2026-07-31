@@ -239,6 +239,49 @@ class TestSelectEventsForPrompt:
             assert etype in selected_types
 
 
+class TestDiplomaticContext:
+    @pytest.fixture
+    def generator(self):
+        return ChronicleGenerator(db=MagicMock(), api_key="fake-key")
+
+    def test_separates_ordinary_empires_from_special_contacts(self, generator):
+        context = generator._format_diplomatic_context(
+            {
+                "diplomacy": {
+                    "relations": [
+                        {
+                            "empire_name": "Commonwealth of Sol",
+                            "country_type": "default",
+                            "opinion": 25,
+                        },
+                        {
+                            "empire_name": "Privateers",
+                            "country_type": "pirate",
+                            "opinion": -100,
+                        },
+                    ]
+                }
+            }
+        )
+
+        assert "=== KNOWN EMPIRES ===" in context
+        assert "Commonwealth of Sol | opinion +25" in context
+        assert "=== SPECIAL CONTACTS (NOT ORDINARY EMPIRES) ===" in context
+        assert "Privateers | type: pirate | special contact" in context
+
+    def test_returns_empty_context_without_relations(self, generator):
+        assert generator._format_diplomatic_context({"diplomacy": {}}) == ""
+
+    def test_legacy_relation_without_country_type_remains_an_empire(self, generator):
+        context = generator._format_diplomatic_context(
+            {"diplomacy": {"relations": [{"empire_name": "Legacy Commonwealth"}]}}
+        )
+
+        assert "=== KNOWN EMPIRES ===" in context
+        assert "- Legacy Commonwealth" in context
+        assert "SPECIAL CONTACTS" not in context
+
+
 class TestShouldFinalizeChapter:
     """Tests for ChronicleGenerator._should_finalize_chapter method."""
 
@@ -1436,7 +1479,37 @@ class TestChronicleProviderRouting:
         assert provider.generate.call_count == 2
         second_prompt = provider.generate.call_args_list[1].kwargs["user_prompt"]
         assert "previous response could not be validated" in second_prompt
+        assert provider.generate.call_args_list[0].kwargs["allow_schema_fallback"] is True
+        assert provider.generate.call_args_list[1].kwargs["allow_schema_fallback"] is False
         assert generator._model_routing_response()["provider"] == "custom"  # type: ignore[attr-defined]
+
+    def test_does_not_retry_after_prompt_schema_fallback(self, provider_config):
+        provider = MagicMock()
+        provider.config = provider_config
+        provider.generate.return_value = AdvisorGenerationResult(
+            text="This is still not JSON.",
+            model="local-story-model",
+            requested_model="local-story-model",
+            provider="custom",
+            schema_fallback_used=True,
+        )
+        generator = ChronicleGenerator(
+            db=MagicMock(),
+            provider_config=provider_config,
+            provider_generator=provider,
+        )
+
+        with pytest.raises(AdvisorProviderError) as exc_info:
+            generator._generate_structured_content(  # type: ignore[attr-defined]
+                contents="Write the current era.",
+                response_schema=CurrentEraOutput,
+                temperature=1.0,
+                max_output_tokens=1024,
+                purpose_label="Chronicle current era",
+            )
+
+        assert exc_info.value.code == "PROVIDER_INVALID_RESPONSE"
+        assert provider.generate.call_count == 1
 
     def test_chapter_includes_provider_provenance(self, provider_config):
         provider = MagicMock()
@@ -1481,6 +1554,9 @@ class TestChronicleProviderRouting:
         call = provider.generate.call_args
         assert call.kwargs["purpose"] == "chronicle"
         assert call.kwargs["response_schema"] is ChapterOutput
+        assert "dramatize the voice, but do not invent" in call.kwargs["system_prompt"]
+        assert "When a reason is" in call.kwargs["user_prompt"]
+        assert "not present in the event list, leave it unexplained" in call.kwargs["user_prompt"]
 
     def test_invalid_chapter_is_not_returned_as_error_prose(self, provider_config):
         provider = MagicMock()

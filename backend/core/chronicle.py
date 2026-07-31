@@ -34,6 +34,7 @@ from backend.core.advisor_providers import (
 from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
+from backend.core.model_briefing import build_model_briefing
 from backend.core.model_routing import display_model_name, normalize_model_routing_mode
 
 logger = logging.getLogger(__name__)
@@ -474,7 +475,7 @@ class ChronicleGenerator:
 
         # Gather briefing for current session
         briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
-        briefing = json.loads(briefing_json) if briefing_json else {}
+        briefing = build_model_briefing(json.loads(briefing_json)) if briefing_json else {}
 
         # Check if we need to finalize any chapters
         chapters_finalized = 0
@@ -856,7 +857,7 @@ class ChronicleGenerator:
 
         # Get briefing for voice/context
         briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
-        briefing = json.loads(briefing_json) if briefing_json else {}
+        briefing = build_model_briefing(json.loads(briefing_json)) if briefing_json else {}
 
         # Get events for this chapter's time range
         events = self.db.get_events_in_snapshot_range(
@@ -982,7 +983,9 @@ class ChronicleGenerator:
         result = self.provider_generator.generate(
             system_prompt=(
                 "Follow the Chronicle instructions precisely. Write as an in-universe "
-                "historian, never as a strategic advisor."
+                "historian, never as a strategic advisor. Treat the supplied events and "
+                "campaign context as evidence: dramatize the voice, but do not invent "
+                "motives, actions, causes, outcomes, or availability."
             ),
             user_prompt=contents,
             model_routing_mode=self.model_routing_mode,
@@ -995,6 +998,7 @@ class ChronicleGenerator:
                 else None
             ),
             schema_name=purpose_label,
+            allow_schema_fallback=bool(config.get("allow_schema_fallback", True)),
         )
         self._record_model_generation(result)
         return result
@@ -1019,6 +1023,7 @@ class ChronicleGenerator:
                     "temperature": temperature,
                     "max_output_tokens": max_output_tokens,
                     "response_schema": response_schema,
+                    "allow_schema_fallback": attempt == 0,
                 },
                 purpose_label=purpose_label,
             )
@@ -1026,7 +1031,7 @@ class ChronicleGenerator:
                 return _validate_structured_response(result.text, response_schema), result
             except Exception as exc:
                 validation_error = exc
-                if attempt == 0:
+                if attempt == 0 and not result.schema_fallback_used:
                     logger.warning(
                         "%s returned invalid structured output; retrying once: %s",
                         purpose_label,
@@ -1038,6 +1043,8 @@ class ChronicleGenerator:
                         "object matching the requested schema. Do not include Markdown or "
                         f"commentary. Validation issue: {str(exc)[:500]}"
                     )
+                else:
+                    break
 
         raise AdvisorProviderError(
             f"{self.provider_config.display_name} could not produce valid structured "
@@ -1502,6 +1509,9 @@ Aim for 500-800 words total across all sections. Include at least one "quote" se
 
 Do NOT give advice. You are a historian, not an advisor.
 Do NOT fabricate events not in the event list.
+You may dramatize language, but not facts. Quotes are literary framing and must not
+introduce unrecorded motives, decrees, actions, causes, or outcomes. When a reason is
+not present in the event list, leave it unexplained.
 {regen_section}"""
 
         parsed, response = self._generate_structured_content(
@@ -1783,7 +1793,7 @@ Do NOT give advice. You are a historian, not an advisor.
             events = self.db.get_recent_events(session_id=session_id, limit=max_events)
 
         briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
-        briefing = json.loads(briefing_json) if briefing_json else {}
+        briefing = build_model_briefing(json.loads(briefing_json)) if briefing_json else {}
 
         stats = self.db.get_session_snapshot_stats(session_id)
 
@@ -1964,11 +1974,17 @@ Do NOT give advice. Write as a historian, not an advisor.
         if not relations:
             return ""
 
-        lines = ["=== KNOWN EMPIRES ==="]
+        empire_lines: list[str] = []
+        special_lines: list[str] = []
 
         for rel in relations:
             name = rel.get("empire_name")
             if not name:
+                continue
+
+            country_type = str(rel.get("country_type") or "default")
+            if country_type != "default":
+                special_lines.append(f"- {name} | type: {country_type} | special contact")
                 continue
 
             parts = [name]
@@ -2007,13 +2023,25 @@ Do NOT give advice. Write as a historian, not an advisor.
             if statuses:
                 parts.append(", ".join(statuses))
 
-            lines.append(f"- {' | '.join(parts)}")
+            empire_lines.append(f"- {' | '.join(parts)}")
+
+        lines: list[str] = []
+        if empire_lines:
+            lines.append("=== KNOWN EMPIRES ===")
+            lines.extend(empire_lines)
+        if special_lines:
+            if lines:
+                lines.append("")
+            lines.append("=== SPECIAL CONTACTS (NOT ORDINARY EMPIRES) ===")
+            lines.extend(special_lines)
 
         # Federation
         federation = diplomacy.get("federation")
         if federation and isinstance(federation, dict):
             fed_name = federation.get("name", "Unknown Federation")
-            lines.append(f"\nFederation: {fed_name}")
+            if lines:
+                lines.append("")
+            lines.append(f"Federation: {fed_name}")
 
         return "\n".join(lines)
 
