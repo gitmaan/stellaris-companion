@@ -34,6 +34,7 @@ from backend.core.advisor_providers import (
 from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
+from backend.core.model_briefing import build_model_briefing
 from backend.core.model_routing import display_model_name, normalize_model_routing_mode
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ class ChapterOutput(BaseModel):
         description="A short opening flavor line — a proverb, decree, or ominous statement that sets the chapter's tone (max 20 words)"
     )
     sections: list[NarrativeSection] = Field(
-        description="3-6 narrative blocks: 'prose' for paragraphs, 'quote' for in-universe quotes with attribution, 'declaration' for punchy proclamations"
+        description="Narrative blocks sized to the supplied evidence: prose, optional literary quotes, or occasional declarations"
     )
     summary: str = Field(
         description="2-3 sentences summarizing the key events for context in future chapters."
@@ -306,6 +307,18 @@ CHRONICLE_REFRESH_MODES = {
     CHRONICLE_REFRESH_MODE_ENHANCED,
 }
 
+CHRONICLE_EVIDENCE_RULES = """=== EVIDENCE RULES ===
+- Treat each event and campaign-context line as an independent recorded fact.
+- Dramatize tone, not campaign facts: do not add concrete motives, actions, causes,
+  outcomes, relationships, or capabilities that are absent from the record.
+- Events sharing a date establish coexistence, not cause and effect.
+- Preserve the meaning of recorded metrics; do not turn counts into strength or net
+  income into stockpiles, costs, or spending.
+- If the record does not explain why something happened, leave the reason unknown.
+- Quotes and declarations are literary framing, not new evidence, and must not introduce
+  additional campaign facts.
+"""
+
 
 def normalize_chronicle_refresh_mode(value: Any) -> str:
     """Normalize refresh mode from UI settings / API input."""
@@ -323,6 +336,36 @@ def get_current_era_regen_min_new_events(refresh_mode: Any) -> int:
     if normalized == CHRONICLE_REFRESH_MODE_ENHANCED:
         return ENHANCED_CURRENT_ERA_REGEN_MIN_NEW_EVENTS
     return CURRENT_ERA_REGEN_MIN_NEW_EVENTS
+
+
+def _chapter_narrative_scope(events: list[dict]) -> str:
+    """Scale chapter length to the amount of consequential evidence available."""
+    notable_facts = {
+        (event.get("event_type"), event.get("summary"))
+        for event in events
+        if event.get("event_type") in NOTABLE_EVENT_TYPES
+    }
+    minor_notable_types = {
+        "first_contact",
+        "new_border_contact",
+        "colony_count_change",
+        "military_power_change",
+    }
+    has_major_turning_point = any(
+        event.get("event_type") in NOTABLE_EVENT_TYPES
+        and event.get("event_type") not in minor_notable_types
+        for event in events
+    )
+
+    if has_major_turning_point or len(notable_facts) >= 3:
+        return (
+            "Use 3-5 sections and aim for 400-650 words. Give the recorded turning "
+            "points room to breathe, but do not pad the chapter beyond its evidence."
+        )
+    return (
+        "Use 2-3 prose sections and aim for 200-350 words. This is a lightly evidenced "
+        "era, so keep it evocative and concise rather than filling gaps with story."
+    )
 
 
 def parse_year(date_str: str | None) -> int | None:
@@ -474,7 +517,7 @@ class ChronicleGenerator:
 
         # Gather briefing for current session
         briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
-        briefing = json.loads(briefing_json) if briefing_json else {}
+        briefing = build_model_briefing(json.loads(briefing_json)) if briefing_json else {}
 
         # Check if we need to finalize any chapters
         chapters_finalized = 0
@@ -856,7 +899,7 @@ class ChronicleGenerator:
 
         # Get briefing for voice/context
         briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
-        briefing = json.loads(briefing_json) if briefing_json else {}
+        briefing = build_model_briefing(json.loads(briefing_json)) if briefing_json else {}
 
         # Get events for this chapter's time range
         events = self.db.get_events_in_snapshot_range(
@@ -982,7 +1025,10 @@ class ChronicleGenerator:
         result = self.provider_generator.generate(
             system_prompt=(
                 "Follow the Chronicle instructions precisely. Write as an in-universe "
-                "historian, never as a strategic advisor."
+                "historian, never as a strategic advisor. Treat the supplied events and "
+                "campaign context as evidence: dramatize the voice, but do not invent "
+                "motives, actions, causes, outcomes, or availability. Never turn events "
+                "that share a date into a causal claim or use literary framing to add facts."
             ),
             user_prompt=contents,
             model_routing_mode=self.model_routing_mode,
@@ -995,6 +1041,7 @@ class ChronicleGenerator:
                 else None
             ),
             schema_name=purpose_label,
+            allow_schema_fallback=bool(config.get("allow_schema_fallback", True)),
         )
         self._record_model_generation(result)
         return result
@@ -1019,6 +1066,7 @@ class ChronicleGenerator:
                     "temperature": temperature,
                     "max_output_tokens": max_output_tokens,
                     "response_schema": response_schema,
+                    "allow_schema_fallback": attempt == 0,
                 },
                 purpose_label=purpose_label,
             )
@@ -1026,7 +1074,7 @@ class ChronicleGenerator:
                 return _validate_structured_response(result.text, response_schema), result
             except Exception as exc:
                 validation_error = exc
-                if attempt == 0:
+                if attempt == 0 and not result.schema_fallback_used:
                     logger.warning(
                         "%s returned invalid structured output; retrying once: %s",
                         purpose_label,
@@ -1038,6 +1086,8 @@ class ChronicleGenerator:
                         "object matching the requested schema. Do not include Markdown or "
                         f"commentary. Validation issue: {str(exc)[:500]}"
                     )
+                else:
+                    break
 
         raise AdvisorProviderError(
             f"{self.provider_config.display_name} could not produce valid structured "
@@ -1437,6 +1487,7 @@ class ChronicleGenerator:
                 len(selected_events),
             )
         events_text = self._format_events(selected_events)
+        narrative_scope = _chapter_narrative_scope(selected_events)
         truncation_note = ""
         if was_truncated:
             truncation_note = (
@@ -1485,6 +1536,8 @@ Incorporate this guidance while maintaining narrative consistency.
 {truncation_note}
 {events_text}
 
+{CHRONICLE_EVIDENCE_RULES}
+
 === YOUR TASK ===
 
 Write Chapter {chapter_number} of the empire's chronicle.
@@ -1492,22 +1545,25 @@ Write Chapter {chapter_number} of the empire's chronicle.
 Requirements:
 - title: A dramatic, thematic name for this era
 - epigraph: A short, evocative opening line — a proverb, decree, or ominous statement that sets the chapter's tone (max 20 words)
-- sections: An array of 3-6 narrative blocks, each with:
+- sections: A narrative array sized to the evidence, with:
   - type "prose": Standard dramatic paragraphs (most sections should be this)
-  - type "quote": An in-universe quote — a ruler's speech, diplomat's words, or intercepted transmission. Include an attribution (e.g., "Admiral Voss, before the Battle of Rigel")
-  - type "declaration": A short, punchy proclamation or decree (e.g., "THE COMMONWEALTH SHALL NOT YIELD"). Use sparingly (0-1 per chapter)
+  - type "quote": Optional in-universe literary framing with an attribution
+  - type "declaration": An optional short proclamation, used sparingly
 - summary: 2-3 sentences summarizing key events for future chapter context
 
-Aim for 500-800 words total across all sections. Include at least one "quote" section per chapter. Use "declaration" only when the events warrant gravitas.
+{narrative_scope}
+Quotes and declarations are optional, never quotas, and cannot add campaign facts.
 
 Do NOT give advice. You are a historian, not an advisor.
 Do NOT fabricate events not in the event list.
+You may dramatize language, but not facts. The epigraph must be atmospheric rather
+than a factual claim. When a reason is not present in the event list, leave it unexplained.
 {regen_section}"""
 
         parsed, response = self._generate_structured_content(
             contents=prompt,
             response_schema=ChapterOutput,
-            temperature=1.0,
+            temperature=0.7,
             max_output_tokens=4096,
             purpose_label=f"Chronicle chapter {chapter_number}",
         )
@@ -1620,14 +1676,16 @@ Do NOT fabricate events not in the event list.
 {truncation_note}
 {events_text}
 
+{CHRONICLE_EVIDENCE_RULES}
+
 === YOUR TASK ===
 
 Write a brief narrative for "The Current Era" - the unfolding present.
 This is NOT a finalized chapter - it's a 1-2 paragraph teaser about current events.
 
 Return structured sections:
-- sections: 1-3 blocks, each with type ("prose" or "quote") and text.
-  For "quote" sections, include an attribution.
+- sections: 1-3 blocks, each with type ("prose" or optional literary "quote") and text.
+  A quote must not add campaign facts absent from the evidence.
 End the final prose section with "The story continues..."
 
 Do NOT give advice. You are a historian, not an advisor.
@@ -1783,7 +1841,7 @@ Do NOT give advice. You are a historian, not an advisor.
             events = self.db.get_recent_events(session_id=session_id, limit=max_events)
 
         briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
-        briefing = json.loads(briefing_json) if briefing_json else {}
+        briefing = build_model_briefing(json.loads(briefing_json)) if briefing_json else {}
 
         stats = self.db.get_session_snapshot_stats(session_id)
 
@@ -1852,38 +1910,23 @@ End with "The Story Continues..." about the current situation.
         """Determine narrative voice based on ethics/identity."""
         if identity.get("is_machine"):
             return (
-                "Write with cold, logical precision. No emotion, only analysis of "
-                "historical patterns. Use technical terminology. Frame the chronicle "
-                "as a data log for future processing units."
+                "Use cold, logical precision and technical language, as a historical data "
+                "log for future processing units."
             )
         elif identity.get("is_hive_mind"):
-            return (
-                "Write as the collective memory. Use 'we' and 'the swarm'. "
-                "Frame history as the growth of the whole."
-            )
+            return "Write as a solemn collective memory using 'we' and 'the swarm'."
         elif "fanatic_authoritarian" in ethics or "authoritarian" in ethics:
-            return (
-                "Write with imperial grandeur. Emphasize the glory of the state, "
-                "the wisdom of the throne, and the order that hierarchy brings."
-            )
+            return "Use formal imperial grandeur and a stately, ceremonial cadence."
         elif "fanatic_egalitarian" in ethics or "egalitarian" in ethics:
-            return (
-                "Write celebrating the triumph of the people. "
-                "Emphasize collective achievement and democratic ideals."
-            )
+            return "Use a civic, people-centered tone with democratic imagery."
         elif "fanatic_militarist" in ethics or "militarist" in ethics:
-            return "Write with martial pride. Emphasize battles, conquests, and military honor."
+            return "Use a disciplined martial cadence and the vocabulary of military history."
         elif "fanatic_spiritualist" in ethics or "spiritualist" in ethics:
-            return "Write with religious reverence. Frame history as divine providence."
+            return "Use solemn, reverent language and spiritual imagery."
         elif "fanatic_pacifist" in ethics or "pacifist" in ethics:
-            return (
-                "Write valuing peace and diplomacy. Frame conflicts as tragedies, peace as triumph."
-            )
+            return "Use a reflective, diplomatic tone and measured language."
         elif "fanatic_materialist" in ethics or "materialist" in ethics:
-            return (
-                "Write celebrating scientific progress. Frame history as the march "
-                "of knowledge and reason."
-            )
+            return "Use precise, intellectually curious language with scientific imagery."
         else:
             return "Write with epic gravitas befitting a galactic chronicle."
 
@@ -1906,6 +1949,8 @@ End with "The Story Continues..." about the current situation.
 
 === RECENT EVENTS ===
 {events_text}
+
+{CHRONICLE_EVIDENCE_RULES}
 
 Write a 2-3 paragraph dramatic recap of recent events, ending with the current stakes.
 Do NOT give advice. Write as a historian, not an advisor.
@@ -1964,11 +2009,17 @@ Do NOT give advice. Write as a historian, not an advisor.
         if not relations:
             return ""
 
-        lines = ["=== KNOWN EMPIRES ==="]
+        empire_lines: list[str] = []
+        special_lines: list[str] = []
 
         for rel in relations:
             name = rel.get("empire_name")
             if not name:
+                continue
+
+            country_type = str(rel.get("country_type") or "default")
+            if country_type != "default":
+                special_lines.append(f"- {name} | type: {country_type} | special contact")
                 continue
 
             parts = [name]
@@ -2007,13 +2058,25 @@ Do NOT give advice. Write as a historian, not an advisor.
             if statuses:
                 parts.append(", ".join(statuses))
 
-            lines.append(f"- {' | '.join(parts)}")
+            empire_lines.append(f"- {' | '.join(parts)}")
+
+        lines: list[str] = []
+        if empire_lines:
+            lines.append("=== KNOWN EMPIRES ===")
+            lines.extend(empire_lines)
+        if special_lines:
+            if lines:
+                lines.append("")
+            lines.append("=== SPECIAL CONTACTS (NOT ORDINARY EMPIRES) ===")
+            lines.extend(special_lines)
 
         # Federation
         federation = diplomacy.get("federation")
         if federation and isinstance(federation, dict):
             fed_name = federation.get("name", "Unknown Federation")
-            lines.append(f"\nFederation: {fed_name}")
+            if lines:
+                lines.append("")
+            lines.append(f"Federation: {fed_name}")
 
         return "\n".join(lines)
 

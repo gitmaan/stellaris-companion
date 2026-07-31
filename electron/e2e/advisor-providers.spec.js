@@ -130,7 +130,7 @@ test('configures a compatible Advisor provider and discovers its models', async 
     await expect(providerSelect).toHaveValue('custom')
     await expect(modelSelect).toHaveValue('local/strategist-large')
     await page.getByRole('button', { name: 'TEST MODEL' }).click()
-    await expect(page.getByText('CONNECTION + JSON CHECK PASSED')).toBeVisible()
+    await expect(page.getByText('ADVISOR + CHRONICLE READY')).toBeVisible()
     await expect(page.getByText(/does not validate campaign-size context/i)).toBeVisible()
     expect(provider.getLastCompletionModel()).toBe('local/strategist-large')
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib.parse import urlparse
@@ -193,6 +194,7 @@ class AdvisorGenerationResult:
     requested_model: str
     provider: str
     routing: dict[str, Any] | None = None
+    schema_fallback_used: bool = False
 
 
 class AdvisorProviderError(RuntimeError):
@@ -222,6 +224,7 @@ class AdvisorGenerator(Protocol):
         purpose: str = "advisor",
         response_schema: type[BaseModel] | None = None,
         schema_name: str | None = None,
+        allow_schema_fallback: bool = True,
     ) -> AdvisorGenerationResult: ...
 
 
@@ -245,8 +248,9 @@ class GeminiAdvisorGenerator:
         purpose: str = "advisor",
         response_schema: type[BaseModel] | None = None,
         schema_name: str | None = None,
+        allow_schema_fallback: bool = True,
     ) -> AdvisorGenerationResult:
-        del schema_name
+        del schema_name, allow_schema_fallback
         config_kwargs: dict[str, Any] = {
             "system_instruction": system_prompt,
             "temperature": temperature,
@@ -376,6 +380,7 @@ class OpenAICompatibleAdvisorGenerator:
         purpose: str = "advisor",
         response_schema: type[BaseModel] | None = None,
         schema_name: str | None = None,
+        allow_schema_fallback: bool = True,
     ) -> AdvisorGenerationResult:
         del model_routing_mode, thinking_level, purpose
         if not self.config.is_configured:
@@ -406,17 +411,18 @@ class OpenAICompatibleAdvisorGenerator:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": effective_user_prompt},
             ],
-            "temperature": temperature,
             "max_tokens": max_output_tokens,
             "stream": False,
         }
+        if response_schema is None:
+            request_body["temperature"] = temperature
         if response_schema is not None:
             request_body["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
                     "name": _structured_schema_name(response_schema, schema_name),
                     "strict": True,
-                    "schema": response_schema.model_json_schema(),
+                    "schema": _portable_json_schema(response_schema),
                 },
             }
             if self.config.provider == ADVISOR_PROVIDER_OPENROUTER:
@@ -427,6 +433,7 @@ class OpenAICompatibleAdvisorGenerator:
             follow_redirects=False,
         )
         close_client = self._client is None
+        schema_fallback_used = False
         try:
             response = client.post(
                 f"{self.config.base_url}/chat/completions",
@@ -435,18 +442,16 @@ class OpenAICompatibleAdvisorGenerator:
             )
             if (
                 response_schema is not None
-                and (
-                    response.status_code == 400
-                    or (
-                        self.config.provider == ADVISOR_PROVIDER_OPENROUTER
-                        and response.status_code == 503
-                    )
+                and allow_schema_fallback
+                and _should_retry_without_schema(
+                    response,
+                    provider=self.config.provider,
                 )
-                and not _is_context_limit_error(_compatible_error_message(response))
             ):
                 fallback_body = dict(request_body)
                 fallback_body.pop("response_format", None)
                 fallback_body.pop("provider", None)
+                schema_fallback_used = True
                 response = client.post(
                     f"{self.config.base_url}/chat/completions",
                     headers=headers,
@@ -522,6 +527,7 @@ class OpenAICompatibleAdvisorGenerator:
             model=response_model,
             requested_model=requested_model,
             provider=self.config.provider,
+            schema_fallback_used=schema_fallback_used,
         )
 
 
@@ -619,6 +625,54 @@ def _content_to_text(content: Any) -> str:
     return ""
 
 
+def _should_retry_without_schema(response: httpx.Response, *, provider: str) -> bool:
+    """Allow one prompt-JSON fallback for structured-parameter incompatibility."""
+    message = _compatible_error_message(response)
+    if _is_context_limit_error(message):
+        return False
+    if response.status_code in {400, 422}:
+        return True
+    if provider != ADVISOR_PROVIDER_OPENROUTER:
+        return False
+    if response.status_code == 503:
+        return True
+    if response.status_code != 404:
+        return False
+
+    normalized = " ".join(message.lower().replace("_", " ").split())
+    route_markers = (
+        "no endpoints can handle requested parameters",
+        "no endpoints found that can handle requested parameters",
+        "routing requirements",
+        "require parameters",
+    )
+    return any(marker in normalized for marker in route_markers)
+
+
+def _portable_json_schema(response_schema: type[BaseModel]) -> dict[str, Any]:
+    """Normalize Pydantic output for strict OpenAI-compatible schema validators."""
+    schema = deepcopy(response_schema.model_json_schema())
+
+    def normalize(node: Any) -> None:
+        if isinstance(node, list):
+            for item in node:
+                normalize(item)
+            return
+        if not isinstance(node, dict):
+            return
+
+        node.pop("default", None)
+        properties = node.get("properties")
+        if isinstance(properties, dict):
+            node["additionalProperties"] = False
+            node["required"] = list(properties)
+        for value in node.values():
+            normalize(value)
+
+    normalize(schema)
+    return schema
+
+
 def _structured_schema_name(
     response_schema: type[BaseModel],
     explicit_name: str | None,
@@ -637,7 +691,7 @@ def _with_json_schema_instruction(
     response_schema: type[BaseModel],
 ) -> str:
     schema_json = json.dumps(
-        response_schema.model_json_schema(),
+        _portable_json_schema(response_schema),
         ensure_ascii=True,
         separators=(",", ":"),
     )

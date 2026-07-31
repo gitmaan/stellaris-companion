@@ -371,16 +371,18 @@ def record_snapshot_from_briefing(
         full_briefing_json=full_json,
         event_state_json=json_dumps(build_event_state_from_briefing(briefing)),
     )
+    try:
+        # Reprocessing the same save can contain extractor fixes even when the
+        # snapshot identity is unchanged. Keep the latest briefing fresh without
+        # manufacturing another historical snapshot.
+        db.update_session_latest_briefing(
+            session_id=session_id,
+            latest_briefing_json=full_json,
+            last_game_date=metrics.get("game_date"),
+        )
+    except Exception:
+        pass
     if inserted and snapshot_id is not None:
-        try:
-            # Persist the latest full briefing once per session (overwrite), not per snapshot row.
-            db.update_session_latest_briefing(
-                session_id=session_id,
-                latest_briefing_json=full_json,
-                last_game_date=metrics.get("game_date"),
-            )
-        except Exception:
-            pass
         with contextlib.suppress(Exception):
             db.record_events_for_new_snapshot(
                 session_id=session_id,
@@ -455,13 +457,13 @@ def record_snapshot_from_companion(
         full_briefing_json=full_json,
         event_state_json=json_dumps(build_event_state_from_briefing(briefing_for_storage)),
     )
+    with contextlib.suppress(Exception):
+        db.update_session_latest_briefing(
+            session_id=session_id,
+            latest_briefing_json=full_json,
+            last_game_date=metrics.get("game_date"),
+        )
     if inserted and snapshot_id is not None:
-        with contextlib.suppress(Exception):
-            db.update_session_latest_briefing(
-                session_id=session_id,
-                latest_briefing_json=full_json,
-                last_game_date=metrics.get("game_date"),
-            )
         try:
             db.record_events_for_new_snapshot(
                 session_id=session_id,

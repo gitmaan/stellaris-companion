@@ -62,12 +62,49 @@ test('OpenRouter model discovery normalizes models and sends current attribution
   })
 
   assert.equal(result.ok, true)
-  assert.equal(capturedUrl, 'http://127.0.0.1:8080/v1/models')
+  assert.equal(capturedUrl, 'http://127.0.0.1:8080/v1/models?sort=top-weekly')
   assert.equal(capturedAuthorization, 'Bearer secret')
   assert.equal(capturedTitle, 'Stellaris Companion')
   assert.deepEqual(result.models, [
     { id: 'provider/model-a', name: 'Model A', contextLength: 32768 },
     { id: 'provider/model-b', name: 'provider/model-b', contextLength: undefined },
+  ])
+})
+
+test('OpenRouter discovery recommends verified text models and omits non-chat entries', async () => {
+  const result = await discoverAdvisorModels({
+    provider: 'openrouter',
+    apiKey: 'secret',
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        data: [
+          {
+            id: 'google/gemini-3.1-flash-lite',
+            architecture: { output_modalities: ['text'] },
+            supported_parameters: ['response_format'],
+          },
+          {
+            id: 'provider/image-model',
+            architecture: { output_modalities: ['image'] },
+          },
+          { id: 'provider/model:batch' },
+        ],
+      }),
+    }),
+  })
+
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.models, [
+    {
+      id: 'google/gemini-3.1-flash-lite',
+      name: 'google/gemini-3.1-flash-lite',
+      contextLength: undefined,
+      supportedParameters: ['response_format'],
+      outputModalities: ['text'],
+      recommended: true,
+    },
   ])
 })
 
@@ -129,7 +166,11 @@ test('model test sends a structured Chronicle-compatible probe', async () => {
   assert.equal(result.structuredOutput, true)
   assert.equal(capturedBody.response_format.type, 'json_schema')
   assert.deepEqual(capturedBody.provider, { require_parameters: true })
+  assert.equal(capturedBody.max_tokens, 512)
+  assert.equal('temperature' in capturedBody, false)
   assert.equal(capturedBody.messages[1].content.includes('campaign'), false)
+  assert.equal(result.advisorReady, true)
+  assert.equal(result.chronicleReady, true)
 })
 
 test('model test redacts an echoed API key from provider errors', async () => {
@@ -180,6 +221,7 @@ test('model test retries without native response format on compatible HTTP 400',
 
   assert.equal(result.ok, true)
   assert.equal(result.structuredOutput, false)
+  assert.equal(result.chronicleReady, true)
   assert.equal(requestBodies.length, 2)
   assert.equal('response_format' in requestBodies[1], false)
   assert.equal('provider' in requestBodies[1], false)
@@ -216,12 +258,13 @@ test('OpenRouter model test retries when no route supports schema parameters', a
 
   assert.equal(result.ok, true)
   assert.equal(result.structuredOutput, false)
+  assert.equal(result.chronicleReady, true)
   assert.equal(requestBodies.length, 2)
   assert.equal('response_format' in requestBodies[1], false)
   assert.equal('provider' in requestBodies[1], false)
 })
 
-test('model test rejects an answer Chronicle cannot validate', async () => {
+test('model test reports Advisor-only when Chronicle cannot validate the answer', async () => {
   const result = await testAdvisorModel({
     provider: 'lm_studio',
     model: 'local-model',
@@ -234,6 +277,42 @@ test('model test rejects an answer Chronicle cannot validate', async () => {
     }),
   })
 
-  assert.equal(result.ok, false)
-  assert.match(result.error, /structured output/i)
+  assert.equal(result.ok, true)
+  assert.equal(result.advisorReady, true)
+  assert.equal(result.chronicleReady, false)
+})
+
+test('OpenRouter model test retries route-specific HTTP 404 without schema parameters', async () => {
+  const requestBodies = []
+  const fetchImpl = async (_url, options) => {
+    requestBodies.push(JSON.parse(options.body))
+    if (requestBodies.length === 1) {
+      return {
+        ok: false,
+        status: 404,
+        text: async () => JSON.stringify({
+          error: { message: 'No endpoints can handle requested parameters' },
+        }),
+      }
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({
+        choices: [{ message: { content: '{"status":"ok"}' } }],
+      }),
+    }
+  }
+
+  const result = await testAdvisorModel({
+    provider: 'openrouter',
+    model: 'provider/model',
+    apiKey: 'secret',
+    fetchImpl,
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.chronicleReady, true)
+  assert.equal(requestBodies.length, 2)
+  assert.equal('response_format' in requestBodies[1], false)
 })

@@ -172,6 +172,8 @@ declare global {
             name: string
             contextLength?: number
             supportedParameters?: string[]
+            outputModalities?: string[]
+            recommended?: boolean
           }>
           baseUrl?: string
           provider?: string
@@ -188,6 +190,8 @@ declare global {
           baseUrl?: string
           provider?: string
           structuredOutput?: boolean
+          advisorReady?: boolean
+          chronicleReady?: boolean
           error?: string
         }>
       }
