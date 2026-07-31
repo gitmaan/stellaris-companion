@@ -160,6 +160,37 @@ declare global {
       getSettings: () => Promise<unknown>
       saveSettings: (settings: unknown) => Promise<unknown>
       showFolderDialog: () => Promise<string | null>
+      advisorProviders: {
+        listModels: (config: {
+          provider: string
+          baseUrl?: string
+          apiKey?: string
+        }) => Promise<{
+          ok: boolean
+          models?: Array<{
+            id: string
+            name: string
+            contextLength?: number
+            supportedParameters?: string[]
+          }>
+          baseUrl?: string
+          provider?: string
+          error?: string
+        }>
+        testModel: (config: {
+          provider: string
+          baseUrl?: string
+          apiKey?: string
+          model: string
+        }) => Promise<{
+          ok: boolean
+          model?: string
+          baseUrl?: string
+          provider?: string
+          structuredOutput?: boolean
+          error?: string
+        }>
+      }
       // Feedback reporting
       getPlatformInfo: () => { platform: string; arch: string }
       captureScreenshot: () => Promise<string | null>

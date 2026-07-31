@@ -27,6 +27,26 @@ export type LanguageSetting = (typeof LANGUAGE_VALUES)[number]
 export type ResolvedLanguage = Exclude<LanguageSetting, 'system'>
 export const DEFAULT_LANGUAGE: LanguageSetting = 'system'
 export const DEFAULT_RESOLVED_LANGUAGE: ResolvedLanguage = 'en'
+export const ADVISOR_PROVIDER_VALUES = [
+  'gemini',
+  'ollama',
+  'lm_studio',
+  'openrouter',
+  'custom',
+] as const
+export type AdvisorProvider = (typeof ADVISOR_PROVIDER_VALUES)[number]
+export const DEFAULT_ADVISOR_PROVIDER: AdvisorProvider = 'gemini'
+
+export function normalizeAdvisorProvider(rawValue: unknown): AdvisorProvider {
+  if (typeof rawValue !== 'string') return DEFAULT_ADVISOR_PROVIDER
+  const normalized = rawValue.trim().toLowerCase().replace(/[ -]/g, '_')
+  if (normalized === 'lmstudio') return 'lm_studio'
+  if (normalized === 'open_router') return 'openrouter'
+  if (normalized === 'openai_compatible') return 'custom'
+  return (ADVISOR_PROVIDER_VALUES as readonly string[]).includes(normalized)
+    ? normalized as AdvisorProvider
+    : DEFAULT_ADVISOR_PROVIDER
+}
 
 export function normalizeUiTheme(rawValue: unknown): UiTheme {
   if (typeof rawValue !== 'string') return DEFAULT_UI_THEME
@@ -79,8 +99,15 @@ export function normalizeResolvedLanguage(rawValue: unknown): ResolvedLanguage {
 export interface Settings {
   googleApiKey: string
   googleApiKeySet: boolean
+  openRouterApiKey: string
+  openRouterApiKeySet: boolean
+  customProviderApiKey: string
+  customProviderApiKeySet: boolean
   secretStorageAvailable: boolean
   secretStorageBackend: string | null
+  advisorProvider: AdvisorProvider
+  advisorModel: string
+  advisorBaseUrl: string
   discordToken: string
   discordTokenSet: boolean
   saveDir: string
@@ -131,6 +158,7 @@ export function useSettings(): UseSettingsResult {
         modelRoutingMode?: unknown
         language?: unknown
         resolvedLanguage?: unknown
+        advisorProvider?: unknown
         updateChannel?: unknown
         secretStorageAvailable?: unknown
         secretStorageBackend?: unknown
@@ -147,6 +175,13 @@ export function useSettings(): UseSettingsResult {
         modelRoutingMode: normalizeModelRoutingMode(loaded.modelRoutingMode),
         language: normalizeLanguage(loaded.language),
         resolvedLanguage: normalizeResolvedLanguage(loaded.resolvedLanguage),
+        advisorProvider: normalizeAdvisorProvider(loaded.advisorProvider),
+        advisorModel: loaded.advisorModel || '',
+        advisorBaseUrl: loaded.advisorBaseUrl || '',
+        openRouterApiKey: loaded.openRouterApiKey || '',
+        openRouterApiKeySet: !!loaded.openRouterApiKeySet,
+        customProviderApiKey: loaded.customProviderApiKey || '',
+        customProviderApiKeySet: !!loaded.customProviderApiKeySet,
         updateChannel: normalizeUpdateChannel(loaded.updateChannel),
         secretStorageAvailable: loaded.secretStorageAvailable === true,
         secretStorageBackend: typeof loaded.secretStorageBackend === 'string'
@@ -188,6 +223,14 @@ export function useSettings(): UseSettingsResult {
         // If googleApiKey was changed (not masked), update the Set flag
         if (newSettings.googleApiKey !== undefined && !newSettings.googleApiKey.includes('...')) {
           updated.googleApiKeySet = !!newSettings.googleApiKey
+        }
+
+        if (newSettings.openRouterApiKey !== undefined && !newSettings.openRouterApiKey.includes('...')) {
+          updated.openRouterApiKeySet = !!newSettings.openRouterApiKey
+        }
+
+        if (newSettings.customProviderApiKey !== undefined && !newSettings.customProviderApiKey.includes('...')) {
+          updated.customProviderApiKeySet = !!newSettings.customProviderApiKey
         }
 
         // If discordToken was changed (not masked), update the Set flag

@@ -32,6 +32,7 @@ extraResources:
 mac:
   category: public.app-category.games
   icon: assets/icon.png
+  minimumSystemVersion: "12.0"
   target:
     # electron-updater on macOS requires a .zip artifact for auto-updates.
     # Keep .dmg for manual installs, but publish .zip so updates work.
@@ -41,8 +42,8 @@ mac:
   gatekeeperAssess: false
   entitlements: entitlements.mac.plist
   entitlementsInherit: entitlements.mac.plist
-  notarize:
-    teamId: TS8UHD459C
+  # Credentials and team ID are provided by CI environment variables.
+  notarize: true
   extendInfo:
     NSDocumentsFolderUsageDescription: "Stellaris Companion needs access to your Documents folder to find Stellaris save files."
 
@@ -52,12 +53,10 @@ win:
     - target: nsis
       arch: [x64]
   # No Windows code-signing cert yet; keep executable unsigned.
-  signAndEditExecutable: false
+  signExecutable: false
   # Allow auto-updates on Windows even while unsigned.
   # When we add a proper WIN_CSC cert, switch this back to true.
   verifyUpdateCodeSignature: false
-  # Prevent deriving publisherName from unrelated cert metadata.
-  publisherName: null
 
 linux:
   icon: assets/icon.png
@@ -76,6 +75,8 @@ publish:
   provider: github
   owner: gitmaan
   repo: stellaris-companion
+  # Matrix jobs upload to a shared draft. The release workflow publishes only
+  # after every platform asset and the combined macOS update feed are ready.
   releaseType: draft
 
 releaseInfo:

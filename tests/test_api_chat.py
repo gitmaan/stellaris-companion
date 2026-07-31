@@ -1,9 +1,17 @@
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 from fastapi.testclient import TestClient
 
 import backend.api.server as server
+from backend.core.advisor_providers import (
+    AdvisorProviderConfig,
+    AdvisorProviderError,
+    OpenAICompatibleAdvisorGenerator,
+)
+from backend.core.companion import Companion
 
 
 def _auth_headers() -> dict[str, str]:
@@ -134,3 +142,100 @@ def test_api_chat_passes_language(monkeypatch):
     assert resp.status_code == 200
     assert companion.last_request is not None
     assert companion.last_request["language"] == "fr"
+
+
+def test_api_chat_returns_typed_provider_error(monkeypatch):
+    app, companion = _make_app(monkeypatch)
+
+    def fail_provider(**kwargs):
+        raise AdvisorProviderError(
+            "Could not connect to Ollama",
+            code="PROVIDER_UNAVAILABLE",
+            status_code=503,
+        )
+
+    companion.ask_precomputed = fail_provider
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/chat",
+            headers=_auth_headers(),
+            json={"message": "Test question", "session_key": "chat-123"},
+        )
+
+    assert resp.status_code == 503
+    assert resp.json()["detail"] == {
+        "error": "Could not connect to Ollama",
+        "code": "PROVIDER_UNAVAILABLE",
+    }
+
+
+def test_api_chat_generates_through_compatible_provider(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "model": "local/strategist",
+                "choices": [
+                    {"message": {"content": "Prioritize alloys and reinforce the northern fleet."}}
+                ],
+            },
+        )
+
+    config = AdvisorProviderConfig(
+        provider="custom",
+        model="local/strategist",
+        base_url="http://127.0.0.1:8080/v1",
+    )
+    generator = OpenAICompatibleAdvisorGenerator(
+        config=config,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    companion = Companion(
+        save_path=None,
+        auto_precompute=False,
+        advisor_provider="custom",
+        advisor_model="local/strategist",
+        advisor_base_url="http://127.0.0.1:8080/v1",
+        advisor_generator=generator,
+    )
+    companion.extractor = SimpleNamespace(get_player_empire_id=lambda: 7)
+    companion.metadata = {"name": "Test Empire", "date": "2230.07.01"}
+    companion.system_prompt = "You are the Test Empire's strategic advisor."
+    companion._complete_briefing_json = json.dumps(
+        {
+            "date": "2230.07.01",
+            "economy": {"alloys": {"monthly": 18}},
+            "military": {"fleet_power": 4200},
+        }
+    )
+    companion._briefing_game_date = "2230.07.01"
+    companion._briefing_ready.set()
+
+    monkeypatch.setenv(server.ENV_API_TOKEN, "test-token")
+    app = server.create_app()
+    app.state.companion = companion
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/chat",
+            headers=_auth_headers(),
+            json={
+                "message": "What should I prioritize?",
+                "session_key": "chat-compatible",
+            },
+        )
+
+    assert resp.status_code == 200
+    assert resp.json()["text"] == ("Prioritize alloys and reinforce the northern fleet.")
+    assert resp.json()["provider"] == "custom"
+    assert captured["path"] == "/v1/chat/completions"
+    request_body = captured["body"]
+    assert isinstance(request_body, dict)
+    assert request_body["model"] == "local/strategist"
+    assert "What should I prioritize?" in request_body["messages"][1]["content"]
+    assert '"alloys"' in request_body["messages"][1]["content"]

@@ -1,7 +1,7 @@
 [project]
 name = "stellaris-companion"
-version = "0.8.5"
-description = "AI-powered strategic advisor for Stellaris using Gemini"
+version = "0.9.0-beta.1"
+description = "AI-powered strategic advisor for Stellaris with configurable model providers"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -18,12 +18,12 @@ classifiers = [
 
 dependencies = [
     "google-genai>=1.0.0",
-    # Keep macOS PyInstaller bundles on the statically-linked wheel; newer
-    # runner-provided builds can dynamically link mismatched libssl.dylib.
+    # Keep macOS PyInstaller bundles on pyca's statically-linked universal wheel.
     "cryptography==48.0.1",
     "python-dotenv>=1.0.0",
     "watchdog>=3.0",
     "fastapi>=0.100.0",
+    "httpx>=0.27.0",
     "uvicorn>=0.23.0",
     "pydantic>=2.0.0",
     "orjson>=3.9.0",
@@ -38,7 +38,7 @@ stellaris-qa-check = "stellaris_save_extractor.qa_check:main"
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
-    "ruff>=0.1.0",
+    "ruff==0.16.0",
     "mypy>=1.0",
 ]
 

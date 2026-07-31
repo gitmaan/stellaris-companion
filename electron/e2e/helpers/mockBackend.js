@@ -57,7 +57,9 @@ function createMockChronicleBackend(options = {}) {
   let phase = 'initial'
   let healthUpdatedAt = 1_000
   let publication = null
+  let chronicleError = options.chronicleError ?? null
   const chronicleRequests = []
+  const chatRequests = []
   const publicationRequests = []
   const publishedStoryId = options.publishedStoryId ?? '84b66f39-ccab-4d60-8d50-82b34537cb5d'
   const initialEventsCovered = options.initialEventsCovered ?? 2
@@ -73,6 +75,10 @@ function createMockChronicleBackend(options = {}) {
     empire_name: 'United Nations of Earth',
     game_date: phase === 'initial' ? '2205.01.01' : '2208.01.01',
     precompute_ready: true,
+    advisor_provider: options.advisorProvider ?? 'gemini',
+    advisor_configured: options.advisorConfigured ?? true,
+    chronicle_provider: options.chronicleProvider ?? options.advisorProvider ?? 'gemini',
+    chronicle_configured: options.chronicleConfigured ?? true,
     empire_type: 'standard',
     empire_ethics: ['egalitarian', 'xenophile'],
     empire_civics: ['idealistic_foundation'],
@@ -177,6 +183,30 @@ function createMockChronicleBackend(options = {}) {
       return
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/chat') {
+      const body = await readJsonBody(req)
+      chatRequests.push(body)
+      if (options.chatError) {
+        sendJson(res, options.chatError.status ?? 502, {
+          detail: {
+            error: options.chatError.error ?? 'Provider request failed',
+            code: options.chatError.code ?? 'PROVIDER_REQUEST_FAILED',
+          },
+        })
+        return
+      }
+      sendJson(res, 200, {
+        text: options.chatResponse ?? 'Mock strategic response.',
+        game_date: healthPayload().game_date,
+        response_time_ms: 12,
+        model: options.chatModel ?? 'mock-advisor-model',
+        model_display: options.chatModel ?? 'Mock Advisor Model',
+        model_routing: null,
+        provider: options.advisorProvider ?? 'gemini',
+      })
+      return
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/chronicle') {
       const body = await readJsonBody(req)
       chronicleRequests.push({
@@ -185,6 +215,15 @@ function createMockChronicleBackend(options = {}) {
         chapter_only: !!body.chapter_only,
         refresh_mode: body.refresh_mode || 'balanced',
       })
+      if (chronicleError) {
+        sendJson(res, chronicleError.status ?? 502, {
+          detail: {
+            error: chronicleError.error ?? 'Provider request failed',
+            code: chronicleError.code ?? 'PROVIDER_REQUEST_FAILED',
+          },
+        })
+        return
+      }
       sendJson(res, 200, chroniclePayload(body))
       return
     }
@@ -273,6 +312,10 @@ function createMockChronicleBackend(options = {}) {
     healthUpdatedAt += 1_000
   }
 
+  function setChronicleError(error) {
+    chronicleError = error
+  }
+
   async function waitForChronicleRequest(predicate, timeoutMs = 10_000) {
     const start = Date.now()
     while (Date.now() - start < timeoutMs) {
@@ -303,8 +346,10 @@ function createMockChronicleBackend(options = {}) {
     start,
     stop,
     advanceCampaign,
+    setChronicleError,
     waitForChronicleRequest,
     waitForPublicationRequest,
+    getChatRequests: () => [...chatRequests],
     getChronicleRequests: () => [...chronicleRequests],
     getPublicationRequests: () => [...publicationRequests],
   }

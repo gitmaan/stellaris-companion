@@ -6,13 +6,20 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.core.advisor_providers import (
+    AdvisorGenerationResult,
+    AdvisorProviderConfig,
+    AdvisorProviderError,
+)
 from backend.core.chronicle import (
     CHRONICLE_REFRESH_MODE_ENHANCED,
     CURRENT_ERA_IMMEDIATE_REFRESH_EVENT_TYPES,
     CURRENT_ERA_REGEN_MIN_NEW_EVENTS,
     ERA_ENDING_EVENTS,
     NOTABLE_EVENT_TYPES,
+    ChapterOutput,
     ChronicleGenerator,
+    CurrentEraOutput,
     _repair_json_string,
     _sections_to_text,
     get_current_era_regen_min_new_events,
@@ -1374,6 +1381,134 @@ class TestCurrentEraFallbackModel:
         assert first_call.kwargs["model"] == "gemini-3-flash-preview"
         assert second_call.kwargs["model"] == "gemini-3.1-flash-lite-preview"
         assert generator._model_routing_response()["fallback"] is True  # type: ignore[attr-defined]
+
+
+class TestChronicleProviderRouting:
+    """Tests shared-provider structured generation for Chronicle content."""
+
+    @pytest.fixture
+    def provider_config(self):
+        return AdvisorProviderConfig(
+            provider="custom",
+            model="local-story-model",
+            base_url="http://127.0.0.1:8080/v1",
+        )
+
+    def test_retries_invalid_json_on_the_same_provider(self, provider_config):
+        provider = MagicMock()
+        provider.config = provider_config
+        provider.generate.side_effect = [
+            AdvisorGenerationResult(
+                text="This is not JSON.",
+                model="local-story-model",
+                requested_model="local-story-model",
+                provider="custom",
+            ),
+            AdvisorGenerationResult(
+                text=(
+                    "```json\n"
+                    '{"sections":[{"type":"prose","text":"The frontier stirred.",'
+                    '"attribution":""}]}\n'
+                    "```"
+                ),
+                model="local-story-model",
+                requested_model="local-story-model",
+                provider="custom",
+            ),
+        ]
+        generator = ChronicleGenerator(
+            db=MagicMock(),
+            provider_config=provider_config,
+            provider_generator=provider,
+        )
+
+        parsed, response = generator._generate_structured_content(  # type: ignore[attr-defined]
+            contents="Write the current era.",
+            response_schema=CurrentEraOutput,
+            temperature=1.0,
+            max_output_tokens=1024,
+            purpose_label="Chronicle current era",
+        )
+
+        assert isinstance(parsed, CurrentEraOutput)
+        assert parsed.sections[0].text == "The frontier stirred."
+        assert response.provider == "custom"
+        assert provider.generate.call_count == 2
+        second_prompt = provider.generate.call_args_list[1].kwargs["user_prompt"]
+        assert "previous response could not be validated" in second_prompt
+        assert generator._model_routing_response()["provider"] == "custom"  # type: ignore[attr-defined]
+
+    def test_chapter_includes_provider_provenance(self, provider_config):
+        provider = MagicMock()
+        provider.config = provider_config
+        provider.generate.return_value = AdvisorGenerationResult(
+            text=json.dumps(
+                {
+                    "title": "The First Horizon",
+                    "epigraph": "The stars remember.",
+                    "sections": [
+                        {
+                            "type": "quote",
+                            "text": "We sail at dawn.",
+                            "attribution": "Admiral Vara",
+                        }
+                    ],
+                    "summary": "The empire crossed its first frontier.",
+                }
+            ),
+            model="local-story-model",
+            requested_model="local-story-model",
+            provider="custom",
+        )
+        generator = ChronicleGenerator(
+            db=MagicMock(),
+            provider_config=provider_config,
+            provider_generator=provider,
+        )
+
+        chapter = generator._generate_chapter_content(  # type: ignore[attr-defined]
+            chapter_number=1,
+            events=[],
+            briefing={"identity": {"empire_name": "Test Empire", "ethics": []}},
+            previous_chapters=[],
+            start_date="2200.01.01",
+            end_date="2205.01.01",
+        )
+
+        assert chapter["title"] == "The First Horizon"
+        assert chapter["provider"] == "custom"
+        assert chapter["model"] == "local-story-model"
+        call = provider.generate.call_args
+        assert call.kwargs["purpose"] == "chronicle"
+        assert call.kwargs["response_schema"] is ChapterOutput
+
+    def test_invalid_chapter_is_not_returned_as_error_prose(self, provider_config):
+        provider = MagicMock()
+        provider.config = provider_config
+        provider.generate.return_value = AdvisorGenerationResult(
+            text="not valid JSON",
+            model="local-story-model",
+            requested_model="local-story-model",
+            provider="custom",
+        )
+        generator = ChronicleGenerator(
+            db=MagicMock(),
+            provider_config=provider_config,
+            provider_generator=provider,
+        )
+
+        with pytest.raises(AdvisorProviderError) as exc_info:
+            generator._generate_chapter_content(  # type: ignore[attr-defined]
+                chapter_number=1,
+                events=[],
+                briefing={"identity": {"empire_name": "Test Empire", "ethics": []}},
+                previous_chapters=[],
+                start_date="2200.01.01",
+                end_date="2205.01.01",
+            )
+
+        assert exc_info.value.code == "PROVIDER_INVALID_RESPONSE"
+        assert provider.generate.call_count == 2
 
 
 class TestSectionsToText:

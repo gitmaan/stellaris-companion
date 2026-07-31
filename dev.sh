@@ -9,11 +9,10 @@ if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
-# Check for API key
+# AI credentials are optional at boot. Save ingestion and local-provider setup
+# still work without a Google key.
 if [ -z "$GOOGLE_API_KEY" ]; then
-  echo "⚠️  GOOGLE_API_KEY not set. Add it to .env or export it."
-  echo "   echo 'GOOGLE_API_KEY=your-key' >> .env"
-  exit 1
+  echo "Note: GOOGLE_API_KEY is not set; Gemini Advisor and Chronicle generation are disabled."
 fi
 
 # Set dev defaults

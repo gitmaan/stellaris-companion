@@ -64,7 +64,23 @@
     },
     "errors": {
       "briefingNotReady": "The advisor is still analyzing your save file. Please try again in {{seconds}} seconds.",
-      "unexpected": "An unexpected error occurred"
+      "unexpected": "An unexpected error occurred",
+      "openProviderSettings": "OPEN PROVIDER SETTINGS",
+      "providerNotConfigured": "{{provider}} is not fully configured for Advisor chat. Choose a model and complete its connection settings.",
+      "providerUnavailable": "{{provider}} could not be reached. Make sure its server is running and the configured address is correct.",
+      "providerAuthFailed": "{{provider}} rejected the configured API key. Check the key and try the connection again.",
+      "providerModelNotFound": "The selected {{provider}} model is unavailable. Refresh the model list or choose another model.",
+      "providerRateLimited": "{{provider}} is currently rate limited. Wait briefly, or choose another model or provider.",
+      "providerBillingFailed": "{{provider}} does not have usable billing or credits for this request. Check the provider account or choose another provider.",
+      "providerTimeout": "{{provider}} took too long to respond. A local model may still be loading; try again or check its server.",
+      "providerContextLimit": "The active context window cannot fit this campaign briefing. Increase the provider's context setting to at least 32K, or choose a larger-context model.",
+      "providerInvalidResponse": "{{provider}} returned a response this app could not read. Check that the endpoint supports OpenAI-compatible chat completions.",
+      "providerEmptyResponse": "{{provider}} returned an empty response. Try again or choose another model.",
+      "providerRequestFailed": "{{provider}} could not complete the request. Check the model and endpoint, then try again."
+    },
+    "providerSetup": {
+      "title": "ADVISOR CONNECTION REQUIRED",
+      "description": "{{provider}} is selected but not ready. Open Provider Settings to finish the connection and choose a model."
     },
     "newChat": "New Chat",
     "welcome": {
@@ -144,6 +160,11 @@
       "emptyTitle": "No Chronicle Yet",
       "emptyBody": "Play your game and accumulate history. Chronicles are generated automatically as your empire progresses through the ages.",
       "noSession": "No session found for this save"
+    },
+    "providerSetup": {
+      "title": "AI PROVIDER CONNECTION REQUIRED",
+      "description": "You can still read existing chapters. Connect the selected provider and choose a model to generate or rewrite Chronicle content.",
+      "action": "OPEN PROVIDER SETTINGS"
     },
     "sidebar": {
       "empireArchives": "Empire Archives",
@@ -264,6 +285,7 @@
     "diagnostics": "DIAGNOSTICS"
     },
     "panels": {
+      "advisorAccess": "AI MODEL ACCESS",
       "geminiAccess": "GEMINI MODEL ACCESS",
       "saveSource": "SAVE FILE SOURCE",
     "mcpRelay": "AI APP CONNECTIONS",
@@ -279,6 +301,53 @@
     "missing": "MISSING",
     "generateKey": "GENERATE KEY >",
     "storageWarning": "Protected credential storage is unavailable. API keys remain available only until you close the app, and Chronicle publishing is disabled."
+    },
+    "advisor": {
+      "providerLabel": "AI PROVIDER",
+      "apiKeyLabel": "OPENROUTER API KEY",
+      "optionalApiKeyLabel": "API KEY",
+      "baseUrlLabel": "SERVER URL",
+      "modelLabel": "AI MODEL",
+      "modelPlaceholder": "ENTER MODEL ID OR CHECK CONNECTION",
+      "selectModel": "Select a model",
+      "searchModels": "SEARCH MODELS",
+      "searchPlaceholder": "Filter by model name or ID",
+      "checkConnection": "CHECK CONNECTION",
+      "checking": "CHECKING...",
+      "connected": "CONNECTED",
+      "failed": "CHECK FAILED",
+      "modelsFound": "Connected // {{count}} models available",
+      "connectedNoModels": "Connected // no models returned; enter a model ID manually",
+      "connectionError": "Could not check this provider.",
+      "testModel": "TEST MODEL",
+      "testingModel": "TESTING MODEL...",
+      "modelReady": "CONNECTION + JSON CHECK PASSED",
+      "modelTestError": "The selected model could not complete the structured output test.",
+      "modelTestPrivacy": "The test sends no campaign data and does not validate campaign-size context.",
+      "modelContextLabel": "{{context}} context",
+      "modelContextDetected": "Reported context // {{context}}",
+      "modelContextTooSmall": "{{context}} context detected. Advisor and Chronicle generally need at least 32K.",
+      "modelContextUnknown": "Context size was not reported. For Advisor and Chronicle, load this model with at least 32K.",
+      "sessionOnlySecrets": "Protected credential storage is unavailable. API keys work for this session but are not saved, and Chronicle publishing is disabled.",
+      "remoteContextNotice": "Advisor questions, Chronicle prompts, and extracted game context are sent to this provider. Public endpoints must use HTTPS.",
+      "ollamaCloudNotice": "This Ollama cloud model processes Advisor and Chronicle prompts remotely rather than on this device.",
+      "showAdvanced": "SHOW ADVANCED CONNECTION",
+      "hideAdvanced": "HIDE ADVANCED CONNECTION",
+      "optional": "OPTIONAL",
+      "providers": {
+        "gemini": "GEMINI",
+        "ollama": "OLLAMA",
+        "lm_studio": "LM STUDIO",
+        "openrouter": "OPENROUTER",
+        "custom": "CUSTOM ENDPOINT"
+      },
+      "providerHelp": {
+        "gemini": "Native Gemini access for Advisor and Chronicle.",
+        "ollama": "Uses one model exposed by Ollama for Advisor and Chronicle. Campaign briefings generally need a 32K or larger active context window.",
+        "lm_studio": "Uses one model exposed by the LM Studio server for Advisor and Chronicle. Load it with a 32K or larger context window.",
+        "openrouter": "Uses your OpenRouter account and selected hosted model for Advisor and Chronicle.",
+        "custom": "Uses an OpenAI-compatible chat-completions endpoint for Advisor and Chronicle. Compatibility is best effort."
+      }
     },
     "geminiQuota": {
       "label": "GEMINI QUOTA",
@@ -298,10 +367,10 @@
       "label": "CHRONICLE REFRESH",
       "balanced": "Steady",
       "enhanced": "Frequent",
-      "balancedTag": "LOWER GEMINI USAGE",
+      "balancedTag": "FEWER MODEL CALLS",
       "enhancedTag": "CURRENT ERA SOONER",
-      "balancedHelp": "Refreshes less often to reduce Gemini calls. Best default for free keys.",
-      "enhancedHelp": "Updates the current-era Chronicle more often while you view it. Uses more Gemini calls.",
+      "balancedHelp": "Refreshes less often to reduce model calls. Best default for local models and usage-based providers.",
+      "enhancedHelp": "Updates the current-era Chronicle more often while you view it. Uses more model calls.",
       "aria": "Set refresh mode to {{mode}}",
       "toastError": "Failed to update Chronicle refresh mode. Please try again.",
       "toastSuccess": "Chronicle refresh mode set to {{mode}}."

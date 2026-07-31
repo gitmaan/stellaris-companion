@@ -5,6 +5,7 @@ const path = require('path')
 const { test, expect, _electron: electron } = require('@playwright/test')
 
 const { createMockChronicleBackend } = require('./helpers/mockBackend')
+const { getElectronLaunchArgs } = require('./helpers/electronLaunch')
 
 const electronDir = path.resolve(__dirname, '..')
 
@@ -40,7 +41,7 @@ async function setVisibilityState(page, nextState) {
 
 async function launchApp(backendPort, userDataDir) {
   return electron.launch({
-    args: [path.join(electronDir, 'main.js')],
+    args: getElectronLaunchArgs(path.join(electronDir, 'main.js')),
     env: {
       ...process.env,
       NODE_ENV: 'test',
@@ -166,9 +167,12 @@ test('chronicle defers teaser refresh while hidden and catches up after the wind
 
     const chronicleRequests = backend.getChronicleRequests()
     expect(chronicleRequests.length).toBeGreaterThanOrEqual(3)
-    expect(chronicleRequests[1].chapter_only).toBe(true)
+    const hiddenTeaserRequest = chronicleRequests
+      .slice(1, -1)
+      .find((request) => request.chapter_only === true)
+    expect(hiddenTeaserRequest).toBeDefined()
     expect(chronicleRequests.at(-1).chapter_only).toBe(false)
-    expect(chronicleRequests[1].refresh_mode).toBe('balanced')
+    expect(hiddenTeaserRequest.refresh_mode).toBe('balanced')
     expect(chronicleRequests.at(-1).refresh_mode).toBe('balanced')
   } finally {
     await app.close()

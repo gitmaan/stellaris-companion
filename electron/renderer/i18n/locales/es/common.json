@@ -282,10 +282,10 @@
       "label": "ACTUALIZACION DE CRONICA",
       "balanced": "Equilibrado",
       "enhanced": "Mejorado",
-      "balancedTag": "PREDET. FREE-TIER",
+      "balancedTag": "MENOS LLAMADAS",
       "enhancedTag": "MAS REACTIVO",
-      "balancedHelp": "Menor uso de Gemini. Mejor valor predeterminado para free tier y actualizaciones de suspense mas estables.",
-      "enhancedHelp": "Actualizaciones mas rapidas de la era actual al ver Cronica. Usa mas llamadas a Gemini.",
+      "balancedHelp": "Actualiza con menos frecuencia para reducir llamadas al modelo. Ideal para modelos locales y proveedores por uso.",
+      "enhancedHelp": "Actualizaciones mas rapidas de la era actual al ver Cronica. Usa mas llamadas al modelo.",
       "aria": "Establecer modo de actualizacion en {{mode}}",
       "toastError": "No se pudo actualizar el modo de Cronica. Intentalo de nuevo.",
       "toastSuccess": "Modo de Cronica establecido en {{mode}}."

@@ -132,7 +132,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
           cache-dependency-path: '**/package-lock.json'
 
@@ -299,6 +299,7 @@ jobs:
           node scripts/finalize_mac_update_manifest.js \
             --version "$VERSION" \
             --assets-dir /tmp/update-feed \
+            --minimum-system-version 21.0.0 \
             --notes electron/release-notes.md \
             --output "/tmp/update-feed/${CHANNEL}-mac.yml"
 

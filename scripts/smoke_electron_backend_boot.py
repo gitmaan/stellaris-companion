@@ -61,7 +61,6 @@ def smoke_backend_boot(executable: Path, *, timeout: int = 25) -> None:
         env = os.environ.copy()
         env.update(
             {
-                "GOOGLE_API_KEY": "smoke-test-key",
                 "STELLARIS_API_TOKEN": "smoke-test-token",
                 "STELLARIS_DB_PATH": str(tmp_path / "history.db"),
                 "STELLARIS_SAVE_DIR": str(save_dir),
@@ -70,6 +69,9 @@ def smoke_backend_boot(executable: Path, *, timeout: int = 25) -> None:
                 "USERPROFILE": str(home_dir),
             }
         )
+        env.pop("GOOGLE_API_KEY", None)
+        env.pop("STELLARIS_ADVISOR_API_KEY", None)
+        env.pop("STELLARIS_ADVISOR_MODEL", None)
         env.pop("STELLARIS_SAVE_PATH", None)
 
         proc = subprocess.Popen(

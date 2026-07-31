@@ -114,6 +114,8 @@ export default function UpdateDialog() {
             version: result.version,
             releaseName: typeof result?.releaseName === 'string' ? result.releaseName : prev.releaseName,
             releaseNotes: releaseNotes ?? prev.releaseNotes,
+            downloading: true,
+            progress: 0,
           }))
         }
       } catch (err) {
@@ -136,6 +138,8 @@ export default function UpdateDialog() {
         version: info?.version ?? prev.version,
         releaseName: info?.releaseName ?? prev.releaseName,
         releaseNotes: releaseNotes ?? prev.releaseNotes,
+        downloading: true,
+        progress: 0,
         error: undefined,
       }))
     })

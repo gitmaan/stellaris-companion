@@ -1,0 +1,87 @@
+name: Desktop CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'electron/**'
+      - '.github/workflows/desktop.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'electron/**'
+      - '.github/workflows/desktop.yml'
+
+jobs:
+  desktop-test:
+    name: Desktop - ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            electron/package-lock.json
+            electron/renderer/package-lock.json
+
+      - name: Install Electron dependencies
+        working-directory: electron
+        run: npm ci
+
+      - name: Install renderer dependencies
+        working-directory: electron/renderer
+        run: npm ci
+
+      - name: Run main-process tests
+        working-directory: electron
+        run: |
+          npm run test:advisor-providers
+          npm run test:chronicle-publishing
+          npm run test:updates
+
+      - name: Build renderer
+        working-directory: electron
+        run: npm run build:renderer
+
+  desktop-e2e:
+    name: Desktop E2E - Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            electron/package-lock.json
+            electron/renderer/package-lock.json
+
+      - name: Install Electron dependencies
+        working-directory: electron
+        run: npm ci
+
+      - name: Install renderer dependencies
+        working-directory: electron/renderer
+        run: npm ci
+
+      - name: Build renderer
+        working-directory: electron
+        run: npm run build:renderer
+
+      - name: Run Electron journeys
+        working-directory: electron
+        run: xvfb-run --auto-servernum npx playwright test
+        env:
+          E2E_NO_SANDBOX: '1'

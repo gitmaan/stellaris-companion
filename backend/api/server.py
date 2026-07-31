@@ -12,11 +12,17 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+
+from backend.core.advisor_providers import (
+    AdvisorProviderConfig,
+    AdvisorProviderError,
+    normalize_advisor_provider,
+)
 
 _chronicle_in_flight: set[str] = set()
 _chronicle_in_flight_lock = threading.Lock()
@@ -121,6 +127,60 @@ def _pick_latest_game_date(*values: Any) -> str | None:
     return latest_raw if latest_raw is not None else fallback_raw
 
 
+def _raise_chronicle_value_error(error: ValueError) -> NoReturn:
+    if str(error) == "GOOGLE_API_KEY not configured":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Chronicle generation requires a configured AI provider. Add one in Settings.",
+                "code": "CHRONICLE_PROVIDER_NOT_CONFIGURED",
+            },
+        ) from error
+    raise HTTPException(status_code=400, detail={"error": str(error)}) from error
+
+
+def _raise_provider_error(error: AdvisorProviderError) -> NoReturn:
+    raise HTTPException(
+        status_code=error.status_code,
+        detail={"error": str(error), "code": error.code},
+    ) from error
+
+
+def _provider_health_fields(companion: Any | None) -> dict[str, Any]:
+    """Report one selected provider for both Advisor and Chronicle."""
+    provider: str | None = None
+    configured: bool | None = None
+
+    if companion is not None:
+        provider_getter = getattr(companion, "get_advisor_provider", None)
+        configured_getter = getattr(companion, "is_advisor_configured", None)
+        if callable(provider_getter):
+            provider = provider_getter() or provider
+        if callable(configured_getter):
+            configured = bool(configured_getter())
+
+    if provider is None or configured is None:
+        try:
+            environment_config = AdvisorProviderConfig.from_environment()
+            environment_provider = environment_config.provider
+            environment_configured = environment_config.is_configured
+        except ValueError:
+            environment_provider = normalize_advisor_provider(
+                os.environ.get("STELLARIS_ADVISOR_PROVIDER")
+            )
+            environment_configured = False
+        provider = provider or environment_provider
+        if configured is None:
+            configured = environment_configured
+
+    return {
+        "advisor_provider": provider,
+        "advisor_configured": configured,
+        "chronicle_provider": provider,
+        "chronicle_configured": configured,
+    }
+
+
 def get_auth_token() -> str | None:
     """Get the expected auth token from environment."""
     return os.environ.get(ENV_API_TOKEN)
@@ -196,7 +256,12 @@ def create_app() -> FastAPI:
         ingestion = getattr(request.app.state, "ingestion", None)
         if ingestion is not None:
             payload = ingestion.get_health_payload()
-            return {"status": "ok", **payload}
+            companion = getattr(request.app.state, "companion", None)
+            return {
+                "status": "ok",
+                **payload,
+                **_provider_health_fields(companion),
+            }
 
         companion = getattr(request.app.state, "companion", None)
         if companion is None or not getattr(companion, "is_loaded", False):
@@ -206,6 +271,7 @@ def create_app() -> FastAPI:
                 "empire_name": None,
                 "game_date": None,
                 "precompute_ready": False,
+                **_provider_health_fields(companion),
             }
 
         precompute_status = companion.get_precompute_status()
@@ -216,6 +282,7 @@ def create_app() -> FastAPI:
             "empire_name": companion.metadata.get("name"),
             "game_date": companion.metadata.get("date"),
             "precompute_ready": precompute_status.get("ready", False),
+            **_provider_health_fields(companion),
         }
 
     @app.get("/api/ingestion-status", dependencies=[Depends(verify_token)])
@@ -544,14 +611,20 @@ def create_app() -> FastAPI:
         save_id, _ = _resolve_current_save_id(request)
         scoped_session_key = _scope_chat_session_key(save_id=save_id, client_key=body.session_key)
         requested_model = (body.model or "").strip()[:120] or None
-        response_text, elapsed = companion.ask_precomputed(
-            question=body.message,
-            session_key=scoped_session_key,
-            save_id=save_id,
-            model_name=requested_model,
-            model_routing_mode=body.model_routing_mode,
-            language=body.language,
-        )
+        try:
+            response_text, elapsed = companion.ask_precomputed(
+                question=body.message,
+                session_key=scoped_session_key,
+                save_id=save_id,
+                model_name=requested_model,
+                model_routing_mode=body.model_routing_mode,
+                language=body.language,
+            )
+        except AdvisorProviderError as exc:
+            raise HTTPException(
+                status_code=exc.status_code,
+                detail={"error": str(exc), "code": exc.code},
+            ) from exc
         response_time_ms = int((time.time() - start_time) * 1000)
         call_stats = companion.get_call_stats()
         response_model = call_stats.get("model") or companion.get_advisor_model()
@@ -565,6 +638,8 @@ def create_app() -> FastAPI:
             "requested_model": call_stats.get("requested_model"),
             "requested_model_display": call_stats.get("requested_model_display"),
             "model_routing": call_stats.get("routing"),
+            "provider": call_stats.get("provider")
+            or getattr(companion, "get_advisor_provider", lambda: "gemini")(),
         }
 
     @app.get("/api/status", dependencies=[Depends(verify_token)])
@@ -804,7 +879,7 @@ def create_app() -> FastAPI:
         - "summary": Fast deterministic recap (default)
         - "dramatic": LLM-powered dramatic narrative
 
-        Note: This is a sync endpoint because the LLM client is synchronous.
+        Note: This is a sync endpoint because provider clients are synchronous.
         FastAPI runs sync endpoints in a threadpool.
         """
         db = getattr(request.app.state, "db", None)
@@ -852,8 +927,10 @@ def create_app() -> FastAPI:
             )
             result["date_range"] = date_range
             return result
+        except AdvisorProviderError as e:
+            _raise_provider_error(e)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail={"error": str(e)})
+            _raise_chronicle_value_error(e)
         except Exception as e:
             raise HTTPException(
                 status_code=500,
@@ -868,7 +945,7 @@ def create_app() -> FastAPI:
         Chronicles are cached and regenerated when significant new events occur.
 
         Note: This is a sync endpoint (def, not async def) because the
-        Gemini client is synchronous. FastAPI runs sync endpoints in a
+        provider clients are synchronous. FastAPI runs sync endpoints in a
         threadpool, avoiding event loop blocking.
         """
         db = getattr(request.app.state, "db", None)
@@ -922,8 +999,10 @@ def create_app() -> FastAPI:
                 language=language,
             )
             return result
+        except AdvisorProviderError as e:
+            _raise_provider_error(e)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail={"error": str(e)})
+            _raise_chronicle_value_error(e)
         except Exception as e:
             raise HTTPException(
                 status_code=500,
@@ -975,8 +1054,10 @@ def create_app() -> FastAPI:
                 language=body.language,
             )
             return result
+        except AdvisorProviderError as e:
+            _raise_provider_error(e)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail={"error": str(e)})
+            _raise_chronicle_value_error(e)
         except Exception as e:
             raise HTTPException(
                 status_code=500,
