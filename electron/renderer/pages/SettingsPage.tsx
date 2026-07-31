@@ -5,18 +5,21 @@ import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
   DEFAULT_LANGUAGE,
   DEFAULT_MODEL_ROUTING_MODE,
+  DEFAULT_UPDATE_CHANNEL,
   DEFAULT_UI_THEME,
   normalizeAdvisorProvider,
   normalizeChronicleRefreshMode,
   normalizeLanguage,
   normalizeModelRoutingMode,
   normalizeResolvedLanguage,
+  normalizeUpdateChannel,
   normalizeUiTheme,
   type AdvisorProvider,
   type ChronicleRefreshMode,
   type LanguageSetting,
   type ModelRoutingMode,
   type ResolvedLanguage,
+  type UpdateChannel,
   type UiTheme,
   useSettings,
 } from '../hooks/useSettings'
@@ -173,6 +176,8 @@ function SettingsPage({
   const [modelRoutingModeSaving, setModelRoutingModeSaving] = useState(false)
   const [language, setLanguage] = useState<LanguageSetting>(DEFAULT_LANGUAGE)
   const [languageSaving, setLanguageSaving] = useState(false)
+  const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(DEFAULT_UPDATE_CHANNEL)
+  const [updateChannelSaving, setUpdateChannelSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [mcpRelayStatus, setMcpRelayStatus] = useState<McpRelayStatus | null>(null)
@@ -217,10 +222,12 @@ function SettingsPage({
     const normalizedModelRoutingMode = normalizeModelRoutingMode(settings.modelRoutingMode)
     const normalizedLanguage = normalizeLanguage(settings.language)
     const normalizedResolvedLanguage = normalizeResolvedLanguage(settings.resolvedLanguage)
+    const normalizedUpdateChannel = normalizeUpdateChannel(settings.updateChannel)
     setUiTheme(normalizedTheme)
     setChronicleRefreshMode(normalizedChronicleRefreshMode)
     setModelRoutingMode(normalizedModelRoutingMode)
     setLanguage(normalizedLanguage)
+    setUpdateChannel(normalizedUpdateChannel)
     onThemeChange?.(normalizedTheme)
     onChronicleRefreshModeChange?.(normalizedChronicleRefreshMode)
     onModelRoutingModeChange?.(normalizedModelRoutingMode)
@@ -454,6 +461,35 @@ function SettingsPage({
     } finally {
       setMcpRelayChecking(false)
     }
+  }
+
+  const handleUpdateChannelChange = async (rawValue: string) => {
+    const nextChannel = normalizeUpdateChannel(rawValue)
+    if (nextChannel === updateChannel) return
+
+    const previousChannel = updateChannel
+    setUpdateChannel(nextChannel)
+    setUpdateChannelSaving(true)
+    const success = await saveSettings({ updateChannel: nextChannel })
+    setUpdateChannelSaving(false)
+
+    if (!success) {
+      setUpdateChannel(previousChannel)
+      showToast({
+        type: 'error',
+        message: t('settings.updateChannel.toastError'),
+        duration: 4000,
+      })
+      return
+    }
+
+    showToast({
+      type: 'success',
+      message: t('settings.updateChannel.toastSuccess', {
+        channel: t(`settings.updateChannel.${nextChannel}`),
+      }),
+      duration: 1800,
+    })
   }
 
   const handleCopyMcpRelayText = async (text: string | undefined, label: string) => {
@@ -704,6 +740,8 @@ function SettingsPage({
   const geminiQuotaLabel = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}`)
   const geminiQuotaTag = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}Tag`)
   const geminiQuotaHelper = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}Help`)
+  const updateChannelLabel = (channel: UpdateChannel) =>
+    t(`settings.updateChannel.${channel}`)
   const providerDefaultUrl = ADVISOR_PROVIDER_DEFAULT_URLS[advisorProvider] || ''
   const filteredAdvisorModels = advisorModels
     .filter((model) => {
@@ -1500,9 +1538,64 @@ function SettingsPage({
                     </HUDPanel>
                 </section>
 
+                {/* Software Updates Section */}
+                <section>
+                    <HUDSectionTitle number="05">{t('settings.sections.updates')}</HUDSectionTitle>
+                    <HUDPanel decoration="brackets" title={t('settings.panels.updateChannel')} quiet>
+                        <div className="space-y-3 pt-2">
+                            <div className="flex items-center justify-between gap-3">
+                                <HUDLabel>{t('settings.updateChannel.label')}</HUDLabel>
+                                {updateChannelSaving && (
+                                  <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
+                                )}
+                            </div>
+                            <div
+                              className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1"
+                              data-testid="update-channel-control"
+                            >
+                              {(['stable', 'beta'] as const).map((channel) => {
+                                const isSelected = updateChannel === channel
+                                return (
+                                  <button
+                                    key={channel}
+                                    type="button"
+                                    disabled={updateChannelSaving}
+                                    aria-pressed={isSelected}
+                                    aria-label={t('settings.updateChannel.aria', {
+                                      channel: updateChannelLabel(channel),
+                                    })}
+                                    onClick={() => void handleUpdateChannelChange(channel)}
+                                    className={`rounded-sm border px-3 py-2 text-left transition-all duration-200 ${
+                                      isSelected
+                                        ? 'border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
+                                        : 'border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
+                                    } disabled:cursor-not-allowed disabled:opacity-50`}
+                                  >
+                                    <div className="font-display text-[11px] uppercase tracking-[0.18em]">
+                                      {updateChannelLabel(channel)}
+                                    </div>
+                                    <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
+                                      {t(`settings.updateChannel.${channel}Tag`)}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
+                              {t(`settings.updateChannel.${updateChannel}Help`)}
+                            </HUDMicro>
+                            {updateChannel === 'beta' && (
+                              <p className="border-l-2 border-accent-yellow/70 pl-3 font-mono text-[10px] leading-relaxed text-accent-yellow/80">
+                                {t('settings.updateChannel.betaWarning')}
+                              </p>
+                            )}
+                        </div>
+                    </HUDPanel>
+                </section>
+
                 {/* Feedback Section */}
                 <section>
-                    <HUDSectionTitle number="05">{t('settings.sections.diagnostics')}</HUDSectionTitle>
+                    <HUDSectionTitle number="06">{t('settings.sections.diagnostics')}</HUDSectionTitle>
                     <div className="flex gap-4 items-center p-4 border border-white/5 bg-black/15 rounded-sm">
                         <div className="flex-1">
                              <HUDLabel className="block mb-1">{t('settings.feedback.label')}</HUDLabel>

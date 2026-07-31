@@ -2,8 +2,6 @@ const crypto = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
 
-const DEFAULT_MINIMUM_SYSTEM_VERSION = '21.0.0'
-
 function parseArgs(argv) {
   const args = {}
   for (let index = 0; index < argv.length; index += 2) {
@@ -50,15 +48,18 @@ function indentBlock(value) {
 
 async function buildMacUpdateManifest({
   assetsDir,
-  minimumSystemVersion = DEFAULT_MINIMUM_SYSTEM_VERSION,
+  minimumSystemVersion,
   releaseDate,
   releaseNotes,
   version,
 }) {
-  if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version || '')) {
+  if (!/^\d+\.\d+\.\d+(?:-beta\.\d+)?$/.test(version || '')) {
     throw new Error(`Invalid release version: ${version || ''}`)
   }
-  if (!/^\d+(?:\.\d+){1,2}$/.test(minimumSystemVersion || '')) {
+  if (
+    minimumSystemVersion !== undefined
+    && !/^\d+(?:\.\d+){1,2}$/.test(minimumSystemVersion)
+  ) {
     throw new Error(`Invalid minimum system version: ${minimumSystemVersion || ''}`)
   }
   if (!releaseNotes?.trim()) {
@@ -95,18 +96,23 @@ async function buildMacUpdateManifest({
     ].join('\n'))
     .join('\n')
 
-  return [
+  const lines = [
     `version: ${version}`,
     'files:',
     fileEntries,
     `path: ${x64Asset.name}`,
     `sha512: ${x64Asset.sha512}`,
-    `minimumSystemVersion: ${minimumSystemVersion}`,
+  ]
+  if (minimumSystemVersion) {
+    lines.push(`minimumSystemVersion: ${minimumSystemVersion}`)
+  }
+  lines.push(
     'releaseNotes: |',
     indentBlock(releaseNotes),
     `releaseDate: '${new Date(normalizedDate).toISOString()}'`,
     '',
-  ].join('\n')
+  )
+  return lines.join('\n')
 }
 
 async function main() {

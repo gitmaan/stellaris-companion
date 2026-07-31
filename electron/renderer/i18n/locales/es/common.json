@@ -259,12 +259,14 @@
       "intelligence": "ENLACE DE INTELIGENCIA",
       "data": "INGESTA DE DATOS",
       "communications": "RELE DE COMUNICACIONES",
+      "updates": "ACTUALIZACIONES DE SOFTWARE",
       "diagnostics": "DIAGNOSTICO"
     },
     "panels": {
       "geminiAccess": "ACCESO AL MODELO GEMINI",
       "saveSource": "FUENTE DE GUARDADO",
-      "discordLink": "ENLACE DISCORD"
+      "discordLink": "ENLACE DISCORD",
+      "updateChannel": "CANAL DE ACTUALIZACION"
     },
     "api": {
       "label": "CLAVE API",
@@ -273,7 +275,8 @@
       "status": "ESTADO:",
       "active": "ACTIVO",
       "missing": "FALTA",
-      "generateKey": "GENERAR CLAVE >"
+      "generateKey": "GENERAR CLAVE >",
+      "storageWarning": "El almacenamiento protegido de credenciales no esta disponible. Las claves API solo estaran disponibles hasta que cierres la aplicacion y la publicacion de la Cronica estara desactivada."
     },
     "chronicleRefresh": {
       "label": "ACTUALIZACION DE CRONICA",
@@ -315,6 +318,19 @@
     "feedback": {
       "label": "INFORMES DEL SISTEMA",
       "body": "Enviar registros detallados para analisis."
+    },
+    "updateChannel": {
+      "label": "CANAL DE VERSION",
+      "stable": "Estable",
+      "beta": "Beta",
+      "stableTag": "RECOMENDADO",
+      "betaTag": "ACCESO ANTICIPADO",
+      "stableHelp": "Versiones probadas para jugar cada dia.",
+      "betaHelp": "Prueba proximas funciones y correcciones antes de su version estable.",
+      "betaWarning": "Las versiones beta pueden ser menos fiables. El regreso a Estable se aplicara cuando haya una version estable mas reciente.",
+      "aria": "Usar el canal de actualizacion {{channel}}",
+      "toastError": "No se pudo cambiar el canal de actualizacion. Intentalo de nuevo.",
+      "toastSuccess": "Canal de actualizacion establecido en {{channel}}."
     },
     "actionBar": {
       "unsaved": "CAMBIOS SIN GUARDAR",

@@ -259,12 +259,14 @@
       "intelligence": "AUFKLAERUNGS-UPLINK",
       "data": "DATENAUFNAHME",
       "communications": "KOMMUNIKATIONSRELAIS",
+      "updates": "SOFTWARE-UPDATES",
       "diagnostics": "DIAGNOSE"
     },
     "panels": {
       "geminiAccess": "GEMINI-MODELLZUGRIFF",
       "saveSource": "SPEICHERDATEI-QUELLE",
-      "discordLink": "DISCORD-VERBINDUNG"
+      "discordLink": "DISCORD-VERBINDUNG",
+      "updateChannel": "UPDATE-KANAL"
     },
     "api": {
       "label": "API-SCHLUESSEL",
@@ -273,7 +275,8 @@
       "status": "STATUS:",
       "active": "AKTIV",
       "missing": "FEHLT",
-      "generateKey": "SCHLUESSEL ERSTELLEN >"
+      "generateKey": "SCHLUESSEL ERSTELLEN >",
+      "storageWarning": "Geschuetzte Anmeldedatenspeicherung ist nicht verfuegbar. API-Schluessel bleiben nur bis zum Schliessen der App verfuegbar; das Veroeffentlichen der Chronik ist deaktiviert."
     },
     "chronicleRefresh": {
       "label": "CHRONIK-AKTUALISIERUNG",
@@ -315,6 +318,19 @@
     "feedback": {
       "label": "SYSTEMBERICHTE",
       "body": "Detaillierte Logs zur Analyse senden."
+    },
+    "updateChannel": {
+      "label": "RELEASE-KANAL",
+      "stable": "Stabil",
+      "beta": "Beta",
+      "stableTag": "EMPFOHLEN",
+      "betaTag": "VORABZUGANG",
+      "stableHelp": "Getestete Versionen fuer das taegliche Spiel.",
+      "betaHelp": "Kommende Funktionen und Korrekturen vor der stabilen Version testen.",
+      "betaWarning": "Beta-Versionen koennen weniger zuverlaessig sein. Die Rueckkehr zu Stabil erfolgt, sobald eine neuere stabile Version verfuegbar ist.",
+      "aria": "Update-Kanal {{channel}} verwenden",
+      "toastError": "Update-Kanal konnte nicht geaendert werden. Bitte erneut versuchen.",
+      "toastSuccess": "Update-Kanal auf {{channel}} gesetzt."
     },
     "actionBar": {
       "unsaved": "UNGESPEICHERTE AENDERUNGEN",

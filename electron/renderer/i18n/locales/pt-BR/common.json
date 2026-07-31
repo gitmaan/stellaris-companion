@@ -259,12 +259,14 @@
       "intelligence": "UPLINK DE INTELIGENCIA",
       "data": "INGESTAO DE DADOS",
       "communications": "RELE DE COMUNICACOES",
+      "updates": "ATUALIZACOES DE SOFTWARE",
       "diagnostics": "DIAGNOSTICO"
     },
     "panels": {
       "geminiAccess": "ACESSO AO MODELO GEMINI",
       "saveSource": "FONTE DO SAVE",
-      "discordLink": "LINK DO DISCORD"
+      "discordLink": "LINK DO DISCORD",
+      "updateChannel": "CANAL DE ATUALIZACAO"
     },
     "api": {
       "label": "CHAVE API",
@@ -273,7 +275,8 @@
       "status": "STATUS:",
       "active": "ATIVO",
       "missing": "AUSENTE",
-      "generateKey": "GERAR CHAVE >"
+      "generateKey": "GERAR CHAVE >",
+      "storageWarning": "O armazenamento protegido de credenciais nao esta disponivel. As chaves de API ficam disponiveis apenas ate o app ser fechado, e a publicacao da Cronica fica desativada."
     },
     "chronicleRefresh": {
       "label": "ATUALIZACAO DA CRONICA",
@@ -315,6 +318,19 @@
     "feedback": {
       "label": "RELATORIOS DO SISTEMA",
       "body": "Enviar logs detalhados para analise."
+    },
+    "updateChannel": {
+      "label": "CANAL DE VERSAO",
+      "stable": "Estavel",
+      "beta": "Beta",
+      "stableTag": "RECOMENDADO",
+      "betaTag": "ACESSO ANTECIPADO",
+      "stableHelp": "Versoes testadas para jogar no dia a dia.",
+      "betaHelp": "Experimente proximos recursos e correcoes antes da versao estavel.",
+      "betaWarning": "Versoes beta podem ser menos confiaveis. A volta ao canal Estavel ocorrera quando uma versao estavel mais recente estiver disponivel.",
+      "aria": "Usar o canal de atualizacao {{channel}}",
+      "toastError": "Nao foi possivel alterar o canal de atualizacao. Tente novamente.",
+      "toastSuccess": "Canal de atualizacao definido como {{channel}}."
     },
     "actionBar": {
       "unsaved": "ALTERACOES NAO SALVAS",

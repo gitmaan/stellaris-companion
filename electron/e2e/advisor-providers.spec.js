@@ -141,13 +141,18 @@ test('configures a compatible Advisor provider and discovers its models', async 
     await reloadedPage.getByRole('button', { name: /Config/i }).click()
 
     await expect(reloadedPage.getByLabel('AI PROVIDER')).toHaveValue('custom')
-    await expect(reloadedPage.getByLabel('API KEY', { exact: true })).toHaveValue('****...****')
+    const sessionOnlyStorage = await reloadedPage
+      .getByText(/API keys work for this session but are not saved/i)
+      .isVisible()
+    await expect(reloadedPage.getByLabel('API KEY', { exact: true })).toHaveValue(
+      sessionOnlyStorage ? '' : '****...****',
+    )
     await reloadedPage.getByLabel('AI MODEL').fill('local/after-reload')
     await reloadedPage.getByRole('button', { name: 'APPLY CHANGES' }).click()
     await expect(reloadedPage.getByText(/CONFIGURATION SAVED/)).toBeVisible()
     await reloadedPage.getByRole('button', { name: 'CHECK CONNECTION' }).click()
     await expect(reloadedPage.getByText('CONNECTED', { exact: true })).toBeVisible()
-    expect(provider.getLastAuthorization()).toBe('Bearer tiny-key')
+    expect(provider.getLastAuthorization()).toBe(sessionOnlyStorage ? '' : 'Bearer tiny-key')
   } finally {
     await app?.close()
     await provider.stop()

@@ -21,8 +21,15 @@ const { autoUpdater } = require('electron-updater')
 const { createBackendClient } = require('./main/backendClient')
 const { createAnnouncementsService } = require('./main/announcements')
 const { createHealthCheckManager } = require('./main/healthcheck')
+const { getLinuxSaveDirCandidates } = require('./main/savePaths')
 const { createSecretStorage } = require('./main/secureStorage')
-const { setupAutoUpdater, registerUpdateIpcHandlers, wireAutoUpdaterEvents } = require('./main/updates')
+const {
+  applyUpdateChannel,
+  normalizeUpdateChannel,
+  registerUpdateIpcHandlers,
+  setupAutoUpdater,
+  wireAutoUpdaterEvents,
+} = require('./main/updates')
 const { registerBackendIpcHandlers } = require('./main/ipc/backend')
 const { registerSettingsIpcHandlers } = require('./main/ipc/settings')
 const { registerExportIpcHandlers } = require('./main/ipc/export')
@@ -69,9 +76,6 @@ if (E2E_USER_DATA_DIR) {
     console.error('Failed to configure E2E userData path:', e)
   }
 }
-
-// Configure electron-updater
-setupAutoUpdater({ autoUpdater, app, isDev: IS_DEV })
 
 // Global process error handlers (ELEC-xxx: diagnostics)
 // Prevent silent failures in production builds.
@@ -805,6 +809,17 @@ function getResolvedLanguageSetting() {
   return resolveLanguage(getLanguageSetting())
 }
 
+function getUpdateChannelSetting() {
+  return normalizeUpdateChannel(store.get('updateChannel'), app.getVersion())
+}
+
+setupAutoUpdater({
+  autoUpdater,
+  app,
+  isDev: IS_DEV,
+  updateChannel: getUpdateChannelSetting(),
+})
+
 function applyUiScaleToWindow(targetWindow = mainWindow) {
   if (!targetWindow || targetWindow.isDestroyed()) return
   targetWindow.webContents.setZoomFactor(getUiScaleSetting())
@@ -849,6 +864,7 @@ function getSettings() {
   )
   const advisorModel = String(store.get('advisorModel', '') || '')
   const advisorBaseUrl = String(store.get('advisorBaseUrl', '') || '')
+  const updateChannel = getUpdateChannelSetting()
 
   return {
     googleApiKey: maskSecret(googleApiKey),
@@ -876,6 +892,7 @@ function getSettings() {
     modelRoutingMode,
     language,
     resolvedLanguage,
+    updateChannel,
   }
 }
 
@@ -910,6 +927,7 @@ function getSettingsWithSecrets() {
   )
   const advisorModel = String(store.get('advisorModel', '') || '')
   const advisorBaseUrl = String(store.get('advisorBaseUrl', '') || '')
+  const updateChannel = getUpdateChannelSetting()
 
   return {
     googleApiKey,
@@ -932,6 +950,7 @@ function getSettingsWithSecrets() {
     modelRoutingMode,
     language,
     resolvedLanguage,
+    updateChannel,
   }
 }
 
@@ -1013,6 +1032,18 @@ function saveSettings(settings) {
     store.set('language', normalizeLanguage(settings.language))
   }
 
+  if (settings.updateChannel !== undefined) {
+    const updateChannel = normalizeUpdateChannel(settings.updateChannel, app.getVersion())
+    store.set('updateChannel', updateChannel)
+    applyUpdateChannel({
+      autoUpdater,
+      app,
+      isDev: IS_DEV,
+      updateChannel,
+      checkNow: true,
+    })
+  }
+
   return { success: true }
 }
 
@@ -1023,21 +1054,7 @@ function getSaveDirCandidates() {
   const homedir = os.homedir()
   const candidates = []
   if (process.platform === 'linux') {
-    const localShare = path.join(homedir, '.local', 'share', 'Paradox Interactive')
-    const flatpakShare = path.join(
-      homedir,
-      '.var',
-      'app',
-      'com.valvesoftware.Steam',
-      '.local',
-      'share',
-      'Paradox Interactive',
-    )
-    candidates.push(
-      path.join(localShare, 'Stellaris', 'save games'),
-      path.join(localShare, 'Stellaris Plaza', 'save games'),
-      path.join(flatpakShare, 'Stellaris', 'save games'),
-    )
+    candidates.push(...getLinuxSaveDirCandidates(homedir))
   } else {
     let documentsPath
     try {
