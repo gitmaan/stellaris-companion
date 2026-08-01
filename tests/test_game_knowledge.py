@@ -26,6 +26,18 @@ def test_current_stable_uses_exact_compiled_snapshot():
     assert "3:1 rule" not in (knowledge.content or "")
 
 
+def test_current_snapshot_is_self_sufficient_for_foundational_4x_mechanics():
+    knowledge = load_game_knowledge("Pegasus v4.4.6")
+    content = knowledge.content or ""
+
+    assert "Critical 4.x Baseline" in content
+    assert "Every eligible Pop Group on a planet grows simultaneously" in content
+    assert "There is no current starbase collection-range" in content
+    assert "Heavy Industry" in content
+    assert "Focus progression unlocks permanent research options" in content
+    assert "Sub-Species Integration" in content
+
+
 def test_new_hotfix_uses_honestly_labeled_partial_coverage():
     prompt = build_game_knowledge_prompt("Pegasus v4.4.7", purpose="advisor")
 

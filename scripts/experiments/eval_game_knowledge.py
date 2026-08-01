@@ -34,7 +34,10 @@ from backend.core.advisor_providers import (  # noqa: E402
     create_advisor_generator,
 )
 from backend.core.chronicle import ChronicleGenerator  # noqa: E402
-from stellaris_companion.game_knowledge import build_game_knowledge_prompt  # noqa: E402
+from stellaris_companion.game_knowledge import (  # noqa: E402
+    DEFAULT_SNAPSHOTS_DIR,
+    build_game_knowledge_prompt,
+)
 
 DEFAULT_OPENROUTER_MODELS = [
     "deepseek/deepseek-v4-flash",
@@ -193,6 +196,110 @@ def build_cases() -> list[EvalCase]:
                 "Does not add a demand, motive, battle, or diplomatic outcome.",
             ],
         ),
+        EvalCase(
+            name="cold_population_growth",
+            purpose="advisor",
+            prompt=(
+                "Campaign evidence: unmodded Pegasus v4.4.6. A planet has several organic "
+                "species. The player remembers that only one selected species can grow each "
+                "month and that an underrepresented species gets a special growth bonus. "
+                "Explain the current baseline without assuming species-specific modifiers."
+            ),
+            review_criteria=[
+                "Corrects the old premise: Pop Groups grow simultaneously each month.",
+                "Explains that Pop Groups are separated by species and other attributes.",
+                "Does not grant underrepresented species a special baseline growth bonus.",
+                "May explain that fractional monthly growth becomes a chance to add one pop.",
+            ],
+        ),
+        EvalCase(
+            name="cold_planet_economy",
+            purpose="advisor",
+            prompt=(
+                "Campaign evidence: unmodded Pegasus v4.4.6. The player wants more Alloys and "
+                "plans to fill every building slot with Alloy Foundries because each copy adds "
+                "Metallurgist jobs. Is that a complete scaling plan? Explain the current roles "
+                "of district development, Heavy Industry specialization, and Foundry buildings."
+            ),
+            review_criteria=[
+                "Uses developed City Districts and Heavy Industry or Foundry specialization as "
+                "the main scalable source of Metallurgist capacity.",
+                "Explains that district development supplies jobs and housing.",
+                "Correctly allows Alloy Foundry buildings to add fixed Metallurgist jobs rather "
+                "than claiming they only modify district jobs.",
+                "Considers available Workforce, inputs, upkeep, and building-slot opportunity "
+                "cost before recommending that every slot be used.",
+                "Does not describe the pre-4 one-pop-per-job planetary economy as current.",
+            ],
+        ),
+        EvalCase(
+            name="cold_trade_system",
+            purpose="advisor",
+            prompt=(
+                "Campaign evidence: unmodded Pegasus v4.4.6. The player is drawing starbase "
+                "collection ranges and patrol routes to carry Trade Value to the capital while "
+                "suppressing piracy. Is that still the right system? Explain the current flow "
+                "from planetary Trade through logistics and Trade Policy."
+            ),
+            review_criteria=[
+                "Corrects the premise: the old starbase Trade Route and piracy-patrol system "
+                "was removed and Trade is collected automatically.",
+                "Treats Trade as a standard advanced resource rather than the old Trade Value "
+                "routing abstraction.",
+                "Explains that planetary or logistics costs consume Trade and Trade Policy "
+                "allocates monthly production between retained Trade and other resources.",
+            ],
+        ),
+        EvalCase(
+            name="cold_empire_focus",
+            purpose="advisor",
+            prompt=(
+                "Campaign evidence: unmodded Pegasus v4.4.6 at game start. The player thinks "
+                "technology planning still consists only of waiting for random research cards. "
+                "Explain how Empire Focus and its progression affect strategic planning and "
+                "research options without claiming that normal random research disappeared."
+            ),
+            review_criteria=[
+                "Identifies Empire Focus and its Core, Conquest, Exploration, and Development "
+                "tasks or progression.",
+                "Explains that task progression can unlock permanent research options or other "
+                "category advances.",
+                "Does not claim that ordinary weighted or random research choices disappeared.",
+            ],
+        ),
+        EvalCase(
+            name="cold_species_templates",
+            purpose="advisor",
+            prompt=(
+                "Campaign evidence: unmodded Pegasus v4.4.6 with several templates of one "
+                "species. The player wants those sub-species to converge on one design and "
+                "assumes they must repeatedly apply a special modification project. Explain the "
+                "current Default Template and Sub-Species Integration option."
+            ),
+            review_criteria=[
+                "Explains that one species template can be selected as the Default Template.",
+                "Explains that templates set to Sub-Species Integration are altered toward the "
+                "default automatically over time.",
+                "Does not claim that integration is mandatory for every sub-species.",
+            ],
+        ),
+        EvalCase(
+            name="cold_colony_establishment",
+            purpose="advisor",
+            prompt=(
+                "Campaign evidence: unmodded Pegasus v4.4.6 colony at 40/100 establishment "
+                "progress, with no modifiers shown. The player expects it to behave like a "
+                "fully established pre-4 colony already. Explain what the number means, the "
+                "baseline time remaining, and what not to assume before establishment."
+            ),
+            review_criteria=[
+                "Recognizes 100 population as the establishment threshold.",
+                "At the base rate of 3 per month, estimates 20 months from 40 to 100.",
+                "Explains that a colony under establishment does not yet have normal population "
+                "growth or production.",
+                "Allows for migration, modifiers, DLC, or mods to change the observed timing.",
+            ],
+        ),
     ]
 
 
@@ -223,6 +330,7 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
         raise RuntimeError(f"{config.display_name} is not configured")
 
     started = time.monotonic()
+    snapshots_dir = args.snapshots_dir or DEFAULT_SNAPSHOTS_DIR
     try:
         if case.structured:
             chronicle = ChronicleGenerator(
@@ -237,14 +345,16 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
                 max_output_tokens=1200,
                 purpose_label=f"Knowledge evaluation: {case.name}",
                 game_knowledge_context=build_game_knowledge_prompt(
-                    "Pegasus v4.4.6", purpose="chronicle"
+                    "Pegasus v4.4.6",
+                    purpose="chronicle",
+                    snapshots_dir=snapshots_dir,
                 ),
             )
         else:
             system_prompt = (
                 "Answer as a strategic advisor. Distinguish campaign observations from "
                 "mechanics.\n\n"
-                f"{build_game_knowledge_prompt('Pegasus v4.4.6', purpose='advisor')}"
+                f"{build_game_knowledge_prompt('Pegasus v4.4.6', purpose='advisor', snapshots_dir=snapshots_dir)}"
             )
             response = generator.generate(
                 system_prompt=system_prompt,
@@ -288,6 +398,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--models", nargs="+", help="Exact model IDs to test")
     parser.add_argument("--base-url", help="OpenAI-compatible API base URL")
+    parser.add_argument(
+        "--snapshots-dir",
+        type=Path,
+        help="Override the versioned snapshot directory for controlled comparisons",
+    )
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--case", action="append", dest="case_names")
     parser.add_argument(

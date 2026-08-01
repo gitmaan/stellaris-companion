@@ -22,6 +22,8 @@ https://store.steampowered.com/news/posts/?appids=281990
 * Name snapshots with the full verified version, such as `snapshots/4.4.6.md`.
 * Describe current behavior, without upgrade history or obsolete values.
 * Preserve topic headings so models can navigate the pack reliably.
+* Keep foundational mechanics from earlier major-version releases when they remain current. A
+  snapshot must be usable by a model whose built-in knowledge predates that major version.
 * Avoid subjective benchmarks such as a "typical" empire size unless an authoritative source
   defines them and the relevant galaxy settings are available.
 * State applicability and evidence limits alongside mechanics that could otherwise create false
@@ -30,4 +32,5 @@ https://store.steampowered.com/news/posts/?appids=281990
 
 Before shipping a snapshot, verify hard numerical claims against the exact installed build, run
 `tests/test_game_knowledge.py`, and manually review the benchmark responses recorded by
-`scripts/experiments/eval_game_knowledge.py`.
+`scripts/experiments/eval_game_knowledge.py`. Include stale-premise cases that exercise the major
+systems a model with an older knowledge cutoff is most likely to answer incorrectly.
