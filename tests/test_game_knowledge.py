@@ -32,6 +32,7 @@ def test_current_snapshot_is_self_sufficient_for_foundational_4x_mechanics():
 
     assert "Critical 4.x Baseline" in content
     assert "Every eligible Pop Group on a planet grows simultaneously" in content
+    assert "Machine and Organic Assembly can occur simultaneously" in content
     assert "There is no current starbase collection-range" in content
     assert "Heavy Industry" in content
     assert "Focus progression unlocks permanent research options" in content

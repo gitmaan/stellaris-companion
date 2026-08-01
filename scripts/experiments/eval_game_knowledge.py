@@ -202,14 +202,17 @@ def build_cases() -> list[EvalCase]:
             prompt=(
                 "Campaign evidence: unmodded Pegasus v4.4.6. A planet has several organic "
                 "species. The player remembers that only one selected species can grow each "
-                "month and that an underrepresented species gets a special growth bonus. "
-                "Explain the current baseline without assuming species-specific modifiers."
+                "month, that an underrepresented species gets a special growth bonus, and that "
+                "mechanical assembly blocks organic growth or assembly. Explain the current "
+                "baseline without assuming species-specific modifiers."
             ),
             review_criteria=[
                 "Corrects the old premise: Pop Groups grow simultaneously each month.",
                 "Explains that Pop Groups are separated by species and other attributes.",
                 "Does not grant underrepresented species a special baseline growth bonus.",
                 "May explain that fractional monthly growth becomes a chance to add one pop.",
+                "Explains that Machine and Organic Assembly can occur simultaneously rather "
+                "than treating them as competing for one assembly slot.",
             ],
         ),
         EvalCase(
