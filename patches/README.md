@@ -1,36 +1,42 @@
 # Model Game Knowledge
 
-The model receives a curated current-state mechanics snapshot for an exactly supported
-Stellaris version. These files are a factual compatibility layer, not release notes and not a
-replacement for save evidence.
+Stellaris Companion gives every supported model a curated mechanics snapshot for the version in
+the player's save. This provides Gemini, OpenRouter, Ollama, LM Studio, and custom providers with
+the same factual baseline even when a model's training cutoff predates the game release.
 
-## Source Order
+## How It Works
 
-1. Final Paradox release notes for the stable game build.
-2. Shipped unmodded game data from that exact build for numerical rules.
-3. Focused in-app extraction fixtures for campaign-state semantics.
-4. Dev diaries only when final notes and shipped data do not define the behavior.
+1. The app reads the Stellaris version from the save.
+2. The shared resolver selects an exact snapshot or the newest compatible snapshot and overlays.
+3. The context is added to both Advisor and Chronicle prompts alongside extracted campaign facts.
+4. Unknown newer release lines do not receive older mechanics presented as current.
 
-Do not promote open-beta mechanics into a stable snapshot. Keep beta knowledge in a separately
-versioned snapshot only when the app explicitly supports that beta build.
+Snapshots describe current behavior rather than patch history. Campaign evidence remains the
+authority for what happened in a particular save, and modded mechanics may differ from the
+unmodded baseline documented here.
 
-Official announcement index:
-https://store.steampowered.com/news/posts/?appids=281990
+## Why Snapshots
 
-## Snapshot Rules
+Models of any age can reproduce obsolete Stellaris systems because older information is common in
+their training data. A self-contained snapshot supplies the current system from first principles
+instead of assuming that the model already understands every earlier redesign.
 
-* Name snapshots with the full verified version, such as `snapshots/4.4.6.md`.
-* Describe current behavior, without upgrade history or obsolete values.
-* Preserve topic headings so models can navigate the pack reliably.
-* Keep foundational mechanics from earlier major-version releases when they remain current. A
-  snapshot must be usable by a model whose built-in knowledge predates that major version.
-* Avoid subjective benchmarks such as a "typical" empire size unless an authoritative source
-  defines them and the relevant galaxy settings are available.
-* State applicability and evidence limits alongside mechanics that could otherwise create false
-  campaign claims.
-* Prefer a fresh stable snapshot over indefinitely accumulating release overlays.
+In a controlled test of six deliberately stale premises across five model families, the compact
+patch context produced 1 clearly correct response from 29 usable answers. The self-contained
+4.4.6 snapshot produced 30 accurate or acceptable answers from 30 responses. Results were judged
+by a maintainer for substantive correctness, allowing normal variation in wording.
 
-Before shipping a snapshot, verify hard numerical claims against the exact installed build, run
-`tests/test_game_knowledge.py`, and manually review the benchmark responses recorded by
-`scripts/experiments/eval_game_knowledge.py`. Include stale-premise cases that exercise the major
-systems a model with an older knowledge cutoff is most likely to answer incorrectly.
+## Maintaining Snapshots
+
+- Use final Paradox release notes first, followed by shipped unmodded game data for numerical rules.
+- Keep the current stable snapshot self-contained, including foundational mechanics that remain true.
+- Add small overlays for hotfixes, then fold them into a fresh snapshot before history accumulates.
+- Do not add open-beta mechanics to a stable snapshot.
+- Avoid subjective benchmarks unless authoritative sources and relevant game settings support them.
+
+Before shipping, run `tests/test_game_knowledge.py` and record cross-provider responses with
+`scripts/experiments/eval_game_knowledge.py` for human review. Test stale premises that a model
+with an older knowledge cutoff is likely to answer confidently but incorrectly.
+
+Official release announcements are available from the
+[Stellaris Steam news feed](https://store.steampowered.com/news/posts/?appids=281990).
