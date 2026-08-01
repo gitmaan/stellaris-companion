@@ -147,7 +147,11 @@ def test_advisor_prompt_uses_exact_pegasus_patch_overlays(companion, version, in
         assert fact in companion.system_prompt
     for fact in excluded:
         assert fact not in companion.system_prompt
-    assert 'A later fact labeled "Override"' in companion.system_prompt
+    assert (
+        "Supplied save observations and recorded events are authoritative"
+        in companion.system_prompt
+    )
+    assert "Mods can change baseline mechanics" in companion.system_prompt
 
 
 def test_build_game_context_prefers_metadata_missing_dlcs_without_extractor(companion):

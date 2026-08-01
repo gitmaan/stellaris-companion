@@ -39,7 +39,7 @@ def test_load_patch_notes_prefers_snapshot_and_appends_newer_deltas(patch_dirs):
 
     result = personality.load_patch_notes("Cetus v4.3.0", cumulative=True)
 
-    assert result == "compiled-through-4-2\n\ndelta-4-3"
+    assert result == "# snapshot\ncompiled-through-4-2\n\ndelta-4-3"
     assert "legacy-4-0" not in result
     assert "legacy-4-1" not in result
     assert "legacy-4-2" not in result
@@ -125,3 +125,15 @@ def test_load_patch_notes_non_cumulative_ignores_snapshots(patch_dirs):
     result = personality.load_patch_notes("Cetus v4.3.0", cumulative=False)
 
     assert result == "delta-only"
+
+
+def test_cleaned_knowledge_preserves_headings_and_removes_comments(patch_dirs):
+    patches_dir, _ = patch_dirs
+    _write_patch(
+        patches_dir / "4.4.md",
+        "# Current mechanics\n<!-- maintainer note -->\n## Economy\n* Trade is currency.",
+    )
+
+    result = personality.load_patch_notes("Pegasus v4.4", cumulative=False)
+
+    assert result == "# Current mechanics\n\n## Economy\n* Trade is currency."

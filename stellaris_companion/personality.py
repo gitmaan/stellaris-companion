@@ -9,85 +9,17 @@ Stellaris knowledge drive personality inference. Only address style
 requires explicit mapping. Includes version/DLC-aware game context.
 """
 
-import re
-from pathlib import Path
-
-from .paths import get_repo_root
-
-# Directory containing patch notes (dev repo root, with a package-local fallback)
-_repo_root = get_repo_root(Path(__file__))
-_patches_repo = _repo_root / "patches"
-PATCHES_DIR = (
-    _patches_repo if _patches_repo.exists() else Path(__file__).resolve().parent / "patches"
+from .game_knowledge import (
+    DEFAULT_PATCHES_DIR,
+    DEFAULT_SNAPSHOTS_DIR,
+    build_game_knowledge_prompt,
+    list_versioned_markdown,
+    load_game_knowledge,
 )
-PATCH_SNAPSHOTS_DIR = PATCHES_DIR / "snapshots"
 
-_PATCH_VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")
-
-
-def _parse_patch_version(version: str) -> tuple[int, int, int] | None:
-    """Parse a major.minor[.patch] version into a sortable tuple."""
-    match = re.fullmatch(r"(\d+)\.(\d+)(?:\.(\d+))?", str(version or "").strip())
-    if not match:
-        return None
-    return int(match.group(1)), int(match.group(2)), int(match.group(3) or 0)
-
-
-def _extract_patch_version(version: str) -> str | None:
-    """Extract the most specific supported version from a game version string."""
-    match = _PATCH_VERSION_PATTERN.search(str(version or ""))
-    if not match:
-        return None
-    parts = [match.group(1), match.group(2)]
-    if match.group(3) is not None:
-        parts.append(match.group(3))
-    return ".".join(parts)
-
-
-def _extract_major_minor(version: str) -> str | None:
-    """Extract the major.minor portion from a full game version string."""
-    extracted = _extract_patch_version(version)
-    parsed = _parse_patch_version(extracted) if extracted else None
-    if parsed is None:
-        return None
-    return f"{parsed[0]}.{parsed[1]}"
-
-
-def _clean_patch_content(content: str) -> str:
-    """Strip human-only comments and headers before prompt injection."""
-    lines = content.split("\n")
-    content_lines = [
-        line for line in lines if not line.startswith("#") and not line.startswith("<!--")
-    ]
-    return "\n".join(content_lines).strip()
-
-
-def _load_patch_file(version: str, *, directory: Path) -> str | None:
-    """Load and clean a versioned patch file from a directory."""
-    patch_file = directory / f"{version}.md"
-    if not patch_file.exists():
-        return None
-    try:
-        return _clean_patch_content(patch_file.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-
-
-def _list_versioned_markdown(directory: Path) -> list[str]:
-    """List available versioned markdown files sorted numerically."""
-    if not directory.exists():
-        return []
-
-    versions: list[tuple[tuple[int, int, int], str]] = []
-    for file_path in directory.glob("*.md"):
-        version = file_path.stem
-        parsed = _parse_patch_version(version)
-        if parsed is None:
-            continue
-        versions.append((parsed, version))
-
-    versions.sort(key=lambda item: item[0])
-    return [version for _, version in versions]
+# Public aliases retained for callers and tests that provide alternate knowledge dirs.
+PATCHES_DIR = DEFAULT_PATCHES_DIR
+PATCH_SNAPSHOTS_DIR = DEFAULT_SNAPSHOTS_DIR
 
 
 def load_patch_notes(
@@ -107,62 +39,14 @@ def load_patch_notes(
     Returns:
         Patch notes content, or None if not found
     """
-    if not version:
-        return None
-
-    # Preserve the patch component so material hotfix overlays apply only to
-    # saves created with that patch or newer (e.g. 4.4.5, but not 4.4.4).
-    target_version = _extract_patch_version(version)
-    target_key = _parse_patch_version(target_version) if target_version else None
-    if target_key is None or target_version is None:
-        return None
-
-    if not cumulative:
-        current_line = []
-        for patch_ver in get_available_patches():
-            patch_key = _parse_patch_version(patch_ver)
-            if patch_key is None:
-                continue
-            if patch_key[:2] == target_key[:2] and patch_key <= target_key:
-                content = _load_patch_file(patch_ver, directory=PATCHES_DIR)
-                if content:
-                    current_line.append(content)
-        return "\n\n".join(current_line) if current_line else None
-
-    # Load all patches from 4.0 up to target version. Prefer a compiled snapshot
-    # when available so the prompt can stay cumulative without duplicating old text.
-    all_patches = get_available_patches()
-    combined = []
-    snapshot_key: tuple[int, int, int] | None = None
-
-    if prefer_snapshot:
-        snapshot_versions = get_available_patch_snapshots()
-        eligible_snapshots = []
-        for snapshot_version in snapshot_versions:
-            parsed = _parse_patch_version(snapshot_version)
-            if parsed is not None and parsed <= target_key:
-                eligible_snapshots.append((parsed, snapshot_version))
-
-        if eligible_snapshots:
-            snapshot_key, snapshot_version = eligible_snapshots[-1]
-            snapshot_content = _load_patch_file(snapshot_version, directory=PATCH_SNAPSHOTS_DIR)
-            if snapshot_content:
-                combined.append(snapshot_content)
-            else:
-                snapshot_key = None
-
-    for patch_ver in all_patches:
-        patch_key = _parse_patch_version(patch_ver)
-        if patch_key is None:
-            continue
-        if snapshot_key is not None and patch_key <= snapshot_key:
-            continue
-        if patch_key <= target_key:
-            content = _load_patch_file(patch_ver, directory=PATCHES_DIR)
-            if content:
-                combined.append(content)
-
-    return "\n\n".join(combined) if combined else None
+    knowledge = load_game_knowledge(
+        version,
+        cumulative=cumulative,
+        prefer_snapshot=prefer_snapshot,
+        patches_dir=PATCHES_DIR,
+        snapshots_dir=PATCH_SNAPSHOTS_DIR,
+    )
+    return knowledge.content
 
 
 def get_available_patches() -> list[str]:
@@ -171,12 +55,12 @@ def get_available_patches() -> list[str]:
     Returns:
         List of version strings (e.g., ['4.3', '4.4', '4.4.5'])
     """
-    return _list_versioned_markdown(PATCHES_DIR)
+    return list_versioned_markdown(PATCHES_DIR)
 
 
 def get_available_patch_snapshots() -> list[str]:
     """Get available compiled cumulative snapshots by version."""
-    return _list_versioned_markdown(PATCH_SNAPSHOTS_DIR)
+    return list_versioned_markdown(PATCH_SNAPSHOTS_DIR)
 
 
 # ---- DLC feature mapping (inline negative enumeration) ----
@@ -430,8 +314,12 @@ def _build_game_context_block(game_context: dict) -> str:
 
     dlcs_str = ", ".join(dlcs) if dlcs else "None (base game only)"
 
-    # Load patch notes for this version
-    patch_notes = load_patch_notes(version)
+    knowledge_prompt = build_game_knowledge_prompt(
+        version,
+        purpose="advisor",
+        patches_dir=PATCHES_DIR,
+        snapshots_dir=PATCH_SNAPSHOTS_DIR,
+    )
 
     # Build inline missing-DLC enumeration (hypothesis E approach)
     missing_lines = []
@@ -457,17 +345,7 @@ VERSION & DLC AWARENESS:
 - Never mention version numbers to the user.
 - Never mention DLC status unprompted."""
 
-    # Add patch-specific mechanics if available
-    if patch_notes:
-        context += f"""
-
-[GAME MECHANICS - current version facts]
-The following describes how mechanics work in {version}.
-Use these as ground truth for your advice. Do not reference patches, updates, or changes.
-Exact-version overlays are ordered from oldest to newest. A later fact labeled "Override"
-supersedes an earlier fact about the same mechanic.
-
-{patch_notes}"""
+    context += f"\n\n{knowledge_prompt}"
 
     return context
 

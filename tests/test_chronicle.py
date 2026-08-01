@@ -1564,7 +1564,10 @@ class TestChronicleProviderRouting:
         chapter = generator._generate_chapter_content(  # type: ignore[attr-defined]
             chapter_number=1,
             events=[],
-            briefing={"identity": {"empire_name": "Test Empire", "ethics": []}},
+            briefing={
+                "meta": {"version": "Pegasus v4.4.6"},
+                "identity": {"empire_name": "Test Empire", "ethics": []},
+            },
             previous_chapters=[],
             start_date="2200.01.01",
             end_date="2205.01.01",
@@ -1578,6 +1581,9 @@ class TestChronicleProviderRouting:
         assert call.kwargs["response_schema"] is ChapterOutput
         assert call.kwargs["temperature"] == 0.7
         assert "dramatize the voice, but do not invent" in call.kwargs["system_prompt"]
+        assert "Verified mechanics for Pegasus v4.4.6" in call.kwargs["system_prompt"]
+        assert "A normal Anchorage adds 5 Naval Capacity" in call.kwargs["system_prompt"]
+        assert "never as evidence that an event occurred" in call.kwargs["system_prompt"]
         assert "When a reason is" in call.kwargs["user_prompt"]
         assert "not present in the event list, leave it unexplained" in call.kwargs["user_prompt"]
         assert "Events sharing a date establish coexistence" in call.kwargs["user_prompt"]
