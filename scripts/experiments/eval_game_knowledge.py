@@ -17,6 +17,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
+from unittest.mock import MagicMock
 
 from google import genai
 from pydantic import BaseModel, Field
@@ -32,6 +33,7 @@ from backend.core.advisor_providers import (  # noqa: E402
     AdvisorProviderConfig,
     create_advisor_generator,
 )
+from backend.core.chronicle import ChronicleGenerator  # noqa: E402
 from stellaris_companion.game_knowledge import build_game_knowledge_prompt  # noqa: E402
 
 DEFAULT_OPENROUTER_MODELS = [
@@ -220,27 +222,38 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
     if generator is None:
         raise RuntimeError(f"{config.display_name} is not configured")
 
-    role_instruction = (
-        "Answer as a strategic advisor. Distinguish campaign observations from mechanics."
-        if case.purpose == "advisor"
-        else "Write as an in-universe historian. Dramatize wording but never add campaign facts."
-    )
-    system_prompt = (
-        f"{role_instruction}\n\n"
-        f"{build_game_knowledge_prompt('Pegasus v4.4.6', purpose=case.purpose)}"
-    )
     started = time.monotonic()
     try:
-        response = generator.generate(
-            system_prompt=system_prompt,
-            user_prompt=case.prompt,
-            model=model,
-            temperature=0.7,
-            max_output_tokens=1200,
-            purpose=case.purpose,
-            response_schema=ChronicleEvalOutput if case.structured else None,
-            schema_name=f"knowledge_{case.name}",
-        )
+        if case.structured:
+            chronicle = ChronicleGenerator(
+                db=MagicMock(),
+                provider_config=config,
+                provider_generator=generator,
+            )
+            _, response = chronicle._generate_structured_content(  # type: ignore[attr-defined]
+                contents=case.prompt,
+                response_schema=ChronicleEvalOutput,
+                temperature=0.7,
+                max_output_tokens=1200,
+                purpose_label=f"Knowledge evaluation: {case.name}",
+                game_knowledge_context=build_game_knowledge_prompt(
+                    "Pegasus v4.4.6", purpose="chronicle"
+                ),
+            )
+        else:
+            system_prompt = (
+                "Answer as a strategic advisor. Distinguish campaign observations from "
+                "mechanics.\n\n"
+                f"{build_game_knowledge_prompt('Pegasus v4.4.6', purpose='advisor')}"
+            )
+            response = generator.generate(
+                system_prompt=system_prompt,
+                user_prompt=case.prompt,
+                model=model,
+                temperature=0.7,
+                max_output_tokens=1200,
+                purpose="advisor",
+            )
         return EvalResult(
             case=case.name,
             purpose=case.purpose,

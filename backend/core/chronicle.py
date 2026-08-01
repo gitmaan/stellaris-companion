@@ -1077,17 +1077,27 @@ class ChronicleGenerator:
         prompt = contents
 
         for attempt in range(2):
-            result = self._generate_content_with_routing(
-                contents=prompt,
-                config={
-                    "temperature": temperature,
-                    "max_output_tokens": max_output_tokens,
-                    "response_schema": response_schema,
-                    "allow_schema_fallback": attempt == 0,
-                },
-                purpose_label=purpose_label,
-                game_knowledge_context=game_knowledge_context,
-            )
+            try:
+                result = self._generate_content_with_routing(
+                    contents=prompt,
+                    config={
+                        "temperature": temperature,
+                        "max_output_tokens": max_output_tokens,
+                        "response_schema": response_schema,
+                        "allow_schema_fallback": attempt == 0,
+                    },
+                    purpose_label=purpose_label,
+                    game_knowledge_context=game_knowledge_context,
+                )
+            except AdvisorProviderError as exc:
+                if attempt == 0 and exc.code == "PROVIDER_EMPTY_RESPONSE":
+                    logger.warning("%s returned an empty response; retrying once", purpose_label)
+                    prompt = (
+                        f"{contents.rstrip()}\n\n"
+                        "Return only a non-empty JSON object matching the requested schema."
+                    )
+                    continue
+                raise
             try:
                 return _validate_structured_response(result.text, response_schema), result
             except Exception as exc:

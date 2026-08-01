@@ -1505,6 +1505,43 @@ class TestChronicleProviderRouting:
         assert provider.generate.call_args_list[1].kwargs["allow_schema_fallback"] is False
         assert generator._model_routing_response()["provider"] == "custom"  # type: ignore[attr-defined]
 
+    def test_retries_empty_structured_response_once(self, provider_config):
+        provider = MagicMock()
+        provider.config = provider_config
+        provider.generate.side_effect = [
+            AdvisorProviderError(
+                "Provider returned an empty response",
+                code="PROVIDER_EMPTY_RESPONSE",
+            ),
+            AdvisorGenerationResult(
+                text=(
+                    '{"sections":[{"type":"prose","text":"The record endured.","attribution":""}]}'
+                ),
+                model="local-story-model",
+                requested_model="local-story-model",
+                provider="custom",
+            ),
+        ]
+        generator = ChronicleGenerator(
+            db=MagicMock(),
+            provider_config=provider_config,
+            provider_generator=provider,
+        )
+
+        parsed, _ = generator._generate_structured_content(  # type: ignore[attr-defined]
+            contents="Write the current era.",
+            response_schema=CurrentEraOutput,
+            temperature=1.0,
+            max_output_tokens=1024,
+            purpose_label="Chronicle current era",
+        )
+
+        assert parsed.sections[0].text == "The record endured."
+        assert provider.generate.call_count == 2
+        retry = provider.generate.call_args_list[1].kwargs
+        assert "non-empty JSON object" in retry["user_prompt"]
+        assert retry["allow_schema_fallback"] is False
+
     def test_does_not_retry_after_prompt_schema_fallback(self, provider_config):
         provider = MagicMock()
         provider.config = provider_config
