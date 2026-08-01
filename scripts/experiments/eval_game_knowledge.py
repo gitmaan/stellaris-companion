@@ -303,6 +303,62 @@ def build_cases() -> list[EvalCase]:
                 "Allows for migration, modifiers, DLC, or mods to change the observed timing.",
             ],
         ),
+        EvalCase(
+            name="cold_psionic_ascension",
+            purpose="advisor",
+            prompt=(
+                "Campaign evidence: unmodded Pegasus v4.4.6 with Shadows of the Shroud "
+                "active. The empire has begun Psionic Ascension, but has not yet breached "
+                "the Shroud. The player expects the old flow of finishing perks and then "
+                "rolling unrelated random Shroud visits. Explain the current progression "
+                "without claiming a Patron or Covenant has already been selected."
+            ),
+            review_criteria=[
+                "Explains that Psionic Ascension uses an Ascension Situation culminating in "
+                "the first Delve after breaching the Shroud.",
+                "Explains that choices can affect Attunement and later Shroud access.",
+                "Recognizes the Shroud Panel, Accords, and possible Covenants as current systems.",
+                "Does not invent a selected Patron, Accord, Covenant, or Delve outcome.",
+            ],
+        ),
+        EvalCase(
+            name="cold_ongoing_war",
+            purpose="advisor",
+            prompt=(
+                "Campaign evidence: unmodded Pegasus v4.4.6. The player is a secondary "
+                "participant in a war and believes participants can never leave until the "
+                "primary empires settle it. Their last colony has just been occupied. Explain "
+                "the available mechanism and the consequences of remaining fully occupied."
+            ),
+            review_criteria=[
+                "Explains that a non-primary participant can negotiate with the opposing war "
+                "leader to leave through trade terms.",
+                "Notes that acceptance is not guaranteed and leaving creates a truce and "
+                "diplomatic penalty.",
+                "Explains the stacking Hopeless War increase to other War Exhaustion gain.",
+                "Does not apply primary-participant monthly Attrition to this secondary "
+                "participant's entire side without evidence.",
+            ],
+        ),
+        EvalCase(
+            name="cold_stellar_cannon",
+            purpose="advisor",
+            prompt=(
+                "Campaign evidence: unmodded Pegasus v4.4.6 with Nomads active. The player "
+                "has found the Stellar Cannon technology and assumes it is a harmless Dyson "
+                "Sphere variant that needs an Ascension Perk. Explain what it is, where it can "
+                "be built, and the main firing tradeoff without claiming they have built one."
+            ),
+            review_criteria=[
+                "Identifies the Stellar Cannon as an offensive megastructure rather than a "
+                "Dyson Sphere economy upgrade.",
+                "Requires a neutron star or pulsar and no Ascension Perk.",
+                "Explains the roughly 140-day charge and that firing consumes the full Energy "
+                "stockpile.",
+                "May describe tiered ship damage and colony devastation, but does not claim a "
+                "shot or planetary effect occurred.",
+            ],
+        ),
     ]
 
 

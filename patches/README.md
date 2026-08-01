@@ -34,6 +34,8 @@ by a maintainer for substantive correctness, allowing normal variation in wordin
 - Do not add open-beta mechanics to a stable snapshot.
 - Avoid subjective benchmarks unless authoritative sources and relevant game settings support them.
 
+Source and coverage decisions for each stable snapshot live in `patches/audits/`.
+
 Before shipping, run `tests/test_game_knowledge.py` and record cross-provider responses with
 `scripts/experiments/eval_game_knowledge.py` for human review. Test stale premises that a model
 with an older knowledge cutoff is likely to answer confidently but incorrectly.

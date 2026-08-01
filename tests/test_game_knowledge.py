@@ -31,12 +31,29 @@ def test_current_snapshot_is_self_sufficient_for_foundational_4x_mechanics():
     content = knowledge.content or ""
 
     assert "Critical 4.x Baseline" in content
+    assert "Humanoids Species Pack are integrated into the current base game" in content
     assert "Every eligible Pop Group on a planet grows simultaneously" in content
     assert "Machine and Organic Assembly can occur simultaneously" in content
     assert "There is no current starbase collection-range" in content
     assert "Heavy Industry" in content
     assert "Focus progression unlocks permanent research options" in content
     assert "Sub-Species Integration" in content
+
+
+def test_current_snapshot_covers_material_mechanics_from_each_stable_4x_release():
+    knowledge = load_game_knowledge("Pegasus v4.4.6")
+    content = knowledge.content or ""
+
+    assert "logistic pressure cannot reduce growth below 10%" in content
+    assert "Research Restriction policies" in content
+    assert "Psionic Ascension proceeds through an Ascension Situation" in content
+    assert "Gaia Worlds provide +15% Pop Growth" in content
+    assert "one pop-limited Assault Army per 100 pops" in content
+    assert "non-primary participant can negotiate" in content
+    assert "Stellar Cannon is an offensive megastructure" in content
+    assert "Tier III Arkship can equip the Stellar Engine" in content
+    assert "Arkships have inherent 40% habitability" in content
+    assert "4 Energy upkeep per 100 automated Worker" in content
 
 
 def test_new_hotfix_uses_honestly_labeled_partial_coverage():
