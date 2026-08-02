@@ -203,11 +203,15 @@ def build_game_knowledge_prompt(
     )
     purpose_rule = (
         "Use mechanics to explain the recorded world, never as evidence that an event "
-        "occurred. Do not add an action, motive, cause, outcome, or unlocked feature unless "
-        "the supplied campaign evidence supports it."
+        "occurred. Do not add a name, identity, participant, place, action, motive, cause, "
+        "outcome, or unlocked feature unless the supplied campaign evidence supports it. "
+        "Treat 'not recorded' as a limit of the supplied record, not proof that something "
+        "never occurred."
         if purpose == "chronicle"
         else "Use mechanics to interpret the save and form advice, but do not invent current "
-        "resources, unlocks, settings, borders, or events."
+        "resources, unlocks, settings, borders, or events, or extend a listed rule into an "
+        "unstated automatic outcome. Verify arithmetic before using a calculated value to "
+        "label the campaign state."
     )
 
     lines = [

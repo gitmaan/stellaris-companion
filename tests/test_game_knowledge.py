@@ -37,6 +37,7 @@ def test_current_snapshot_is_self_sufficient_for_foundational_4x_mechanics():
     assert "There is no current starbase collection-range" in content
     assert "Heavy Industry" in content
     assert "Focus progression unlocks permanent research options" in content
+    assert "does not by itself change the draw weights" in content
     assert "Sub-Species Integration" in content
 
 
@@ -50,9 +51,14 @@ def test_current_snapshot_covers_material_mechanics_from_each_stable_4x_release(
     assert "Gaia Worlds provide +15% Pop Growth" in content
     assert "one pop-limited Assault Army per 100 pops" in content
     assert "non-primary participant can negotiate" in content
+    assert "+5% after the first month, +10% after the second" in content
+    assert "fully occupied secondary participant does not trigger" in content
     assert "Stellar Cannon is an offensive megastructure" in content
+    assert "10,000 is not the minimum needed to fire" in content
     assert "Tier III Arkship can equip the Stellar Engine" in content
     assert "Arkships have inherent 40% habitability" in content
+    assert "15,000 + 7,500 + 5,000 = 27,500 capacity" in content
+    assert "Critical stage occupies the lowest 5%" in content
     assert "4 Energy upkeep per 100 automated Worker" in content
 
 
@@ -78,5 +84,14 @@ def test_chronicle_prompt_keeps_mechanics_subordinate_to_recorded_evidence():
     prompt = build_game_knowledge_prompt("Pegasus v4.4.6", purpose="chronicle")
 
     assert "never as evidence that an event occurred" in prompt
+    assert "Do not add a name, identity, participant, place, action" in prompt
+    assert "Treat 'not recorded' as a limit of the supplied record" in prompt
     assert "Supplied save observations and recorded events are authoritative" in prompt
     assert "Mods can change baseline mechanics" in prompt
+
+
+def test_advisor_prompt_does_not_extend_rules_into_unverified_outcomes():
+    prompt = build_game_knowledge_prompt("Pegasus v4.4.6", purpose="advisor")
+
+    assert "extend a listed rule into an unstated automatic outcome" in prompt
+    assert "Verify arithmetic before using a calculated value" in prompt
