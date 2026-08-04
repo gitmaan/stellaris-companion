@@ -1,5 +1,4 @@
-- Improved compatibility with current OpenRouter and local models across both Advisor and Chronicle.
-- Added reliable starting models with easy access to OpenRouter's popular model catalog.
-- Model connection tests now confirm whether both Advisor and Chronicle are ready.
-- Improved interpretation of Stellaris 4 populations, diplomatic contacts, dormant powers, and L-Gates.
-- Chronicle chapters now stay closer to recorded campaign events while scaling detail to the story available.
+- Improved Advisor and Chronicle accuracy for current Stellaris 4.4 mechanics.
+- Added stronger guidance for populations, Trade, war participation, and Nomad economies.
+- Reduced stale or invented campaign interpretations by grounding responses in save data and verified game rules.
+- Improved Chronicle reliability when a model returns an empty or incomplete structured response.
