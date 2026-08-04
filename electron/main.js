@@ -1585,6 +1585,8 @@ registerExportIpcHandlers({
   dialog,
   getMainWindow: () => mainWindow,
   app,
+  shell,
+  callBackendApiEnvelope,
 })
 
 const chroniclePublishingService = createChroniclePublishingService({

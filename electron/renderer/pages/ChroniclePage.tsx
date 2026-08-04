@@ -6,7 +6,8 @@ import ChronicleChapterList from '../components/ChronicleChapterList'
 import ChronicleContent from '../components/ChronicleContent'
 import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
 import ChroniclePublishDialog from '../components/ChroniclePublishDialog'
-import { useBackend, ChronicleResponse } from '../hooks/useBackend'
+import CampaignHistoryDialog from '../components/CampaignHistoryDialog'
+import { useBackend, ChronicleResponse, type Playthrough } from '../hooks/useBackend'
 import { generateChronicleHtml } from '../lib/chronicleExport'
 import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
@@ -19,9 +20,12 @@ import { HUDButton } from '../components/hud/HUDButton'
 interface SaveInfo {
   save_id: string
   empire_name: string
+  display_name: string
   ethics?: string[]
   chapter_count: number
   last_date: string
+  is_current: boolean
+  has_chronicle: boolean
 }
 
 // Session type from backend
@@ -124,6 +128,7 @@ function ChroniclePage({
 
   // Cached sessions - fetched once, reused across operations
   const [cachedSessions, setCachedSessions] = useState<Session[]>([])
+  const [playthroughs, setPlaythroughs] = useState<Playthrough[]>([])
   const latestSessionBySaveId = useMemo(() => {
     const map = new Map<string, Session>()
     for (const session of cachedSessions) {
@@ -148,6 +153,10 @@ function ChroniclePage({
   // Available saves/games
   const [saves, setSaves] = useState<SaveInfo[]>([])
   const [selectedSaveId, setSelectedSaveId] = useState<string | null>(null)
+  const selectedPlaythrough = useMemo(
+    () => playthroughs.find(item => item.save_id === selectedSaveId) || null,
+    [playthroughs, selectedSaveId],
+  )
 
   // Chronicle data
   const [chronicle, setChronicle] = useState<ChronicleResponse | null>(null)
@@ -164,6 +173,7 @@ function ChroniclePage({
   // Narrator panel state
   const [narratorPanelOpen, setNarratorPanelOpen] = useState(false)
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
 
   // Sidebar collapse state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -188,11 +198,12 @@ function ChroniclePage({
   const lastHiddenChapterFinalizeAtRef = useRef(0)
   const visibleCatchupInFlightRef = useRef(false)
 
-  // Load available saves from sessions (fetches and caches sessions)
+  // Load save-scoped campaign summaries. This is metadata-only and never generates
+  // or rewrites Chronicle content.
   const loadSaves = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent ?? false
     if (!silent) setSavesLoading(true)
-    const result = await backend.sessions()
+    const result = await backend.playthroughs(true)
     if (!isMountedRef.current) return
 
     if (result.error) {
@@ -205,41 +216,42 @@ function ChroniclePage({
     }
 
     if (result.data) {
-      // Cache the sessions for reuse in other operations
-      const incomingSessions = result.data.sessions
+      const allPlaythroughs = result.data.playthroughs
+      const activePlaythroughs = allPlaythroughs.filter(item => !item.is_trashed)
+      setPlaythroughs(allPlaythroughs)
+
+      // Existing generation APIs remain session-scoped. The campaign summary
+      // supplies the latest session without collapsing or rewriting old sessions.
+      const incomingSessions: Session[] = activePlaythroughs.map(item => ({
+        id: item.latest_session_id,
+        save_id: item.save_id,
+        empire_name: item.empire_name || item.display_name,
+        last_game_date: item.last_game_date || '',
+        snapshot_count: item.snapshot_count,
+      }))
       setCachedSessions(prev => (
         areSessionsEquivalent(prev, incomingSessions) ? prev : incomingSessions
       ))
-
-      // Group sessions by save_id to get unique saves
-      const saveMap = new Map<string, SaveInfo>()
-
-      for (const session of incomingSessions) {
-        const saveId = session.save_id
-
-        if (!saveMap.has(saveId)) {
-          saveMap.set(saveId, {
-            save_id: saveId,
-            empire_name: session.empire_name,
-            chapter_count: 0,
-            last_date: session.last_game_date,
-          })
-        } else {
-          // Update with latest date
-          const existing = saveMap.get(saveId)!
-          if (session.last_game_date > existing.last_date) {
-            existing.last_date = session.last_game_date
-          }
-        }
-      }
-
-      const saveList = Array.from(saveMap.values())
+      const saveList: SaveInfo[] = activePlaythroughs.map(item => ({
+        save_id: item.save_id,
+        empire_name: item.empire_name || item.display_name,
+        display_name: item.display_name,
+        chapter_count: item.total_chapter_count,
+        last_date: item.last_game_date || '—',
+        is_current: item.is_current,
+        has_chronicle: item.has_chronicle,
+      }))
       setSaves(saveList)
 
-      // Auto-select first save if none selected
-      if (saveList.length > 0) {
-        setSelectedSaveId(prev => prev ?? saveList[0].save_id)
-      }
+      setSelectedSaveId(previous => {
+        if (previous && saveList.some(item => item.save_id === previous)) return previous
+        const remembered = window.localStorage.getItem('chronicle.lastSelectedSaveId')
+        const next = activePlaythroughs.find(item => item.is_current)?.save_id
+          || (remembered && saveList.some(item => item.save_id === remembered) ? remembered : null)
+          || saveList[0]?.save_id
+          || null
+        return next
+      })
     }
     if (!silent) setSavesLoading(false)
   }, [backend])
@@ -256,15 +268,6 @@ function ChroniclePage({
 
     if (!session) {
       setError(t('chronicle.page.noSession'))
-      return
-    }
-
-    // With <= 1 total snapshots for this save there are zero events
-    // (events require diffs between snapshots). Skip the fetch entirely.
-    const totalSnapshots = totalSnapshotsBySaveId.get(selectedSaveId) ?? 0
-    if (totalSnapshots <= 1) {
-      setChronicle(null)
-      setLoading(false)
       return
     }
 
@@ -289,6 +292,32 @@ function ChroniclePage({
     let retryAfterMs: number | null = null
 
     try {
+      // Browsing history first performs a pure cache read. Historical campaigns
+      // stop here, so opening them never spends model quota or rewrites content.
+      if (!forceRefresh && !chapterOnly) {
+        const cachedResult = await backend.cachedChronicle(selectedSaveId)
+        if (!isMountedRef.current || token !== chronicleRequestTokenRef.current) return
+        if (cachedResult.data) {
+          const cached = cachedResult.data
+          const hasCachedContent = cached.cached && Boolean(
+            cached.chronicle.trim() || cached.chapters.length || cached.current_era,
+          )
+          setChronicle(hasCachedContent ? cached : null)
+          if (cached.chapters.length > 0) {
+            didInitChapterSelectionRef.current = true
+            setSelectedChapter(previous => previous ?? 1)
+          } else {
+            didInitChapterSelectionRef.current = false
+            setSelectedChapter(null)
+          }
+        }
+
+        const totalSnapshots = totalSnapshotsBySaveId.get(selectedSaveId) ?? 0
+        if (!selectedPlaythrough?.is_current || chronicleConfigured === false || totalSnapshots <= 1) {
+          return
+        }
+      }
+
       const chronicleResult = await backend.chronicle(
         session.id,
         forceRefresh,
@@ -364,7 +393,9 @@ function ChroniclePage({
     modelRoutingMode,
     refreshMode,
     chronicleProvider,
+    chronicleConfigured,
     selectedSaveId,
+    selectedPlaythrough,
     t,
     totalSnapshotsBySaveId,
   ])
@@ -373,6 +404,7 @@ function ChroniclePage({
     if (isDocumentVisible()) return
     if (chronicleConfigured === false) return
     if (!selectedSaveId) return
+    if (!selectedPlaythrough?.is_current) return
 
     const session = latestSessionBySaveId.get(selectedSaveId)
     if (!session) return
@@ -397,6 +429,7 @@ function ChroniclePage({
     latestSessionBySaveId,
     loadChronicle,
     selectedSaveId,
+    selectedPlaythrough,
     totalSnapshotsBySaveId,
   ])
 
@@ -671,10 +704,29 @@ function ChroniclePage({
     setLoading(false)
     setError(null)
     setErrorNeedsSettings(false)
+    window.localStorage.setItem('chronicle.lastSelectedSaveId', saveId)
     setSelectedSaveId(saveId)
     setChronicle(null)
     setSelectedChapter(null)
   }, [])
+
+  const handleHistoryChanged = useCallback(async (
+    saveId: string,
+    action: 'label' | 'trash' | 'restore' | 'reset' | 'undo-reset' | 'delete',
+  ) => {
+    const affectsSelectedChronicle = saveId === selectedSaveId
+      && ['trash', 'reset', 'delete'].includes(action)
+    if (affectsSelectedChronicle) {
+      setChronicle(null)
+      setSelectedChapter(null)
+      didInitChapterSelectionRef.current = false
+    }
+    await loadSaves({ silent: true })
+    if (saveId === selectedSaveId && action === 'undo-reset') {
+      const restored = await backend.cachedChronicle(saveId)
+      if (restored.data?.cached) setChronicle(restored.data)
+    }
+  }, [backend, loadSaves, selectedSaveId])
 
   // Handle refresh (generate more chapters)
   const handleRefresh = useCallback(() => {
@@ -769,13 +821,19 @@ function ChroniclePage({
   }, [])
 
   // Get empire name for header
-  const empireName = saves.find(s => s.save_id === selectedSaveId)?.empire_name || 'Unknown Empire'
+  const empireName = saves.find(s => s.save_id === selectedSaveId)?.display_name || 'Unknown Empire'
 
   // Export chronicle as standalone HTML
   const handleExport = useCallback(async () => {
     if (!chronicle) return
     const activeTheme = document.documentElement.getAttribute('data-theme')
-    const html = generateChronicleHtml(empireName, chronicle.chapters, chronicle.current_era, activeTheme || undefined)
+    const html = generateChronicleHtml(
+      empireName,
+      chronicle.chapters,
+      chronicle.current_era,
+      activeTheme || undefined,
+      chronicle.chronicle,
+    )
     const filename = `Chronicle - ${empireName}.html`
     await window.electronAPI?.exportChronicle(html, filename)
   }, [chronicle, empireName])
@@ -797,6 +855,7 @@ function ChroniclePage({
           loading={savesLoading || loading}
           regeneratingChapter={regeneratingChapter}
           onRefresh={handleRefresh}
+          onManageCampaigns={() => setHistoryDialogOpen(true)}
           onOpenNarratorPanel={() => setNarratorPanelOpen(true)}
           onPublish={() => setPublishDialogOpen(true)}
           onExport={handleExport}
@@ -903,6 +962,7 @@ function ChroniclePage({
                 empireName={empireName}
                 chapters={chronicle.chapters}
                 currentEra={chronicle.current_era}
+                legacyChronicle={chronicle.chronicle}
                 onRegenerate={handleRegenerateChapter}
                 confirmingRegen={confirmRegen}
                 onCancelRegen={handleCancelRegen}
@@ -936,6 +996,12 @@ function ChroniclePage({
         saveId={selectedSaveId}
         empireName={empireName}
         chronicle={chronicle}
+      />
+      <CampaignHistoryDialog
+        isOpen={historyDialogOpen}
+        onClose={() => setHistoryDialogOpen(false)}
+        playthroughs={playthroughs}
+        onChanged={handleHistoryChanged}
       />
     </div>
   )

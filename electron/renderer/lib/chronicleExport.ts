@@ -113,10 +113,14 @@ export function generateChronicleHtml(
   chapters: ChronicleChapter[],
   currentEra: CurrentEra | null,
   rawTheme?: string,
+  legacyChronicle?: string,
 ): string {
   const css = applyExportTheme(CSS, resolveExportTheme(rawTheme))
   const chaptersHtml = chapters.map(renderChapter).join('\n')
   const currentEraHtml = currentEra ? renderCurrentEra(currentEra) : ''
+  const legacyHtml = chapters.length === 0 && !currentEra && legacyChronicle?.trim()
+    ? `<section class="chapter-panel narrative">${renderNarrativeText(legacyChronicle)}</section>`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -138,6 +142,7 @@ ${css}
 
 ${chaptersHtml}
 ${currentEraHtml}
+${legacyHtml}
 
   <footer class="chronicle-footer">
     <div class="energy-line"></div>

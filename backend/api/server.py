@@ -8,7 +8,9 @@ the Python backend. All endpoints require Bearer token authentication.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
+import sqlite3
 import threading
 import time
 from pathlib import Path
@@ -86,6 +88,25 @@ class ChronicleCustomRequest(BaseModel):
     custom_instructions: str | None = None
 
 
+class PlaythroughLabelRequest(BaseModel):
+    """User-facing local label for one campaign."""
+
+    display_label: str | None = None
+
+
+class ChronicleResetRequest(BaseModel):
+    """Explicit reversible reset for one language-scoped Chronicle."""
+
+    confirm: bool = False
+    language: str | None = None
+
+
+class HistoryBackupRequest(BaseModel):
+    """Destination selected by the trusted Electron save dialog."""
+
+    destination: str
+
+
 def _parse_game_date(value: Any) -> tuple[int, int, int] | None:
     """Parse a Stellaris game date string (YYYY.MM.DD with optional zero padding)."""
     if not isinstance(value, str):
@@ -125,6 +146,75 @@ def _pick_latest_game_date(*values: Any) -> str | None:
                 latest_raw = stripped
 
     return latest_raw if latest_raw is not None else fallback_raw
+
+
+def _cached_chronicle_response(cached: dict[str, Any] | None) -> dict[str, Any]:
+    """Shape a stored Chronicle for the renderer without invoking a provider or writing data."""
+    if not cached:
+        return {
+            "chapters": [],
+            "current_era": None,
+            "pending_chapters": 0,
+            "message": None,
+            "chronicle": "",
+            "cached": False,
+            "event_count": 0,
+            "generated_at": "",
+            "model_routing": None,
+        }
+
+    chapters_data: dict[str, Any] = {}
+    cache_warning: str | None = None
+    raw_chapters = cached.get("chapters_json")
+    if isinstance(raw_chapters, str) and raw_chapters:
+        try:
+            parsed = json.loads(raw_chapters)
+            if isinstance(parsed, dict):
+                chapters_data = parsed
+            else:
+                cache_warning = "Stored chapter data is not an object; legacy prose was preserved."
+        except json.JSONDecodeError:
+            cache_warning = "Stored chapter data could not be parsed; legacy prose was preserved."
+
+    raw_list = chapters_data.get("chapters")
+    chapters: list[dict[str, Any]] = []
+    if isinstance(raw_list, list):
+        for index, raw in enumerate(raw_list, start=1):
+            if not isinstance(raw, dict):
+                continue
+            chapter = dict(raw)
+            chapter.setdefault("number", index)
+            chapter.setdefault("title", f"Chapter {index}")
+            chapter.setdefault("start_date", "")
+            chapter.setdefault("end_date", "")
+            chapter.setdefault("narrative", "")
+            chapter.setdefault("summary", "")
+            chapter.setdefault("is_finalized", True)
+            chapter.setdefault("context_stale", False)
+            chapter.setdefault("can_regenerate", bool(chapter.get("is_finalized", True)))
+            chapters.append(chapter)
+
+    era_cache = chapters_data.get("current_era_cache")
+    current_era = (
+        era_cache.get("current_era")
+        if isinstance(era_cache, dict) and isinstance(era_cache.get("current_era"), dict)
+        else None
+    )
+    response = {
+        "chapters": chapters,
+        "current_era": current_era,
+        "pending_chapters": 0,
+        "message": None,
+        "chronicle": cached.get("chronicle_text") or "",
+        "cached": True,
+        "event_count": int(cached.get("event_count") or 0),
+        "generated_at": str(cached.get("generated_at") or ""),
+        "model_routing": None,
+        "language": cached.get("language") or "en",
+    }
+    if cache_warning:
+        response["cache_warning"] = cache_warning
+    return response
 
 
 def _raise_chronicle_value_error(error: ValueError) -> NoReturn:
@@ -741,6 +831,217 @@ def create_app() -> FastAPI:
             )
 
         return {"sessions": sessions}
+
+    @app.get("/api/playthroughs", dependencies=[Depends(verify_token)])
+    async def get_playthroughs(
+        request: Request,
+        language: str = "en",
+        include_trashed: bool = True,
+    ) -> dict[str, Any]:
+        """Return read-only campaign summaries for the Chronicle history manager."""
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        from backend.core.language import normalize_language
+
+        output_language = normalize_language(language)
+        current_save_id, _ = _resolve_current_save_id(request)
+        items = db.get_playthroughs(
+            language=output_language,
+            include_trashed=include_trashed,
+        )
+        for item in items:
+            item["is_current"] = bool(current_save_id and item.get("save_id") == current_save_id)
+        return {
+            "playthroughs": items,
+            "current_save_id": current_save_id,
+            "language": output_language,
+        }
+
+    @app.get(
+        "/api/playthroughs/{save_id}/chronicle",
+        dependencies=[Depends(verify_token)],
+    )
+    async def get_cached_playthrough_chronicle(
+        request: Request,
+        save_id: str,
+        language: str = "en",
+    ) -> dict[str, Any]:
+        """Read an existing Chronicle without provider initialization or cache writes."""
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        from backend.core.language import normalize_language
+
+        output_language = normalize_language(language)
+        if db.get_playthrough(save_id, language=output_language) is None:
+            raise HTTPException(status_code=404, detail={"error": "Playthrough not found"})
+        cached = db.get_cached_chronicle_for_save(save_id, language=output_language)
+        return _cached_chronicle_response(cached)
+
+    @app.post(
+        "/api/playthroughs/{save_id}/label",
+        dependencies=[Depends(verify_token)],
+    )
+    async def set_playthrough_label(
+        request: Request,
+        save_id: str,
+        body: PlaythroughLabelRequest,
+    ) -> dict[str, Any]:
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        try:
+            db.set_playthrough_label(save_id, body.display_label)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+        return {"save_id": save_id, "display_label": (body.display_label or "").strip() or None}
+
+    @app.post(
+        "/api/playthroughs/{save_id}/trash",
+        dependencies=[Depends(verify_token)],
+    )
+    async def trash_playthrough(request: Request, save_id: str) -> dict[str, Any]:
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        current_save_id, _ = _resolve_current_save_id(request)
+        if current_save_id == save_id:
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "The currently loaded campaign cannot be moved to Trash"},
+            )
+        try:
+            db.trash_playthrough(save_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+        return {"save_id": save_id, "trashed": True}
+
+    @app.post(
+        "/api/playthroughs/{save_id}/restore",
+        dependencies=[Depends(verify_token)],
+    )
+    async def restore_playthrough(request: Request, save_id: str) -> dict[str, Any]:
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        try:
+            db.restore_playthrough(save_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+        return {"save_id": save_id, "trashed": False}
+
+    @app.post(
+        "/api/playthroughs/{save_id}/reset-chronicle",
+        dependencies=[Depends(verify_token)],
+    )
+    async def reset_playthrough_chronicle(
+        request: Request,
+        save_id: str,
+        body: ChronicleResetRequest,
+    ) -> dict[str, Any]:
+        if not body.confirm:
+            raise HTTPException(status_code=400, detail={"error": "Reset requires confirm=true"})
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        from backend.core.language import normalize_language
+
+        output_language = normalize_language(body.language)
+        with _chronicle_in_flight_lock:
+            if any(key.startswith(f"{save_id}:") for key in _chronicle_in_flight):
+                raise HTTPException(
+                    status_code=409,
+                    detail={"error": "Chronicle generation is in progress; try again shortly"},
+                )
+        try:
+            rows_reset = db.reset_chronicle(save_id, language=output_language)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+        return {
+            "save_id": save_id,
+            "language": output_language,
+            "reset": True,
+            "rows_reset": rows_reset,
+            "can_undo": True,
+        }
+
+    @app.post(
+        "/api/playthroughs/{save_id}/undo-reset",
+        dependencies=[Depends(verify_token)],
+    )
+    async def undo_playthrough_chronicle_reset(
+        request: Request,
+        save_id: str,
+        body: ChronicleResetRequest,
+    ) -> dict[str, Any]:
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        from backend.core.language import normalize_language
+
+        output_language = normalize_language(body.language)
+        restored = db.undo_chronicle_reset(save_id, language=output_language)
+        if not restored:
+            raise HTTPException(status_code=404, detail={"error": "No Chronicle reset to undo"})
+        return {"save_id": save_id, "language": output_language, "restored": True}
+
+    @app.delete("/api/playthroughs/{save_id}", dependencies=[Depends(verify_token)])
+    async def delete_playthrough(
+        request: Request,
+        save_id: str,
+        confirm: bool = False,
+    ) -> dict[str, Any]:
+        if not confirm:
+            raise HTTPException(status_code=400, detail={"error": "Deletion requires confirm=true"})
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        current_save_id, _ = _resolve_current_save_id(request)
+        if current_save_id == save_id:
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "The currently loaded campaign cannot be deleted"},
+            )
+        playthrough = db.get_playthrough(save_id)
+        if playthrough is None:
+            raise HTTPException(status_code=404, detail={"error": "Playthrough not found"})
+        if not playthrough.get("is_trashed"):
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "Move the campaign to Trash before deleting it permanently"},
+            )
+        with _chronicle_in_flight_lock:
+            if any(key.startswith(f"{save_id}:") for key in _chronicle_in_flight):
+                raise HTTPException(
+                    status_code=409,
+                    detail={"error": "Chronicle generation is in progress; try again shortly"},
+                )
+        try:
+            deleted = db.delete_playthrough(save_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+        return {"save_id": save_id, "deleted": True, "counts": deleted}
+
+    @app.get("/api/history/storage", dependencies=[Depends(verify_token)])
+    async def get_history_storage(request: Request) -> dict[str, Any]:
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        return db.get_db_stats()
+
+    @app.post("/api/history/backup", dependencies=[Depends(verify_token)])
+    async def backup_history(
+        request: Request,
+        body: HistoryBackupRequest,
+    ) -> dict[str, Any]:
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        try:
+            return db.create_backup(body.destination)
+        except (OSError, ValueError, sqlite3.Error) as exc:
+            raise HTTPException(status_code=400, detail={"error": str(exc)}) from exc
 
     @app.get("/api/sessions/{session_id}/events", dependencies=[Depends(verify_token)])
     async def get_session_events(

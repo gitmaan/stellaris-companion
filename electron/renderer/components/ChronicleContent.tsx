@@ -7,6 +7,7 @@ interface ChronicleContentProps {
   empireName: string
   chapters: ChronicleChapter[]
   currentEra: CurrentEra | null
+  legacyChronicle?: string
   onRegenerate: (chapterNumber: number, regenerationInstructions?: string) => void
   confirmingRegen: number | null
   onCancelRegen: () => void
@@ -22,6 +23,7 @@ function ChronicleContent({
   empireName,
   chapters,
   currentEra,
+  legacyChronicle,
   onRegenerate,
   confirmingRegen,
   onCancelRegen,
@@ -40,7 +42,13 @@ function ChronicleContent({
         <div className="energy-line mt-4 max-w-[200px] mx-auto" />
       </header>
 
-      {chapters.length === 0 && !currentEra && (
+      {chapters.length === 0 && !currentEra && legacyChronicle?.trim() && (
+        <section className="chronicle-narrative text-base leading-relaxed text-text-primary">
+          {renderNarrative(legacyChronicle)}
+        </section>
+      )}
+
+      {chapters.length === 0 && !currentEra && !legacyChronicle?.trim() && (
         <div className="flex items-center justify-center text-text-secondary text-sm h-[200px]">
           <p>{t('chronicle.content.selectChapter')}</p>
         </div>

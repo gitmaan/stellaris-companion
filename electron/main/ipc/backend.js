@@ -40,6 +40,73 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     return await callBackendApiEnvelope('/api/sessions')
   })
 
+  ipcMain.handle('backend:playthroughs', async (event, { include_trashed } = {}) => {
+    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+    const language = typeof getResolvedLanguage === 'function' ? getResolvedLanguage() : 'en'
+    const query = new URLSearchParams({
+      language,
+      include_trashed: include_trashed === false ? 'false' : 'true',
+    })
+    return await callBackendApiEnvelope(`/api/playthroughs?${query.toString()}`)
+  })
+
+  ipcMain.handle('backend:cached-chronicle', async (event, { save_id }) => {
+    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+    const language = typeof getResolvedLanguage === 'function' ? getResolvedLanguage() : 'en'
+    const query = new URLSearchParams({ language })
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/chronicle?${query.toString()}`)
+  })
+
+  ipcMain.handle('backend:set-playthrough-label', async (event, { save_id, display_label }) => {
+    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/label`, {
+      method: 'POST',
+      body: JSON.stringify({ display_label }),
+    })
+  })
+
+  ipcMain.handle('backend:trash-playthrough', async (event, { save_id }) => {
+    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/trash`, {
+      method: 'POST',
+    })
+  })
+
+  ipcMain.handle('backend:restore-playthrough', async (event, { save_id }) => {
+    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/restore`, {
+      method: 'POST',
+    })
+  })
+
+  ipcMain.handle('backend:reset-chronicle', async (event, { save_id }) => {
+    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/reset-chronicle`, {
+      method: 'POST',
+      body: JSON.stringify(withLanguage({ confirm: true })),
+    })
+  })
+
+  ipcMain.handle('backend:undo-chronicle-reset', async (event, { save_id }) => {
+    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/undo-reset`, {
+      method: 'POST',
+      body: JSON.stringify(withLanguage()),
+    })
+  })
+
+  ipcMain.handle('backend:delete-playthrough', async (event, { save_id }) => {
+    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}?confirm=true`, {
+      method: 'DELETE',
+    })
+  })
+
+  ipcMain.handle('backend:history-storage', async (event) => {
+    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+    return await callBackendApiEnvelope('/api/history/storage')
+  })
+
   ipcMain.handle('backend:session-events', async (event, { session_id, limit }) => {
     try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
     let url = `/api/sessions/${session_id}/events`

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -22,6 +23,9 @@ from backend.core.json_utils import json_dumps
 
 DEFAULT_DB_FILENAME = "stellaris_history.db"
 ENV_DB_PATH = "STELLARIS_DB_PATH"
+PRE_CAMPAIGN_HISTORY_SCHEMA_VERSION = 10
+
+logger = logging.getLogger(__name__)
 
 # Default DB retention (no user-facing knobs).
 # Keep the earliest full briefing (baseline). The latest briefing is stored on the session row
@@ -282,12 +286,42 @@ class GameDatabase:
                 "ALTER TABLE advisor_memory_new RENAME TO advisor_memory;",
                 "CREATE INDEX IF NOT EXISTS idx_advisor_memory_updated ON advisor_memory(updated_at);",
             ],
+            10: [
+                # Additive playthrough management state. Existing Chronicle/history rows are
+                # deliberately left untouched so upgrading cannot rewrite user prose.
+                """
+                CREATE TABLE IF NOT EXISTS playthrough_metadata (
+                    save_id TEXT PRIMARY KEY,
+                    display_label TEXT,
+                    trashed_at INTEGER,
+                    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+                    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS idx_playthrough_metadata_trashed ON playthrough_metadata(trashed_at);",
+                # Reversible backups for explicit Chronicle resets. Trash/restore never touches
+                # Chronicle rows and therefore does not need a content backup.
+                """
+                CREATE TABLE IF NOT EXISTS chronicle_revisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    save_id TEXT NOT NULL,
+                    language TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+                );
+                """,
+                "CREATE INDEX IF NOT EXISTS idx_chronicle_revisions_save_language ON chronicle_revisions(save_id, language, created_at DESC);",
+            ],
         }
 
         current = self.get_schema_version()
         target = max(migrations.keys(), default=0)
         if current >= target:
             return
+
+        if 0 < current < PRE_CAMPAIGN_HISTORY_SCHEMA_VERSION <= target:
+            self._create_pre_migration_backup(PRE_CAMPAIGN_HISTORY_SCHEMA_VERSION)
 
         for next_version in range(current + 1, target + 1):
             statements = migrations.get(next_version)
@@ -303,6 +337,27 @@ class GameDatabase:
                 except Exception:
                     self._conn.execute("ROLLBACK;")
                     raise
+
+    def _create_pre_migration_backup(self, target_version: int) -> Path | None:
+        """Create one WAL-safe backup before the campaign-history schema is installed."""
+        if self.path == Path(":memory:"):
+            return None
+        backup_path = self.path.with_name(f"{self.path.name}.pre-v{int(target_version)}.backup")
+        if backup_path.exists():
+            return backup_path
+        try:
+            backup_conn = sqlite3.connect(str(backup_path))
+            try:
+                with self._lock:
+                    self._conn.backup(backup_conn)
+            finally:
+                backup_conn.close()
+            return backup_path
+        except Exception as exc:
+            logger.warning("Could not create pre-v%s database backup: %s", target_version, exc)
+            with contextlib.suppress(OSError):
+                backup_path.unlink()
+            return None
 
     # --- Phase 3 Milestone 1: sessions + snapshot writes ---
 
@@ -1131,6 +1186,477 @@ class GameDatabase:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def get_playthroughs(
+        self,
+        *,
+        language: str = "en",
+        include_trashed: bool = False,
+        limit: int = 1000,
+    ) -> list[dict[str, Any]]:
+        """Return save-scoped campaign summaries without mutating Chronicle caches."""
+        lim = max(1, min(int(limit), 1000))
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                WITH session_rollup AS (
+                    SELECT
+                        save_id,
+                        COUNT(*) AS session_count,
+                        MIN(started_at) AS first_seen_at,
+                        MAX(COALESCE(last_updated_at, started_at)) AS last_played_at,
+                        MIN(last_game_date) AS first_session_game_date,
+                        MAX(last_game_date) AS last_session_game_date
+                    FROM sessions
+                    GROUP BY save_id
+                ),
+                snapshot_rollup AS (
+                    SELECT
+                        s.save_id,
+                        COUNT(snap.id) AS snapshot_count,
+                        MIN(snap.game_date) AS first_snapshot_game_date,
+                        MAX(snap.game_date) AS last_snapshot_game_date
+                    FROM sessions s
+                    LEFT JOIN snapshots snap ON snap.session_id = s.id
+                    GROUP BY s.save_id
+                ),
+                event_rollup AS (
+                    SELECT s.save_id, COUNT(e.id) AS event_count
+                    FROM sessions s
+                    LEFT JOIN events e ON e.session_id = s.id
+                    GROUP BY s.save_id
+                )
+                SELECT
+                    sr.save_id,
+                    (
+                        SELECT s2.empire_name
+                        FROM sessions s2
+                        WHERE s2.save_id = sr.save_id
+                        ORDER BY COALESCE(s2.last_updated_at, s2.started_at) DESC, s2.started_at DESC
+                        LIMIT 1
+                    ) AS empire_name,
+                    (
+                        SELECT s2.id
+                        FROM sessions s2
+                        WHERE s2.save_id = sr.save_id
+                        ORDER BY COALESCE(s2.last_updated_at, s2.started_at) DESC, s2.started_at DESC
+                        LIMIT 1
+                    ) AS latest_session_id,
+                    sr.session_count,
+                    sr.first_seen_at,
+                    sr.last_played_at,
+                    COALESCE(sn.first_snapshot_game_date, sr.first_session_game_date) AS first_game_date,
+                    CASE
+                        WHEN sn.last_snapshot_game_date > sr.last_session_game_date
+                            THEN sn.last_snapshot_game_date
+                        ELSE COALESCE(sr.last_session_game_date, sn.last_snapshot_game_date)
+                    END AS last_game_date,
+                    COALESCE(sn.snapshot_count, 0) AS snapshot_count,
+                    COALESCE(er.event_count, 0) AS event_count,
+                    pm.display_label,
+                    pm.trashed_at
+                FROM session_rollup sr
+                LEFT JOIN snapshot_rollup sn ON sn.save_id = sr.save_id
+                LEFT JOIN event_rollup er ON er.save_id = sr.save_id
+                LEFT JOIN playthrough_metadata pm ON pm.save_id = sr.save_id
+                WHERE (? = 1 OR pm.trashed_at IS NULL)
+                ORDER BY sr.last_played_at DESC
+                LIMIT ?;
+                """,
+                (1 if include_trashed else 0, lim),
+            ).fetchall()
+
+            cache_rows = self._conn.execute(
+                """
+                SELECT
+                    c.*,
+                    COALESCE(NULLIF(c.save_id, ''), s.save_id) AS resolved_save_id
+                FROM cached_chronicles c
+                LEFT JOIN sessions s ON s.id = c.session_id;
+                """
+            ).fetchall()
+            revision_rows = self._conn.execute(
+                """
+                SELECT save_id, language, COUNT(*) AS revision_count
+                FROM chronicle_revisions
+                GROUP BY save_id, language;
+                """
+            ).fetchall()
+
+        cache_summary: dict[str, dict[str, Any]] = {}
+        for raw_row in cache_rows:
+            cache = dict(raw_row)
+            save_id = str(cache.get("resolved_save_id") or "")
+            if not save_id:
+                continue
+            cache_language = str(cache.get("language") or "en")
+            chapters_data: dict[str, Any] = {}
+            chapters_json = cache.get("chapters_json")
+            if isinstance(chapters_json, str) and chapters_json:
+                with contextlib.suppress(json.JSONDecodeError):
+                    parsed = json.loads(chapters_json)
+                    if isinstance(parsed, dict):
+                        chapters_data = parsed
+            chapters = chapters_data.get("chapters")
+            chapter_count = len(chapters) if isinstance(chapters, list) else 0
+            era_cache = chapters_data.get("current_era_cache")
+            has_current_era = bool(
+                isinstance(era_cache, dict) and isinstance(era_cache.get("current_era"), dict)
+            )
+            has_content = bool(
+                (isinstance(cache.get("chronicle_text"), str) and cache["chronicle_text"].strip())
+                or chapter_count
+                or has_current_era
+            )
+            summary = cache_summary.setdefault(
+                save_id,
+                {
+                    "has_chronicle": False,
+                    "cached_languages": set(),
+                    "chapter_count_by_language": {},
+                    "has_content_by_language": {},
+                    "has_current_era": False,
+                },
+            )
+            if has_content:
+                summary["has_chronicle"] = True
+                summary["cached_languages"].add(cache_language)
+                summary["has_content_by_language"][cache_language] = True
+                summary["chapter_count_by_language"][cache_language] = max(
+                    int(summary["chapter_count_by_language"].get(cache_language, 0)),
+                    chapter_count,
+                )
+                summary["has_current_era"] = bool(summary["has_current_era"] or has_current_era)
+
+        revision_counts = {
+            (str(row["save_id"]), str(row["language"])): int(row["revision_count"])
+            for row in revision_rows
+        }
+
+        result: list[dict[str, Any]] = []
+        for raw_row in rows:
+            item = dict(raw_row)
+            save_id = str(item["save_id"])
+            summary = cache_summary.get(save_id, {})
+            languages = sorted(summary.get("cached_languages", set()))
+            chapter_counts = summary.get("chapter_count_by_language", {})
+            has_content_by_language = summary.get("has_content_by_language", {})
+            item.update(
+                {
+                    "display_name": item.get("display_label")
+                    or item.get("empire_name")
+                    or "Unknown Empire",
+                    "is_trashed": item.get("trashed_at") is not None,
+                    "has_chronicle": bool(summary.get("has_chronicle")),
+                    "cached_languages": languages,
+                    "chapter_count": int(chapter_counts.get(language, 0)),
+                    "total_chapter_count": max(chapter_counts.values(), default=0),
+                    "has_current_era": bool(summary.get("has_current_era")),
+                    "can_undo_reset": (
+                        revision_counts.get((save_id, language), 0) > 0
+                        and not bool(has_content_by_language.get(language))
+                    ),
+                }
+            )
+            result.append(item)
+        return result
+
+    def get_playthrough(self, save_id: str, *, language: str = "en") -> dict[str, Any] | None:
+        for item in self.get_playthroughs(
+            language=language,
+            include_trashed=True,
+            limit=1000,
+        ):
+            if item.get("save_id") == save_id:
+                return item
+        return None
+
+    def set_playthrough_label(self, save_id: str, display_label: str | None) -> None:
+        value = (display_label or "").strip()[:80]
+        with self._lock:
+            exists = self._conn.execute(
+                "SELECT 1 FROM sessions WHERE save_id = ? LIMIT 1", (save_id,)
+            ).fetchone()
+            if not exists:
+                raise ValueError(f"Playthrough not found: {save_id}")
+            self._conn.execute(
+                """
+                INSERT INTO playthrough_metadata (save_id, display_label, updated_at)
+                VALUES (?, ?, strftime('%s','now'))
+                ON CONFLICT(save_id) DO UPDATE SET
+                    display_label = excluded.display_label,
+                    updated_at = excluded.updated_at;
+                """,
+                (save_id, value or None),
+            )
+
+    def trash_playthrough(self, save_id: str) -> None:
+        with self._lock:
+            exists = self._conn.execute(
+                "SELECT 1 FROM sessions WHERE save_id = ? LIMIT 1", (save_id,)
+            ).fetchone()
+            if not exists:
+                raise ValueError(f"Playthrough not found: {save_id}")
+            self._conn.execute(
+                """
+                INSERT INTO playthrough_metadata (save_id, trashed_at, updated_at)
+                VALUES (?, strftime('%s','now'), strftime('%s','now'))
+                ON CONFLICT(save_id) DO UPDATE SET
+                    trashed_at = excluded.trashed_at,
+                    updated_at = excluded.updated_at;
+                """,
+                (save_id,),
+            )
+
+    def restore_playthrough(self, save_id: str) -> None:
+        with self._lock:
+            exists = self._conn.execute(
+                "SELECT 1 FROM sessions WHERE save_id = ? LIMIT 1", (save_id,)
+            ).fetchone()
+            if not exists:
+                raise ValueError(f"Playthrough not found: {save_id}")
+            self._conn.execute(
+                """
+                UPDATE playthrough_metadata
+                SET trashed_at = NULL, updated_at = strftime('%s','now')
+                WHERE save_id = ?;
+                """,
+                (save_id,),
+            )
+
+    def get_cached_chronicle_for_save(
+        self,
+        save_id: str,
+        *,
+        language: str = "en",
+    ) -> dict[str, Any] | None:
+        """Read a save-scoped cache with a non-mutating legacy session fallback."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT c.*
+                FROM cached_chronicles c
+                LEFT JOIN sessions s ON s.id = c.session_id
+                WHERE c.language = ?
+                  AND (c.save_id = ? OR ((c.save_id IS NULL OR c.save_id = '') AND s.save_id = ?))
+                ORDER BY CASE WHEN c.save_id = ? THEN 0 ELSE 1 END, c.generated_at DESC
+                LIMIT 1;
+                """,
+                (language, save_id, save_id, save_id),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def reset_chronicle(self, save_id: str, *, language: str = "en") -> int:
+        """Reset generated content for one language after storing an exact revision."""
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT c.*
+                FROM cached_chronicles c
+                LEFT JOIN sessions s ON s.id = c.session_id
+                WHERE c.language = ?
+                  AND (c.save_id = ? OR ((c.save_id IS NULL OR c.save_id = '') AND s.save_id = ?));
+                """,
+                (language, save_id, save_id),
+            ).fetchall()
+            payload = [dict(row) for row in rows]
+            meaningful = any(
+                (isinstance(row.get("chronicle_text"), str) and row["chronicle_text"].strip())
+                or row.get("chapters_json")
+                for row in payload
+            )
+            if not payload or not meaningful:
+                raise ValueError(f"No cached Chronicle found for save: {save_id}")
+
+            self._conn.execute("BEGIN IMMEDIATE;")
+            try:
+                self._conn.execute(
+                    """
+                    INSERT INTO chronicle_revisions (save_id, language, reason, payload_json)
+                    VALUES (?, ?, 'reset', ?);
+                    """,
+                    (save_id, language, json.dumps(payload, ensure_ascii=False)),
+                )
+                row_ids = [str(row["id"]) for row in payload]
+                self._conn.executemany(
+                    """
+                    UPDATE cached_chronicles
+                    SET chronicle_text = '', chapters_json = NULL,
+                        event_count = 0, snapshot_count = 0,
+                        generated_at = datetime('now')
+                    WHERE id = ?;
+                    """,
+                    ((row_id,) for row_id in row_ids),
+                )
+                self._conn.execute(
+                    """
+                    DELETE FROM chronicle_revisions
+                    WHERE id IN (
+                        SELECT id FROM chronicle_revisions
+                        WHERE save_id = ? AND language = ?
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT -1 OFFSET 5
+                    );
+                    """,
+                    (save_id, language),
+                )
+                self._conn.execute("COMMIT;")
+            except Exception:
+                self._conn.execute("ROLLBACK;")
+                raise
+            return len(payload)
+
+    def undo_chronicle_reset(self, save_id: str, *, language: str = "en") -> bool:
+        with self._lock:
+            revision = self._conn.execute(
+                """
+                SELECT id, payload_json
+                FROM chronicle_revisions
+                WHERE save_id = ? AND language = ? AND reason = 'reset'
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1;
+                """,
+                (save_id, language),
+            ).fetchone()
+            if not revision:
+                return False
+            current_rows = self._conn.execute(
+                """
+                SELECT c.chronicle_text, c.chapters_json
+                FROM cached_chronicles c
+                LEFT JOIN sessions s ON s.id = c.session_id
+                WHERE c.language = ?
+                  AND (c.save_id = ? OR ((c.save_id IS NULL OR c.save_id = '') AND s.save_id = ?));
+                """,
+                (language, save_id, save_id),
+            ).fetchall()
+            if any(
+                (isinstance(row["chronicle_text"], str) and row["chronicle_text"].strip())
+                or row["chapters_json"]
+                for row in current_rows
+            ):
+                # New content has been generated since the reset. Never overwrite it
+                # with an older revision just because an Undo token still exists.
+                self._conn.execute(
+                    "DELETE FROM chronicle_revisions WHERE id = ?", (revision["id"],)
+                )
+                return False
+            payload = json.loads(str(revision["payload_json"]))
+            if not isinstance(payload, list):
+                return False
+            columns = (
+                "id",
+                "session_id",
+                "save_id",
+                "language",
+                "chronicle_text",
+                "chapters_json",
+                "event_count",
+                "snapshot_count",
+                "generated_at",
+                "chronicle_custom_instructions",
+            )
+            self._conn.execute("BEGIN IMMEDIATE;")
+            try:
+                self._conn.execute(
+                    """
+                    DELETE FROM cached_chronicles
+                    WHERE language = ? AND (
+                        save_id = ? OR session_id IN (SELECT id FROM sessions WHERE save_id = ?)
+                    );
+                    """,
+                    (language, save_id, save_id),
+                )
+                for raw in payload:
+                    if not isinstance(raw, dict):
+                        continue
+                    self._conn.execute(
+                        f"INSERT INTO cached_chronicles ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)});",
+                        tuple(raw.get(column) for column in columns),
+                    )
+                self._conn.execute(
+                    "DELETE FROM chronicle_revisions WHERE id = ?", (revision["id"],)
+                )
+                self._conn.execute("COMMIT;")
+            except Exception:
+                self._conn.execute("ROLLBACK;")
+                raise
+            return True
+
+    def delete_playthrough(self, save_id: str) -> dict[str, int]:
+        """Permanently delete all local data for one playthrough transactionally."""
+        with self._lock:
+            session_count = int(
+                self._conn.execute(
+                    "SELECT COUNT(*) AS count FROM sessions WHERE save_id = ?", (save_id,)
+                ).fetchone()["count"]
+            )
+            if session_count == 0:
+                raise ValueError(f"Playthrough not found: {save_id}")
+            snapshot_count = int(
+                self._conn.execute(
+                    """
+                    SELECT COUNT(*) AS count FROM snapshots
+                    WHERE session_id IN (SELECT id FROM sessions WHERE save_id = ?)
+                    """,
+                    (save_id,),
+                ).fetchone()["count"]
+            )
+            event_count = int(
+                self._conn.execute(
+                    """
+                    SELECT COUNT(*) AS count FROM events
+                    WHERE session_id IN (SELECT id FROM sessions WHERE save_id = ?)
+                    """,
+                    (save_id,),
+                ).fetchone()["count"]
+            )
+            cache_count = int(
+                self._conn.execute(
+                    """
+                    SELECT COUNT(*) AS count FROM cached_chronicles
+                    WHERE save_id = ? OR session_id IN (SELECT id FROM sessions WHERE save_id = ?)
+                    """,
+                    (save_id, save_id),
+                ).fetchone()["count"]
+            )
+            self._conn.execute("BEGIN IMMEDIATE;")
+            try:
+                self._conn.execute(
+                    """
+                    DELETE FROM cached_chronicles
+                    WHERE save_id = ? OR session_id IN (SELECT id FROM sessions WHERE save_id = ?)
+                    """,
+                    (save_id, save_id),
+                )
+                self._conn.execute("DELETE FROM advisor_memory WHERE save_id = ?", (save_id,))
+                self._conn.execute("DELETE FROM chronicle_revisions WHERE save_id = ?", (save_id,))
+                self._conn.execute("DELETE FROM sessions WHERE save_id = ?", (save_id,))
+                self._conn.execute("DELETE FROM playthrough_metadata WHERE save_id = ?", (save_id,))
+                self._conn.execute("COMMIT;")
+            except Exception:
+                self._conn.execute("ROLLBACK;")
+                raise
+            return {
+                "sessions": session_count,
+                "snapshots": snapshot_count,
+                "events": event_count,
+                "chronicle_caches": cache_count,
+            }
+
+    def create_backup(self, destination: str | Path) -> dict[str, Any]:
+        """Create a consistent SQLite backup while the app remains online."""
+        target = Path(destination).expanduser().resolve()
+        if target == self.path.resolve():
+            raise ValueError("Backup destination must differ from the active database")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        backup_conn = sqlite3.connect(str(target))
+        try:
+            with self._lock:
+                self._conn.backup(backup_conn)
+        finally:
+            backup_conn.close()
+        return {"path": str(target), "bytes": target.stat().st_size}
+
     def get_session_by_id(self, session_id: str) -> dict[str, Any] | None:
         """Get a single session by ID with snapshot stats."""
         with self._lock:
@@ -1290,15 +1816,8 @@ class GameDatabase:
         *,
         language: str = "en",
     ) -> dict[str, Any] | None:
-        """Get cached chronicle by save_id (cross-session)."""
-        with self._lock:
-            row = self._conn.execute(
-                """SELECT * FROM cached_chronicles
-                   WHERE save_id = ? AND language = ?
-                   ORDER BY generated_at DESC LIMIT 1""",
-                (save_id, language),
-            ).fetchone()
-            return dict(row) if row else None
+        """Get cached Chronicle by save_id, including legacy session-scoped rows."""
+        return self.get_cached_chronicle_for_save(save_id, language=language)
 
     def get_chronicle_custom_instructions(self, save_id: str) -> str | None:
         """Get chronicle custom instructions for a save_id."""

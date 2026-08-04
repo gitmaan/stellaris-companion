@@ -59,10 +59,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   copyToClipboard: (text) => ipcRenderer.invoke('copy-to-clipboard', { text }),
   openExternal: (url) => ipcRenderer.invoke('open-external', { url }),
   exportChronicle: (html, defaultFilename) => ipcRenderer.invoke('export-chronicle', { html, defaultFilename }),
+  revealHistoryData: () => ipcRenderer.invoke('history:reveal-data'),
+  backupHistory: () => ipcRenderer.invoke('history:backup'),
   chroniclePublishing: {
     publish: (publication) => ipcRenderer.invoke('chronicle-publishing:publish', publication),
     status: (saveId) => ipcRenderer.invoke('chronicle-publishing:status', { saveId }),
     delete: (saveId) => ipcRenderer.invoke('chronicle-publishing:delete', { saveId }),
+    list: () => ipcRenderer.invoke('chronicle-publishing:list'),
   },
   getBackendLogTail: (opts) => ipcRenderer.invoke('get-backend-log-tail', opts || {}),
   mcpRelay: {
@@ -85,6 +88,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }),
     status: () => ipcRenderer.invoke('backend:status'),
     sessions: () => ipcRenderer.invoke('backend:sessions'),
+    playthroughs: (includeTrashed = true) => ipcRenderer.invoke('backend:playthroughs', {
+      include_trashed: includeTrashed,
+    }),
+    cachedChronicle: (saveId) => ipcRenderer.invoke('backend:cached-chronicle', {
+      save_id: saveId,
+    }),
+    setPlaythroughLabel: (saveId, displayLabel) => ipcRenderer.invoke('backend:set-playthrough-label', {
+      save_id: saveId,
+      display_label: displayLabel,
+    }),
+    trashPlaythrough: (saveId) => ipcRenderer.invoke('backend:trash-playthrough', {
+      save_id: saveId,
+    }),
+    restorePlaythrough: (saveId) => ipcRenderer.invoke('backend:restore-playthrough', {
+      save_id: saveId,
+    }),
+    resetChronicle: (saveId) => ipcRenderer.invoke('backend:reset-chronicle', {
+      save_id: saveId,
+    }),
+    undoChronicleReset: (saveId) => ipcRenderer.invoke('backend:undo-chronicle-reset', {
+      save_id: saveId,
+    }),
+    deletePlaythrough: (saveId) => ipcRenderer.invoke('backend:delete-playthrough', {
+      save_id: saveId,
+    }),
+    historyStorage: () => ipcRenderer.invoke('backend:history-storage'),
     sessionEvents: (sessionId, limit) =>
       ipcRenderer.invoke('backend:session-events', {
         session_id: sessionId,

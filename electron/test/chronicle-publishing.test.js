@@ -123,6 +123,26 @@ test('publishes, updates, checks status, and deletes with an encrypted anonymous
   assert.deepEqual(store.get('chroniclePublications'), [])
 })
 
+test('lists only non-secret local publication summaries for campaign badges', () => {
+  const { service, store } = createHarness(async () => Response.json({}))
+  store.set('chroniclePublications', [{
+    saveId: 'save-local-only-1',
+    state: 'published',
+    storyId: '00cd337e-0852-45bb-a15f-9b645f8db2bd',
+    revision: 3,
+    title: 'The Test Chronicle',
+    publicUrl: 'https://galacticfilingcabinet.com/chronicles/00cd337e-0852-45bb-a15f-9b645f8db2bd',
+    publisherSecret: 'must-never-cross-ipc',
+  }])
+
+  assert.deepEqual(service.listLocal(), [{
+    saveId: 'save-local-only-1',
+    state: 'published',
+    title: 'The Test Chronicle',
+    publicUrl: 'https://galacticfilingcabinet.com/chronicles/00cd337e-0852-45bb-a15f-9b645f8db2bd',
+  }])
+})
+
 test('preserves the idempotency identifier when the first network request fails', async () => {
   let attempt = 0
   const requestBodies = []

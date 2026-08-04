@@ -32,6 +32,7 @@ import { HUDButton } from '../components/hud/HUDButton'
 import { HUDSelect } from '../components/hud/HUDForm'
 import { useToast } from '../components/Toast'
 import type { McpRelayHealthResult, McpRelayStatus } from '../global'
+import type { HistoryStorageResponse } from '../hooks/useBackend'
 
 /**
  * DISC-017: Convert technical error messages to user-friendly messages.
@@ -107,6 +108,14 @@ function formatContextLength(contextLength: number): string {
     return `${Number.isInteger(thousands) ? thousands : thousands.toFixed(1)}K`
   }
   return String(contextLength)
+}
+
+function formatBytes(bytes: number | null | undefined): string {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes)) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
 type GeminiQuotaMode = 'standard' | 'higher'
@@ -189,6 +198,8 @@ function SettingsPage({
   const [mcpRelayLoading, setMcpRelayLoading] = useState(false)
   const [mcpRelayChecking, setMcpRelayChecking] = useState(false)
   const [mcpRelayInstalling, setMcpRelayInstalling] = useState(false)
+  const [historyStorage, setHistoryStorage] = useState<HistoryStorageResponse | null>(null)
+  const [historyBackupRunning, setHistoryBackupRunning] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const settingsHydratedRef = useRef(false)
   const advisorCheckIdRef = useRef(0)
@@ -200,6 +211,14 @@ function SettingsPage({
         clearTimeout(successTimeoutRef.current)
       }
     }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void window.electronAPI?.backend.historyStorage().then(result => {
+      if (!cancelled && result.ok) setHistoryStorage(result.data)
+    })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -297,6 +316,29 @@ function SettingsPage({
   const handleBrowse = async () => {
     const selectedPath = await showFolderDialog()
     if (selectedPath) setSaveDir(selectedPath)
+  }
+
+  const handleRevealHistory = async () => {
+    const result = await window.electronAPI?.revealHistoryData()
+    if (!result?.success) {
+      showToast({ type: 'error', message: result?.error || t('settings.saveData.revealError') })
+    }
+  }
+
+  const handleBackupHistory = async () => {
+    if (!window.electronAPI?.backupHistory) return
+    setHistoryBackupRunning(true)
+    try {
+      const result = await window.electronAPI.backupHistory()
+      if (result === null) return
+      if (!result.ok) {
+        showToast({ type: 'error', message: result.error, duration: 6000 })
+        return
+      }
+      showToast({ type: 'success', message: t('settings.saveData.backupSuccess') })
+    } finally {
+      setHistoryBackupRunning(false)
+    }
   }
 
   const handleSave = async () => {
@@ -1385,6 +1427,41 @@ function SettingsPage({
                                  />
                                  <HUDMicro className="block mt-2 normal-case">
                                      {t('settings.saveData.playerNameHelp')}
+                                 </HUDMicro>
+                             </div>
+                             <div className="border-t border-white/10 pt-4">
+                                 <div className="flex flex-wrap items-start justify-between gap-3">
+                                   <div className="min-w-0 flex-1">
+                                     <HUDLabel>{t('settings.saveData.historyLabel')}</HUDLabel>
+                                     <p className="mt-1 truncate font-mono text-[10px] text-white/45" title={historyStorage?.path}>
+                                       {historyStorage?.path || t('settings.saveData.historyLoading')}
+                                     </p>
+                                     <HUDMicro className="mt-1 block normal-case tracking-[0.02em] text-white/45">
+                                       {t('settings.saveData.historySize', { size: formatBytes(historyStorage?.bytes) })}
+                                     </HUDMicro>
+                                   </div>
+                                   <div className="flex flex-wrap gap-2">
+                                     <HUDButton
+                                       type="button"
+                                       variant="secondary"
+                                       onClick={() => void handleRevealHistory()}
+                                       className="px-3 py-1.5 text-[10px]"
+                                     >
+                                       {t('settings.saveData.revealHistory')}
+                                     </HUDButton>
+                                     <HUDButton
+                                       type="button"
+                                       variant="secondary"
+                                       onClick={() => void handleBackupHistory()}
+                                       disabled={historyBackupRunning}
+                                       className="px-3 py-1.5 text-[10px]"
+                                     >
+                                       {historyBackupRunning ? t('settings.saveData.backingUp') : t('settings.saveData.backupHistory')}
+                                     </HUDButton>
+                                   </div>
+                                 </div>
+                                 <HUDMicro className="mt-3 block normal-case tracking-[0.02em] text-white/45">
+                                   {t('settings.saveData.historyHelp')}
                                  </HUDMicro>
                              </div>
                          </div>

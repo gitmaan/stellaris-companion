@@ -112,6 +112,53 @@ export interface SessionsResponse {
   sessions: Session[]
 }
 
+export interface Playthrough {
+  save_id: string
+  empire_name: string | null
+  display_name: string
+  display_label: string | null
+  latest_session_id: string
+  first_game_date: string | null
+  last_game_date: string | null
+  first_seen_at: number
+  last_played_at: number
+  session_count: number
+  snapshot_count: number
+  event_count: number
+  has_chronicle: boolean
+  cached_languages: string[]
+  chapter_count: number
+  total_chapter_count: number
+  has_current_era: boolean
+  can_undo_reset: boolean
+  is_current: boolean
+  is_trashed: boolean
+  trashed_at: number | null
+}
+
+export interface PlaythroughsResponse {
+  playthroughs: Playthrough[]
+  current_save_id: string | null
+  language: string
+}
+
+export interface PlaythroughMutationResponse {
+  save_id: string
+  display_label?: string | null
+  trashed?: boolean
+  reset?: boolean
+  restored?: boolean
+  can_undo?: boolean
+  rows_reset?: number
+  counts?: Record<string, number>
+}
+
+export interface HistoryStorageResponse {
+  path: string
+  bytes: number | null
+  files?: Record<string, number>
+}
+
 export interface SessionEvent {
   id: number
   game_date: string
@@ -177,6 +224,8 @@ export interface ChronicleResponse {
   event_count: number
   generated_at: string
   model_routing?: ModelRoutingSummary | null
+  cache_warning?: string
+  language?: string
 }
 
 export interface ModelRoutingEvent {
@@ -444,6 +493,77 @@ export function useBackend() {
     )
   }, [callApi])
 
+  const playthroughs = useCallback(async (
+    includeTrashed = true,
+  ): Promise<UseBackendResult<PlaythroughsResponse>> => {
+    return callApi<PlaythroughsResponse>('playthroughs', () =>
+      window.electronAPI!.backend.playthroughs(includeTrashed)
+    )
+  }, [callApi])
+
+  const cachedChronicle = useCallback(async (
+    saveId: string,
+  ): Promise<UseBackendResult<ChronicleResponse>> => {
+    return callApi<ChronicleResponse>('cachedChronicle', () =>
+      window.electronAPI!.backend.cachedChronicle(saveId)
+    )
+  }, [callApi])
+
+  const setPlaythroughLabel = useCallback(async (
+    saveId: string,
+    displayLabel: string | null,
+  ): Promise<UseBackendResult<PlaythroughMutationResponse>> => {
+    return callApi<PlaythroughMutationResponse>('setPlaythroughLabel', () =>
+      window.electronAPI!.backend.setPlaythroughLabel(saveId, displayLabel)
+    )
+  }, [callApi])
+
+  const trashPlaythrough = useCallback(async (
+    saveId: string,
+  ): Promise<UseBackendResult<PlaythroughMutationResponse>> => {
+    return callApi<PlaythroughMutationResponse>('trashPlaythrough', () =>
+      window.electronAPI!.backend.trashPlaythrough(saveId)
+    )
+  }, [callApi])
+
+  const restorePlaythrough = useCallback(async (
+    saveId: string,
+  ): Promise<UseBackendResult<PlaythroughMutationResponse>> => {
+    return callApi<PlaythroughMutationResponse>('restorePlaythrough', () =>
+      window.electronAPI!.backend.restorePlaythrough(saveId)
+    )
+  }, [callApi])
+
+  const resetChronicle = useCallback(async (
+    saveId: string,
+  ): Promise<UseBackendResult<PlaythroughMutationResponse>> => {
+    return callApi<PlaythroughMutationResponse>('resetChronicle', () =>
+      window.electronAPI!.backend.resetChronicle(saveId)
+    )
+  }, [callApi])
+
+  const undoChronicleReset = useCallback(async (
+    saveId: string,
+  ): Promise<UseBackendResult<PlaythroughMutationResponse>> => {
+    return callApi<PlaythroughMutationResponse>('undoChronicleReset', () =>
+      window.electronAPI!.backend.undoChronicleReset(saveId)
+    )
+  }, [callApi])
+
+  const deletePlaythrough = useCallback(async (
+    saveId: string,
+  ): Promise<UseBackendResult<PlaythroughMutationResponse>> => {
+    return callApi<PlaythroughMutationResponse>('deletePlaythrough', () =>
+      window.electronAPI!.backend.deletePlaythrough(saveId)
+    )
+  }, [callApi])
+
+  const historyStorage = useCallback(async (): Promise<UseBackendResult<HistoryStorageResponse>> => {
+    return callApi<HistoryStorageResponse>('historyStorage', () =>
+      window.electronAPI!.backend.historyStorage()
+    )
+  }, [callApi])
+
   /**
    * Get events for a specific session
    */
@@ -555,6 +675,15 @@ export function useBackend() {
     chat,
     status,
     sessions,
+    playthroughs,
+    cachedChronicle,
+    setPlaythroughLabel,
+    trashPlaythrough,
+    restorePlaythrough,
+    resetChronicle,
+    undoChronicleReset,
+    deletePlaythrough,
+    historyStorage,
     sessionEvents,
     recap,
     chronicle,
@@ -568,7 +697,7 @@ export function useBackend() {
     get loadingStates() {
       return loadingStatesRef.current
     },
-  }), [health, chat, status, sessions, sessionEvents, recap, chronicle, regenerateChapter, endSession, getChronicleCustom, setChronicleCustom, isLoading])
+  }), [health, chat, status, sessions, playthroughs, cachedChronicle, setPlaythroughLabel, trashPlaythrough, restorePlaythrough, resetChronicle, undoChronicleReset, deletePlaythrough, historyStorage, sessionEvents, recap, chronicle, regenerateChapter, endSession, getChronicleCustom, setChronicleCustom, isLoading])
 }
 
 export default useBackend

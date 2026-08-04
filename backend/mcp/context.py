@@ -921,6 +921,8 @@ class StellarisMcpContext:
                 MAX(snap.game_date) AS last_game_date_computed
             FROM sessions s
             LEFT JOIN snapshots snap ON snap.session_id = s.id
+            LEFT JOIN playthrough_metadata pm ON pm.save_id = s.save_id
+            WHERE pm.trashed_at IS NULL
             GROUP BY s.id
             ORDER BY (s.ended_at IS NULL) DESC, COALESCE(s.last_updated_at, s.started_at) DESC
             LIMIT 1;
