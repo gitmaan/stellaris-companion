@@ -36,6 +36,7 @@ from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
 from backend.core.model_briefing import build_model_briefing
 from backend.core.model_routing import display_model_name, normalize_model_routing_mode
+from stellaris_companion.game_knowledge import build_game_knowledge_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -392,6 +393,16 @@ def _parse_iso_datetime(value: Any) -> datetime | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+
+def _chronicle_game_knowledge(briefing: dict[str, Any]) -> str:
+    """Resolve the shared mechanics context from a model-facing briefing."""
+    meta = briefing.get("meta") if isinstance(briefing.get("meta"), dict) else {}
+    model_context = (
+        briefing.get("model_context") if isinstance(briefing.get("model_context"), dict) else {}
+    )
+    version = str(meta.get("version") or model_context.get("game_version") or "unknown")
+    return build_game_knowledge_prompt(version, purpose="chronicle")
 
 
 class ChronicleGenerator:
@@ -1002,6 +1013,7 @@ class ChronicleGenerator:
             contents=prompt,
             config={"temperature": 1.0, "max_output_tokens": 2048},
             purpose_label="Chronicle recap",
+            game_knowledge_context=_chronicle_game_knowledge(data["briefing"]),
         )
 
         return {
@@ -1019,17 +1031,21 @@ class ChronicleGenerator:
         contents: str,
         config: dict[str, Any],
         purpose_label: str,
+        game_knowledge_context: str | None = None,
     ) -> AdvisorGenerationResult:
         """Generate Chronicle content through the selected model provider."""
         response_schema = config.get("response_schema")
+        system_prompt = (
+            "Follow the Chronicle instructions precisely. Write as an in-universe "
+            "historian, never as a strategic advisor. Treat the supplied events and "
+            "campaign context as evidence: dramatize the voice, but do not invent "
+            "motives, actions, causes, outcomes, or availability. Never turn events "
+            "that share a date into a causal claim or use literary framing to add facts."
+        )
+        if game_knowledge_context:
+            system_prompt = f"{system_prompt}\n\n{game_knowledge_context}"
         result = self.provider_generator.generate(
-            system_prompt=(
-                "Follow the Chronicle instructions precisely. Write as an in-universe "
-                "historian, never as a strategic advisor. Treat the supplied events and "
-                "campaign context as evidence: dramatize the voice, but do not invent "
-                "motives, actions, causes, outcomes, or availability. Never turn events "
-                "that share a date into a causal claim or use literary framing to add facts."
-            ),
+            system_prompt=system_prompt,
             user_prompt=contents,
             model_routing_mode=self.model_routing_mode,
             temperature=float(config.get("temperature", 1.0)),
@@ -1054,22 +1070,34 @@ class ChronicleGenerator:
         temperature: float,
         max_output_tokens: int,
         purpose_label: str,
+        game_knowledge_context: str | None = None,
     ) -> tuple[BaseModel, AdvisorGenerationResult]:
         """Generate and validate structured Chronicle output with one corrective retry."""
         validation_error: Exception | None = None
         prompt = contents
 
         for attempt in range(2):
-            result = self._generate_content_with_routing(
-                contents=prompt,
-                config={
-                    "temperature": temperature,
-                    "max_output_tokens": max_output_tokens,
-                    "response_schema": response_schema,
-                    "allow_schema_fallback": attempt == 0,
-                },
-                purpose_label=purpose_label,
-            )
+            try:
+                result = self._generate_content_with_routing(
+                    contents=prompt,
+                    config={
+                        "temperature": temperature,
+                        "max_output_tokens": max_output_tokens,
+                        "response_schema": response_schema,
+                        "allow_schema_fallback": attempt == 0,
+                    },
+                    purpose_label=purpose_label,
+                    game_knowledge_context=game_knowledge_context,
+                )
+            except AdvisorProviderError as exc:
+                if attempt == 0 and exc.code == "PROVIDER_EMPTY_RESPONSE":
+                    logger.warning("%s returned an empty response; retrying once", purpose_label)
+                    prompt = (
+                        f"{contents.rstrip()}\n\n"
+                        "Return only a non-empty JSON object matching the requested schema."
+                    )
+                    continue
+                raise
             try:
                 return _validate_structured_response(result.text, response_schema), result
             except Exception as exc:
@@ -1566,6 +1594,7 @@ than a factual claim. When a reason is not present in the event list, leave it u
             temperature=0.7,
             max_output_tokens=4096,
             purpose_label=f"Chronicle chapter {chapter_number}",
+            game_knowledge_context=_chronicle_game_knowledge(briefing),
         )
         chapter = ChapterOutput.model_validate(parsed)
         sections = [section.model_dump() for section in chapter.sections]
@@ -1697,6 +1726,7 @@ Do NOT give advice. You are a historian, not an advisor.
             temperature=1.0,
             max_output_tokens=1024,
             purpose_label="Chronicle current era",
+            game_knowledge_context=_chronicle_game_knowledge(briefing),
         )
         era_output = CurrentEraOutput.model_validate(parsed)
         sections = [section.model_dump() for section in era_output.sections]
@@ -1779,6 +1809,7 @@ Do NOT give advice. You are a historian, not an advisor.
             contents=prompt,
             config={"temperature": 1.0, "max_output_tokens": 4096},
             purpose_label="Chronicle legacy",
+            game_knowledge_context=_chronicle_game_knowledge(data["briefing"]),
         )
 
         chronicle_text = response.text

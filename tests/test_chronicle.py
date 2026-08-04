@@ -1505,6 +1505,43 @@ class TestChronicleProviderRouting:
         assert provider.generate.call_args_list[1].kwargs["allow_schema_fallback"] is False
         assert generator._model_routing_response()["provider"] == "custom"  # type: ignore[attr-defined]
 
+    def test_retries_empty_structured_response_once(self, provider_config):
+        provider = MagicMock()
+        provider.config = provider_config
+        provider.generate.side_effect = [
+            AdvisorProviderError(
+                "Provider returned an empty response",
+                code="PROVIDER_EMPTY_RESPONSE",
+            ),
+            AdvisorGenerationResult(
+                text=(
+                    '{"sections":[{"type":"prose","text":"The record endured.","attribution":""}]}'
+                ),
+                model="local-story-model",
+                requested_model="local-story-model",
+                provider="custom",
+            ),
+        ]
+        generator = ChronicleGenerator(
+            db=MagicMock(),
+            provider_config=provider_config,
+            provider_generator=provider,
+        )
+
+        parsed, _ = generator._generate_structured_content(  # type: ignore[attr-defined]
+            contents="Write the current era.",
+            response_schema=CurrentEraOutput,
+            temperature=1.0,
+            max_output_tokens=1024,
+            purpose_label="Chronicle current era",
+        )
+
+        assert parsed.sections[0].text == "The record endured."
+        assert provider.generate.call_count == 2
+        retry = provider.generate.call_args_list[1].kwargs
+        assert "non-empty JSON object" in retry["user_prompt"]
+        assert retry["allow_schema_fallback"] is False
+
     def test_does_not_retry_after_prompt_schema_fallback(self, provider_config):
         provider = MagicMock()
         provider.config = provider_config
@@ -1564,7 +1601,10 @@ class TestChronicleProviderRouting:
         chapter = generator._generate_chapter_content(  # type: ignore[attr-defined]
             chapter_number=1,
             events=[],
-            briefing={"identity": {"empire_name": "Test Empire", "ethics": []}},
+            briefing={
+                "meta": {"version": "Pegasus v4.4.6"},
+                "identity": {"empire_name": "Test Empire", "ethics": []},
+            },
             previous_chapters=[],
             start_date="2200.01.01",
             end_date="2205.01.01",
@@ -1578,6 +1618,9 @@ class TestChronicleProviderRouting:
         assert call.kwargs["response_schema"] is ChapterOutput
         assert call.kwargs["temperature"] == 0.7
         assert "dramatize the voice, but do not invent" in call.kwargs["system_prompt"]
+        assert "Verified mechanics for Pegasus v4.4.6" in call.kwargs["system_prompt"]
+        assert "A normal Anchorage adds 5 Naval Capacity" in call.kwargs["system_prompt"]
+        assert "never as evidence that an event occurred" in call.kwargs["system_prompt"]
         assert "When a reason is" in call.kwargs["user_prompt"]
         assert "not present in the event list, leave it unexplained" in call.kwargs["user_prompt"]
         assert "Events sharing a date establish coexistence" in call.kwargs["user_prompt"]
