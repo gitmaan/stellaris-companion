@@ -69,10 +69,10 @@ test('campaign manager supports bulk cleanup, restore, labels, reset undo, and p
     await page.getByRole('button', { name: /Chronicle/i }).click()
     await expect(page.getByText('Old teaser.')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Manage campaigns' }).click()
+    await page.getByRole('complementary').getByRole('button', { name: 'Manage campaigns' }).click()
     const dialog = page.getByRole('dialog', { name: 'Campaign History' })
     await expect(dialog).toBeVisible()
-    await dialog.getByRole('button', { name: 'Select empty starts (2)' }).click()
+    await dialog.getByRole('button', { name: 'Select unused campaigns (2)' }).click()
     await dialog.getByRole('button', { name: 'Move selected to Trash (2)' }).click()
     await expect(dialog.getByRole('button', { name: 'Campaigns (1)' })).toBeVisible()
 
@@ -88,9 +88,9 @@ test('campaign manager supports bulk cleanup, restore, labels, reset undo, and p
     await expect(dialog.getByText('Clean Test Run')).toBeVisible()
 
     const currentRow = dialog.locator('article').filter({ hasText: 'United Nations of Earth' })
-    await currentRow.getByRole('button', { name: 'Reset Chronicle' }).click()
-    await currentRow.getByRole('button', { name: 'Confirm reset' }).click()
-    await expect(page.getByText('Chronicle reset. Campaign history was kept.')).toBeVisible()
+    await currentRow.getByRole('button', { name: 'Clear Chronicle' }).click()
+    await currentRow.getByRole('button', { name: 'Confirm clear' }).click()
+    await expect(page.getByText('Chronicle cleared. Campaign history was kept.')).toBeVisible()
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
 
     const cleanRow = dialog.locator('article').filter({ hasText: 'Clean Test Run' })
@@ -100,6 +100,85 @@ test('campaign manager supports bulk cleanup, restore, labels, reset undo, and p
     await deleteRow.getByRole('button', { name: 'Delete permanently' }).click()
     await deleteRow.getByRole('button', { name: 'Confirm delete' }).click()
     await expect(dialog.getByText('Clean Test Run')).not.toBeVisible()
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(userDataDir, { recursive: true, force: true })
+  }
+})
+
+test('game data settings use plain language and open campaign management directly', async () => {
+  const backend = createMockChronicleBackend({ campaigns: historyCampaigns() })
+  const backendPort = await backend.start()
+  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-companion-settings-history-e2e-'))
+  const app = await launchApp(backendPort, userDataDir)
+
+  try {
+    await app.evaluate(({ dialog, shell }) => {
+      dialog.showOpenDialog = async () => ({
+        canceled: false,
+        filePaths: ['/tmp/Stellaris Saves'],
+      })
+      dialog.showSaveDialog = async () => ({
+        canceled: false,
+        filePath: '/tmp/Stellaris Companion History Backup.db',
+      })
+      globalThis.__historyRevealPath = null
+      shell.showItemInFolder = selectedPath => {
+        globalThis.__historyRevealPath = selectedPath
+      }
+    })
+
+    const page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    await page.getByRole('button', { name: /Config/i }).click()
+
+    await expect(page.getByText('GAME DATA', { exact: true })).toBeVisible()
+    await expect(page.getByText('SAVE GAME FOLDER', { exact: true })).toBeVisible()
+    await expect(page.getByText('CAMPAIGN HISTORY', { exact: true })).toBeVisible()
+    await expect(page.getByText('18.0 MB stored on this device')).toBeVisible()
+
+    const saveFolder = page.getByLabel('SAVE FOLDER')
+    await expect(saveFolder).toHaveAttribute('placeholder', 'DETECTED AUTOMATICALLY')
+    await page.getByRole('button', { name: 'CHANGE FOLDER' }).click()
+    await expect(saveFolder).toHaveValue('/tmp/Stellaris Saves')
+    await page.getByRole('button', { name: 'USE AUTOMATIC' }).click()
+    await expect(saveFolder).toHaveValue('')
+
+    await expect(page.getByLabel('YOUR MULTIPLAYER NAME')).not.toBeVisible()
+    const multiplayerSettings = page.getByRole('button', { name: 'MULTIPLAYER SETTINGS' })
+    await multiplayerSettings.click()
+    await expect(multiplayerSettings).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByLabel('YOUR MULTIPLAYER NAME')).toBeVisible()
+    await multiplayerSettings.click()
+    await expect(page.getByLabel('YOUR MULTIPLAYER NAME')).not.toBeVisible()
+
+    await page.getByRole('button', { name: 'OPEN FOLDER' }).click()
+    const revealedPath = await app.evaluate(() => globalThis.__historyRevealPath)
+    expect(revealedPath).toContain('stellaris_history.db')
+
+    await page.getByRole('button', { name: 'CREATE BACKUP' }).click()
+    await expect(page.getByText('Campaign history backup saved.')).toBeVisible()
+
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0].setSize(800, 650)
+    })
+    const historySummary = page.getByText('18.0 MB stored on this device')
+    await historySummary.scrollIntoViewIfNeeded()
+    const viewportWidth = await page.evaluate(() => window.innerWidth)
+    const historySummaryBox = await historySummary.boundingBox()
+    expect(historySummaryBox.height).toBeLessThan(40)
+    for (const accessibleName of ['Manage campaign history', 'CREATE BACKUP', 'OPEN FOLDER']) {
+      const box = await page.getByRole('button', { name: accessibleName }).boundingBox()
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(viewportWidth)
+    }
+
+    await page.getByRole('button', { name: 'Manage campaign history' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Campaign History' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Select unused campaigns (2)' })).toBeVisible()
+    await expect(dialog.getByText('Finds campaigns with no story or recorded events.')).toBeVisible()
   } finally {
     await app.close()
     await backend.stop()

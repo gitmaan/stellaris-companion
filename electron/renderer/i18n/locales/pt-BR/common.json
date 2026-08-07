@@ -257,14 +257,15 @@
     "saveSuccess": "CONFIGURACAO SALVA // AJUSTES APLICADOS",
     "sections": {
       "intelligence": "UPLINK DE INTELIGENCIA",
-      "data": "INGESTAO DE DADOS",
+      "data": "DADOS DO JOGO",
       "communications": "RELE DE COMUNICACOES",
       "updates": "ATUALIZACOES DE SOFTWARE",
       "diagnostics": "DIAGNOSTICO"
     },
     "panels": {
       "geminiAccess": "ACESSO AO MODELO GEMINI",
-      "saveSource": "FONTE DO SAVE",
+      "saveSource": "PASTA DE SAVES",
+      "campaignHistory": "HISTORICO DE CAMPANHAS",
       "discordLink": "LINK DO DISCORD",
       "updateChannel": "CANAL DE ATUALIZACAO"
     },
@@ -300,9 +301,24 @@
       "toastSuccess": "Roteamento de modelo definido como {{mode}}."
     },
     "saveData": {
-      "directoryLabel": "CAMINHO DO DIRETORIO",
-      "placeholder": "AUTO-DETECTAR",
-      "target": "ALVO: DIRETORIO LOCAL DE SAVES DO STELLARIS"
+      "directoryLabel": "PASTA DE SAVES",
+      "placeholder": "DETECTADA AUTOMATICAMENTE",
+      "changeFolder": "ALTERAR PASTA",
+      "useAutomatic": "USAR DETECCAO AUTOMATICA",
+      "target": "Onde o Stellaris armazena seus saves.",
+      "multiplayerSettings": "CONFIGURACOES MULTIJOGADOR",
+      "playerNameLabel": "SEU NOME MULTIJOGADOR",
+      "playerNamePlaceholder": "DEIXE VAZIO PARA UM JOGADOR",
+      "playerNameHelp": "Usado apenas para identificar seu imperio em saves multijogador.",
+      "historyLoading": "Verificando o historico de campanhas...",
+      "historySize": "{{size}} armazenados neste dispositivo",
+      "manageCampaignsAria": "Gerenciar historico de campanhas",
+      "revealHistory": "ABRIR PASTA",
+      "backupHistory": "CRIAR BACKUP",
+      "backingUp": "CRIANDO BACKUP...",
+      "backupSuccess": "Backup do historico de campanhas salvo.",
+      "revealError": "Nao foi possivel abrir a pasta do historico de campanhas.",
+      "historyHelp": "Crie uma copia do seu historico ou gerencie campanhas antigas e duplicadas."
     },
     "discord": {
       "loading": "ESTABELECENDO HANDSHAKE...",

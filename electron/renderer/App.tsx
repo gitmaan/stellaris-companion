@@ -43,6 +43,7 @@ const tabTransition = {
 function App() {
   const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('chat')
+  const [campaignHistoryOpenRequest, setCampaignHistoryOpenRequest] = useState(0)
   const [uiTheme, setUiTheme] = useState<UiTheme>(DEFAULT_UI_THEME)
   const [chronicleRefreshMode, setChronicleRefreshMode] = useState<ChronicleRefreshMode>(
     DEFAULT_CHRONICLE_REFRESH_MODE,
@@ -160,6 +161,11 @@ function App() {
     setTransmissionsOpen(false)
   }, [])
 
+  const handleOpenCampaignHistory = useCallback(() => {
+    setActiveTab('chronicle')
+    setCampaignHistoryOpenRequest(request => request + 1)
+  }, [])
+
   return (
     <ErrorBoundary onError={(err) => promptErrorReport(err, 'ui')}>
       <HUDContainer data-theme={uiTheme} className="flex flex-col h-screen">
@@ -264,6 +270,7 @@ function App() {
                         refreshMode={chronicleRefreshMode}
                         modelRoutingMode={modelRoutingMode}
                         onOpenSettings={() => setActiveTab('settings')}
+                        historyOpenRequest={campaignHistoryOpenRequest}
                       />
                     )}
                     {tab === 'settings' && (
@@ -274,6 +281,7 @@ function App() {
                         onChronicleRefreshModeChange={setChronicleRefreshMode}
                         onModelRoutingModeChange={setModelRoutingMode}
                         onLanguageChange={setResolvedLanguage}
+                        onOpenCampaignHistory={handleOpenCampaignHistory}
                       />
                     )}
                   </div>

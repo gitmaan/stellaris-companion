@@ -257,14 +257,15 @@
     "saveSuccess": "配置已保存 // 设置已应用",
     "sections": {
       "intelligence": "情报上行链路",
-      "data": "数据摄取",
+      "data": "游戏数据",
       "communications": "通信中继",
       "updates": "软件更新",
       "diagnostics": "诊断"
     },
     "panels": {
       "geminiAccess": "Gemini 模型访问",
-      "saveSource": "存档来源",
+      "saveSource": "游戏存档文件夹",
+      "campaignHistory": "战役历史",
       "discordLink": "Discord 连接",
       "updateChannel": "更新轨道"
     },
@@ -300,9 +301,24 @@
       "toastSuccess": "模型路由已设置为 {{mode}}。"
     },
     "saveData": {
-      "directoryLabel": "目录路径",
-      "placeholder": "自动检测",
-      "target": "目标：STELLARIS 存档目录（本地）"
+      "directoryLabel": "存档文件夹",
+      "placeholder": "已自动检测",
+      "changeFolder": "更改文件夹",
+      "useAutomatic": "使用自动检测",
+      "target": "Stellaris 保存游戏存档的位置。",
+      "multiplayerSettings": "多人游戏设置",
+      "playerNameLabel": "你的多人游戏名称",
+      "playerNamePlaceholder": "单人游戏请留空",
+      "playerNameHelp": "仅用于在多人游戏存档中识别你的帝国。",
+      "historyLoading": "正在检查战役历史...",
+      "historySize": "此设备上已存储 {{size}}",
+      "manageCampaignsAria": "管理战役历史",
+      "revealHistory": "打开文件夹",
+      "backupHistory": "创建备份",
+      "backingUp": "正在创建备份...",
+      "backupSuccess": "战役历史备份已保存。",
+      "revealError": "无法打开战役历史文件夹。",
+      "historyHelp": "创建战役历史副本，或管理旧战役和重复战役。"
     },
     "discord": {
       "loading": "正在建立握手...",

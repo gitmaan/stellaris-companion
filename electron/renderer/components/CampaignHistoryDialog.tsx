@@ -315,7 +315,7 @@ function CampaignHistoryDialog({
                 value={query}
                 onChange={event => setQuery(event.target.value)}
                 placeholder={t('chronicle.history.search')}
-                className="ml-auto min-w-48 rounded border border-border bg-bg-primary px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent-cyan/60"
+                className="w-full min-w-48 rounded border border-border bg-bg-primary px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent-cyan/60 sm:ml-auto sm:w-auto"
               />
             </div>
 
@@ -354,7 +354,7 @@ function CampaignHistoryDialog({
                     const isWorking = workingId === playthrough.save_id
                     return (
                       <article key={playthrough.save_id} className="rounded-md border border-border bg-bg-primary/40 p-4">
-                        <div className="flex gap-3">
+                        <div className="flex flex-col gap-3 sm:flex-row">
                           {tab === 'active' && !playthrough.is_current && (
                             <input
                               type="checkbox"
@@ -382,11 +382,18 @@ function CampaignHistoryDialog({
                             )}
                             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
                               <span>{t('chronicle.history.gameDates', { first: formatGameDate(playthrough.first_game_date), last: formatGameDate(playthrough.last_game_date) })}</span>
-                              <span>{t('chronicle.history.sessions', { count: playthrough.session_count })}</span>
-                              <span>{t('chronicle.history.snapshots', { count: playthrough.snapshot_count })}</span>
                               <span>{t('chronicle.history.events', { count: playthrough.event_count })}</span>
-                              <span>{t('chronicle.history.chapters', { count: playthrough.total_chapter_count })}</span>
                             </div>
+                            <details className="mt-2 text-xs text-text-muted">
+                              <summary className="cursor-pointer select-none transition-colors hover:text-text-secondary">
+                                {t('chronicle.history.moreDetails')}
+                              </summary>
+                              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 pl-3">
+                                <span>{t('chronicle.history.sessions', { count: playthrough.session_count })}</span>
+                                <span>{t('chronicle.history.snapshots', { count: playthrough.snapshot_count })}</span>
+                                <span>{t('chronicle.history.chapters', { count: playthrough.total_chapter_count })}</span>
+                              </div>
+                            </details>
 
                             {editingId === playthrough.save_id && (
                               <div className="mt-3 flex max-w-lg gap-2">
@@ -418,7 +425,7 @@ function CampaignHistoryDialog({
                             )}
                           </div>
 
-                          <div className="flex shrink-0 flex-wrap content-start justify-end gap-2 sm:max-w-72">
+                          <div className="flex w-full shrink-0 flex-wrap content-start gap-2 sm:w-auto sm:max-w-72 sm:justify-end">
                             {tab === 'active' ? (
                               <>
                                 <ActionButton onClick={() => { setEditingId(playthrough.save_id); setLabel(playthrough.display_label || '') }} disabled={isWorking}>
@@ -443,7 +450,13 @@ function CampaignHistoryDialog({
                                   {t('chronicle.history.restore')}
                                 </ActionButton>
                                 <ActionButton onClick={() => void handleDelete(playthrough)} disabled={isWorking} tone="danger">
-                                  {confirmDeleteId === playthrough.save_id ? t('chronicle.history.confirmDelete') : t('chronicle.history.delete')}
+                                  {publication?.state === 'published'
+                                    ? (confirmDeleteId === playthrough.save_id
+                                      ? t('chronicle.history.confirmDeleteLocal')
+                                      : t('chronicle.history.deleteLocal'))
+                                    : (confirmDeleteId === playthrough.save_id
+                                      ? t('chronicle.history.confirmDelete')
+                                      : t('chronicle.history.delete'))}
                                 </ActionButton>
                               </>
                             )}

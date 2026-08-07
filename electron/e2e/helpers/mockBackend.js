@@ -243,6 +243,24 @@ function createMockChronicleBackend(options = {}) {
       return
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/history/storage') {
+      sendJson(res, 200, options.historyStorage ?? {
+        path: '/tmp/stellaris-companion/stellaris_history.db',
+        bytes: 18 * 1024 * 1024,
+        files: { database: 16 * 1024 * 1024, working: 2 * 1024 * 1024 },
+      })
+      return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/history/backup') {
+      const body = await readJsonBody(req)
+      sendJson(res, 200, {
+        path: body.destination,
+        bytes: options.historyStorage?.bytes ?? 18 * 1024 * 1024,
+      })
+      return
+    }
+
     const playthroughMatch = url.pathname.match(/^\/api\/playthroughs\/([^/]+)(?:\/([^/]+))?$/)
     if (playthroughMatch) {
       const saveId = decodeURIComponent(playthroughMatch[1])

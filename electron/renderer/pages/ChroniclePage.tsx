@@ -114,6 +114,7 @@ interface ChroniclePageProps {
   refreshMode?: ChronicleRefreshMode
   modelRoutingMode?: ModelRoutingMode
   onOpenSettings?: () => void
+  historyOpenRequest?: number
 }
 
 function ChroniclePage({
@@ -121,6 +122,7 @@ function ChroniclePage({
   refreshMode = DEFAULT_CHRONICLE_REFRESH_MODE,
   modelRoutingMode,
   onOpenSettings,
+  historyOpenRequest = 0,
 }: ChroniclePageProps) {
   const { t } = useTranslation()
   const backend = useBackend()
@@ -174,6 +176,10 @@ function ChroniclePage({
   const [narratorPanelOpen, setNarratorPanelOpen] = useState(false)
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
+
+  useEffect(() => {
+    if (historyOpenRequest > 0) setHistoryDialogOpen(true)
+  }, [historyOpenRequest])
 
   // Sidebar collapse state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
