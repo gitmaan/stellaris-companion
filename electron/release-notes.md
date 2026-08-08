@@ -1,4 +1,4 @@
-- Improved Advisor and Chronicle accuracy for current Stellaris 4.4 mechanics.
-- Added stronger guidance for populations, Trade, war participation, and Nomad economies.
-- Reduced stale or invented campaign interpretations by grounding responses in save data and verified game rules.
-- Improved Chronicle reliability when a model returns an empty or incomplete structured response.
+- Added Campaign History tools to rename, hide, restore, or remove individual campaigns.
+- Made empty restart cleanup faster with search and one-click selection.
+- Existing Chronicles remain intact through automatic upgrades, with backup and undo protection.
+- Thanks to **duelingThoughts** for bringing this to my attention.
