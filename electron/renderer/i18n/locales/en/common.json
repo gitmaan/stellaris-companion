@@ -367,6 +367,17 @@
     },
     "advisor": {
       "providerLabel": "AI PROVIDER",
+      "providerChoiceLabel": "WHERE SHOULD AI RUN?",
+      "localProviderLabel": "LOCAL APP",
+      "otherProviderLabel": "PROVIDER",
+      "providerGroups": {
+        "gemini": "Gemini",
+        "geminiTag": "EASIEST SETUP",
+        "local": "Local / private",
+        "localTag": "RUNS ON THIS DEVICE",
+        "other": "Other provider",
+        "otherTag": "HOSTED OR CUSTOM"
+      },
       "apiKeyLabel": "OPENROUTER API KEY",
       "optionalApiKeyLabel": "API KEY",
       "baseUrlLabel": "SERVER URL",
@@ -388,8 +399,8 @@
       "connectionError": "Could not check this provider.",
       "testModel": "TEST MODEL",
       "testingModel": "TESTING MODEL...",
-      "modelReady": "ADVISOR + CHRONICLE READY",
-      "modelReadyPromptJson": "ADVISOR + CHRONICLE READY // COMPATIBILITY MODE",
+      "modelReady": "STRUCTURED RESPONSES SUPPORTED",
+      "modelReadyPromptJson": "STRUCTURED RESPONSES SUPPORTED // COMPATIBILITY MODE",
       "modelAdvisorOnly": "ADVISOR READY // CHRONICLE NOT COMPATIBLE",
       "modelTestError": "The selected model could not complete the structured output test.",
       "modelTestPrivacy": "The test sends no campaign data and does not validate campaign-size context.",

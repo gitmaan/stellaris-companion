@@ -52,6 +52,7 @@ const {
   discoverAdvisorModels,
   getAdvisorProviderBaseUrl,
   normalizeAdvisorProvider,
+  normalizeProviderBaseUrl,
   testAdvisorModel,
 } = require('./main/advisorProviders')
 
@@ -987,6 +988,10 @@ function getSettingsWithSecrets() {
  * @returns {Object} Result with success status
  */
 function saveSettings(settings) {
+  const normalizedAdvisorBaseUrl = settings.advisorBaseUrl !== undefined
+    ? normalizeProviderBaseUrl(settings.advisorBaseUrl)
+    : null
+
   if (settings.googleApiKey !== undefined && !settings.googleApiKey.includes('...')) {
     setSecret(SECRET_STORE_KEYS.googleApiKey, settings.googleApiKey || null)
   }
@@ -1012,7 +1017,7 @@ function saveSettings(settings) {
   }
 
   if (settings.advisorBaseUrl !== undefined) {
-    store.set('advisorBaseUrl', String(settings.advisorBaseUrl || '').trim())
+    store.set('advisorBaseUrl', normalizedAdvisorBaseUrl)
   }
 
   const nextSaveDir = settings.saveDir !== undefined ? settings.saveDir : settings.savePath

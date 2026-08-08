@@ -19,3 +19,14 @@ test('ships complete update-channel and protected-storage copy in every locale',
     assert.ok(settings?.updateChannel?.betaWarning, `${locale}: missing Beta warning`)
   }
 })
+
+test('keeps provider setup simple without overstating the connection probe', () => {
+  const messages = JSON.parse(fs.readFileSync(path.join(localesDir, 'en', 'common.json'), 'utf8'))
+  const advisor = messages.settings.advisor
+
+  assert.ok(advisor.providerGroups.gemini)
+  assert.ok(advisor.providerGroups.local)
+  assert.ok(advisor.providerGroups.other)
+  assert.match(advisor.modelReady, /structured responses supported/i)
+  assert.doesNotMatch(advisor.modelReady, /advisor.*chronicle ready/i)
+})
