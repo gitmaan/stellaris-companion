@@ -21,9 +21,12 @@ const itemVariants = {
 interface SaveInfo {
   save_id: string
   empire_name: string
+  display_name: string
   ethics?: string[]
   chapter_count: number
   last_date: string
+  is_current: boolean
+  has_chronicle: boolean
 }
 
 interface ChronicleChapterListProps {
@@ -39,6 +42,7 @@ interface ChronicleChapterListProps {
   loading: boolean
   regeneratingChapter: number | null
   onRefresh: () => void
+  onManageCampaigns?: () => void
   onOpenNarratorPanel?: () => void
   onPublish?: () => void
   onExport?: () => void
@@ -62,6 +66,7 @@ function ChronicleChapterList({
   loading,
   regeneratingChapter,
   onRefresh,
+  onManageCampaigns,
   onOpenNarratorPanel,
   onPublish,
   onExport,
@@ -110,20 +115,29 @@ function ChronicleChapterList({
           >
             {saves.map(save => (
               <option key={save.save_id} value={save.save_id}>
-                {save.empire_name}
+                {save.display_name} · {save.last_date}{save.is_current ? ` · ${t('chronicle.sidebar.current')}` : ''}
               </option>
             ))}
           </select>
         ) : selectedSave ? (
           <div className="flex items-center gap-2 p-2.5 bg-bg-tertiary/50 border border-border rounded-md">
             <span className="text-accent-teal text-base">◈</span>
-            <span className="text-sm font-medium text-text-primary truncate">{selectedSave.empire_name}</span>
+            <span className="text-sm font-medium text-text-primary truncate">{selectedSave.display_name}</span>
           </div>
         ) : (
           <div className="flex items-center gap-2 p-2.5 bg-bg-tertiary/50 border border-border rounded-md opacity-60">
             <span className="text-text-secondary text-base">◇</span>
             <span className="text-sm font-medium text-text-secondary">{t('chronicle.sidebar.noHistory')}</span>
           </div>
+        )}
+        {onManageCampaigns && (
+          <button
+            type="button"
+            onClick={onManageCampaigns}
+            className="mt-2 w-full rounded border border-border px-3 py-2 text-left text-xs uppercase tracking-wider text-text-secondary transition-colors hover:border-accent-cyan/40 hover:bg-accent-cyan/5 hover:text-accent-cyan"
+          >
+            {t('chronicle.sidebar.manageCampaigns')}
+          </button>
         )}
       </div>
 

@@ -257,14 +257,15 @@
     "saveSuccess": "設定を保存しました // 適用済み",
     "sections": {
       "intelligence": "情報アップリンク",
-      "data": "データ取り込み",
+      "data": "ゲームデータ",
       "communications": "通信リレー",
       "updates": "ソフトウェア更新",
       "diagnostics": "診断"
     },
     "panels": {
       "geminiAccess": "Gemini モデルアクセス",
-      "saveSource": "セーブファイルの場所",
+      "saveSource": "セーブゲームフォルダー",
+      "campaignHistory": "キャンペーン履歴",
       "discordLink": "Discord 接続",
       "updateChannel": "更新トラック"
     },
@@ -300,9 +301,24 @@
       "toastSuccess": "モデルルーティングを {{mode}} に設定しました。"
     },
     "saveData": {
-      "directoryLabel": "ディレクトリパス",
-      "placeholder": "自動検出",
-      "target": "対象: Stellaris セーブゲームディレクトリ (ローカル)"
+      "directoryLabel": "セーブフォルダー",
+      "placeholder": "自動検出済み",
+      "changeFolder": "フォルダーを変更",
+      "useAutomatic": "自動検出を使用",
+      "target": "Stellaris がセーブゲームを保存する場所です。",
+      "multiplayerSettings": "マルチプレイヤー設定",
+      "playerNameLabel": "マルチプレイヤー名",
+      "playerNamePlaceholder": "シングルプレイヤーでは空欄",
+      "playerNameHelp": "マルチプレイヤーのセーブで帝国を識別する場合にのみ使用します。",
+      "historyLoading": "キャンペーン履歴を確認中...",
+      "historySize": "このデバイスに {{size}} 保存",
+      "manageCampaignsAria": "キャンペーン履歴を管理",
+      "revealHistory": "フォルダーを開く",
+      "backupHistory": "バックアップを作成",
+      "backingUp": "バックアップを作成中...",
+      "backupSuccess": "キャンペーン履歴のバックアップを保存しました。",
+      "revealError": "キャンペーン履歴フォルダーを開けませんでした。",
+      "historyHelp": "キャンペーン履歴をコピーするか、古いキャンペーンや重複を管理します。"
     },
     "discord": {
       "loading": "ハンドシェイク確立中...",

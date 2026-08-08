@@ -257,14 +257,15 @@
     "saveSuccess": "KONFIGURATION GESPEICHERT // EINSTELLUNGEN ANGEWENDET",
     "sections": {
       "intelligence": "AUFKLAERUNGS-UPLINK",
-      "data": "DATENAUFNAHME",
+      "data": "SPIELDATEN",
       "communications": "KOMMUNIKATIONSRELAIS",
       "updates": "SOFTWARE-UPDATES",
       "diagnostics": "DIAGNOSE"
     },
     "panels": {
       "geminiAccess": "GEMINI-MODELLZUGRIFF",
-      "saveSource": "SPEICHERDATEI-QUELLE",
+      "saveSource": "SPIELSTAND-ORDNER",
+      "campaignHistory": "KAMPAGNENVERLAUF",
       "discordLink": "DISCORD-VERBINDUNG",
       "updateChannel": "UPDATE-KANAL"
     },
@@ -300,9 +301,24 @@
       "toastSuccess": "Modell-Routing auf {{mode}} gesetzt."
     },
     "saveData": {
-      "directoryLabel": "VERZEICHNISPFAD",
-      "placeholder": "AUTO-ERKENNUNG",
-      "target": "ZIEL: STELLARIS-SPEICHERDATEI-VERZEICHNIS (LOKAL)"
+      "directoryLabel": "SPEICHERORDNER",
+      "placeholder": "AUTOMATISCH ERKANNT",
+      "changeFolder": "ORDNER AENDERN",
+      "useAutomatic": "AUTOMATISCH VERWENDEN",
+      "target": "Hier speichert Stellaris deine Spielstaende.",
+      "multiplayerSettings": "MEHRSPIELER-EINSTELLUNGEN",
+      "playerNameLabel": "DEIN MEHRSPIELERNAME",
+      "playerNamePlaceholder": "FUER EINZELSPIELER LEER LASSEN",
+      "playerNameHelp": "Wird nur verwendet, um dein Reich in Mehrspieler-Spielstaenden zu erkennen.",
+      "historyLoading": "Kampagnenverlauf wird geprueft...",
+      "historySize": "{{size}} auf diesem Geraet gespeichert",
+      "manageCampaignsAria": "Kampagnenverlauf verwalten",
+      "revealHistory": "ORDNER OEFFNEN",
+      "backupHistory": "SICHERUNG ERSTELLEN",
+      "backingUp": "SICHERUNG WIRD ERSTELLT...",
+      "backupSuccess": "Sicherung des Kampagnenverlaufs gespeichert.",
+      "revealError": "Der Ordner fuer den Kampagnenverlauf konnte nicht geoeffnet werden.",
+      "historyHelp": "Erstelle eine Kopie deines Kampagnenverlaufs oder verwalte alte und doppelte Kampagnen."
     },
     "discord": {
       "loading": "HANDSHAKE WIRD HERGESTELLT...",

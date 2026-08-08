@@ -32,6 +32,7 @@ import { HUDButton } from '../components/hud/HUDButton'
 import { HUDSelect } from '../components/hud/HUDForm'
 import { useToast } from '../components/Toast'
 import type { McpRelayHealthResult, McpRelayStatus } from '../global'
+import type { HistoryStorageResponse } from '../hooks/useBackend'
 
 /**
  * DISC-017: Convert technical error messages to user-friendly messages.
@@ -51,6 +52,7 @@ interface SettingsPageProps {
   onChronicleRefreshModeChange?: (mode: ChronicleRefreshMode) => void
   onModelRoutingModeChange?: (mode: ModelRoutingMode) => void
   onLanguageChange?: (language: ResolvedLanguage) => void
+  onOpenCampaignHistory?: () => void
 }
 
 const UI_SCALE_OPTIONS = [
@@ -109,6 +111,14 @@ function formatContextLength(contextLength: number): string {
   return String(contextLength)
 }
 
+function formatBytes(bytes: number | null | undefined): string {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes)) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
 type GeminiQuotaMode = 'standard' | 'higher'
 
 const GEMINI_QUOTA_MODES: GeminiQuotaMode[] = ['standard', 'higher']
@@ -127,6 +137,7 @@ function SettingsPage({
   onChronicleRefreshModeChange,
   onModelRoutingModeChange,
   onLanguageChange,
+  onOpenCampaignHistory,
 }: SettingsPageProps) {
   const { t } = useTranslation()
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
@@ -166,6 +177,7 @@ function SettingsPage({
   } | null>(null)
   const [saveDir, setSaveDir] = useState('')
   const [playerName, setPlayerName] = useState('')
+  const [multiplayerOpen, setMultiplayerOpen] = useState(false)
   const [uiScale, setUiScale] = useState(1)
   const [uiScaleSaving, setUiScaleSaving] = useState(false)
   const [uiTheme, setUiTheme] = useState<UiTheme>(DEFAULT_UI_THEME)
@@ -189,6 +201,8 @@ function SettingsPage({
   const [mcpRelayLoading, setMcpRelayLoading] = useState(false)
   const [mcpRelayChecking, setMcpRelayChecking] = useState(false)
   const [mcpRelayInstalling, setMcpRelayInstalling] = useState(false)
+  const [historyStorage, setHistoryStorage] = useState<HistoryStorageResponse | null>(null)
+  const [historyBackupRunning, setHistoryBackupRunning] = useState(false)
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const settingsHydratedRef = useRef(false)
   const advisorCheckIdRef = useRef(0)
@@ -200,6 +214,14 @@ function SettingsPage({
         clearTimeout(successTimeoutRef.current)
       }
     }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void window.electronAPI?.backend.historyStorage().then(result => {
+      if (!cancelled && result.ok) setHistoryStorage(result.data)
+    })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -218,6 +240,7 @@ function SettingsPage({
     setAdvisorBaseUrl(settings.advisorBaseUrl || '')
     setSaveDir(settings.saveDir || '')
     setPlayerName(settings.playerName || '')
+    setMultiplayerOpen(Boolean(settings.playerName?.trim()))
     setUiScale(settings.uiScale || 1)
     const normalizedTheme = normalizeUiTheme(settings.uiTheme)
     const normalizedChronicleRefreshMode = normalizeChronicleRefreshMode(
@@ -297,6 +320,29 @@ function SettingsPage({
   const handleBrowse = async () => {
     const selectedPath = await showFolderDialog()
     if (selectedPath) setSaveDir(selectedPath)
+  }
+
+  const handleRevealHistory = async () => {
+    const result = await window.electronAPI?.revealHistoryData()
+    if (!result?.success) {
+      showToast({ type: 'error', message: result?.error || t('settings.saveData.revealError') })
+    }
+  }
+
+  const handleBackupHistory = async () => {
+    if (!window.electronAPI?.backupHistory) return
+    setHistoryBackupRunning(true)
+    try {
+      const result = await window.electronAPI.backupHistory()
+      if (result === null) return
+      if (!result.ok) {
+        showToast({ type: 'error', message: result.error, duration: 6000 })
+        return
+      }
+      showToast({ type: 'success', message: t('settings.saveData.backupSuccess') })
+    } finally {
+      setHistoryBackupRunning(false)
+    }
   }
 
   const handleSave = async () => {
@@ -1358,37 +1404,115 @@ function SettingsPage({
                 {/* Save Data Section */}
                 <section>
                     <HUDSectionTitle number="02">{t('settings.sections.data')}</HUDSectionTitle>
-                    <HUDPanel decoration="brackets" title={t('settings.panels.saveSource')} quiet>
-                         <div className="space-y-4 pt-2">
-                             <div className="flex gap-2 items-end">
-                                 <HUDInput 
-                                    className="flex-1"
-                                    label={t('settings.saveData.directoryLabel')}
-                                    value={saveDir}
-                                    onChange={(e) => setSaveDir(e.target.value)}
-                                    placeholder={t('settings.saveData.placeholder')}
-                                    readOnly
-                                 />
-                                 <HUDButton variant="secondary" onClick={handleBrowse} className="mb-[1px]">
-                                     {t('common.browse')}
-                                 </HUDButton>
-                             </div>
-                             <HUDMicro className="block mt-2">
-                                 {t('settings.saveData.target')}
-                             </HUDMicro>
-                             <div className="pt-2">
-                                 <HUDInput
-                                    label={t('settings.saveData.playerNameLabel')}
-                                    value={playerName}
-                                    onChange={(e) => setPlayerName(e.target.value)}
-                                    placeholder={t('settings.saveData.playerNamePlaceholder')}
-                                 />
-                                 <HUDMicro className="block mt-2 normal-case">
-                                     {t('settings.saveData.playerNameHelp')}
-                                 </HUDMicro>
-                             </div>
-                         </div>
-                    </HUDPanel>
+                    <div className="space-y-4">
+                      <HUDPanel decoration="brackets" title={t('settings.panels.saveSource')} quiet>
+                        <div className="space-y-4 pt-2">
+                          <HUDInput
+                            label={t('settings.saveData.directoryLabel')}
+                            value={saveDir}
+                            onChange={(e) => setSaveDir(e.target.value)}
+                            placeholder={t('settings.saveData.placeholder')}
+                            readOnly
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <HUDButton
+                              type="button"
+                              variant="secondary"
+                              onClick={handleBrowse}
+                              className="px-3 py-1.5 text-[10px]"
+                            >
+                              {t('settings.saveData.changeFolder')}
+                            </HUDButton>
+                            {saveDir && (
+                              <HUDButton
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setSaveDir('')}
+                                className="px-3 py-1.5 text-[10px]"
+                              >
+                                {t('settings.saveData.useAutomatic')}
+                              </HUDButton>
+                            )}
+                          </div>
+                          <HUDMicro className="block normal-case tracking-[0.02em] text-white/45">
+                            {t('settings.saveData.target')}
+                          </HUDMicro>
+
+                          <div className="border-t border-white/10 pt-4">
+                            <button
+                              type="button"
+                              aria-expanded={multiplayerOpen}
+                              onClick={() => setMultiplayerOpen(open => !open)}
+                              className="flex w-full items-center justify-between gap-3 text-left"
+                            >
+                              <HUDLabel>{t('settings.saveData.multiplayerSettings')}</HUDLabel>
+                              <span
+                                aria-hidden="true"
+                                className={`text-xs text-text-secondary transition-transform ${multiplayerOpen ? 'rotate-90' : ''}`}
+                              >
+                                ›
+                              </span>
+                            </button>
+                            {multiplayerOpen && (
+                              <div className="mt-4">
+                                <HUDInput
+                                  label={t('settings.saveData.playerNameLabel')}
+                                  value={playerName}
+                                  onChange={(e) => setPlayerName(e.target.value)}
+                                  placeholder={t('settings.saveData.playerNamePlaceholder')}
+                                />
+                                <HUDMicro className="mt-2 block normal-case tracking-[0.02em] text-white/45">
+                                  {t('settings.saveData.playerNameHelp')}
+                                </HUDMicro>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </HUDPanel>
+
+                      <HUDPanel decoration="brackets" title={t('settings.panels.campaignHistory')} quiet>
+                        <div className="space-y-4 pt-2">
+                          <div>
+                            <p className="font-mono text-sm text-text-primary">
+                              {historyStorage
+                                ? t('settings.saveData.historySize', { size: formatBytes(historyStorage.bytes) })
+                                : t('settings.saveData.historyLoading')}
+                            </p>
+                            <p className="mt-2 text-xs leading-relaxed text-text-secondary">
+                              {t('settings.saveData.historyHelp')}
+                            </p>
+                          </div>
+                          <div className="grid max-w-lg grid-cols-1 gap-2 xl:grid-cols-2">
+                            <HUDButton
+                              type="button"
+                              onClick={onOpenCampaignHistory}
+                              aria-label={t('settings.saveData.manageCampaignsAria')}
+                              className="w-full px-3 py-1.5 text-[10px] xl:col-span-2"
+                            >
+                              {t('chronicle.sidebar.manageCampaigns')}
+                            </HUDButton>
+                            <HUDButton
+                              type="button"
+                              variant="secondary"
+                              onClick={() => void handleBackupHistory()}
+                              disabled={historyBackupRunning}
+                              className="w-full px-3 py-1.5 text-[10px]"
+                            >
+                              {historyBackupRunning ? t('settings.saveData.backingUp') : t('settings.saveData.backupHistory')}
+                            </HUDButton>
+                            <HUDButton
+                              type="button"
+                              variant="ghost"
+                              onClick={() => void handleRevealHistory()}
+                              className="w-full px-3 py-1.5 text-[10px]"
+                              title={historyStorage?.path}
+                            >
+                              {t('settings.saveData.revealHistory')}
+                            </HUDButton>
+                          </div>
+                        </div>
+                      </HUDPanel>
+                    </div>
                 </section>
 
             </div>

@@ -257,14 +257,15 @@
     "saveSuccess": "CONFIGURACION GUARDADA // AJUSTES APLICADOS",
     "sections": {
       "intelligence": "ENLACE DE INTELIGENCIA",
-      "data": "INGESTA DE DATOS",
+      "data": "DATOS DEL JUEGO",
       "communications": "RELE DE COMUNICACIONES",
       "updates": "ACTUALIZACIONES DE SOFTWARE",
       "diagnostics": "DIAGNOSTICO"
     },
     "panels": {
       "geminiAccess": "ACCESO AL MODELO GEMINI",
-      "saveSource": "FUENTE DE GUARDADO",
+      "saveSource": "CARPETA DE PARTIDAS",
+      "campaignHistory": "HISTORIAL DE CAMPANAS",
       "discordLink": "ENLACE DISCORD",
       "updateChannel": "CANAL DE ACTUALIZACION"
     },
@@ -300,9 +301,24 @@
       "toastSuccess": "Enrutamiento de modelo establecido en {{mode}}."
     },
     "saveData": {
-      "directoryLabel": "RUTA DE DIRECTORIO",
-      "placeholder": "AUTO-DETECTAR",
-      "target": "OBJETIVO: DIRECTORIO LOCAL DE GUARDADOS DE STELLARIS"
+      "directoryLabel": "CARPETA DE PARTIDAS",
+      "placeholder": "DETECTADA AUTOMATICAMENTE",
+      "changeFolder": "CAMBIAR CARPETA",
+      "useAutomatic": "USAR DETECCION AUTOMATICA",
+      "target": "Donde Stellaris guarda tus partidas.",
+      "multiplayerSettings": "AJUSTES MULTIJUGADOR",
+      "playerNameLabel": "TU NOMBRE MULTIJUGADOR",
+      "playerNamePlaceholder": "DEJAR VACIO PARA UN JUGADOR",
+      "playerNameHelp": "Solo se usa para identificar tu imperio en partidas multijugador.",
+      "historyLoading": "Comprobando el historial de campanas...",
+      "historySize": "{{size}} guardados en este dispositivo",
+      "manageCampaignsAria": "Gestionar historial de campanas",
+      "revealHistory": "ABRIR CARPETA",
+      "backupHistory": "CREAR COPIA",
+      "backingUp": "CREANDO COPIA...",
+      "backupSuccess": "Copia del historial de campanas guardada.",
+      "revealError": "No se pudo abrir la carpeta del historial de campanas.",
+      "historyHelp": "Crea una copia de tu historial o administra campanas antiguas y duplicadas."
     },
     "discord": {
       "loading": "ESTABLECIENDO HANDSHAKE...",

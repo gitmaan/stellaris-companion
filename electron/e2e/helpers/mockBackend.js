@@ -28,6 +28,19 @@ function buildChronicleResponse({ narrative, eventsCovered, cached }) {
   }
 }
 
+function buildEmptyChronicleResponse() {
+  return {
+    chapters: [],
+    current_era: null,
+    pending_chapters: 0,
+    message: null,
+    chronicle: '',
+    cached: false,
+    event_count: 0,
+    generated_at: '',
+  }
+}
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = []
@@ -68,6 +81,18 @@ function createMockChronicleBackend(options = {}) {
   const updatedNarrative = options.updatedNarrative ?? 'Updated after visible refresh.'
   const balancedThreshold = options.balancedThreshold ?? 3
   const enhancedThreshold = options.enhancedThreshold ?? 1
+  let campaigns = (options.campaigns ?? [{
+    saveId: 'save-1',
+    empireName: 'United Nations of Earth',
+    displayLabel: null,
+    current: true,
+    trashed: false,
+    hasChronicle: true,
+    canUndoReset: false,
+    sessionCount: 1,
+    snapshotCount: 3,
+    eventCount: initialEventsCovered,
+  }]).map(campaign => ({ ...campaign }))
 
   const healthPayload = () => ({
     status: 'ok',
@@ -104,6 +129,36 @@ function createMockChronicleBackend(options = {}) {
         is_active: true,
       },
     ],
+  })
+
+  const playthroughsPayload = () => ({
+    current_save_id: campaigns.find(campaign => campaign.current)?.saveId || null,
+    language: 'en',
+    playthroughs: campaigns.map((campaign, index) => ({
+      save_id: campaign.saveId,
+      empire_name: campaign.empireName,
+      display_name: campaign.displayLabel || campaign.empireName,
+      display_label: campaign.displayLabel,
+      latest_session_id: campaign.sessionId || `session-${index + 1}`,
+      first_game_date: campaign.firstGameDate || '2200.01.01',
+      last_game_date: campaign.lastGameDate || (
+        campaign.current && phase === 'advanced' ? '2208.01.01' : '2205.01.01'
+      ),
+      first_seen_at: 1,
+      last_played_at: 2 + index,
+      session_count: campaign.sessionCount ?? 1,
+      snapshot_count: campaign.snapshotCount ?? 0,
+      event_count: campaign.eventCount ?? 0,
+      has_chronicle: campaign.hasChronicle ?? false,
+      cached_languages: campaign.hasChronicle ? ['en'] : [],
+      chapter_count: 0,
+      total_chapter_count: 0,
+      has_current_era: campaign.hasChronicle ?? false,
+      can_undo_reset: campaign.canUndoReset ?? false,
+      is_current: campaign.current ?? false,
+      is_trashed: campaign.trashed ?? false,
+      trashed_at: campaign.trashed ? 1 : null,
+    })),
   })
 
   const statusPayload = () => ({
@@ -181,6 +236,94 @@ function createMockChronicleBackend(options = {}) {
     if (req.method === 'GET' && url.pathname === '/api/sessions') {
       sendJson(res, 200, sessionsPayload())
       return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/playthroughs') {
+      sendJson(res, 200, playthroughsPayload())
+      return
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/history/storage') {
+      sendJson(res, 200, options.historyStorage ?? {
+        path: '/tmp/stellaris-companion/stellaris_history.db',
+        bytes: 18 * 1024 * 1024,
+        files: { database: 16 * 1024 * 1024, working: 2 * 1024 * 1024 },
+      })
+      return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/history/backup') {
+      const body = await readJsonBody(req)
+      sendJson(res, 200, {
+        path: body.destination,
+        bytes: options.historyStorage?.bytes ?? 18 * 1024 * 1024,
+      })
+      return
+    }
+
+    const playthroughMatch = url.pathname.match(/^\/api\/playthroughs\/([^/]+)(?:\/([^/]+))?$/)
+    if (playthroughMatch) {
+      const saveId = decodeURIComponent(playthroughMatch[1])
+      const action = playthroughMatch[2] || null
+      const campaign = campaigns.find(item => item.saveId === saveId)
+      if (!campaign) {
+        sendJson(res, 404, { detail: { error: 'Playthrough not found' } })
+        return
+      }
+
+      if (req.method === 'GET' && action === 'chronicle') {
+        sendJson(res, 200, campaign.hasChronicle
+          ? buildChronicleResponse({
+            narrative: campaign.narrative || initialNarrative,
+            eventsCovered: campaign.eventCount ?? initialEventsCovered,
+            cached: true,
+          })
+          : buildEmptyChronicleResponse())
+        return
+      }
+
+      if (req.method === 'POST' && action === 'label') {
+        const body = await readJsonBody(req)
+        campaign.displayLabel = body.display_label || null
+        sendJson(res, 200, { save_id: saveId, display_label: campaign.displayLabel })
+        return
+      }
+
+      if (req.method === 'POST' && action === 'trash') {
+        if (campaign.current) {
+          sendJson(res, 409, { detail: { error: 'The currently loaded campaign cannot be moved to Trash' } })
+          return
+        }
+        campaign.trashed = true
+        sendJson(res, 200, { save_id: saveId, trashed: true })
+        return
+      }
+
+      if (req.method === 'POST' && action === 'restore') {
+        campaign.trashed = false
+        sendJson(res, 200, { save_id: saveId, trashed: false })
+        return
+      }
+
+      if (req.method === 'POST' && action === 'reset-chronicle') {
+        campaign.hasChronicle = false
+        campaign.canUndoReset = true
+        sendJson(res, 200, { save_id: saveId, reset: true, can_undo: true })
+        return
+      }
+
+      if (req.method === 'POST' && action === 'undo-reset') {
+        campaign.hasChronicle = true
+        campaign.canUndoReset = false
+        sendJson(res, 200, { save_id: saveId, restored: true })
+        return
+      }
+
+      if (req.method === 'DELETE' && !action && campaign.trashed && url.searchParams.get('confirm') === 'true') {
+        campaigns = campaigns.filter(item => item.saveId !== saveId)
+        sendJson(res, 200, { save_id: saveId, deleted: true, counts: {} })
+        return
+      }
     }
 
     if (req.method === 'POST' && url.pathname === '/api/chat') {

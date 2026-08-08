@@ -128,6 +128,15 @@ function createChroniclePublishingService({
     return { removed: true }
   }
 
+  function listLocal() {
+    return readPublicationRecords(store).map(record => ({
+      saveId: record.saveId,
+      state: record.storyId && record.revision ? 'published' : (record.state || 'unpublished'),
+      title: typeof record.title === 'string' ? record.title : '',
+      publicUrl: typeof record.publicUrl === 'string' ? record.publicUrl : null,
+    }))
+  }
+
   function ensurePublisherIdentity() {
     if (!isEncryptionAvailable()) {
       throw new ChroniclePublishingError(
@@ -211,7 +220,7 @@ function createChroniclePublishingService({
     )
   }
 
-  return { publish, getStatus, remove, ensurePublisherIdentity }
+  return { publish, getStatus, remove, listLocal, ensurePublisherIdentity }
 }
 
 function registerChroniclePublishingIpcHandlers({ ipcMain, validateSender, service }) {
@@ -226,6 +235,10 @@ function registerChroniclePublishingIpcHandlers({ ipcMain, validateSender, servi
   ipcMain.handle('chronicle-publishing:delete', async (event, { saveId } = {}) => {
     validateSender(event)
     return invokeSafely(() => service.remove(saveId))
+  })
+  ipcMain.handle('chronicle-publishing:list', async (event) => {
+    validateSender(event)
+    return invokeSafely(() => service.listLocal())
   })
 }
 

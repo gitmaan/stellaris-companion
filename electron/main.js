@@ -21,6 +21,10 @@ const { autoUpdater } = require('electron-updater')
 const { createBackendClient } = require('./main/backendClient')
 const { createAnnouncementsService } = require('./main/announcements')
 const { createHealthCheckManager } = require('./main/healthcheck')
+const {
+  buildHistoryUpgradeFailureDialog,
+  extractHistoryUpgradeError,
+} = require('./main/historyUpgrade')
 const { getLinuxSaveDirCandidates } = require('./main/savePaths')
 const { createSecretStorage } = require('./main/secureStorage')
 const {
@@ -400,12 +404,16 @@ function startPythonBackend(settings) {
     detached: process.platform !== 'win32',
   })
 
+  let startupStderr = ''
+
   pythonProcess.stdout.on('data', (data) => {
     console.log(`[Python] ${data.toString().trim()}`)
   })
 
   pythonProcess.stderr.on('data', (data) => {
-    console.error(`[Python Error] ${data.toString().trim()}`)
+    const chunk = data.toString()
+    startupStderr = `${startupStderr}${chunk}`.slice(-32768)
+    console.error(`[Python Error] ${chunk.trim()}`)
   })
 
   pythonProcess.on('error', (err) => {
@@ -419,7 +427,25 @@ function startPythonBackend(settings) {
 
     // If not quitting, notify renderer of disconnect
     if (!isQuitting && mainWindow) {
-      mainWindow.webContents.send('backend-status', { connected: false })
+      const historyUpgradeError = extractHistoryUpgradeError(startupStderr)
+      const statusPayload = {
+        connected: false,
+        backend_configured: backendConfigured,
+        ...(historyUpgradeError
+          ? { code: 'history_upgrade_failed', error: historyUpgradeError }
+          : {}),
+      }
+      lastBackendStatusPayload = statusPayload
+      mainWindow.webContents.send('backend-status', statusPayload)
+
+      if (historyUpgradeError) {
+        dialog.showMessageBox(
+          mainWindow,
+          buildHistoryUpgradeFailureDialog(historyUpgradeError),
+        ).catch((error) => {
+          console.error('Failed to show campaign-history upgrade error:', error)
+        })
+      }
     }
   })
 }
@@ -1585,6 +1611,8 @@ registerExportIpcHandlers({
   dialog,
   getMainWindow: () => mainWindow,
   app,
+  shell,
+  callBackendApiEnvelope,
 })
 
 const chroniclePublishingService = createChroniclePublishingService({

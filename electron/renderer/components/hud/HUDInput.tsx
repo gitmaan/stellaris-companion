@@ -12,18 +12,23 @@ export const HUDInput: React.FC<HUDInputProps> = ({
   error, 
   statusText,
   statusClassName = 'text-text-secondary',
-  className = '', 
-  ...props 
+  className = '',
+  id,
+  ...props
 }) => {
+  const generatedId = React.useId();
+  const inputId = id || generatedId;
+
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
       {label && (
-        <label className="font-display text-[10px] tracking-widest text-text-secondary uppercase mb-1 ml-1">
+        <label htmlFor={inputId} className="font-display text-[10px] tracking-widest text-text-secondary uppercase mb-1 ml-1">
           {label}
         </label>
       )}
       <div className="relative group">
         <input
+          id={inputId}
           className={`w-full bg-black/20 border-b border-white/20 px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted/50 focus:outline-none focus:border-accent-cyan focus:bg-accent-cyan/5 transition-all duration-300 rounded-t-sm ${statusText ? 'pr-24' : ''}`}
           {...props}
         />

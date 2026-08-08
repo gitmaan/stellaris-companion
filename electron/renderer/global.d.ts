@@ -12,6 +12,9 @@ import type {
   DiscordStatus,
   EndSessionResponse,
   HealthResponse,
+  HistoryStorageResponse,
+  PlaythroughMutationResponse,
+  PlaythroughsResponse,
   RecapResponse,
   RegenerateChapterResponse,
   SessionEventsResponse,
@@ -116,6 +119,13 @@ export interface ChroniclePublicationPayload {
   }
 }
 
+export interface ChroniclePublicationSummary {
+  saveId: string
+  state: 'unpublished' | 'publishing' | 'published'
+  title: string
+  publicUrl: string | null
+}
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -130,6 +140,15 @@ declare global {
         ) => Promise<BackendIpcResponse<ChatResponse>>
         status: () => Promise<BackendIpcResponse<StatusResponse>>
         sessions: () => Promise<BackendIpcResponse<SessionsResponse>>
+        playthroughs: (includeTrashed?: boolean) => Promise<BackendIpcResponse<PlaythroughsResponse>>
+        cachedChronicle: (saveId: string) => Promise<BackendIpcResponse<ChronicleResponse>>
+        setPlaythroughLabel: (saveId: string, displayLabel: string | null) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
+        trashPlaythrough: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
+        restorePlaythrough: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
+        resetChronicle: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
+        undoChronicleReset: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
+        deletePlaythrough: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
+        historyStorage: () => Promise<BackendIpcResponse<HistoryStorageResponse>>
         sessionEvents: (sessionId: string, limit?: number) => Promise<BackendIpcResponse<SessionEventsResponse>>
         recap: (
           sessionId: string,
@@ -203,10 +222,13 @@ declare global {
       copyToClipboard: (text: string) => Promise<{ success: boolean }>
       openExternal: (url: string) => Promise<{ success: boolean }>
       exportChronicle: (html: string, defaultFilename: string) => Promise<{ success: boolean; filePath?: string; error?: string } | null>
+      revealHistoryData: () => Promise<{ success: boolean; path?: string; error?: string }>
+      backupHistory: () => Promise<BackendIpcResponse<{ path: string; bytes: number }> | null>
       chroniclePublishing: {
         publish: (publication: ChroniclePublicationPayload) => Promise<ChroniclePublicationResult<ChroniclePublicationReceipt>>
         status: (saveId: string) => Promise<ChroniclePublicationResult<ChroniclePublicationStatus>>
         delete: (saveId: string) => Promise<ChroniclePublicationResult<{ removed: true }>>
+        list: () => Promise<ChroniclePublicationResult<ChroniclePublicationSummary[]>>
       }
       getBackendLogTail: (opts?: { maxBytes?: number }) => Promise<{ ok: true; data: string } | { ok: false; error: string }>
       mcpRelay: {

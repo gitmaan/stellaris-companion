@@ -257,14 +257,15 @@
     "saveSuccess": "CONFIGURATION ENREGISTREE // PARAMETRES APPLIQUES",
     "sections": {
       "intelligence": "LIAISON DE RENSEIGNEMENT",
-      "data": "INGESTION DES DONNEES",
+      "data": "DONNEES DU JEU",
       "communications": "RELAIS COMMUNICATIONS",
       "updates": "MISES A JOUR LOGICIELLES",
       "diagnostics": "DIAGNOSTIC"
     },
     "panels": {
       "geminiAccess": "ACCES AU MODELE GEMINI",
-      "saveSource": "SOURCE DE SAUVEGARDE",
+      "saveSource": "DOSSIER DE SAUVEGARDE",
+      "campaignHistory": "HISTORIQUE DES CAMPAGNES",
       "discordLink": "LIEN DISCORD",
       "updateChannel": "CANAL DE MISE A JOUR"
     },
@@ -300,9 +301,24 @@
       "toastSuccess": "Routage modele defini sur {{mode}}."
     },
     "saveData": {
-      "directoryLabel": "CHEMIN DU DOSSIER",
-      "placeholder": "AUTO-DETECTION",
-      "target": "CIBLE : DOSSIER DES SAUVEGARDES STELLARIS (LOCAL)"
+      "directoryLabel": "DOSSIER DE SAUVEGARDE",
+      "placeholder": "DETECTE AUTOMATIQUEMENT",
+      "changeFolder": "CHANGER DE DOSSIER",
+      "useAutomatic": "UTILISER LA DETECTION AUTO",
+      "target": "Emplacement ou Stellaris enregistre vos sauvegardes.",
+      "multiplayerSettings": "PARAMETRES MULTIJOUEUR",
+      "playerNameLabel": "VOTRE NOM MULTIJOUEUR",
+      "playerNamePlaceholder": "LAISSER VIDE EN SOLO",
+      "playerNameHelp": "Utilise uniquement pour identifier votre empire dans les sauvegardes multijoueur.",
+      "historyLoading": "Verification de l'historique des campagnes...",
+      "historySize": "{{size}} stockes sur cet appareil",
+      "manageCampaignsAria": "Gerer l'historique des campagnes",
+      "revealHistory": "OUVRIR LE DOSSIER",
+      "backupHistory": "CREER UNE SAUVEGARDE",
+      "backingUp": "CREATION DE LA SAUVEGARDE...",
+      "backupSuccess": "Sauvegarde de l'historique des campagnes enregistree.",
+      "revealError": "Impossible d'ouvrir le dossier de l'historique des campagnes.",
+      "historyHelp": "Creez une copie de votre historique ou gerez les campagnes anciennes et en double."
     },
     "discord": {
       "loading": "ETABLISSEMENT DE LA POIGNEE DE MAIN...",

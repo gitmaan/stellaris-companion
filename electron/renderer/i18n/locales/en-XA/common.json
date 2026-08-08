@@ -236,14 +236,15 @@
     "saveSuccess": "[!! CONFIGURATION SAVED // SETTINGS APPLIED !!]",
     "sections": {
       "intelligence": "[!! INTELLIGENCE UPLINK !!]",
-      "data": "[!! DATA INGESTION !!]",
+      "data": "[!! GAME DATA !!]",
       "communications": "[!! COMMUNICATIONS RELAY !!]",
       "updates": "[!! SOFTWARE UPDATES !!]",
       "diagnostics": "[!! DIAGNOSTICS !!]"
     },
     "panels": {
       "geminiAccess": "[!! GEMINI MODEL ACCESS !!]",
-      "saveSource": "[!! SAVE FILE SOURCE !!]",
+      "saveSource": "[!! SAVE GAME FOLDER !!]",
+      "campaignHistory": "[!! CAMPAIGN HISTORY !!]",
       "discordLink": "[!! DISCORD LINK !!]",
       "updateChannel": "[!! UPDATE TRACK !!]"
     },
@@ -279,9 +280,24 @@
       "toastSuccess": "[!! Model routing set to {{mode}}. !!]"
     },
     "saveData": {
-      "directoryLabel": "[!! DIRECTORY PATH !!]",
-      "placeholder": "[!! AUTO-DETECT !!]",
-      "target": "[!! TARGET: STELLARIS SAVE GAME DIRECTORY (LOCAL) !!]"
+      "directoryLabel": "[!! SAVE FOLDER !!]",
+      "placeholder": "[!! DETECTED AUTOMATICALLY !!]",
+      "changeFolder": "[!! CHANGE FOLDER !!]",
+      "useAutomatic": "[!! USE AUTOMATIC !!]",
+      "target": "[!! Where Stellaris stores your save games. !!]",
+      "multiplayerSettings": "[!! MULTIPLAYER SETTINGS !!]",
+      "playerNameLabel": "[!! YOUR MULTIPLAYER NAME !!]",
+      "playerNamePlaceholder": "[!! LEAVE BLANK FOR SINGLE-PLAYER !!]",
+      "playerNameHelp": "[!! Used only to identify your empire in multiplayer saves. !!]",
+      "historyLoading": "[!! Checking campaign history... !!]",
+      "historySize": "[!! {{size}} stored on this device !!]",
+      "manageCampaignsAria": "[!! Manage campaign history !!]",
+      "revealHistory": "[!! OPEN FOLDER !!]",
+      "backupHistory": "[!! CREATE BACKUP !!]",
+      "backingUp": "[!! CREATING BACKUP... !!]",
+      "backupSuccess": "[!! Campaign history backup saved. !!]",
+      "revealError": "[!! Could not reveal the campaign history folder. !!]",
+      "historyHelp": "[!! Create a copy of your campaign history, or manage old and duplicate campaigns. !!]"
     },
     "discord": {
       "loading": "[!! ESTABLISHING HANDSHAKE... !!]",
