@@ -31,6 +31,18 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require release tags to come from main
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          git fetch origin main --no-tags
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Release tag ${{ github.ref_name }} is not attached to a commit on main." >&2
+            exit 1
+          fi
 
       - name: Validate release metadata
         id: release-metadata
@@ -62,8 +74,69 @@ jobs:
             echo "matrix=$(echo "$ALL" | jq -c --arg p "$PLATFORM" '{"include": [.include[] | select(.name == $p)]}')" >> "$GITHUB_OUTPUT"
           fi
 
-  release:
+  release_checks:
     needs: setup
+    name: Release validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install '.[dev]'
+
+      - name: Lint Python
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Validate Rust parser
+        working-directory: stellaris-parser
+        run: |
+          cargo fmt --check
+          cargo clippy -- -D warnings
+          cargo test
+          cargo build --release
+
+      - name: Run Python tests
+        run: pytest tests/ --tb=short
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            electron/package-lock.json
+            electron/renderer/package-lock.json
+
+      - name: Install desktop dependencies
+        run: |
+          npm ci --prefix electron
+          npm ci --prefix electron/renderer
+
+      - name: Validate desktop app
+        run: |
+          npm test --prefix electron
+          npm run build:renderer --prefix electron
+          xvfb-run --auto-servernum npm run test:e2e --prefix electron
+        env:
+          E2E_NO_SANDBOX: '1'
+
+  release:
+    needs: [setup, release_checks]
     name: Build - ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -263,7 +336,7 @@ jobs:
           fi
 
   finalize_release:
-    needs: [setup, release]
+    needs: [setup, release_checks, release]
     if: needs.setup.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
