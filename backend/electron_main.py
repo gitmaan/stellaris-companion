@@ -468,7 +468,9 @@ def main() -> None:
         db = get_default_db()
         logger.info(f"History DB ready: {db.path}")
     except Exception as e:
-        logger.error(f"Failed to initialize history DB: {e}")
+        # The Electron shell recognizes this marker and shows a focused recovery
+        # message instead of leaving the user with a generic disconnected state.
+        logger.error(f"HISTORY_DB_UPGRADE_FAILED: {e}")
         sys.exit(1)
 
     # Initialize companion (Electron ingestion manager owns save loading + precompute).

@@ -234,6 +234,73 @@ def test_upgrade_from_v9_creates_backup_and_preserves_cache_bytes(tmp_path):
     upgraded.close()
 
 
+def test_upgrade_stops_before_schema_changes_when_safety_backup_fails(tmp_path, monkeypatch):
+    path = tmp_path / "history.db"
+    db = GameDatabase(path)
+    _add_campaign(db, save_id="alpha", empire_name="Alpha Union")
+    before = _cache_rows(db)
+    db.execute("DROP TABLE chronicle_revisions;")
+    db.execute("DROP TABLE playthrough_metadata;")
+    db.execute("UPDATE schema_version SET version = 9;")
+    db.execute("PRAGMA user_version = 9;")
+    db.close()
+
+    def fail_backup(_self, _target_version):
+        raise RuntimeError("simulated safety backup failure")
+
+    monkeypatch.setattr(GameDatabase, "_create_pre_migration_backup", fail_backup)
+    with pytest.raises(RuntimeError, match="simulated safety backup failure"):
+        GameDatabase(path)
+
+    with sqlite3.connect(path) as unchanged:
+        unchanged.row_factory = sqlite3.Row
+        assert unchanged.execute("SELECT version FROM schema_version;").fetchone()[0] == 9
+        assert (
+            unchanged.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'playthrough_metadata';"
+            ).fetchone()
+            is None
+        )
+        after = [
+            dict(row)
+            for row in unchanged.execute("SELECT * FROM cached_chronicles ORDER BY id;").fetchall()
+        ]
+        assert after == before
+
+
+def test_failed_campaign_history_migration_rolls_back_partial_schema(tmp_path):
+    path = tmp_path / "history.db"
+    db = GameDatabase(path)
+    _add_campaign(db, save_id="alpha", empire_name="Alpha Union")
+    before = _cache_rows(db)
+    db.execute("DROP TABLE chronicle_revisions;")
+    db.execute("DROP TABLE playthrough_metadata;")
+    db.execute("UPDATE schema_version SET version = 9;")
+    db.execute("PRAGMA user_version = 9;")
+    # Migration 10 creates playthrough_metadata first. A conflicting view at the
+    # second table name proves that the earlier DDL is rolled back on failure.
+    db.execute("CREATE VIEW chronicle_revisions AS SELECT 'blocked' AS value;")
+    db.close()
+
+    with pytest.raises(sqlite3.OperationalError):
+        GameDatabase(path)
+
+    with sqlite3.connect(path) as unchanged:
+        unchanged.row_factory = sqlite3.Row
+        assert unchanged.execute("SELECT version FROM schema_version;").fetchone()[0] == 9
+        assert (
+            unchanged.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'playthrough_metadata';"
+            ).fetchone()
+            is None
+        )
+        after = [
+            dict(row)
+            for row in unchanged.execute("SELECT * FROM cached_chronicles ORDER BY id;").fetchall()
+        ]
+        assert after == before
+
+
 def test_backup_is_consistent_and_cannot_replace_live_database(tmp_path):
     path = tmp_path / "history.db"
     db = GameDatabase(path)

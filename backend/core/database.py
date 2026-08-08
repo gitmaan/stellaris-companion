@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import logging
 import os
 import sqlite3
 import threading
@@ -24,8 +23,6 @@ from backend.core.json_utils import json_dumps
 DEFAULT_DB_FILENAME = "stellaris_history.db"
 ENV_DB_PATH = "STELLARIS_DB_PATH"
 PRE_CAMPAIGN_HISTORY_SCHEMA_VERSION = 10
-
-logger = logging.getLogger(__name__)
 
 # Default DB retention (no user-facing knobs).
 # Keep the earliest full briefing (baseline). The latest briefing is stored on the session row
@@ -339,25 +336,37 @@ class GameDatabase:
                     raise
 
     def _create_pre_migration_backup(self, target_version: int) -> Path | None:
-        """Create one WAL-safe backup before the campaign-history schema is installed."""
+        """Create and verify a WAL-safe backup before campaign-history migration.
+
+        A failed safety backup must stop the migration. Continuing would make the
+        nominally additive upgrade harder to recover from if the host is already
+        experiencing a full disk, permissions issue, or SQLite corruption.
+        """
         if self.path == Path(":memory:"):
             return None
         backup_path = self.path.with_name(f"{self.path.name}.pre-v{int(target_version)}.backup")
-        if backup_path.exists():
-            return backup_path
+        pending_path = backup_path.with_name(f".{backup_path.name}.{uuid.uuid4().hex}.tmp")
         try:
-            backup_conn = sqlite3.connect(str(backup_path))
+            backup_conn = sqlite3.connect(str(pending_path))
             try:
                 with self._lock:
                     self._conn.backup(backup_conn)
+                integrity = backup_conn.execute("PRAGMA integrity_check;").fetchone()
+                if integrity is None or str(integrity[0]).lower() != "ok":
+                    detail = str(integrity[0]) if integrity else "no integrity result"
+                    raise sqlite3.DatabaseError(f"backup integrity check failed: {detail}")
             finally:
                 backup_conn.close()
+            os.replace(pending_path, backup_path)
             return backup_path
         except Exception as exc:
-            logger.warning("Could not create pre-v%s database backup: %s", target_version, exc)
             with contextlib.suppress(OSError):
-                backup_path.unlink()
-            return None
+                pending_path.unlink()
+            raise RuntimeError(
+                "Could not create and verify the campaign-history safety backup. "
+                "The database upgrade was stopped before changing existing campaign data. "
+                "Check available disk space and app-data folder permissions, then reopen the app."
+            ) from exc
 
     # --- Phase 3 Milestone 1: sessions + snapshot writes ---
 
