@@ -7,18 +7,30 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     language: typeof getResolvedLanguage === 'function' ? getResolvedLanguage() : 'en',
   })
 
-  ipcMain.handle('backend:health', async (event) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  const safeHandle = (channel, handler) => {
+    ipcMain.handle(channel, async (event, ...args) => {
+      try {
+        validateSender(event)
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'IPC error',
+          code: 'IPC_SENDER_INVALID',
+        }
+      }
+      return await handler(...args)
+    })
+  }
+
+  safeHandle('backend:health', async () => {
     return await callBackendApiEnvelope('/api/health')
   })
 
-  ipcMain.handle('backend:diagnostics', async (event) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:diagnostics', async () => {
     return await callBackendApiEnvelope('/api/diagnostics')
   })
 
-  ipcMain.handle('backend:chat', async (event, { message, session_key, model, model_routing_mode }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:chat', async ({ message, session_key, model, model_routing_mode }) => {
     return await callBackendApiEnvelope('/api/chat', {
       method: 'POST',
       body: JSON.stringify(withLanguage({
@@ -30,18 +42,15 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     })
   })
 
-  ipcMain.handle('backend:status', async (event) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:status', async () => {
     return await callBackendApiEnvelope('/api/status')
   })
 
-  ipcMain.handle('backend:sessions', async (event) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:sessions', async () => {
     return await callBackendApiEnvelope('/api/sessions')
   })
 
-  ipcMain.handle('backend:playthroughs', async (event, { include_trashed } = {}) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:playthroughs', async ({ include_trashed } = {}) => {
     const language = typeof getResolvedLanguage === 'function' ? getResolvedLanguage() : 'en'
     const query = new URLSearchParams({
       language,
@@ -50,65 +59,56 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     return await callBackendApiEnvelope(`/api/playthroughs?${query.toString()}`)
   })
 
-  ipcMain.handle('backend:cached-chronicle', async (event, { save_id }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:cached-chronicle', async ({ save_id }) => {
     const language = typeof getResolvedLanguage === 'function' ? getResolvedLanguage() : 'en'
     const query = new URLSearchParams({ language })
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/chronicle?${query.toString()}`)
   })
 
-  ipcMain.handle('backend:set-playthrough-label', async (event, { save_id, display_label }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:set-playthrough-label', async ({ save_id, display_label }) => {
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/label`, {
       method: 'POST',
       body: JSON.stringify({ display_label }),
     })
   })
 
-  ipcMain.handle('backend:trash-playthrough', async (event, { save_id }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:trash-playthrough', async ({ save_id }) => {
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/trash`, {
       method: 'POST',
     })
   })
 
-  ipcMain.handle('backend:restore-playthrough', async (event, { save_id }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:restore-playthrough', async ({ save_id }) => {
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/restore`, {
       method: 'POST',
     })
   })
 
-  ipcMain.handle('backend:reset-chronicle', async (event, { save_id }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:reset-chronicle', async ({ save_id }) => {
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/reset-chronicle`, {
       method: 'POST',
       body: JSON.stringify(withLanguage({ confirm: true })),
     })
   })
 
-  ipcMain.handle('backend:undo-chronicle-reset', async (event, { save_id }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:undo-chronicle-reset', async ({ save_id }) => {
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/undo-reset`, {
       method: 'POST',
       body: JSON.stringify(withLanguage()),
     })
   })
 
-  ipcMain.handle('backend:delete-playthrough', async (event, { save_id }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:delete-playthrough', async ({ save_id }) => {
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}?confirm=true`, {
       method: 'DELETE',
     })
   })
 
-  ipcMain.handle('backend:history-storage', async (event) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:history-storage', async () => {
     return await callBackendApiEnvelope('/api/history/storage')
   })
 
-  ipcMain.handle('backend:session-events', async (event, { session_id, limit }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:session-events', async ({ session_id, limit }) => {
     let url = `/api/sessions/${session_id}/events`
     if (limit) {
       url += `?limit=${limit}`
@@ -116,8 +116,7 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     return await callBackendApiEnvelope(url)
   })
 
-  ipcMain.handle('backend:recap', async (event, { session_id, style, model_routing_mode }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:recap', async ({ session_id, style, model_routing_mode }) => {
     return await callBackendApiEnvelope('/api/recap', {
       method: 'POST',
       body: JSON.stringify(withLanguage({
@@ -128,8 +127,7 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     })
   })
 
-  ipcMain.handle('backend:chronicle', async (event, { session_id, force_refresh, chapter_only, refresh_mode, model_routing_mode }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:chronicle', async ({ session_id, force_refresh, chapter_only, refresh_mode, model_routing_mode }) => {
     return await callBackendApiEnvelope('/api/chronicle', {
       method: 'POST',
       body: JSON.stringify(withLanguage({
@@ -142,8 +140,7 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     })
   })
 
-  ipcMain.handle('backend:regenerate-chapter', async (event, { session_id, chapter_number, confirm, regeneration_instructions, model_routing_mode }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:regenerate-chapter', async ({ session_id, chapter_number, confirm, regeneration_instructions, model_routing_mode }) => {
     return await callBackendApiEnvelope('/api/chronicle/regenerate-chapter', {
       method: 'POST',
       body: JSON.stringify(withLanguage({
@@ -156,33 +153,28 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     })
   })
 
-  ipcMain.handle('backend:end-session', async (event) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:end-session', async () => {
     return await callBackendApiEnvelope('/api/end-session', {
       method: 'POST',
     })
   })
 
-  ipcMain.handle('backend:get-chronicle-custom', async (event) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:get-chronicle-custom', async () => {
     return await callBackendApiEnvelope('/api/chronicle-custom-instructions')
   })
 
-  ipcMain.handle('backend:set-chronicle-custom', async (event, { custom_instructions }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:set-chronicle-custom', async ({ custom_instructions }) => {
     return await callBackendApiEnvelope('/api/chronicle-custom-instructions', {
       method: 'POST',
       body: JSON.stringify({ custom_instructions }),
     })
   })
 
-  ipcMain.handle('backend:get-session-advisor-custom', async (event) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:get-session-advisor-custom', async () => {
     return await callBackendApiEnvelope('/api/session-advisor-custom')
   })
 
-  ipcMain.handle('backend:set-session-advisor-custom', async (event, { custom_instructions }) => {
-    try { validateSender(event) } catch (e) { return { ok: false, error: e instanceof Error ? e.message : 'IPC error', code: 'IPC_SENDER_INVALID' } }
+  safeHandle('backend:set-session-advisor-custom', async ({ custom_instructions }) => {
     return await callBackendApiEnvelope('/api/session-advisor-custom', {
       method: 'POST',
       body: JSON.stringify({ custom_instructions }),

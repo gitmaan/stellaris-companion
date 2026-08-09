@@ -477,6 +477,14 @@ class ChronicleGenerator:
             )
         return self._provider_generator
 
+    def close(self) -> None:
+        """Release provider connections created for this generation request."""
+        close = getattr(self._provider_generator, "close", None)
+        if callable(close):
+            close()
+        self._provider_generator = None
+        self._client = None
+
     def generate_chronicle(
         self,
         session_id: str,

@@ -529,6 +529,7 @@ def main() -> None:
         # Clean up save watcher
         if save_watcher.is_running:
             save_watcher.stop()
+        companion.close()
         logger.info("Server stopped")
 
 

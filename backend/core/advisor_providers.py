@@ -227,6 +227,8 @@ class AdvisorGenerator(Protocol):
         allow_schema_fallback: bool = True,
     ) -> AdvisorGenerationResult: ...
 
+    def close(self) -> None: ...
+
 
 class GeminiAdvisorGenerator:
     """Native Gemini adapter retaining the existing quota fallback behavior."""
@@ -234,6 +236,11 @@ class GeminiAdvisorGenerator:
     def __init__(self, *, config: AdvisorProviderConfig, client: Any):
         self.config = config
         self.client = client
+
+    def close(self) -> None:
+        close = getattr(self.client, "close", None)
+        if callable(close):
+            close()
 
     def generate(
         self,
@@ -366,6 +373,23 @@ class OpenAICompatibleAdvisorGenerator:
     ):
         self.config = config
         self._client = client
+        self._owns_client = client is None
+
+    @property
+    def client(self) -> httpx.Client:
+        """Lazily create one connection pool for this generator's lifetime."""
+        if self._client is None:
+            self._client = httpx.Client(
+                timeout=httpx.Timeout(self.config.timeout_seconds, connect=10.0),
+                follow_redirects=False,
+            )
+        return self._client
+
+    def close(self) -> None:
+        """Close the connection pool when this generator created it."""
+        if self._owns_client and self._client is not None:
+            self._client.close()
+            self._client = None
 
     def generate(
         self,
@@ -428,14 +452,9 @@ class OpenAICompatibleAdvisorGenerator:
             if self.config.provider == ADVISOR_PROVIDER_OPENROUTER:
                 request_body["provider"] = {"require_parameters": True}
 
-        client = self._client or httpx.Client(
-            timeout=httpx.Timeout(self.config.timeout_seconds, connect=10.0),
-            follow_redirects=False,
-        )
-        close_client = self._client is None
         schema_fallback_used = False
         try:
-            response = client.post(
+            response = self.client.post(
                 f"{self.config.base_url}/chat/completions",
                 headers=headers,
                 json=request_body,
@@ -452,7 +471,7 @@ class OpenAICompatibleAdvisorGenerator:
                 fallback_body.pop("response_format", None)
                 fallback_body.pop("provider", None)
                 schema_fallback_used = True
-                response = client.post(
+                response = self.client.post(
                     f"{self.config.base_url}/chat/completions",
                     headers=headers,
                     json=fallback_body,
@@ -469,10 +488,6 @@ class OpenAICompatibleAdvisorGenerator:
                 code="PROVIDER_UNAVAILABLE",
                 status_code=503,
             ) from exc
-        finally:
-            if close_client:
-                client.close()
-
         if not response.is_success:
             error_message = _redact_sensitive_text(
                 _compatible_error_message(response),

@@ -284,6 +284,12 @@ class Companion:
         self.custom_instructions = cleaned or None
         self._build_personality()
 
+    def close(self) -> None:
+        """Release provider connections owned by this companion."""
+        close = getattr(self._advisor_generator, "close", None)
+        if callable(close):
+            close()
+
     def _build_game_context(self) -> dict | None:
         """Build game context dict for version/DLC awareness.
 
