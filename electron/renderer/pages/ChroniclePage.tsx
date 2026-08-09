@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -6,7 +6,6 @@ import ChronicleChapterList from '../components/ChronicleChapterList'
 import ChronicleContent from '../components/ChronicleContent'
 import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
 import ChroniclePublishDialog from '../components/ChroniclePublishDialog'
-import CampaignHistoryDialog from '../components/CampaignHistoryDialog'
 import { useBackend, ChronicleResponse, type Playthrough } from '../hooks/useBackend'
 import { generateChronicleHtml } from '../lib/chronicleExport'
 import {
@@ -16,6 +15,8 @@ import {
 } from '../hooks/useSettings'
 import { HUDMicro } from '../components/hud/HUDText'
 import { HUDButton } from '../components/hud/HUDButton'
+
+const CampaignHistoryDialog = lazy(() => import('../components/CampaignHistoryDialog'))
 
 interface SaveInfo {
   save_id: string
@@ -1003,12 +1004,16 @@ function ChroniclePage({
         empireName={empireName}
         chronicle={chronicle}
       />
-      <CampaignHistoryDialog
-        isOpen={historyDialogOpen}
-        onClose={() => setHistoryDialogOpen(false)}
-        playthroughs={playthroughs}
-        onChanged={handleHistoryChanged}
-      />
+      {historyDialogOpen && (
+        <Suspense fallback={null}>
+          <CampaignHistoryDialog
+            isOpen
+            onClose={() => setHistoryDialogOpen(false)}
+            playthroughs={playthroughs}
+            onChanged={handleHistoryChanged}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

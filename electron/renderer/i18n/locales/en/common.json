@@ -216,6 +216,7 @@
       "chapters_one": "{{count}} chapter",
       "chapters_other": "{{count}} chapters",
       "moreDetails": "More details",
+      "moreActions": "More",
       "selectCampaign": "Select {{name}}",
       "labelPlaceholder": "Campaign label",
       "rename": "Rename",
