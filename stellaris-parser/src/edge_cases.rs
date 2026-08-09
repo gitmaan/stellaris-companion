@@ -304,7 +304,7 @@ with_empty={
         let parsed: HashMap<String, Value> =
             from_utf8_slice(clausewitz_data).expect("Failed to parse empty blocks");
 
-        assert!(parsed.get("empty").is_some(), "empty should exist");
+        assert!(parsed.contains_key("empty"), "empty should exist");
 
         let with_empty = parsed.get("with_empty").expect("with_empty should exist");
         assert!(with_empty.get("nested").is_some(), "nested should exist");

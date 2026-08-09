@@ -431,33 +431,39 @@ function CampaignHistoryDialog({
                                 <ActionButton onClick={() => { setEditingId(playthrough.save_id); setLabel(playthrough.display_label || '') }} disabled={isWorking}>
                                   {t('chronicle.history.rename')}
                                 </ActionButton>
-                                {playthrough.can_undo_reset ? (
-                                  <ActionButton onClick={() => void handleUndoReset(playthrough)} disabled={isWorking}>
-                                    {t('chronicle.history.undoReset')}
-                                  </ActionButton>
-                                ) : playthrough.has_chronicle ? (
-                                  <ActionButton onClick={() => void handleReset(playthrough)} disabled={isWorking} tone="warning">
-                                    {confirmResetId === playthrough.save_id ? t('chronicle.history.confirmReset') : t('chronicle.history.reset')}
-                                  </ActionButton>
-                                ) : null}
                                 <ActionButton onClick={() => void handleTrash(playthrough)} disabled={isWorking || playthrough.is_current} tone="warning" title={playthrough.is_current ? t('chronicle.history.currentProtected') : undefined}>
                                   {t('chronicle.history.moveToTrash')}
                                 </ActionButton>
+                                {(playthrough.can_undo_reset || playthrough.has_chronicle) && (
+                                  <OverflowActions label={t('chronicle.history.moreActions')}>
+                                    {playthrough.can_undo_reset ? (
+                                      <ActionButton onClick={() => void handleUndoReset(playthrough)} disabled={isWorking}>
+                                        {t('chronicle.history.undoReset')}
+                                      </ActionButton>
+                                    ) : (
+                                      <ActionButton onClick={() => void handleReset(playthrough)} disabled={isWorking} tone="warning">
+                                        {confirmResetId === playthrough.save_id ? t('chronicle.history.confirmReset') : t('chronicle.history.reset')}
+                                      </ActionButton>
+                                    )}
+                                  </OverflowActions>
+                                )}
                               </>
                             ) : (
                               <>
                                 <ActionButton onClick={() => void handleRestore(playthrough)} disabled={isWorking}>
                                   {t('chronicle.history.restore')}
                                 </ActionButton>
-                                <ActionButton onClick={() => void handleDelete(playthrough)} disabled={isWorking} tone="danger">
-                                  {publication?.state === 'published'
-                                    ? (confirmDeleteId === playthrough.save_id
-                                      ? t('chronicle.history.confirmDeleteLocal')
-                                      : t('chronicle.history.deleteLocal'))
-                                    : (confirmDeleteId === playthrough.save_id
-                                      ? t('chronicle.history.confirmDelete')
-                                      : t('chronicle.history.delete'))}
-                                </ActionButton>
+                                <OverflowActions label={t('chronicle.history.moreActions')}>
+                                  <ActionButton onClick={() => void handleDelete(playthrough)} disabled={isWorking} tone="danger">
+                                    {publication?.state === 'published'
+                                      ? (confirmDeleteId === playthrough.save_id
+                                        ? t('chronicle.history.confirmDeleteLocal')
+                                        : t('chronicle.history.deleteLocal'))
+                                      : (confirmDeleteId === playthrough.save_id
+                                        ? t('chronicle.history.confirmDelete')
+                                        : t('chronicle.history.delete'))}
+                                  </ActionButton>
+                                </OverflowActions>
                               </>
                             )}
                           </div>
@@ -550,6 +556,29 @@ function ActionButton({
     >
       {children}
     </button>
+  )
+}
+
+function OverflowActions({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <details className="group relative">
+      <summary
+        role="button"
+        aria-label={label}
+        className="cursor-pointer list-none rounded border border-border px-3 py-1.5 text-[10px] uppercase tracking-wider text-text-secondary hover:border-accent-cyan/40 hover:text-accent-cyan"
+      >
+        {label}
+      </summary>
+      <div className="absolute right-0 z-10 mt-2 flex min-w-max justify-end rounded border border-border bg-bg-primary p-2 shadow-xl">
+        {children}
+      </div>
+    </details>
   )
 }
 

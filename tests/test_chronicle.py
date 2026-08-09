@@ -1604,6 +1604,7 @@ class TestChronicleProviderRouting:
             briefing={
                 "meta": {"version": "Pegasus v4.4.6"},
                 "identity": {"empire_name": "Test Empire", "ethics": []},
+                "military": {"naval_capacity": {"used": 20}},
             },
             previous_chapters=[],
             start_date="2200.01.01",

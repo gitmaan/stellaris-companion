@@ -85,9 +85,7 @@ a = Analysis(
         'google.genai',
         'google.genai._api_client',
         'google.genai.types',
-        'google.api_core',
         'google.auth',
-        'google.protobuf',
         # FastAPI and dependencies
         'fastapi',
         'starlette',

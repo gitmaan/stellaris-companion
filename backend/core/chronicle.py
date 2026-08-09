@@ -402,7 +402,11 @@ def _chronicle_game_knowledge(briefing: dict[str, Any]) -> str:
         briefing.get("model_context") if isinstance(briefing.get("model_context"), dict) else {}
     )
     version = str(meta.get("version") or model_context.get("game_version") or "unknown")
-    return build_game_knowledge_prompt(version, purpose="chronicle")
+    return build_game_knowledge_prompt(
+        version,
+        purpose="chronicle",
+        topics=json_dumps(briefing),
+    )
 
 
 class ChronicleGenerator:
@@ -476,6 +480,14 @@ class ChronicleGenerator:
                 status_code=400,
             )
         return self._provider_generator
+
+    def close(self) -> None:
+        """Release provider connections created for this generation request."""
+        close = getattr(self._provider_generator, "close", None)
+        if callable(close):
+            close()
+        self._provider_generator = None
+        self._client = None
 
     def generate_chronicle(
         self,

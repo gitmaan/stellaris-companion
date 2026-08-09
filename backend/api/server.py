@@ -1237,6 +1237,8 @@ def create_app() -> FastAPI:
                 status_code=500,
                 detail={"error": f"Recap generation failed: {str(e)}"},
             )
+        finally:
+            generator.close()
 
     @app.post("/api/chronicle", dependencies=[Depends(verify_token)])
     def generate_chronicle(request: Request, body: ChronicleRequest) -> dict[str, Any]:
@@ -1310,6 +1312,7 @@ def create_app() -> FastAPI:
                 detail={"error": f"Chronicle generation failed: {str(e)}"},
             )
         finally:
+            generator.close()
             with _chronicle_in_flight_lock:
                 _chronicle_in_flight.discard(in_flight_key)
 
@@ -1364,5 +1367,7 @@ def create_app() -> FastAPI:
                 status_code=500,
                 detail={"error": f"Chapter regeneration failed: {str(e)}"},
             )
+        finally:
+            generator.close()
 
     return app

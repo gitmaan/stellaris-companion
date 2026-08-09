@@ -95,3 +95,44 @@ def test_advisor_prompt_does_not_extend_rules_into_unverified_outcomes():
 
     assert "extend a listed rule into an unstated automatic outcome" in prompt
     assert "Verify arithmetic before using a calculated value" in prompt
+
+
+def test_topic_focused_prompt_keeps_only_relevant_mechanics_and_guardrails():
+    full_prompt = build_game_knowledge_prompt("Pegasus v4.4.6", purpose="advisor")
+    focused_prompt = build_game_knowledge_prompt(
+        "Pegasus v4.4.6",
+        purpose="advisor",
+        topics="Should I add anchorages before expanding my fleet and naval capacity?",
+    )
+
+    assert "A normal Anchorage adds 5 Naval Capacity" in focused_prompt
+    assert "Critical 4.x Baseline" in focused_prompt
+    assert "Interpretation Guardrails" in focused_prompt
+    assert "Psionics & the Shroud" not in focused_prompt
+    assert "Nomadic Empires & Arkships" not in focused_prompt
+    assert len(focused_prompt) < len(full_prompt) / 2
+
+
+def test_topic_focused_prompt_prefers_newer_overlay_sections():
+    prompt = build_game_knowledge_prompt(
+        "Pegasus v4.4.5",
+        purpose="advisor",
+        topics="operational reserves, resource abundance, and automation",
+    )
+
+    assert "Operational Reserves track Energy and Minerals one-to-one" in prompt
+    assert "Resource Abundance slider" in prompt
+    assert "uses a 3:1 rule rather than one-to-one conversion" not in prompt
+    assert "Automated Science Ships return normally after exploring Astral Rifts" not in prompt
+
+
+def test_topic_focused_prompt_does_not_misreport_available_older_coverage():
+    prompt = build_game_knowledge_prompt(
+        "Cetus v4.3.5",
+        purpose="advisor",
+        topics="What should I prioritize next?",
+    )
+
+    assert "Verified mechanics are available through 4.3.5" in prompt
+    assert "no topic-specific mechanics section was needed" in prompt
+    assert "No verified mechanics pack covers" not in prompt

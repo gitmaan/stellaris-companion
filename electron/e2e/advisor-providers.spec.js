@@ -96,8 +96,10 @@ test('configures a compatible Advisor provider and discovers its models', async 
     await page.waitForLoadState('domcontentloaded')
     await page.getByRole('button', { name: /Config/i }).click()
 
-    const providerSelect = page.getByLabel('AI PROVIDER')
-    await expect(providerSelect).toHaveValue('gemini')
+    await expect(page.getByRole('button', { name: /Gemini.*EASIEST SETUP/i })).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: /Other provider/i }).click()
+    const providerSelect = page.getByLabel('PROVIDER')
+    await expect(providerSelect).toHaveValue('openrouter')
     await providerSelect.selectOption('custom')
     await expect(page.getByText(/extracted game context are sent to this provider/i)).toBeVisible()
 
@@ -130,7 +132,7 @@ test('configures a compatible Advisor provider and discovers its models', async 
     await expect(providerSelect).toHaveValue('custom')
     await expect(modelSelect).toHaveValue('local/strategist-large')
     await page.getByRole('button', { name: 'TEST MODEL' }).click()
-    await expect(page.getByText('ADVISOR + CHRONICLE READY')).toBeVisible()
+    await expect(page.getByText('STRUCTURED RESPONSES SUPPORTED')).toBeVisible()
     await expect(page.getByText(/does not validate campaign-size context/i)).toBeVisible()
     expect(provider.getLastCompletionModel()).toBe('local/strategist-large')
 
@@ -140,7 +142,7 @@ test('configures a compatible Advisor provider and discovers its models', async 
     await reloadedPage.waitForLoadState('domcontentloaded')
     await reloadedPage.getByRole('button', { name: /Config/i }).click()
 
-    await expect(reloadedPage.getByLabel('AI PROVIDER')).toHaveValue('custom')
+    await expect(reloadedPage.getByLabel('PROVIDER')).toHaveValue('custom')
     const sessionOnlyStorage = await reloadedPage
       .getByText(/API keys work for this session but are not saved/i)
       .isVisible()
@@ -187,7 +189,7 @@ test('turns provider failures into actionable Chat recovery', async () => {
     await expect(page.getByText(/ECONNREFUSED/i)).toHaveCount(0)
 
     await page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' }).click()
-    await expect(page.getByLabel('AI PROVIDER')).toBeVisible()
+    await expect(page.getByText('WHERE SHOULD AI RUN?')).toBeVisible()
   } finally {
     await app.close()
     await backend.stop()
@@ -212,7 +214,7 @@ test('guides an unconfigured Advisor directly to provider settings', async () =>
     await expect(page.getByText(/Ollama is selected but not ready/i)).toBeVisible()
 
     await page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' }).click()
-    await expect(page.getByLabel('AI PROVIDER')).toBeVisible()
+    await expect(page.getByText('WHERE SHOULD AI RUN?')).toBeVisible()
   } finally {
     await app.close()
     await backend.stop()
@@ -240,7 +242,7 @@ test('keeps existing Chronicle readable while guiding provider setup', async () 
     ).toBeVisible()
 
     await page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' }).click()
-    await expect(page.getByLabel('AI PROVIDER')).toBeVisible()
+    await expect(page.getByText('WHERE SHOULD AI RUN?')).toBeVisible()
   } finally {
     await app.close()
     await backend.stop()

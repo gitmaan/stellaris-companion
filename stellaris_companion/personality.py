@@ -188,6 +188,7 @@ def build_optimized_prompt(
     game_context: dict | None = None,
     *,
     custom_instructions: str | None = None,
+    include_game_knowledge: bool = True,
 ) -> str:
     """Generate the optimal production prompt based on empirical testing.
 
@@ -289,12 +290,19 @@ If safe_to_claim_over_cap is false, do not present derived_status or derived_ove
 
     # Append game context (version/DLC awareness) if provided
     if game_context:
-        prompt += _build_game_context_block(game_context)
+        prompt += _build_game_context_block(
+            game_context,
+            include_game_knowledge=include_game_knowledge,
+        )
 
     return prompt
 
 
-def _build_game_context_block(game_context: dict) -> str:
+def _build_game_context_block(
+    game_context: dict,
+    *,
+    include_game_knowledge: bool = True,
+) -> str:
     """Build the internal game context block for version/DLC awareness.
 
     This block is appended to the system prompt but should never be
@@ -313,13 +321,6 @@ def _build_game_context_block(game_context: dict) -> str:
     missing = game_context.get("missing_dlcs", [])
 
     dlcs_str = ", ".join(dlcs) if dlcs else "None (base game only)"
-
-    knowledge_prompt = build_game_knowledge_prompt(
-        version,
-        purpose="advisor",
-        patches_dir=PATCHES_DIR,
-        snapshots_dir=PATCH_SNAPSHOTS_DIR,
-    )
 
     # Build inline missing-DLC enumeration (hypothesis E approach)
     missing_lines = []
@@ -345,7 +346,14 @@ VERSION & DLC AWARENESS:
 - Never mention version numbers to the user.
 - Never mention DLC status unprompted."""
 
-    context += f"\n\n{knowledge_prompt}"
+    if include_game_knowledge:
+        knowledge_prompt = build_game_knowledge_prompt(
+            version,
+            purpose="advisor",
+            patches_dir=PATCHES_DIR,
+            snapshots_dir=PATCH_SNAPSHOTS_DIR,
+        )
+        context += f"\n\n{knowledge_prompt}"
 
     return context
 

@@ -1,6 +1,6 @@
 {
   "name": "stellaris-companion",
-  "version": "0.9.0-beta.4",
+  "version": "1.0.0-beta.1",
   "description": "Desktop companion app for Stellaris - AI-powered strategic advisor",
   "main": "main.js",
   "author": "Stellaris Companion",
@@ -16,6 +16,7 @@
     "build:renderer": "cd renderer && npm run build",
     "build:electron": "electron-builder",
     "build:mcpb": "python3 ../scripts/package_mcpb.py",
+    "test": "node --test test/*.test.js",
     "test:e2e": "npm run build:renderer && playwright test",
     "test:e2e:headed": "npm run build:renderer && playwright test --headed",
     "test:chronicle-publishing": "node --test test/chronicle-publishing.test.js",

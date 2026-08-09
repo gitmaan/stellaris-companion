@@ -43,10 +43,7 @@ jobs:
 
       - name: Run main-process tests
         working-directory: electron
-        run: |
-          npm run test:advisor-providers
-          npm run test:chronicle-publishing
-          npm run test:updates
+        run: npm test
 
       - name: Build renderer
         working-directory: electron

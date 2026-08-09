@@ -2,7 +2,7 @@ const assert = require('node:assert/strict')
 const test = require('node:test')
 const { registerBackendIpcHandlers } = require('../main/ipc/backend')
 
-function createHarness() {
+function createHarness({ validateSender = () => {} } = {}) {
   const handlers = new Map()
   const calls = []
   registerBackendIpcHandlers({
@@ -11,7 +11,7 @@ function createHarness() {
         handlers.set(channel, handler)
       },
     },
-    validateSender: () => {},
+    validateSender,
     getResolvedLanguage: () => 'de',
     callBackendApiEnvelope: async (url, options) => {
       calls.push({ url, options })
@@ -21,6 +21,23 @@ function createHarness() {
   const invoke = (channel, payload) => handlers.get(channel)({}, payload)
   return { calls, invoke }
 }
+
+test('backend IPC rejects an invalid sender before calling the backend', async () => {
+  const { calls, invoke } = createHarness({
+    validateSender: () => {
+      throw new Error('Untrusted renderer')
+    },
+  })
+
+  const result = await invoke('backend:health')
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: 'Untrusted renderer',
+    code: 'IPC_SENDER_INVALID',
+  })
+  assert.equal(calls.length, 0)
+})
 
 test('campaign history IPC uses language-scoped, URL-safe backend routes', async () => {
   const { calls, invoke } = createHarness()

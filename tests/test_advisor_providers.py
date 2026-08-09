@@ -133,6 +133,48 @@ def test_compatible_generator_sends_common_chat_contract():
     }
 
 
+def test_compatible_generator_reuses_and_closes_its_connection_pool(monkeypatch):
+    clients = []
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.closed = False
+            self.call_count = 0
+            clients.append(self)
+
+        def post(self, url, **kwargs):
+            del url, kwargs
+            self.call_count += 1
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "Ready."}}]},
+            )
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr("backend.core.advisor_providers.httpx.Client", FakeClient)
+    generator = OpenAICompatibleAdvisorGenerator(
+        config=AdvisorProviderConfig(
+            provider="ollama",
+            model="local-model",
+            base_url="http://127.0.0.1:11434/v1",
+        )
+    )
+
+    generator.generate(system_prompt="system", user_prompt="first")
+    generator.generate(system_prompt="system", user_prompt="second")
+
+    assert len(clients) == 1
+    assert clients[0].call_count == 2
+    assert clients[0].closed is False
+
+    generator.close()
+
+    assert clients[0].closed is True
+
+
 def test_compatible_generator_reports_auth_failure_without_exposing_key():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(

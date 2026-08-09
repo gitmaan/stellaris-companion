@@ -31,6 +31,8 @@ import { HUDInput } from '../components/hud/HUDInput'
 import { HUDButton } from '../components/hud/HUDButton'
 import { HUDSelect } from '../components/hud/HUDForm'
 import { useToast } from '../components/Toast'
+import { AdvisorProviderChooser } from '../components/settings/AdvisorProviderChooser'
+import { ChronicleRefreshControl } from '../components/settings/ChronicleRefreshControl'
 import type { McpRelayHealthResult, McpRelayStatus } from '../global'
 import type { HistoryStorageResponse } from '../hooks/useBackend'
 
@@ -73,14 +75,6 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'tactica-green': 'Tactica Green',
   'command-amber': 'Command Amber',
 }
-
-const ADVISOR_PROVIDER_OPTIONS: { value: AdvisorProvider; label: string }[] = [
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'ollama', label: 'Ollama' },
-  { value: 'lm_studio', label: 'LM Studio' },
-  { value: 'openrouter', label: 'OpenRouter' },
-  { value: 'custom', label: 'Custom (OpenAI-compatible)' },
-]
 
 const ADVISOR_PROVIDER_DEFAULT_URLS: Partial<Record<AdvisorProvider, string>> = {
   ollama: 'http://127.0.0.1:11434/v1',
@@ -786,12 +780,6 @@ function SettingsPage({
     label: t(`languages.${option.value}`),
   }))
 
-  const chronicleModeLabel = (mode: ChronicleRefreshMode) =>
-    t(`settings.chronicleRefresh.${mode}`)
-
-  const chronicleModeHelper = (mode: ChronicleRefreshMode) =>
-    t(`settings.chronicleRefresh.${mode}Help`)
-
   const modelRoutingLabel = (mode: ModelRoutingMode) =>
     t(`settings.modelRouting.${mode === 'quality_first' ? 'qualityFirst' : 'conserve'}`)
 
@@ -971,11 +959,9 @@ function SettingsPage({
                     <HUDSectionTitle number="01">{t('settings.sections.intelligence')}</HUDSectionTitle>
                     <HUDPanel decoration="tech" title={t('settings.panels.advisorAccess')} quiet>
                         <div className="space-y-4 pt-2">
-                             <HUDSelect
-                                label={t('settings.advisor.providerLabel')}
-                                value={advisorProvider}
-                                onChange={(e) => handleAdvisorProviderChange(e.target.value)}
-                                options={ADVISOR_PROVIDER_OPTIONS}
+                             <AdvisorProviderChooser
+                               provider={advisorProvider}
+                               onChange={handleAdvisorProviderChange}
                              />
                              {settings?.secretStorageAvailable === false && (
                                <HUDMicro className="block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
@@ -1314,89 +1300,15 @@ function SettingsPage({
                                        </HUDMicro>
                                      </div>
 
-                                     <div className="space-y-3">
-                                       <div className="flex items-center justify-between gap-3">
-                                         <HUDLabel>{t('settings.chronicleRefresh.label')}</HUDLabel>
-                                         {chronicleRefreshModeSaving && (
-                                           <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
-                                         )}
-                                       </div>
-
-                                       <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
-                                         {(['balanced', 'enhanced'] as const).map((mode) => {
-                                           const isSelected = chronicleRefreshMode === mode
-                                           return (
-                                             <button
-                                               key={mode}
-                                               type="button"
-                                               disabled={chronicleRefreshModeSaving}
-                                               aria-pressed={isSelected}
-                                               aria-label={t('settings.chronicleRefresh.aria', { mode: chronicleModeLabel(mode) })}
-                                               onClick={() => void handleChronicleRefreshModeChange(mode)}
-                                               className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
-                                                 isSelected
-                                                   ? 'border border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
-                                                   : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
-                                               } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                             >
-                                               <div className="font-display text-[11px] uppercase tracking-[0.18em]">
-                                                 {chronicleModeLabel(mode)}
-                                               </div>
-                                               <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
-                                                 {mode === 'balanced' ? t('settings.chronicleRefresh.balancedTag') : t('settings.chronicleRefresh.enhancedTag')}
-                                               </div>
-                                             </button>
-                                           )
-                                         })}
-                                       </div>
-
-                                       <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
-                                         {chronicleModeHelper(chronicleRefreshMode)}
-                                       </HUDMicro>
-                                     </div>
                                    </div>
                                  </details>
                              </div>
                              )}
-                             {advisorProvider !== 'gemini' && (
-                               <div className="space-y-3 border-t border-white/10 pt-4">
-                                 <div className="flex items-center justify-between gap-3">
-                                   <HUDLabel>{t('settings.chronicleRefresh.label')}</HUDLabel>
-                                   {chronicleRefreshModeSaving && (
-                                     <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
-                                   )}
-                                 </div>
-                                 <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
-                                   {(['balanced', 'enhanced'] as const).map((mode) => {
-                                     const isSelected = chronicleRefreshMode === mode
-                                     return (
-                                       <button
-                                         key={mode}
-                                         type="button"
-                                         disabled={chronicleRefreshModeSaving}
-                                         aria-pressed={isSelected}
-                                         onClick={() => void handleChronicleRefreshModeChange(mode)}
-                                         className={`rounded-sm px-3 py-2 text-left transition-all duration-200 ${
-                                           isSelected
-                                             ? 'border border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
-                                             : 'border border-transparent text-text-secondary hover:border-white/15 hover:bg-white/5'
-                                         } disabled:cursor-not-allowed disabled:opacity-50`}
-                                       >
-                                         <div className="font-display text-[11px] uppercase tracking-[0.18em]">
-                                           {chronicleModeLabel(mode)}
-                                         </div>
-                                         <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
-                                           {mode === 'balanced' ? t('settings.chronicleRefresh.balancedTag') : t('settings.chronicleRefresh.enhancedTag')}
-                                         </div>
-                                       </button>
-                                     )
-                                   })}
-                                 </div>
-                                 <HUDMicro className="block normal-case tracking-[0.02em] text-white/45">
-                                   {chronicleModeHelper(chronicleRefreshMode)}
-                                 </HUDMicro>
-                               </div>
-                             )}
+                             <ChronicleRefreshControl
+                               mode={chronicleRefreshMode}
+                               saving={chronicleRefreshModeSaving}
+                               onChange={(mode) => void handleChronicleRefreshModeChange(mode)}
+                             />
                         </div>
                     </HUDPanel>
                 </section>

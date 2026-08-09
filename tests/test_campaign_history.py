@@ -206,13 +206,15 @@ def test_permanent_delete_is_isolated_to_one_campaign(tmp_path):
     db.close()
 
 
-def test_upgrade_from_v9_creates_backup_and_preserves_cache_bytes(tmp_path):
+def test_upgrade_from_v085_schema_creates_backup_and_preserves_cache_bytes(tmp_path):
     path = tmp_path / "history.db"
     db = GameDatabase(path)
     _add_campaign(db, save_id="alpha", empire_name="Alpha Union")
     before = _cache_rows(db)
     db.execute("DROP TABLE chronicle_revisions;")
     db.execute("DROP TABLE playthrough_metadata;")
+    # v0.8.5 shipped schema 9. Recreate that exact boundary before opening the
+    # database with the campaign-history release.
     db.execute("UPDATE schema_version SET version = 9;")
     db.execute("PRAGMA user_version = 9;")
     db.close()
