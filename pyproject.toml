@@ -1,6 +1,6 @@
 [project]
 name = "stellaris-companion"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.2"
 description = "AI-powered strategic advisor for Stellaris with configurable model providers"
 readme = "README.md"
 license = "MIT"
@@ -17,9 +17,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "google-genai>=1.0.0",
-    # Keep macOS PyInstaller bundles on pyca's statically-linked universal wheel.
-    "cryptography==50.0.0",
+    # Pin the tested API-key auth stack so release bundles remain reproducible.
+    "google-genai==1.57.0",
+    "google-auth==2.47.0",
     "python-dotenv>=1.0.0",
     "watchdog>=3.0",
     "fastapi>=0.100.0",
