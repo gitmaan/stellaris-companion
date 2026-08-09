@@ -51,6 +51,7 @@ from backend.core.model_routing import (
     normalize_model_routing_mode,
 )
 from backend.core.utils import compute_save_hash_from_briefing
+from stellaris_companion.game_knowledge import build_game_knowledge_prompt
 from stellaris_companion.personality import build_optimized_prompt
 from stellaris_save_extractor import SaveExtractor
 
@@ -273,6 +274,7 @@ class Companion:
                 self.situation,
                 game_context,
                 custom_instructions=self.custom_instructions,
+                include_game_knowledge=False,
             )
         except Exception as e:
             logger.warning("Failed to build personality (%s), using fallback", e)
@@ -328,6 +330,17 @@ class Companion:
             "required_dlcs": required_dlcs,
             "missing_dlcs": missing_dlcs,
         }
+
+    def _build_advisor_game_knowledge(self, question: str) -> str:
+        """Select only mechanics relevant to the current advisor question."""
+        game_context = self._build_game_context()
+        if not game_context or not game_context.get("version"):
+            return ""
+        return build_game_knowledge_prompt(
+            str(game_context["version"]),
+            purpose="advisor",
+            topics=question,
+        )
 
     @property
     def is_loaded(self) -> bool:
@@ -1019,6 +1032,9 @@ class Companion:
             "- If a value is missing, say so in the requested language and suggest what to check in-game.\n"
             "- Be a strategic ADVISOR: interpret, prioritize, and recommend next actions.\n"
         )
+        game_knowledge_prompt = self._build_advisor_game_knowledge(cleaned_question)
+        if game_knowledge_prompt:
+            ask_system_prompt += f"\n{game_knowledge_prompt}\n"
         naval_cap_policy_block = self._build_naval_capacity_policy_block(
             question=cleaned_question,
             briefing_json=model_briefing_json,

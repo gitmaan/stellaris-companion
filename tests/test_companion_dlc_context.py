@@ -143,15 +143,17 @@ def test_advisor_prompt_uses_exact_pegasus_patch_overlays(companion, version, in
         },
     )
 
-    for fact in included:
-        assert fact in companion.system_prompt
-    for fact in excluded:
-        assert fact not in companion.system_prompt
-    assert (
-        "Supplied save observations and recorded events are authoritative"
-        in companion.system_prompt
+    knowledge_prompt = companion._build_advisor_game_knowledge(
+        "operational reserves, resource abundance, and astral rift automation"
     )
-    assert "Mods can change baseline mechanics" in companion.system_prompt
+
+    assert "INTERNAL GAME KNOWLEDGE" not in companion.system_prompt
+    for fact in included:
+        assert fact in knowledge_prompt
+    for fact in excluded:
+        assert fact not in knowledge_prompt
+    assert "Supplied save observations and recorded events are authoritative" in knowledge_prompt
+    assert "Mods can change baseline mechanics" in knowledge_prompt
 
 
 def test_build_game_context_prefers_metadata_missing_dlcs_without_extractor(companion):

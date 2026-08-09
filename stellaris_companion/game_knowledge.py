@@ -28,6 +28,38 @@ DEFAULT_PATCHES_DIR = _find_default_patches_dir()
 DEFAULT_SNAPSHOTS_DIR = DEFAULT_PATCHES_DIR / "snapshots"
 
 _VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")
+_MARKDOWN_SECTION_PATTERN = re.compile(r"(?m)^(#{1,3})\s+(.+?)\s*$")
+_SEARCH_ALIASES: dict[str, tuple[str, ...]] = {
+    "pop": ("population", "workforce", "colony"),
+    "growth": ("population", "workforce", "colony"),
+    "job": ("population", "workforce"),
+    "district": ("planet", "development", "production"),
+    "building": ("planet", "development", "production"),
+    "resource": ("economy", "trade", "production", "reserve"),
+    "energy": ("economy", "production", "reserve"),
+    "mineral": ("economy", "production", "reserve"),
+    "alloy": ("economy", "production"),
+    "food": ("economy", "production"),
+    "technology": ("research", "science", "focus"),
+    "tech": ("research", "science", "focus"),
+    "scientist": ("research", "science"),
+    "ship": ("naval", "fleet", "starbase"),
+    "anchorage": ("naval", "fleet", "starbase"),
+    "psi": ("psionic", "shroud"),
+    "gaia": ("infernal", "hot"),
+    "battle": ("combat", "war", "threat"),
+    "army": ("combat", "war", "military"),
+    "invasion": ("combat", "war", "military"),
+    "occupation": ("combat", "war"),
+    "arkship": ("nomad", "logistics"),
+    "waystation": ("nomad", "logistics", "contract"),
+    "wayline": ("nomad", "logistics"),
+    "cargo": ("reserve", "economy", "logistics"),
+    "abundance": ("reserve", "economy"),
+    "astral": ("automation", "reliability", "science"),
+    "rift": ("automation", "reliability", "science"),
+    "automated": ("automation", "reliability"),
+}
 
 KnowledgeStatus = Literal["exact", "partial", "unsupported_newer", "unavailable"]
 KnowledgePurpose = Literal["advisor", "chronicle"]
@@ -95,6 +127,67 @@ def _load_file(version: str, directory: Path) -> str | None:
         return clean_knowledge_content(path.read_text(encoding="utf-8"))
     except OSError:
         return None
+
+
+def _search_terms(text: str) -> set[str]:
+    terms = set(re.findall(r"[a-z0-9]+", text.lower()))
+    singular_terms = {
+        f"{term[:-3]}y" if term.endswith("ies") else term[:-1]
+        for term in terms
+        if len(term) > 3 and term.endswith(("ies", "s"))
+    }
+    terms.update(singular_terms)
+    for term in tuple(terms):
+        terms.update(_SEARCH_ALIASES.get(term, ()))
+    return terms
+
+
+def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
+    """Keep safety baselines plus the few mechanics sections relevant to a request."""
+    headings = list(_MARKDOWN_SECTION_PATTERN.finditer(content))
+    if not headings:
+        return content
+
+    topic_terms = _search_terms(topics)
+    selected: set[int] = set()
+    candidates: list[tuple[int, int, int, set[str]]] = []
+    document_index = -1
+
+    for index, match in enumerate(headings):
+        if match.group(1) == "#":
+            document_index += 1
+        title = match.group(2).strip()
+        normalized_title = title.lower()
+        if (
+            "critical 4.x baseline" in normalized_title
+            or "interpretation guardrails" in normalized_title
+        ):
+            selected.add(index)
+            continue
+
+        matched_terms = topic_terms & _search_terms(title)
+        score = len(matched_terms)
+        if score:
+            candidates.append((score, document_index, index, matched_terms))
+
+    # A newer overlay with the same topic takes precedence over an older snapshot.
+    current_candidates = [
+        candidate
+        for candidate in candidates
+        if not any(
+            newer_document > candidate[1] and len(candidate[3] & newer_terms) >= 2
+            for _, newer_document, _, newer_terms in candidates
+        )
+    ]
+    current_candidates.sort(key=lambda item: (-item[0], -item[1], -item[2]))
+    selected.update(index for _, _, index, _ in current_candidates[:limit])
+
+    sections: list[str] = []
+    for index in sorted(selected):
+        start = headings[index].start()
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(content)
+        sections.append(content[start:end].strip())
+    return "\n\n".join(sections)
 
 
 def load_game_knowledge(
@@ -192,6 +285,8 @@ def build_game_knowledge_prompt(
     version: str,
     *,
     purpose: KnowledgePurpose,
+    topics: str | None = None,
+    max_topic_sections: int = 3,
     patches_dir: Path = DEFAULT_PATCHES_DIR,
     snapshots_dir: Path = DEFAULT_SNAPSHOTS_DIR,
 ) -> str:
@@ -225,17 +320,25 @@ def build_game_knowledge_prompt(
         purpose_rule,
     ]
 
-    if knowledge.content and knowledge.status == "exact":
+    knowledge_content = knowledge.content
+    if knowledge_content and topics is not None:
+        knowledge_content = _select_relevant_sections(
+            knowledge_content,
+            topics,
+            limit=max(0, max_topic_sections),
+        )
+
+    if knowledge_content and knowledge.status == "exact":
         lines.extend(
             [
                 "",
                 f"Verified mechanics for {version}:",
                 "Treat these as the current baseline. Do not discuss patches or changes.",
                 "",
-                knowledge.content,
+                knowledge_content,
             ]
         )
-    elif knowledge.content:
+    elif knowledge_content:
         lines.extend(
             [
                 "",
@@ -243,7 +346,16 @@ def build_game_knowledge_prompt(
                 f"The campaign reports {version}; do not assume older details remained unchanged.",
                 "Use the following only when it agrees with supplied campaign evidence:",
                 "",
-                knowledge.content,
+                knowledge_content,
+            ]
+        )
+    elif knowledge.content and topics is not None:
+        lines.extend(
+            [
+                "",
+                f"Verified mechanics are available through {knowledge.loaded_through},",
+                "but no topic-specific mechanics section was needed for this request.",
+                "Rely on supplied campaign evidence and the evidence hierarchy above.",
             ]
         )
     else:

@@ -402,7 +402,11 @@ def _chronicle_game_knowledge(briefing: dict[str, Any]) -> str:
         briefing.get("model_context") if isinstance(briefing.get("model_context"), dict) else {}
     )
     version = str(meta.get("version") or model_context.get("game_version") or "unknown")
-    return build_game_knowledge_prompt(version, purpose="chronicle")
+    return build_game_knowledge_prompt(
+        version,
+        purpose="chronicle",
+        topics=json_dumps(briefing),
+    )
 
 
 class ChronicleGenerator:
