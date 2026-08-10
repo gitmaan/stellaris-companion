@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { HUDButton } from './hud/HUDButton'
 import { HUDSelect, HUDCheckbox } from './hud/HUDForm'
 import { HUDTextArea } from './hud/HUDInput'
+import type { WarDiagnostics } from '../hooks/useBackend'
 
 interface ReportContext {
   appVersion: string
@@ -24,6 +25,7 @@ interface ReportContext {
   ingestionLastError?: string
   precomputeReady?: boolean
   t2Ready?: boolean
+  warDiagnostics?: WarDiagnostics
   error?: {
     message: string
     stack?: string
@@ -114,6 +116,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
           ctx.ingestionLastError = diagnostics.ingestionLastError || undefined
           ctx.precomputeReady = typeof diagnostics.precomputeReady === 'boolean' ? diagnostics.precomputeReady : undefined
           ctx.t2Ready = typeof diagnostics.t2Ready === 'boolean' ? diagnostics.t2Ready : undefined
+          ctx.warDiagnostics = diagnostics.warDiagnostics || undefined
         } else {
           throw new Error('Diagnostics unavailable')
         }
@@ -168,6 +171,19 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
       if (ctx.empireCivics?.length) lines.push(`- Civics: ${ctx.empireCivics.join(', ')}`)
       if (ctx.dlcs?.length) lines.push(`- DLCs: ${ctx.dlcs.length} enabled`)
       if (ctx.ingestionLastError) lines.push(`- Ingestion last error: ${ctx.ingestionLastError}`)
+      if (ctx.warDiagnostics) {
+        const warDiagnosticsJson = JSON.stringify(ctx.warDiagnostics, null, 2)
+        lines.push('')
+        lines.push('<details><summary>War calculation diagnostics</summary>')
+        lines.push('')
+        lines.push('```json')
+        lines.push(warDiagnosticsJson.length > 24_000
+          ? `${warDiagnosticsJson.slice(0, 24_000).trimEnd()}...`
+          : warDiagnosticsJson)
+        lines.push('```')
+        lines.push('')
+        lines.push('</details>')
+      }
       lines.push('')
     }
 
@@ -308,7 +324,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
       }
 
       const payload = {
-        schema_version: 1,
+        schema_version: 2,
         submitted_at_ms: Date.now(),
         install_id: typeof installId === 'string' ? installId : undefined,
         category,
@@ -335,6 +351,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               ingestionLastError: enriched.ingestionLastError,
               precomputeReady: enriched.precomputeReady,
               t2Ready: enriched.t2Ready,
+              warDiagnostics: enriched.warDiagnostics,
             }
             : undefined,
           error: includeErrorContext ? enriched.error : undefined,
@@ -472,7 +489,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
                 Optional (opt-in)
               </span>
               <HUDCheckbox
-                label="Include game diagnostics (DLCs, empire, save metadata)"
+                label="Include game diagnostics (metadata and bounded war calculations)"
                 checked={includeDiagnostics}
                 onChange={(e) => setIncludeDiagnostics(e.target.checked)}
               />

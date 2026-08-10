@@ -18,10 +18,13 @@ By default, submitting a report includes only basic environment info (app versio
 
 The following are opt-in toggles in the modal:
 
-- Game diagnostics (save metadata, DLC count, empire identity)
+- Game diagnostics (save metadata, DLC count, empire identity, and a bounded war-calculation trace)
 - Backend log tail (last ~32KB)
 - Screenshot (submitted reports upload a temporary image URL)
 - Error stack / LLM prompt-response context (when available)
+
+War diagnostics include country IDs, raw battle-side result/loss fields, and the
+calculated player-side result. They do not include or upload the save file.
 
 ## Maintainer triage + Jules workflow
 

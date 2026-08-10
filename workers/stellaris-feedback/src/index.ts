@@ -41,6 +41,15 @@ interface ReportPayload {
       ingestionLastError?: string
       precomputeReady?: boolean
       t2Ready?: boolean
+      warDiagnostics?: {
+        schema_version?: number
+        player_id?: string
+        result_orientation?: string
+        loss_orientation?: string
+        wars?: unknown[]
+        included_battles?: number
+        truncated?: boolean
+      }
     }
     error?: {
       message: string
@@ -318,6 +327,17 @@ async function createGitHubIssue(
     if (typeof diag.precomputeReady === 'boolean') bodyParts.push(`**Precompute Ready:** ${diag.precomputeReady}`)
     if (typeof diag.t2Ready === 'boolean') bodyParts.push(`**Tier 2 Ready:** ${diag.t2Ready}`)
     if (diag.ingestionLastError) bodyParts.push(`**Ingestion Last Error:** ${diag.ingestionLastError}`)
+    if (diag.warDiagnostics) {
+      bodyParts.push(
+        '',
+        '<details><summary>War calculation diagnostics</summary>',
+        '',
+        '```json',
+        truncate(JSON.stringify(diag.warDiagnostics, null, 2), 24000),
+        '```',
+        '</details>'
+      )
+    }
   }
 
   if (context.error) {
@@ -450,6 +470,17 @@ async function addGitHubComment(
     if (typeof diag.precomputeReady === 'boolean') bodyParts.push(`**Precompute Ready:** ${diag.precomputeReady}`)
     if (typeof diag.t2Ready === 'boolean') bodyParts.push(`**Tier 2 Ready:** ${diag.t2Ready}`)
     if (diag.ingestionLastError) bodyParts.push(`**Ingestion Last Error:** ${diag.ingestionLastError}`)
+    if (diag.warDiagnostics) {
+      bodyParts.push(
+        '',
+        '<details><summary>War calculation diagnostics</summary>',
+        '',
+        '```json',
+        truncate(JSON.stringify(diag.warDiagnostics, null, 2), 24000),
+        '```',
+        '</details>'
+      )
+    }
   }
 
   bodyParts.push('', data.description)

@@ -7,6 +7,7 @@ the Python backend. All endpoints require Bearer token authentication.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import os
@@ -33,6 +34,15 @@ _chronicle_in_flight_lock = threading.Lock()
 # Auth configuration
 ENV_API_TOKEN = "STELLARIS_API_TOKEN"
 security = HTTPBearer(auto_error=False)
+
+
+def _extract_war_diagnostics(save_path: Path) -> dict[str, Any]:
+    """Extract a bounded battle calculation trace for opt-in issue reports."""
+    from stellaris_companion.rust_bridge import session as rust_session
+    from stellaris_save_extractor import SaveExtractor
+
+    with rust_session(str(save_path)):
+        return SaveExtractor(str(save_path)).get_war_diagnostics(max_battles=120)
 
 
 class ChatRequest(BaseModel):
@@ -406,6 +416,7 @@ def create_app() -> FastAPI:
             "ingestionLastError": None,
             "precomputeReady": None,
             "t2Ready": None,
+            "warDiagnostics": None,
         }
 
         ingestion = getattr(request.app.state, "ingestion", None)
@@ -460,6 +471,24 @@ def create_app() -> FastAPI:
                     diagnostics["empireCivics"] = identity.get("civics", [])
                     diagnostics["empireOrigin"] = identity.get("origin")
                     diagnostics["empireType"] = identity.get("authority")
+
+        # Battle-side traces are opt-in through the report modal's diagnostics
+        # checkbox. Compute them on demand so the full save is never uploaded or
+        # retained in the issue payload.
+        current_save_path = None
+        if companion is not None:
+            current_save_path = getattr(companion, "save_path", None)
+        if current_save_path is None and ingestion is not None:
+            status = ingestion.get_status()
+            current_save_path = status.get("current_save_path")
+        if current_save_path:
+            path = Path(current_save_path)
+            if path.is_file():
+                with contextlib.suppress(Exception):
+                    diagnostics["warDiagnostics"] = await asyncio.to_thread(
+                        _extract_war_diagnostics,
+                        path,
+                    )
 
         return diagnostics
 

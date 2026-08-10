@@ -34,6 +34,7 @@ except ModuleNotFoundError as exc:
         ) from exc
     raise
 
+from backend.core.advisor_memory import sanitize_advisor_memory
 from backend.core.advisor_providers import (
     ADVISOR_PROVIDER_GEMINI,
     AdvisorGenerator,
@@ -713,7 +714,8 @@ class Companion:
             summary = db.get_advisor_memory_summary(save_id, language=language)
             if not summary:
                 return None
-            return summary[: self._max_save_memory_chars]
+            sanitized = sanitize_advisor_memory(summary)
+            return sanitized[: self._max_save_memory_chars] or None
         except Exception:
             return None
 
@@ -722,25 +724,23 @@ class Companion:
         *,
         save_id: str | None,
         question: str,
-        answer: str,
         game_date: str | None,
         language: str = "en",
     ) -> None:
-        """Append a compact memory entry and persist per-save summary."""
+        """Persist player intent without carrying forward Advisor factual claims."""
         if not save_id:
             return
 
         q = self._normalize_text_line(question, limit=180)
-        a = self._normalize_text_line(answer, limit=280)
         stamp = str(game_date or "date-unknown")
-        entry = f"- [{stamp}] User asked: {q} | Advisor suggested: {a}"
+        entry = f"- [{stamp}] Player topic/request: {q}"
 
         try:
             from backend.core.database import get_default_db
 
             db = get_default_db()
             existing = db.get_advisor_memory_summary(save_id, language=language) or ""
-            lines = [ln.strip() for ln in existing.splitlines() if ln.strip()]
+            lines = sanitize_advisor_memory(existing).splitlines()
 
             # Keep recent continuity, then append current turn.
             if len(lines) >= self._max_save_memory_entries:
@@ -1029,6 +1029,7 @@ class Companion:
             "- Treat model_context as the semantic contract for interpreting that JSON.\n"
             "- Do NOT call tools or ask to call tools.\n"
             "- ALL numbers and factual claims must come from the JSON.\n"
+            "- Current EMPIRE STATE overrides SAVE MEMORY and prior Advisor claims.\n"
             "- If a value is missing, say so in the requested language and suggest what to check in-game.\n"
             "- Be a strategic ADVISOR: interpret, prioritize, and recommend next actions.\n"
         )
@@ -1100,7 +1101,6 @@ class Companion:
             self._update_save_memory_summary(
                 save_id=save_id,
                 question=cleaned_question,
-                answer=response_text_raw,
                 game_date=game_date,
                 language=output_language,
             )

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from backend.core.advisor_memory import sanitize_advisor_memory
 from backend.core.database import GameDatabase
 from backend.core.language import language_name, normalize_language
 
@@ -244,7 +245,12 @@ class StellarisMcpContext:
                 "events", []
             ),
             "advisor_custom_instructions": self._get_advisor_custom(session_id),
-            "advisor_memory": self.db.get_advisor_memory_summary(save_id, language=self.language)
+            "advisor_memory": (
+                sanitize_advisor_memory(
+                    self.db.get_advisor_memory_summary(save_id, language=self.language)
+                )
+                or None
+            )
             if save_id
             else None,
             "response_guidance": self._advisor_response_guidance(briefing),

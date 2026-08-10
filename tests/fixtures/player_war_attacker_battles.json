@@ -1,0 +1,52 @@
+{
+  "player_id": "0",
+  "player_is_war_attacker": true,
+  "battles": [
+    {
+      "attackers": ["15"],
+      "defenders": ["0"],
+      "attacker_victory": "yes",
+      "attacker_losses": "1",
+      "defender_losses": "15",
+      "system": "2",
+      "type": "ships"
+    },
+    {
+      "attackers": ["0"],
+      "defenders": ["15"],
+      "attacker_victory": "no",
+      "attacker_losses": "4",
+      "defender_losses": "2",
+      "system": "3",
+      "type": "armies"
+    },
+    {
+      "attackers": ["1"],
+      "defenders": ["15"],
+      "attacker_victory": "yes",
+      "attacker_losses": "25",
+      "defender_losses": "0",
+      "system": "1",
+      "type": "ships"
+    },
+    {
+      "attackers": ["15"],
+      "defenders": ["0", "1"],
+      "attacker_victory": "future_value",
+      "attacker_losses": "2",
+      "defender_losses": "3",
+      "system": "4",
+      "type": "ships"
+    }
+  ],
+  "expected": {
+    "total_battles": 3,
+    "our_victories": 1,
+    "their_victories": 1,
+    "unknown_outcomes": 1,
+    "our_ship_losses": 3,
+    "their_ship_losses": 18,
+    "our_army_losses": 4,
+    "their_army_losses": 2
+  }
+}

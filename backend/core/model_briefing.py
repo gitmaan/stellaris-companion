@@ -9,7 +9,7 @@ from typing import Any
 
 from backend.core.json_utils import json_dumps
 
-MODEL_BRIEFING_SCHEMA_VERSION = 1
+MODEL_BRIEFING_SCHEMA_VERSION = 2
 
 
 def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
@@ -25,6 +25,8 @@ def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
     meta = result.get("meta") if isinstance(result.get("meta"), dict) else {}
     version = str(meta.get("version") or "").strip()
     major_version = _major_version(version)
+
+    _add_model_facing_war_stats(result)
 
     population: dict[str, Any] = {
         "unit": "in-game population",
@@ -63,6 +65,28 @@ def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
                 "hostility, awakening, or path-blocking evidence."
             )
         },
+        "military": {
+            "wars": {
+                "participation_scope": (
+                    "battle_stats cover only engagements where the player country directly "
+                    "participated; allied-only engagements are excluded."
+                ),
+                "side_scope": (
+                    "Victory and casualty fields are parent-war coalition totals. In a "
+                    "multi-country engagement, our_side losses may include allied casualties."
+                ),
+                "assessment_rule": (
+                    "Battle history is tactical evidence, not a complete measure of overall war "
+                    "progress. Consider occupation, war goals, controlled capitals and systems, "
+                    "and current military strength before declaring a war won or lost."
+                ),
+                "preferred_fields": (
+                    "Use the explicit player_involved_battles, our_side_victories, "
+                    "opposing_side_victories, our_side_ship_losses, and "
+                    "opposing_side_ship_losses aliases when discussing battle history."
+                ),
+            }
+        },
         "evidence": {
             "instruction": (
                 "Treat save-derived fields as observations. Clearly label strategic forecasts "
@@ -71,6 +95,39 @@ def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
         },
     }
     return result
+
+
+def _add_model_facing_war_stats(briefing: dict[str, Any]) -> None:
+    """Add unambiguous aliases without changing the stored extraction artifact."""
+    military = briefing.get("military")
+    if not isinstance(military, dict):
+        return
+    wars_block = military.get("wars")
+    if not isinstance(wars_block, dict):
+        return
+    wars = wars_block.get("wars")
+    if not isinstance(wars, list):
+        return
+
+    aliases = {
+        "player_involved_battles": "total_battles",
+        "our_side_victories": "our_victories",
+        "opposing_side_victories": "their_victories",
+        "unknown_outcomes": "unknown_outcomes",
+        "our_side_ship_losses": "our_ship_losses",
+        "opposing_side_ship_losses": "their_ship_losses",
+        "our_side_army_losses": "our_army_losses",
+        "opposing_side_army_losses": "their_army_losses",
+    }
+    for war in wars:
+        if not isinstance(war, dict):
+            continue
+        stats = war.get("battle_stats")
+        if not isinstance(stats, dict):
+            continue
+        for alias, source in aliases.items():
+            if source in stats:
+                stats[alias] = stats[source]
 
 
 def build_model_briefing_json(raw_briefing_json: str) -> str:
