@@ -1,9 +1,6 @@
-**The largest Stellaris Companion update yet.**
+**More trustworthy war assessments.**
 
-- Added support for Gemini, Ollama, LM Studio, OpenRouter, and other compatible AI providers.
-- Added Campaign History with search, rename, trash, restore, cleanup, and protected Chronicle resets.
-- Improved Advisor and Chronicle accuracy with save-grounded evidence and verified Stellaris mechanics.
-- Simplified provider setup and Chronicle refresh controls.
-- Improved performance, dependency security, and release reliability.
-
-This is a major beta release. If something feels unclear or unreliable, please report it so we can polish the stable 1.0 release.
+- Corrected war victories, defeats, and casualties when tactical battle sides appear reversed in Stellaris saves.
+- Added occupation and capital-control evidence so the Advisor considers strategic progress as well as battle history.
+- Prevented stale Advisor responses from overriding evidence from the current save.
+- Added privacy-safe war diagnostics for future reports without uploading save files.
