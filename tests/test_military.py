@@ -1,7 +1,9 @@
 """Focused tests for military extraction helpers."""
 
+import json
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -19,57 +21,82 @@ class DummyMilitaryExtractor(MilitaryMixin):
             1: "Ignored System",
             2: "Player Victory System",
             3: "Player Defense System",
+            4: "Unknown Outcome System",
         }
 
     def _resolve_system_name(self, system_id: int) -> str:
         return self._systems.get(system_id, f"System {system_id}")
 
 
-def test_extract_battle_stats_counts_only_player_battles():
+def test_extract_battle_stats_uses_parent_war_side_fixture():
     extractor = DummyMilitaryExtractor()
-    battles = [
-        {
-            "attackers": ["16777220"],
-            "defenders": ["15"],
-            "attacker_victory": "no",
-            "attacker_losses": "25",
-            "defender_losses": "0",
-            "system": "1",
-            "type": "ships",
-        },
-        {
-            "attackers": ["0"],
-            "defenders": ["15"],
-            "attacker_victory": "yes",
-            "attacker_losses": "1",
-            "defender_losses": "10",
-            "system": "2",
-            "type": "ships",
-        },
-        {
-            "attackers": ["15"],
-            "defenders": ["0"],
-            "attacker_victory": "yes",
-            "attacker_losses": "3",
-            "defender_losses": "7",
-            "system": "3",
-            "type": "armies",
-        },
-    ]
+    fixture_path = Path(__file__).parent / "fixtures" / "player_war_attacker_battles.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
 
-    stats = extractor._extract_battle_stats(battles, player_id=0)
+    stats = extractor._extract_battle_stats(
+        fixture["battles"],
+        player_id=fixture["player_id"],
+        player_is_war_attacker=fixture["player_is_war_attacker"],
+    )
 
-    assert stats["total_battles"] == 2
-    assert stats["our_victories"] == 1
-    assert stats["their_victories"] == 1
-    assert stats["our_ship_losses"] == 1
-    assert stats["their_ship_losses"] == 10
-    assert stats["our_army_losses"] == 7
-    assert stats["their_army_losses"] == 3
+    for key, expected in fixture["expected"].items():
+        assert stats[key] == expected
     assert {loc["system"] for loc in stats["battle_locations"]} == {
-        "Player Victory System",
+        "Unknown Outcome System",
         "Player Defense System",
+        "Player Victory System",
     }
+
+
+@pytest.mark.parametrize(
+    (
+        "player_is_war_attacker",
+        "local_player_side",
+        "attacker_victory",
+        "expected_our_victories",
+        "expected_their_victories",
+        "expected_our_losses",
+        "expected_their_losses",
+    ),
+    [
+        (True, "defenders", "yes", 1, 0, 2, 9),
+        (True, "attackers", "no", 0, 1, 2, 9),
+        (False, "attackers", "yes", 0, 1, 9, 2),
+        (False, "defenders", "no", 1, 0, 9, 2),
+    ],
+)
+def test_extract_battle_stats_outcome_matrix_uses_parent_war_side(
+    player_is_war_attacker,
+    local_player_side,
+    attacker_victory,
+    expected_our_victories,
+    expected_their_victories,
+    expected_our_losses,
+    expected_their_losses,
+):
+    extractor = DummyMilitaryExtractor()
+    battle = {
+        "attackers": ["0"] if local_player_side == "attackers" else ["15"],
+        "defenders": ["0"] if local_player_side == "defenders" else ["15"],
+        "attacker_victory": attacker_victory,
+        "attacker_losses": "2",
+        "defender_losses": "9",
+        "system": "2",
+        "type": "ships",
+    }
+
+    stats = extractor._extract_battle_stats(
+        [battle],
+        player_id=0,
+        player_is_war_attacker=player_is_war_attacker,
+    )
+
+    assert stats["total_battles"] == 1
+    assert stats["our_victories"] == expected_our_victories
+    assert stats["their_victories"] == expected_their_victories
+    assert stats["unknown_outcomes"] == 0
+    assert stats["our_ship_losses"] == expected_our_losses
+    assert stats["their_ship_losses"] == expected_their_losses
 
 
 def test_extract_battle_stats_accepts_dict_participants():
@@ -86,12 +113,102 @@ def test_extract_battle_stats_accepts_dict_participants():
         },
     ]
 
-    stats = extractor._extract_battle_stats(battles, player_id=0)
+    stats = extractor._extract_battle_stats(
+        battles,
+        player_id=0,
+        player_is_war_attacker=True,
+    )
 
     assert stats["total_battles"] == 1
     assert stats["our_victories"] == 1
     assert stats["our_ship_losses"] == 2
     assert stats["their_ship_losses"] == 9
+
+
+def test_summarize_war_control_includes_capital_and_system_evidence():
+    summary = DummyMilitaryExtractor._summarize_war_control(
+        lost_control_records=[
+            {
+                "owner_id": "15",
+                "controller_id": "0",
+                "fleet_id": "100",
+                "system_id": "9",
+                "system_name": "Enemy Prime",
+            },
+            {
+                "owner_id": "16",
+                "controller_id": "1",
+                "fleet_id": "101",
+                "system_id": "10",
+                "system_name": "Allied Advance",
+            },
+            {
+                "owner_id": "0",
+                "controller_id": "15",
+                "fleet_id": "102",
+                "system_id": "12",
+                "system_name": "Sol",
+            },
+        ],
+        capital_control={
+            "0": {"controller_id": "0", "system_id": "12", "capital_name": "Earth"},
+            "15": {"controller_id": "0", "system_id": "9", "capital_name": "Enemy Prime"},
+            "16": {"controller_id": "16", "system_id": "10", "capital_name": "Second Prime"},
+        },
+        our_side_ids={"0", "1"},
+        opposing_side_ids={"15", "16"},
+        player_id="0",
+        country_names={0: "Player", 1: "Ally", 15: "Enemy", 16: "Second Enemy"},
+    )
+
+    assert summary["enemy_starbase_assets_controlled_by_our_side"] == 2
+    assert summary["enemy_assets_controlled_by_player"] == 1
+    assert {entry["system_id"] for entry in summary["enemy_systems_controlled_by_our_side"]} == {
+        "9",
+        "10",
+    }
+    assert [
+        entry["empire"] for entry in summary["enemy_capital_colonies_occupied_by_our_side"]
+    ] == ["Enemy"]
+    assert {
+        entry["empire"] for entry in summary["enemy_capital_systems_controlled_by_our_side"]
+    } == {"Enemy", "Second Enemy"}
+    assert summary["our_starbase_assets_controlled_by_enemy_side"] == 1
+    assert summary["player_capital_colony_occupied_by_enemy_side"] is False
+    assert summary["player_capital_system_controlled_by_enemy_side"] is True
+
+
+def test_battle_diagnostic_record_exposes_raw_and_parent_side_calculation():
+    extractor = DummyMilitaryExtractor()
+    battle = {
+        "attackers": ["15"],
+        "defenders": ["0"],
+        "attacker_victory": "yes",
+        "attacker_losses": "1",
+        "defender_losses": "15",
+        "system": "2",
+        "type": "ships",
+    }
+
+    diagnostic = extractor._build_battle_diagnostic_record(
+        battle,
+        local_attackers={"15"},
+        local_defenders={"0"},
+        player_is_war_attacker=True,
+    )
+
+    assert diagnostic == {
+        "local_attacker_country_ids": ["15"],
+        "local_defender_country_ids": ["0"],
+        "raw_attacker_victory": "yes",
+        "raw_attacker_losses": 1,
+        "raw_defender_losses": 15,
+        "battle_type": "ships",
+        "system_id": "2",
+        "computed_result": "our_side_victory",
+        "computed_our_side_losses": 1,
+        "computed_opposing_side_losses": 15,
+    }
 
 
 def test_classify_megastructure_status_uses_live_state_not_stage_suffix():
@@ -199,7 +316,13 @@ def test_real_save_battle_stats_match_raw_player_participation(test_save_path):
         if player_id not in attackers and player_id not in defenders:
             continue
 
-        expected = {"total_battles": 0, "our_victories": 0, "their_victories": 0}
+        player_is_war_attacker = player_id in attackers
+        expected = {
+            "total_battles": 0,
+            "our_victories": 0,
+            "their_victories": 0,
+            "unknown_outcomes": 0,
+        }
         battles = war.get("battles", [])
         if isinstance(battles, list):
             for battle in battles:
@@ -215,10 +338,10 @@ def test_real_save_battle_stats_match_raw_player_participation(test_save_path):
                     continue
 
                 expected["total_battles"] += 1
-                attacker_victory = battle.get("attacker_victory") == "yes"
-                if (player_was_attacker and attacker_victory) or (
-                    player_was_defender and not attacker_victory
-                ):
+                attacker_victory = battle.get("attacker_victory")
+                if attacker_victory not in {"yes", "no"}:
+                    expected["unknown_outcomes"] += 1
+                elif (attacker_victory == "yes") == player_is_war_attacker:
                     expected["our_victories"] += 1
                 else:
                     expected["their_victories"] += 1
@@ -228,20 +351,33 @@ def test_real_save_battle_stats_match_raw_player_participation(test_save_path):
     with rust_session(test_save_path):
         extractor = SaveExtractor(test_save_path)
         wars = extractor.get_wars()
+        diagnostics = extractor.get_war_diagnostics()
 
     assert wars["player_at_war"] is True
     assert wars["active_war_count"] == len(expected_by_war)
+    assert diagnostics["schema_version"] == 2
+    assert diagnostics["result_orientation"] == "parent_war_side"
+    assert diagnostics["included_battles"] == 0
+    assert diagnostics["wars"][0]["direct_battle_count"] == 0
 
     actual_by_war = [
         {
             "total_battles": war["battle_stats"]["total_battles"],
             "our_victories": war["battle_stats"]["our_victories"],
             "their_victories": war["battle_stats"]["their_victories"],
+            "unknown_outcomes": war["battle_stats"]["unknown_outcomes"],
         }
         for war in wars["wars"]
     ]
     assert (
         actual_by_war
         == expected_by_war
-        == [{"total_battles": 0, "our_victories": 0, "their_victories": 0}]
+        == [
+            {
+                "total_battles": 0,
+                "our_victories": 0,
+                "their_victories": 0,
+                "unknown_outcomes": 0,
+            }
+        ]
     )

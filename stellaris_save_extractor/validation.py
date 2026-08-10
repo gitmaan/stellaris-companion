@@ -311,6 +311,7 @@ class ExtractionValidator:
                 "total_battles",
                 "our_victories",
                 "their_victories",
+                "unknown_outcomes",
                 "our_ship_losses",
                 "their_ship_losses",
                 "our_army_losses",
@@ -327,21 +328,27 @@ class ExtractionValidator:
                 else:
                     result.add_pass()
 
-            # Victories should not exceed total battles
+            # Every directly-involved battle must have exactly one classified
+            # outcome, including an explicit unknown bucket for malformed or
+            # future save-schema values.
             total = battle_stats.get("total_battles", 0)
             our_wins = battle_stats.get("our_victories", 0)
             their_wins = battle_stats.get("their_victories", 0)
-            if our_wins + their_wins > total:
+            unknown = battle_stats.get("unknown_outcomes", 0)
+            classified = our_wins + their_wins + unknown
+            if classified != total:
                 result.add_issue(
                     "battle_stats_invariant",
-                    f"Victories ({our_wins}+{their_wins}) exceed total battles ({total}) in '{war_name}'",
+                    f"Classified outcomes ({our_wins}+{their_wins}+{unknown}) do not equal "
+                    f"total battles ({total}) in '{war_name}'",
                     details={
                         "war": war_name,
                         "total": total,
                         "our_wins": our_wins,
                         "their_wins": their_wins,
+                        "unknown": unknown,
                     },
-                    fix_suggestion="Check battle victory counting logic",
+                    fix_suggestion="Check battle outcome classification logic",
                 )
             else:
                 result.add_pass()

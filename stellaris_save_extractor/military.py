@@ -11,6 +11,8 @@ from .fleet_classification import classify_owned_fleet
 
 logger = logging.getLogger(__name__)
 
+WAR_DIAGNOSTICS_SCHEMA_VERSION = 2
+
 
 class MilitaryMixin:
     """Domain methods extracted from the original SaveExtractor."""
@@ -48,6 +50,78 @@ class MilitaryMixin:
         Requires Rust session mode to be active.
         """
         return self._get_wars_rust()
+
+    def get_war_diagnostics(self, *, max_battles: int = 120) -> dict:
+        """Return a bounded, privacy-safe record of battle-side calculations.
+
+        This diagnostic deliberately excludes ship designs, coordinates, raw
+        country data, and the save itself. It is intended for opt-in feedback
+        reports where aggregate output is insufficient to reproduce a side
+        attribution problem.
+        """
+        session = _get_active_session()
+        if not session:
+            raise ParserError("Rust session mode required for get_war_diagnostics")
+
+        max_battles = max(1, min(int(max_battles), 250))
+        player_id = str(self.get_player_empire_id())
+        result = {
+            "schema_version": WAR_DIAGNOSTICS_SCHEMA_VERSION,
+            "player_id": player_id,
+            "result_orientation": "parent_war_side",
+            "loss_orientation": "parent_war_side",
+            "wars": [],
+            "included_battles": 0,
+            "truncated": False,
+        }
+
+        for war_id, war in session.iter_section("war"):
+            if not isinstance(war, dict):
+                continue
+            attacker_ids = self._war_participant_ids(war.get("attackers", []))
+            defender_ids = self._war_participant_ids(war.get("defenders", []))
+            player_is_war_attacker = player_id in attacker_ids
+            if not player_is_war_attacker and player_id not in defender_ids:
+                continue
+
+            war_diagnostic = {
+                "war_id": str(war_id),
+                "our_side": "attacker" if player_is_war_attacker else "defender",
+                "attacker_country_ids": sorted(attacker_ids),
+                "defender_country_ids": sorted(defender_ids),
+                "direct_battle_count": 0,
+                "battle_records": [],
+                "truncated": False,
+            }
+            battles = war.get("battles", [])
+            if not isinstance(battles, list):
+                battles = []
+            for battle in battles:
+                if not isinstance(battle, dict):
+                    continue
+                local_attackers = self._battle_participant_ids(battle.get("attackers", []))
+                local_defenders = self._battle_participant_ids(battle.get("defenders", []))
+                if player_id not in local_attackers and player_id not in local_defenders:
+                    continue
+
+                war_diagnostic["direct_battle_count"] += 1
+                if result["included_battles"] >= max_battles:
+                    war_diagnostic["truncated"] = True
+                    result["truncated"] = True
+                    continue
+
+                war_diagnostic["battle_records"].append(
+                    self._build_battle_diagnostic_record(
+                        battle,
+                        local_attackers=local_attackers,
+                        local_defenders=local_defenders,
+                        player_is_war_attacker=player_is_war_attacker,
+                    )
+                )
+                result["included_battles"] += 1
+            result["wars"].append(war_diagnostic)
+
+        return result
 
     def _resolve_war_name(self, name_block: dict | str | None, war_id: str) -> str:
         """Resolve a war name from its name block structure.
@@ -97,6 +171,13 @@ class MilitaryMixin:
         # it would trigger iter_section("galactic_object") *inside* the war
         # stream, corrupting the session (nested iter_section is not supported).
         self._get_galactic_objects_cached()
+
+        # Build occupation evidence before streaming the war section. Rust
+        # section streams cannot be nested, and these indexes use country,
+        # fleet, colony, and planet data referenced by every active war.
+        countries = self._get_countries_cached()
+        lost_control_records = self._build_lost_control_records(session, countries)
+        capital_control = self._build_capital_control_index(session, countries)
 
         # Iterate through wars using Rust parser (P031: use session.iter_section directly)
         for war_id, war_data in session.iter_section("war"):
@@ -148,6 +229,8 @@ class MilitaryMixin:
 
             # Build war info
             our_side = "attacker" if player_is_attacker else "defender"
+            our_side_ids = set(attacker_ids if player_is_attacker else defender_ids)
+            opposing_side_ids = set(defender_ids if player_is_attacker else attacker_ids)
 
             # Resolve country names
             attacker_names = [country_names.get(int(cid), f"Empire {cid}") for cid in attacker_ids]
@@ -162,6 +245,7 @@ class MilitaryMixin:
             battle_stats = self._extract_battle_stats(
                 war_data.get("battles", []),
                 player_id=player_id,
+                player_is_war_attacker=player_is_attacker,
             )
 
             war_info = {
@@ -175,6 +259,14 @@ class MilitaryMixin:
                 },
                 "war_goal": war_goal,
                 "battle_stats": battle_stats,
+                "strategic_control": self._summarize_war_control(
+                    lost_control_records=lost_control_records,
+                    capital_control=capital_control,
+                    our_side_ids=our_side_ids,
+                    opposing_side_ids=opposing_side_ids,
+                    player_id=player_id_str,
+                    country_names=country_names,
+                ),
                 "status": "in_progress",  # All wars in the war section are active
             }
 
@@ -191,28 +283,40 @@ class MilitaryMixin:
         battles: list,
         *,
         player_id: int | str,
+        player_is_war_attacker: bool,
     ) -> dict:
         """Extract battle statistics from the battles block.
 
         Args:
             battles: List of battle records from war data
             player_id: Country ID of the player empire
+            player_is_war_attacker: Whether the player belongs to the parent
+                war's attacker coalition. Stellaris stores battle outcomes and
+                loss totals relative to the parent war sides, even when the
+                per-battle participant lists use the opposite tactical order.
 
         Returns:
             Dict with battle statistics for battles where the player empire
             directly participated:
             - total_battles: Total number of player battles
-            - our_victories: Battles won by the player empire
-            - their_victories: Battles lost by the player empire
-            - our_ship_losses: Ships lost by the player empire
-            - their_ship_losses: Ships lost by the opponent
-            - our_army_losses: Armies lost by the player empire
-            - their_army_losses: Armies lost by the opponent
+            - our_victories: Battles won by the player's war side
+            - their_victories: Battles won by the opposing war side
+            - unknown_outcomes: Battles without a recognized result flag
+            - our_ship_losses: Ships lost by the player's war side
+            - their_ship_losses: Ships lost by the opposing war side
+            - our_army_losses: Armies lost by the player's war side
+            - their_army_losses: Armies lost by the opposing war side
+
+            The participant lists are used only to restrict the result to
+            engagements in which the player country directly participated.
+            Loss totals remain coalition-side values for those engagements and
+            may include allied casualties in multi-country battles.
         """
         stats = {
             "total_battles": 0,
             "our_victories": 0,
             "their_victories": 0,
+            "unknown_outcomes": 0,
             "our_ship_losses": 0,
             "their_ship_losses": 0,
             "our_army_losses": 0,
@@ -228,30 +332,21 @@ class MilitaryMixin:
             if not isinstance(battle, dict):
                 continue
 
-            # Determine battle outcome
-            # attacker_victory=yes means the battle's attackers won (not war attackers)
-            # We need to check whether the player's empire was attacking or defending
-            # in THIS battle. Coalition-wide battles should not be attributed to the
-            # player when only allies participated.
+            # The per-battle participant lists identify who directly fought, but
+            # attacker_victory and attacker/defender losses are relative to the
+            # parent war coalitions. The tactical list order can be the opposite
+            # of the parent war side in real saves.
             battle_attackers = self._battle_participant_ids(battle.get("attackers", []))
             battle_defenders = self._battle_participant_ids(battle.get("defenders", []))
-            attacker_victory = battle.get("attacker_victory") == "yes"
-
-            player_was_battle_attacker = player_id_str in battle_attackers
-            player_was_battle_defender = player_id_str in battle_defenders
-
-            if not player_was_battle_attacker and not player_was_battle_defender:
+            if player_id_str not in battle_attackers and player_id_str not in battle_defenders:
                 continue
 
             stats["total_battles"] += 1
 
-            # Determine if we won this battle
-            if (
-                player_was_battle_attacker
-                and attacker_victory
-                or player_was_battle_defender
-                and not attacker_victory
-            ):
+            war_attacker_won = self._parse_battle_outcome(battle.get("attacker_victory"))
+            if war_attacker_won is None:
+                stats["unknown_outcomes"] += 1
+            elif war_attacker_won == player_is_war_attacker:
                 stats["our_victories"] += 1
             else:
                 stats["their_victories"] += 1
@@ -266,8 +361,8 @@ class MilitaryMixin:
 
             battle_type = battle.get("type", "ships")
 
-            # Assign losses to our side vs their side
-            if player_was_battle_attacker:
+            # Loss fields use the same parent-war orientation as the result flag.
+            if player_is_war_attacker:
                 our_losses = attacker_losses
                 their_losses = defender_losses
             else:
@@ -323,6 +418,325 @@ class MilitaryMixin:
         ]
 
         return stats
+
+    def _build_lost_control_records(self, session, countries: dict[str, dict]) -> list[dict]:
+        """Return save-recorded starbases whose owner has lost control."""
+        pending: list[dict[str, str]] = []
+        for owner_id, country in countries.items():
+            if not isinstance(country, dict):
+                continue
+            fleet_manager = country.get("fleets_manager")
+            if not isinstance(fleet_manager, dict):
+                continue
+            owned_fleets = fleet_manager.get("owned_fleets", [])
+            if not isinstance(owned_fleets, list):
+                continue
+            for entry in owned_fleets:
+                if not isinstance(entry, dict) or entry.get("ownership_status") != "lost_control":
+                    continue
+                fleet_id = entry.get("fleet")
+                controller_id = entry.get("debtor")
+                if fleet_id is None or controller_id is None:
+                    continue
+                pending.append(
+                    {
+                        "owner_id": str(owner_id),
+                        "controller_id": str(controller_id),
+                        "fleet_id": str(fleet_id),
+                    }
+                )
+
+        if not pending:
+            return []
+
+        fleet_ids = list(dict.fromkeys(record["fleet_id"] for record in pending))
+        fleets: dict[str, dict] = {}
+        for entry in session.get_entries("fleet", fleet_ids):
+            fleet_id = entry.get("_key")
+            fleet = entry.get("_value")
+            if fleet_id is not None and isinstance(fleet, dict):
+                fleets[str(fleet_id)] = fleet
+
+        records: list[dict] = []
+        for record in pending:
+            fleet = fleets.get(record["fleet_id"])
+            if not isinstance(fleet, dict):
+                continue
+            if fleet.get("station") != "yes" and fleet.get("orbital_station") != "yes":
+                continue
+
+            system_id = self._fleet_system_id(fleet)
+            enriched: dict = dict(record)
+            enriched["system_id"] = system_id
+            if system_id is not None:
+                with contextlib.suppress(ValueError, TypeError):
+                    system_name = self._resolve_system_name(int(system_id))
+                    if system_name:
+                        enriched["system_name"] = system_name
+            records.append(enriched)
+        return records
+
+    @staticmethod
+    def _fleet_system_id(fleet: dict) -> str | None:
+        """Read a stationary fleet's current system from common save shapes."""
+        for block_name in ("movement_manager", "combat"):
+            block = fleet.get(block_name)
+            if not isinstance(block, dict):
+                continue
+            coordinate = block.get("coordinate")
+            if not isinstance(coordinate, dict):
+                continue
+            origin = coordinate.get("origin")
+            if origin is not None and str(origin) != "4294967295":
+                return str(origin)
+        return None
+
+    def _build_capital_control_index(
+        self,
+        session,
+        countries: dict[str, dict],
+    ) -> dict[str, dict]:
+        """Resolve capital colony controllers and systems across save schemas."""
+        try:
+            data = session.extract_sections(["colony", "colonies", "planets"])
+        except Exception as exc:
+            logger.debug("war_capital_control_unavailable error=%s", exc)
+            return {}
+
+        colonies = data.get("colony") or data.get("colonies", {})
+        if isinstance(colonies, dict):
+            nested_colonies = colonies.get("colony") or colonies.get("colonies")
+            if isinstance(nested_colonies, dict):
+                colonies = nested_colonies
+        else:
+            colonies = {}
+
+        planets = data.get("planets", {})
+        if isinstance(planets, dict) and isinstance(planets.get("planet"), dict):
+            planets = planets["planet"]
+        if not isinstance(planets, dict):
+            planets = {}
+
+        result: dict[str, dict] = {}
+        for country_id, country in countries.items():
+            if not isinstance(country, dict):
+                continue
+            capital_id = country.get("capital")
+            if capital_id is None:
+                continue
+            capital_id_str = str(capital_id)
+            colony = colonies.get(capital_id_str)
+            carrier: dict = {}
+            if isinstance(colony, dict):
+                carrier_id = self._capital_carrier_id(colony.get("carrier"))
+                if carrier_id is not None and isinstance(planets.get(carrier_id), dict):
+                    carrier = planets[carrier_id]
+            else:
+                colony = {}
+                if isinstance(planets.get(capital_id_str), dict):
+                    carrier = planets[capital_id_str]
+
+            controller_id = colony.get("controller") or carrier.get("controller")
+            coordinate = colony.get("coordinate") or carrier.get("coordinate")
+            system_id = (
+                str(coordinate.get("origin"))
+                if isinstance(coordinate, dict) and coordinate.get("origin") is not None
+                else None
+            )
+            name_block = colony.get("name") or carrier.get("name")
+            capital_name = None
+            if name_block:
+                capital_name = self.resolve_name(
+                    name_block,
+                    default="Unknown Capital",
+                    context="planet",
+                ).display
+
+            result[str(country_id)] = {
+                "capital_id": capital_id_str,
+                "controller_id": str(controller_id) if controller_id is not None else None,
+                "system_id": system_id,
+                "capital_name": capital_name,
+            }
+        return result
+
+    @staticmethod
+    def _capital_carrier_id(carrier: object) -> str | None:
+        """Normalize Pegasus colony carrier references to a planet ID."""
+        if isinstance(carrier, (str, int)) and not isinstance(carrier, bool):
+            return str(carrier)
+        if not isinstance(carrier, dict):
+            return None
+        for key in ("planet", "reference", "id", "carrier_id", "value"):
+            value = carrier.get(key)
+            if value is not None and not isinstance(value, (dict, list, bool)):
+                return str(value)
+        return None
+
+    @staticmethod
+    def _summarize_war_control(
+        *,
+        lost_control_records: list[dict],
+        capital_control: dict[str, dict],
+        our_side_ids: set[str],
+        opposing_side_ids: set[str],
+        player_id: str,
+        country_names: dict[int, str],
+    ) -> dict:
+        """Summarize occupation evidence relative to the player's war side."""
+        enemy_assets = [
+            record
+            for record in lost_control_records
+            if record.get("owner_id") in opposing_side_ids
+            and record.get("controller_id") in our_side_ids
+        ]
+        our_assets = [
+            record
+            for record in lost_control_records
+            if record.get("owner_id") in our_side_ids
+            and record.get("controller_id") in opposing_side_ids
+        ]
+
+        def systems(records: list[dict]) -> list[dict]:
+            by_id: dict[str, dict] = {}
+            for record in records:
+                system_id = record.get("system_id")
+                if system_id is None:
+                    continue
+                by_id.setdefault(
+                    str(system_id),
+                    {
+                        "system_id": str(system_id),
+                        "system_name": record.get("system_name"),
+                    },
+                )
+            return list(by_id.values())
+
+        enemy_systems = systems(enemy_assets)
+        our_systems = systems(our_assets)
+        enemy_system_ids = {entry["system_id"] for entry in enemy_systems}
+        our_system_ids = {entry["system_id"] for entry in our_systems}
+
+        def empire_name(country_id: str) -> str:
+            with contextlib.suppress(ValueError, TypeError):
+                return country_names.get(int(country_id), f"Empire {country_id}")
+            return f"Empire {country_id}"
+
+        occupied_enemy_capitals: list[dict] = []
+        controlled_enemy_capital_systems: list[dict] = []
+        for country_id in sorted(opposing_side_ids):
+            capital = capital_control.get(country_id, {})
+            capital_info = {
+                "empire": empire_name(country_id),
+                "empire_id": country_id,
+                "capital": capital.get("capital_name"),
+                "system_id": capital.get("system_id"),
+            }
+            if capital.get("controller_id") in our_side_ids:
+                occupied_enemy_capitals.append(capital_info)
+            if capital.get("system_id") in enemy_system_ids:
+                controlled_enemy_capital_systems.append(capital_info)
+
+        player_capital = capital_control.get(player_id, {})
+        player_capital_system_id = player_capital.get("system_id")
+        player_capital_controller = player_capital.get("controller_id")
+        player_capital_system_lost = (
+            player_capital_system_id in our_system_ids
+            if player_capital_system_id is not None
+            else None
+        )
+        player_capital_occupied = (
+            player_capital_controller in opposing_side_ids
+            if player_capital_controller is not None
+            else None
+        )
+
+        return {
+            "enemy_starbase_assets_controlled_by_our_side": len(enemy_assets),
+            "enemy_systems_controlled_by_our_side": enemy_systems,
+            "enemy_assets_controlled_by_player": sum(
+                record.get("controller_id") == player_id for record in enemy_assets
+            ),
+            "our_starbase_assets_controlled_by_enemy_side": len(our_assets),
+            "our_systems_controlled_by_enemy_side": our_systems,
+            "enemy_capital_colonies_occupied_by_our_side": occupied_enemy_capitals,
+            "enemy_capital_systems_controlled_by_our_side": controlled_enemy_capital_systems,
+            "player_capital_colony_occupied_by_enemy_side": player_capital_occupied,
+            "player_capital_system_controlled_by_enemy_side": player_capital_system_lost,
+            "evidence_scope": (
+                "Save-recorded lost-control starbase assets and capital colony controllers; "
+                "this is strategic control evidence, not a complete war-score calculation."
+            ),
+        }
+
+    @staticmethod
+    def _parse_battle_outcome(value: object) -> bool | None:
+        """Return whether the parent war attacker won, or None if unknown."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"yes", "true", "1"}:
+                return True
+            if normalized in {"no", "false", "0"}:
+                return False
+        if isinstance(value, int) and value in {0, 1}:
+            return bool(value)
+        return None
+
+    @staticmethod
+    def _war_participant_ids(participants: object) -> set[str]:
+        """Normalize parent-war participant records into country IDs."""
+        if not isinstance(participants, list):
+            participants = [participants] if participants else []
+        result: set[str] = set()
+        for participant in participants:
+            if isinstance(participant, dict):
+                country_id = participant.get("country")
+                if country_id is not None:
+                    result.add(str(country_id))
+        return result
+
+    def _build_battle_diagnostic_record(
+        self,
+        battle: dict,
+        *,
+        local_attackers: set[str],
+        local_defenders: set[str],
+        player_is_war_attacker: bool,
+    ) -> dict:
+        """Build one bounded battle calculation record for feedback reports."""
+        attacker_losses = 0
+        defender_losses = 0
+        with contextlib.suppress(ValueError, TypeError):
+            attacker_losses = int(battle.get("attacker_losses", 0))
+        with contextlib.suppress(ValueError, TypeError):
+            defender_losses = int(battle.get("defender_losses", 0))
+
+        war_attacker_won = self._parse_battle_outcome(battle.get("attacker_victory"))
+        if war_attacker_won is None:
+            computed_result = "unknown"
+        elif war_attacker_won == player_is_war_attacker:
+            computed_result = "our_side_victory"
+        else:
+            computed_result = "opposing_side_victory"
+
+        return {
+            "local_attacker_country_ids": sorted(local_attackers),
+            "local_defender_country_ids": sorted(local_defenders),
+            "raw_attacker_victory": battle.get("attacker_victory"),
+            "raw_attacker_losses": attacker_losses,
+            "raw_defender_losses": defender_losses,
+            "battle_type": battle.get("type", "ships"),
+            "system_id": str(battle.get("system")) if battle.get("system") is not None else None,
+            "computed_result": computed_result,
+            "computed_our_side_losses": (
+                attacker_losses if player_is_war_attacker else defender_losses
+            ),
+            "computed_opposing_side_losses": (
+                defender_losses if player_is_war_attacker else attacker_losses
+            ),
+        }
 
     @staticmethod
     def _battle_participant_ids(participants: object) -> set[str]:

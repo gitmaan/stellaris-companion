@@ -289,6 +289,40 @@ export interface DiagnosticsResponse {
   ingestionLastError: string | null
   precomputeReady: boolean | null
   t2Ready: boolean | null
+  warDiagnostics: WarDiagnostics | null
+}
+
+export interface WarBattleDiagnosticRecord {
+  local_attacker_country_ids: string[]
+  local_defender_country_ids: string[]
+  raw_attacker_victory: unknown
+  raw_attacker_losses: number
+  raw_defender_losses: number
+  battle_type: string
+  system_id: string | null
+  computed_result: 'our_side_victory' | 'opposing_side_victory' | 'unknown'
+  computed_our_side_losses: number
+  computed_opposing_side_losses: number
+}
+
+export interface WarDiagnostic {
+  war_id: string
+  our_side: 'attacker' | 'defender'
+  attacker_country_ids: string[]
+  defender_country_ids: string[]
+  direct_battle_count: number
+  battle_records: WarBattleDiagnosticRecord[]
+  truncated: boolean
+}
+
+export interface WarDiagnostics {
+  schema_version: number
+  player_id: string
+  result_orientation: 'parent_war_side'
+  loss_orientation: 'parent_war_side'
+  wars: WarDiagnostic[]
+  included_battles: number
+  truncated: boolean
 }
 
 // ============================================

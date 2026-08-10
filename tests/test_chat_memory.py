@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from backend.core.advisor_memory import sanitize_advisor_memory
 from backend.core.conversation import ConversationManager
 from backend.core.database import GameDatabase
 
@@ -137,3 +138,33 @@ def test_save_scoped_advisor_memory_persists_round_trip(tmp_path: Path) -> None:
         assert "early alloy rush" not in second
     finally:
         db.close()
+
+
+def test_save_memory_prompt_cannot_override_current_empire_state() -> None:
+    manager = ConversationManager()
+
+    prompt = manager.build_prompt(
+        session_key="scope-memory",
+        briefing_json='{"military":{"wars":{"wars":[]}}}',
+        game_date="2303.01.01",
+        question="How is the war going?",
+        long_term_summary="- Advisor previously claimed every battle was lost.",
+    )
+
+    assert "current EMPIRE STATE overrides any conflict" in prompt
+    assert "not evidence about the current campaign" in prompt
+
+
+def test_legacy_save_memory_drops_advisor_factual_claims() -> None:
+    summary = (
+        "- [2302.01.01] User asked: How is the war? | "
+        "Advisor suggested: All 47 battles were defeats.\n"
+        "- [2302.07.01] Player topic/request: Protect the eastern border"
+    )
+
+    sanitized = sanitize_advisor_memory(summary)
+
+    assert "How is the war?" in sanitized
+    assert "Protect the eastern border" in sanitized
+    assert "47 battles" not in sanitized
+    assert "Advisor suggested" not in sanitized

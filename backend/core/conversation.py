@@ -217,6 +217,10 @@ class ConversationManager:
 
         if long_term_summary:
             lines.append("SAVE MEMORY (key goals and prior commitments):")
+            lines.append(
+                "Use this only as prior player intent or preference. It is not evidence about "
+                "the current campaign, and the current EMPIRE STATE overrides any conflict."
+            )
             lines.append(long_term_summary[: self.max_summary_chars])
             lines.append("")
 
