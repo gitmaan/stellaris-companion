@@ -299,14 +299,23 @@ function CampaignHistoryDialog({
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-bg-tertiary/30 px-5 py-3">
               <button
                 type="button"
-                onClick={() => { setTab('active'); setSelected(new Set()) }}
+                onClick={() => {
+                  setTab('active')
+                  setSelected(new Set())
+                  setConfirmDeleteId(null)
+                  setConfirmRemovePublicationId(null)
+                }}
                 className={`rounded border px-3 py-1.5 text-xs uppercase tracking-wider ${tab === 'active' ? 'border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan' : 'border-border text-text-secondary'}`}
               >
                 {t('chronicle.history.active', { count: playthroughs.filter(item => !item.is_trashed).length })}
               </button>
               <button
                 type="button"
-                onClick={() => { setTab('trash'); setSelected(new Set()) }}
+                onClick={() => {
+                  setTab('trash')
+                  setSelected(new Set())
+                  setConfirmResetId(null)
+                }}
                 className={`rounded border px-3 py-1.5 text-xs uppercase tracking-wider ${tab === 'trash' ? 'border-accent-yellow/50 bg-accent-yellow/10 text-accent-yellow' : 'border-border text-text-secondary'}`}
               >
                 {t('chronicle.history.trash', { count: playthroughs.filter(item => item.is_trashed).length })}
@@ -374,7 +383,6 @@ function CampaignHistoryDialog({
                               <h3 className="truncate font-medium text-text-primary">{playthrough.display_name}</h3>
                               {playthrough.is_current && <Badge tone="cyan">{t('chronicle.history.current')}</Badge>}
                               {playthrough.has_chronicle && <Badge tone="teal">{t('chronicle.history.hasChronicle')}</Badge>}
-                              {!playthrough.has_chronicle && <Badge tone="muted">{t('chronicle.history.noChronicle')}</Badge>}
                               {publication?.state === 'published' && <Badge tone="yellow">{t('chronicle.history.published')}</Badge>}
                             </div>
                             {playthrough.display_label && (
@@ -382,7 +390,6 @@ function CampaignHistoryDialog({
                             )}
                             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
                               <span>{t('chronicle.history.gameDates', { first: formatGameDate(playthrough.first_game_date), last: formatGameDate(playthrough.last_game_date) })}</span>
-                              <span>{t('chronicle.history.events', { count: playthrough.event_count })}</span>
                             </div>
                             <details className="mt-2 text-xs text-text-muted">
                               <summary className="cursor-pointer select-none transition-colors hover:text-text-secondary">
@@ -391,6 +398,7 @@ function CampaignHistoryDialog({
                               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 pl-3">
                                 <span>{t('chronicle.history.sessions', { count: playthrough.session_count })}</span>
                                 <span>{t('chronicle.history.snapshots', { count: playthrough.snapshot_count })}</span>
+                                <span>{t('chronicle.history.events', { count: playthrough.event_count })}</span>
                                 <span>{t('chronicle.history.chapters', { count: playthrough.total_chapter_count })}</span>
                               </div>
                             </details>
@@ -418,9 +426,36 @@ function CampaignHistoryDialog({
                               </div>
                             )}
 
-                            {tab === 'trash' && publication?.state === 'published' && confirmDeleteId === playthrough.save_id && (
-                              <p className="mt-3 rounded border border-accent-yellow/30 bg-accent-yellow/5 px-3 py-2 text-xs text-accent-yellow">
-                                {t('chronicle.history.publishedDeleteWarning')}
+                            {confirmResetId === playthrough.save_id && (
+                              <ConfirmationPanel
+                                title={t('chronicle.history.resetTitle')}
+                                body={t('chronicle.history.resetHelp')}
+                                confirmLabel={t('chronicle.history.confirmReset')}
+                                onCancel={() => setConfirmResetId(null)}
+                                onConfirm={() => void handleReset(playthrough)}
+                                disabled={isWorking}
+                              />
+                            )}
+
+                            {confirmDeleteId === playthrough.save_id && (
+                              <ConfirmationPanel
+                                title={t('chronicle.history.deleteTitle')}
+                                body={publication?.state === 'published'
+                                  ? t('chronicle.history.deletePublishedHelp')
+                                  : t('chronicle.history.deleteHelp')}
+                                confirmLabel={publication?.state === 'published'
+                                  ? t('chronicle.history.confirmDeleteLocal')
+                                  : t('chronicle.history.confirmDelete')}
+                                onCancel={() => setConfirmDeleteId(null)}
+                                onConfirm={() => void handleDelete(playthrough)}
+                                disabled={isWorking}
+                                tone="danger"
+                              />
+                            )}
+
+                            {tab === 'active' && playthrough.is_current && (
+                              <p className="mt-3 text-xs leading-relaxed text-text-muted">
+                                {t('chronicle.history.currentProtected')}
                               </p>
                             )}
                           </div>
@@ -428,21 +463,25 @@ function CampaignHistoryDialog({
                           <div className="flex w-full shrink-0 flex-wrap content-start gap-2 sm:w-auto sm:max-w-72 sm:justify-end">
                             {tab === 'active' ? (
                               <>
-                                <ActionButton onClick={() => { setEditingId(playthrough.save_id); setLabel(playthrough.display_label || '') }} disabled={isWorking}>
+                                <ActionButton onClick={() => {
+                                  setEditingId(playthrough.save_id)
+                                  setLabel(playthrough.display_label || '')
+                                  setConfirmResetId(null)
+                                }} disabled={isWorking}>
                                   {t('chronicle.history.rename')}
                                 </ActionButton>
-                                <ActionButton onClick={() => void handleTrash(playthrough)} disabled={isWorking || playthrough.is_current} tone="warning" title={playthrough.is_current ? t('chronicle.history.currentProtected') : undefined}>
+                                <ActionButton onClick={() => void handleTrash(playthrough)} disabled={isWorking || playthrough.is_current} tone="warning">
                                   {t('chronicle.history.moveToTrash')}
                                 </ActionButton>
-                                {(playthrough.can_undo_reset || playthrough.has_chronicle) && (
-                                  <OverflowActions label={t('chronicle.history.moreActions')}>
+                                {(playthrough.can_undo_reset || (playthrough.has_chronicle && confirmResetId !== playthrough.save_id)) && (
+                                  <OverflowActions label={t('chronicle.history.storyActions')}>
                                     {playthrough.can_undo_reset ? (
                                       <ActionButton onClick={() => void handleUndoReset(playthrough)} disabled={isWorking}>
                                         {t('chronicle.history.undoReset')}
                                       </ActionButton>
                                     ) : (
                                       <ActionButton onClick={() => void handleReset(playthrough)} disabled={isWorking} tone="warning">
-                                        {confirmResetId === playthrough.save_id ? t('chronicle.history.confirmReset') : t('chronicle.history.reset')}
+                                        {t('chronicle.history.reset')}
                                       </ActionButton>
                                     )}
                                   </OverflowActions>
@@ -453,17 +492,13 @@ function CampaignHistoryDialog({
                                 <ActionButton onClick={() => void handleRestore(playthrough)} disabled={isWorking}>
                                   {t('chronicle.history.restore')}
                                 </ActionButton>
-                                <OverflowActions label={t('chronicle.history.moreActions')}>
+                                {confirmDeleteId !== playthrough.save_id && <OverflowActions label={t('chronicle.history.deleteOptions')}>
                                   <ActionButton onClick={() => void handleDelete(playthrough)} disabled={isWorking} tone="danger">
                                     {publication?.state === 'published'
-                                      ? (confirmDeleteId === playthrough.save_id
-                                        ? t('chronicle.history.confirmDeleteLocal')
-                                        : t('chronicle.history.deleteLocal'))
-                                      : (confirmDeleteId === playthrough.save_id
-                                        ? t('chronicle.history.confirmDelete')
-                                        : t('chronicle.history.delete'))}
+                                      ? t('chronicle.history.deleteLocal')
+                                      : t('chronicle.history.delete')}
                                   </ActionButton>
-                                </OverflowActions>
+                                </OverflowActions>}
                               </>
                             )}
                           </div>
@@ -495,11 +530,22 @@ function CampaignHistoryDialog({
                             {t('chronicle.history.openStory')}
                           </ActionButton>
                         )}
-                        <ActionButton onClick={() => void handleRemoveOrphanedPublication(publication)} tone="danger">
-                          {confirmRemovePublicationId === publication.saveId
-                            ? t('chronicle.history.confirmRemoveStory')
-                            : t('chronicle.history.removeStory')}
-                        </ActionButton>
+                        {confirmRemovePublicationId === publication.saveId ? (
+                          <div className="w-full">
+                            <ConfirmationPanel
+                              title={t('chronicle.history.removeStoryTitle')}
+                              body={t('chronicle.history.removeStoryHelp')}
+                              confirmLabel={t('chronicle.history.confirmRemoveStory')}
+                              onCancel={() => setConfirmRemovePublicationId(null)}
+                              onConfirm={() => void handleRemoveOrphanedPublication(publication)}
+                              tone="danger"
+                            />
+                          </div>
+                        ) : (
+                          <ActionButton onClick={() => void handleRemoveOrphanedPublication(publication)} tone="danger">
+                            {t('chronicle.history.removeStory')}
+                          </ActionButton>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -518,12 +564,49 @@ function CampaignHistoryDialog({
   )
 }
 
-function Badge({ children, tone }: { children: React.ReactNode; tone: 'cyan' | 'teal' | 'yellow' | 'muted' }) {
+function ConfirmationPanel({
+  title,
+  body,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+  disabled,
+  tone = 'warning',
+}: {
+  title: string
+  body: string
+  confirmLabel: string
+  onCancel: () => void
+  onConfirm: () => void
+  disabled?: boolean
+  tone?: 'warning' | 'danger'
+}) {
+  const { t } = useTranslation()
+  const styles = tone === 'danger'
+    ? 'border-accent-red/35 bg-accent-red/5'
+    : 'border-accent-yellow/35 bg-accent-yellow/5'
+  const titleStyle = tone === 'danger' ? 'text-accent-red' : 'text-accent-yellow'
+  return (
+    <section aria-live="polite" className={`mt-3 rounded border px-3 py-3 ${styles}`}>
+      <p className={`text-xs font-medium ${titleStyle}`}>{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-text-secondary">{body}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <ActionButton onClick={onCancel} disabled={disabled}>
+          {t('chronicle.history.cancel')}
+        </ActionButton>
+        <ActionButton onClick={onConfirm} disabled={disabled} tone={tone}>
+          {confirmLabel}
+        </ActionButton>
+      </div>
+    </section>
+  )
+}
+
+function Badge({ children, tone }: { children: React.ReactNode; tone: 'cyan' | 'teal' | 'yellow' }) {
   const styles = {
     cyan: 'border-accent-cyan/40 bg-accent-cyan/5 text-accent-cyan',
     teal: 'border-accent-teal/40 bg-accent-teal/5 text-accent-teal',
     yellow: 'border-accent-yellow/40 bg-accent-yellow/5 text-accent-yellow',
-    muted: 'border-border bg-bg-tertiary/50 text-text-muted',
   }
   return <span className={`rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider ${styles[tone]}`}>{children}</span>
 }

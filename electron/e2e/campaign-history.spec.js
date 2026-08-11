@@ -88,9 +88,10 @@ test('campaign manager supports bulk cleanup, restore, labels, reset undo, and p
     await expect(dialog.getByText('Clean Test Run')).toBeVisible()
 
     const currentRow = dialog.locator('article').filter({ hasText: 'United Nations of Earth' })
-    await currentRow.getByRole('button', { name: 'More' }).click()
-    await currentRow.getByRole('button', { name: 'Clear Chronicle' }).click()
-    await currentRow.getByRole('button', { name: 'Confirm clear' }).click()
+    await currentRow.getByRole('button', { name: 'Story actions' }).click()
+    await currentRow.getByRole('button', { name: 'Reset Chronicle' }).click()
+    await expect(currentRow.getByText(/Campaign history and save records stay/i)).toBeVisible()
+    await currentRow.getByRole('button', { name: 'Reset Chronicle' }).click()
     await expect(page.getByText('Chronicle cleared. Campaign history was kept.')).toBeVisible()
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
 
@@ -98,9 +99,10 @@ test('campaign manager supports bulk cleanup, restore, labels, reset undo, and p
     await cleanRow.getByRole('button', { name: 'Move to Trash' }).click()
     await dialog.getByRole('button', { name: 'Trash (2)' }).click()
     const deleteRow = dialog.locator('article').filter({ hasText: 'Clean Test Run' })
-    await deleteRow.getByRole('button', { name: 'More' }).click()
+    await deleteRow.getByRole('button', { name: 'Delete options' }).click()
     await deleteRow.getByRole('button', { name: 'Delete permanently' }).click()
-    await deleteRow.getByRole('button', { name: 'Confirm delete' }).click()
+    await expect(deleteRow.getByText(/This cannot be undone/i)).toBeVisible()
+    await deleteRow.getByRole('button', { name: 'Delete permanently' }).click()
     await expect(dialog.getByText('Clean Test Run')).not.toBeVisible()
   } finally {
     await app.close()
