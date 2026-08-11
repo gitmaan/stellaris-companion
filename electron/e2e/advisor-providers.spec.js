@@ -173,7 +173,7 @@ test('configures a compatible Advisor provider and discovers its models', async 
     await expect(providerSelect).toHaveValue('custom')
     await expect(modelSelect).toHaveValue('local/strategist-large')
     await page.getByRole('button', { name: 'CHECK SELECTED MODEL' }).click()
-    await expect(page.getByText('ADVISOR & CHRONICLE READY')).toBeVisible()
+    await expect(page.getByText(/STRUCTURED RESPONSES SUPPORTED/i)).toBeVisible()
     await expect(page.getByText(/never send campaign data/i)).toBeVisible()
     expect(provider.getLastCompletionModel()).toBe('local/strategist-large')
 
