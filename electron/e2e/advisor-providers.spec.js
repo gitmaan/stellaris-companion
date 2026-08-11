@@ -84,6 +84,46 @@ async function launchApp(backendPort, userDataDir) {
   })
 }
 
+test('keeps response diagnostics optional and humanizes Advisor style details', async () => {
+  const backend = createMockChronicleBackend({
+    chatResponse: 'Fortify the northern choke point before expanding again.',
+    chatModel: 'Mock Advisor Model',
+  })
+  const backendPort = await backend.start()
+  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-advisor-surface-e2e-'))
+  const app = await launchApp(backendPort, userDataDir)
+
+  try {
+    const page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+
+    const chatInput = page.getByPlaceholder('HOW CAN WE HELP?')
+    await chatInput.fill('What should I do next?')
+    await page.getByRole('button', { name: 'SEND' }).click()
+    await expect(page.getByText('Fortify the northern choke point before expanding again.')).toBeVisible()
+
+    const responseDetails = page.getByText('Response details', { exact: true })
+    await expect(responseDetails).toBeVisible()
+    await expect(page.getByText('MODEL: Mock Advisor Model')).toBeHidden()
+    await responseDetails.click()
+    await expect(page.getByText('MODEL: Mock Advisor Model')).toBeVisible()
+    await expect(page.getByText('Response time: 0.01s')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'REPORT' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Advisor Info' }).click()
+    const styleDialog = page.getByRole('dialog', { name: 'Advisor style' })
+    await expect(styleDialog).toBeVisible()
+    await expect(styleDialog.getByText('Idealistic Foundation')).toBeVisible()
+    await expect(styleDialog.getByText('Prosperous Unification')).toBeVisible()
+    await expect(styleDialog.getByText('idealistic_foundation')).toHaveCount(0)
+    await expect(styleDialog.getByLabel('Advisor personality instructions')).toBeVisible()
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(userDataDir, { recursive: true, force: true })
+  }
+})
+
 test('configures a compatible Advisor provider and discovers its models', async () => {
   const backend = createMockChronicleBackend()
   const backendPort = await backend.start()

@@ -113,6 +113,8 @@
       "latency": "LATENCY: {{seconds}}s",
       "report": "REPORT",
       "reportTitle": "Report this response",
+      "details": "Response details",
+      "responseTime": "Response time: {{seconds}}s",
       "blockedLink": "Blocked non-http(s) link"
     },
     "errors": {
@@ -203,6 +205,35 @@
       ],
       "roast": "Roast my empire"
     }
+  },
+  "advisorPanel": {
+    "title": "Advisor style",
+    "close": "Close Advisor style",
+    "noSave": "No save loaded",
+    "empireDetails": "About your empire",
+    "empireDetailsHelp": "The Advisor uses these details from your save to keep its advice in character.",
+    "ethics": "Ethics",
+    "authority": "Authority",
+    "civics": "Civics",
+    "origin": "Origin",
+    "noTraits": "No empire details are available yet.",
+    "personality": "Advisor personality",
+    "personalityHelp": "Choose how the Advisor sounds in this campaign. This changes the voice, not the game analysis.",
+    "personalityInstructions": "Advisor personality instructions",
+    "placeholder": "For example: calm, direct, and optimistic.",
+    "tryStyle": "Try a style",
+    "styles": {
+      "intelligence": "Paranoid intelligence officer who trusts no one",
+      "passiveAggressive": "Passive-aggressive about your decisions",
+      "corporate": "Corporate middle manager using buzzwords for galactic conquest",
+      "enthusiastic": "Overly enthusiastic about everything, even catastrophes"
+    },
+    "saveStyle": "Save style",
+    "saving": "Saving…",
+    "saved": "Style saved for this campaign.",
+    "savedWhenReady": "Style saved and will apply when analysis is ready.",
+    "saveError": "The Advisor style could not be saved.",
+    "loadSaveHelp": "Load a save to choose an Advisor style for this campaign."
   },
   "chronicle": {
     "page": {
