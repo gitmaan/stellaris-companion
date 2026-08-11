@@ -21,6 +21,59 @@
     "retrying": "Retrying...",
     "unknownDate": "Unknown date"
   },
+  "onboarding": {
+    "step": "STEP {{current}} / {{total}}",
+    "actions": {
+      "start": "GET STARTED",
+      "back": "BACK",
+      "continue": "CONTINUE",
+      "later": "SET UP LATER",
+      "finish": "FINISH"
+    },
+    "welcome": {
+      "frameTitle": "FIRST CONTACT",
+      "logoAlt": "Stellaris Companion logo",
+      "title": "Welcome to Stellaris Companion",
+      "body": "Choose how Advisor and Chronicle work, then connect your Stellaris saves."
+    },
+    "ai": {
+      "frameTitle": "CHOOSE YOUR AI",
+      "geminiKey": "GEMINI KEY",
+      "getGeminiKey": "GET A GEMINI KEY",
+      "providerKey": "PROVIDER KEY",
+      "serverAddress": "SERVER ADDRESS",
+      "optionalKey": "API KEY",
+      "optional": "OPTIONAL",
+      "enterKey": "ENTER KEY",
+      "ready": "READY",
+      "notSet": "NOT SET",
+      "findModels": "FIND AVAILABLE MODELS",
+      "looking": "LOOKING...",
+      "model": "MODEL",
+      "chooseModel": "Choose a model",
+      "findModelsFirst": "FIND AVAILABLE MODELS FIRST",
+      "modelsFound_one": "Ready // {{count}} model found",
+      "modelsFound_other": "Ready // {{count}} models found",
+      "noModels": "Connection found, but no models are available yet.",
+      "connectionError": "Could not reach this provider. Check that it is running and try again."
+    },
+    "saves": {
+      "frameTitle": "CONNECT YOUR SAVES",
+      "label": "SAVE GAMES",
+      "title": "Find your Stellaris campaigns",
+      "browseElsewhere": "BROWSE ELSEWHERE",
+      "scanAgain": "SCAN AGAIN",
+      "browseFolder": "BROWSE FOLDER",
+      "scanning": "Looking for Stellaris save files...",
+      "found": "Your campaigns are ready.",
+      "count_one": "{{count}} save file found",
+      "count_other": "{{count}} save files found",
+      "notFound": "We could not find your Stellaris saves automatically.",
+      "notFoundIn": "No .sav files were found in {{path}}.",
+      "notFoundDefault": "We checked the usual save locations but did not find any .sav files yet.",
+      "notFoundHelp": "Choose Browse Folder and select your Stellaris save-games folder, or set this up later in Settings."
+    }
+  },
   "status": {
     "ready": "SYSTEMS ONLINE",
     "analyzing": "SURVEYING EMPIRE...",
