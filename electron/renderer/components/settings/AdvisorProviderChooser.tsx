@@ -23,6 +23,11 @@ export function AdvisorProviderChooser({ provider, onChange }: AdvisorProviderCh
   const { t } = useTranslation()
   const selectedGroup = providerGroup(provider)
   const groups: ProviderGroup[] = ['gemini', 'local', 'other']
+  const groupIcons: Record<ProviderGroup, string> = {
+    gemini: '✦',
+    local: '▣',
+    other: '◎',
+  }
 
   const chooseGroup = (group: ProviderGroup) => {
     if (group === selectedGroup) return
@@ -53,14 +58,28 @@ export function AdvisorProviderChooser({ provider, onChange }: AdvisorProviderCh
               type="button"
               aria-pressed={selected}
               onClick={() => chooseGroup(group)}
-              className={`rounded-sm border px-3 py-2 text-left transition-all duration-200 ${
+              className={`relative rounded-sm border px-3 py-2 text-left transition-all duration-200 ${
                 selected
-                  ? 'border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
+                  ? 'border-accent-cyan bg-accent-cyan/15 text-accent-cyan shadow-glow-sm'
                   : 'border-white/10 bg-black/20 text-text-secondary hover:border-white/20 hover:bg-white/5 hover:text-text-primary'
               }`}
             >
-              <div className="font-display text-[11px] uppercase tracking-[0.16em]">
-                {t(`settings.advisor.providerGroups.${group}`)}
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 font-display text-[11px] uppercase tracking-[0.16em]">
+                  <span aria-hidden="true" className={selected ? 'text-accent-cyan' : 'text-white/35'}>
+                    {groupIcons[group]}
+                  </span>
+                  {t(`settings.advisor.providerGroups.${group}`)}
+                </span>
+                {selected && (
+                  <span
+                    aria-hidden="true"
+                    title={t('settings.advisor.selected')}
+                    className="font-mono text-xs text-accent-green"
+                  >
+                    ✓
+                  </span>
+                )}
               </div>
               <HUDMicro className="mt-1 block text-[9px] text-white/40">
                 {t(`settings.advisor.providerGroups.${group}Tag`)}

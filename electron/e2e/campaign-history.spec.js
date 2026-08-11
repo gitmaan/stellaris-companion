@@ -135,8 +135,8 @@ test('game data settings use plain language and open campaign management directl
     await page.waitForLoadState('domcontentloaded')
     await page.getByRole('button', { name: /Config/i }).click()
 
-    await expect(page.getByText('GAME DATA', { exact: true })).toBeVisible()
-    await expect(page.getByText('SAVE GAME FOLDER', { exact: true })).toBeVisible()
+    await expect(page.getByText('GAME & CAMPAIGNS', { exact: true })).toBeVisible()
+    await expect(page.getByText('SAVE GAME LOCATION', { exact: true })).toBeVisible()
     await expect(page.getByText('CAMPAIGN HISTORY', { exact: true })).toBeVisible()
     await expect(page.getByText('18.0 MB stored on this device')).toBeVisible()
 
