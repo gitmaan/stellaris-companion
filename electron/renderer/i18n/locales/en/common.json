@@ -221,6 +221,10 @@
     },
     "sidebar": {
       "empireArchives": "Empire Archives",
+      "campaigns": "Campaigns",
+      "chooseCampaign": "Choose a campaign",
+      "currentCampaignDate": "Current campaign · {{date}}",
+      "lastPlayed": "Last played · {{date}}",
       "closeSidebar": "Close sidebar",
       "noHistory": "No game history yet",
       "chapters": "Chapters",
@@ -234,6 +238,7 @@
       "current": "Current",
       "manageCampaigns": "Manage campaigns",
       "narrator": "Narrator",
+      "storyStyle": "Story style",
       "publish": "Publish",
       "export": "Export",
       "events": "Events",

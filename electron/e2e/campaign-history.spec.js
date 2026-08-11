@@ -212,7 +212,14 @@ test('selecting historical campaigns reads cache without generating Chronicle co
     await backend.waitForChronicleRequest(() => true)
     const generationCount = backend.getChronicleRequests().length
 
-    await page.locator('select').filter({ has: page.locator('option', { hasText: 'Duplicate Start One' }) }).selectOption('save-empty-1')
+    const sidebar = page.getByRole('complementary')
+    const currentEra = sidebar.getByRole('button', { name: 'Current Era' })
+    await currentEra.focus()
+    await currentEra.press('Enter')
+    await sidebar.getByRole('button', { name: 'Choose a campaign' }).click()
+    const historicalCampaign = sidebar.getByRole('option', { name: /Duplicate Start One/ })
+    await historicalCampaign.focus()
+    await historicalCampaign.press('Enter')
     await expect(page.getByText('A historical Chronicle read from cache.')).toBeVisible()
     await page.waitForTimeout(750)
 
