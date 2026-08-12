@@ -60,11 +60,25 @@
       "latency": "遅延: {{seconds}}s",
       "report": "報告",
       "reportTitle": "この応答を報告",
-      "blockedLink": "HTTP(S) 以外のリンクをブロックしました"
+      "blockedLink": "HTTP(S) 以外のリンクをブロックしました",
+      "details": "応答の詳細",
+      "responseTime": "応答時間: {{seconds}}s"
     },
     "errors": {
       "briefingNotReady": "顧問はまだセーブファイルを分析しています。{{seconds}} 秒後にもう一度お試しください。",
-      "unexpected": "予期しないエラーが発生しました"
+      "unexpected": "予期しないエラーが発生しました",
+      "openProviderSettings": "プロバイダー設定を開く",
+      "providerNotConfigured": "{{provider}} は、アドバイザー チャット用に完全には構成されていません。モデルを選択し、接続設定を完了します。",
+      "providerUnavailable": "{{provider}} に到達できませんでした。サーバーが実行中であり、構成されたアドレスが正しいことを確認してください。",
+      "providerAuthFailed": "{{provider}} は、構成された API キーを拒否しました。キーを確認して、接続を再試行してください。",
+      "providerModelNotFound": "選択された {{provider}} モデルは使用できません。モデル リストを更新するか、別のモデルを選択します。",
+      "providerRateLimited": "{{provider}} は現在レート制限されています。しばらく待つか、別のモデルまたはプロバイダーを選択してください。",
+      "providerBillingFailed": "{{provider}} には、このリクエストに使用できる請求またはクレジットがありません。プロバイダー アカウントを確認するか、別のプロバイダーを選択してください。",
+      "providerTimeout": "{{provider}} の応答に時間がかかりすぎました。ローカル モデルがまだロード中の可能性があります。再試行するか、サーバーを確認してください。",
+      "providerContextLimit": "アクティブなコンテキスト ウィンドウは、このキャンペーン ブリーフィングに適合しません。プロバイダーのコンテキスト設定を少なくとも 32K に増やすか、より大きなコンテキスト モデルを選択してください。",
+      "providerInvalidResponse": "{{provider}} は、このアプリが読み取れない応答を返しました。エンドポイントが OpenAI 互換のチャット補完をサポートしていることを確認してください。",
+      "providerEmptyResponse": "{{provider}} は空の応答を返しました。もう一度試すか、別のモデルを選択してください。",
+      "providerRequestFailed": "{{provider}} はリクエストを完了できませんでした。モデルとエンドポイントを確認して、再試行してください。"
     },
     "newChat": "新しいチャット",
     "welcome": {
@@ -133,6 +147,10 @@
         "ライバルは我々をどう評しますか?"
       ],
       "roast": "我が帝国を辛口評価して"
+    },
+    "providerSetup": {
+      "title": "アドバイザ接続が必要です",
+      "description": "{{provider}} が選択されていますが、準備ができていません。プロバイダー設定を開いて接続を完了し、モデルを選択します。"
     }
   },
   "chronicle": {
@@ -164,7 +182,14 @@
       "latest": "最新",
       "pending_one": "{{count}} 章が保留中",
       "pending_other": "{{count}} 章が保留中",
-      "generateMore": "さらに章を生成"
+      "generateMore": "さらに章を生成",
+      "campaigns": "キャンペーン",
+      "chooseCampaign": "キャンペーンを選択してください",
+      "currentCampaignDate": "現在のキャンペーン · {{date}}",
+      "lastPlayed": "最終プレイ · {{date}}",
+      "current": "現在",
+      "manageCampaigns": "キャンペーンの管理",
+      "storyStyle": "ストーリースタイル"
     },
     "publish": {
       "eyebrow": "共有 // 公開記録",
@@ -242,6 +267,81 @@
         "pr": "熱意が過剰な帝国広報部",
         "earnings": "銀河征服を四半期決算のように淡々と報告"
       }
+    },
+    "providerSetup": {
+      "title": "AI プロバイダーの接続が必要です",
+      "description": "既存の章を引き続き読むことができます。選択したプロバイダーに接続し、Chronicle コンテンツを生成または書き換えるモデルを選択します。",
+      "action": "プロバイダー設定を開く"
+    },
+    "history": {
+      "eyebrow": "アーカイブ // ローカル レコード",
+      "title": "キャンペーン履歴",
+      "subtitle": "キャンペーンの名前を変更したり、重複した開始を削除したり、ゴミ箱からアイテムを回復したりします。",
+      "close": "キャンペーン履歴を閉じる",
+      "active": "キャンペーン ({{count}})",
+      "trash": "ゴミ箱 ({{count}})",
+      "search": "検索キャンペーン",
+      "selectEmpty": "未使用のキャンペーンを選択します ({{count}})",
+      "trashSelected": "選択したアイテムをゴミ箱に移動 ({{count}})",
+      "emptyHelp": "ストーリーや記録されたイベントのないキャンペーンを検索します。",
+      "trashEmpty": "ゴミ箱は空です。",
+      "noMatches": "この検索に一致するキャンペーンはありません。",
+      "current": "現在",
+      "hasChronicle": "クロニクル",
+      "noChronicle": "クロニクルなし",
+      "published": "公開されました",
+      "gameDates": "{{first}} — {{last}}",
+      "sessions_one": "{{count}} セッション",
+      "sessions_other": "{{count}} セッション",
+      "snapshots_one": "{{count}} スナップショット",
+      "snapshots_other": "{{count}} スナップショット",
+      "events_one": "{{count}} イベント",
+      "events_other": "{{count}} イベント",
+      "chapters_one": "{{count}} 章",
+      "chapters_other": "{{count}} 章",
+      "moreDetails": "詳細はこちら",
+      "moreActions": "詳細",
+      "storyActions": "ストーリーアクション",
+      "deleteOptions": "オプションの削除",
+      "selectCampaign": "{{name}} を選択します",
+      "labelPlaceholder": "キャンペーンラベル",
+      "rename": "名前の変更",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "reset": "リセットクロニクル",
+      "resetTitle": "このクロニクルをリセットしますか?",
+      "resetHelp": "生成されたクロニクルの書き込みを削除します。キャンペーン履歴と保存記録は残り、これを元に戻すことができます。",
+      "confirmReset": "リセットクロニクル",
+      "undoReset": "復元クロニクル",
+      "moveToTrash": "ゴミ箱に移動",
+      "restore": "復元",
+      "delete": "完全に削除",
+      "deleteLocal": "ローカルデータを削除します",
+      "deleteTitle": "このキャンペーンを完全に削除しますか?",
+      "deleteHelp": "このキャンペーン履歴をこのデバイスから削除します。これを元に戻すことはできません。",
+      "deletePublishedHelp": "このキャンペーン履歴をこのデバイスから削除します。公開された記事はオンラインに残ります。これを元に戻すことはできません。",
+      "confirmDelete": "完全に削除",
+      "confirmDeleteLocal": "ローカル データを削除します",
+      "currentProtected": "現在ロードされているキャンペーンはゴミ箱に入れたり、削除したりすることはできません。",
+      "publishedDeleteWarning": "このキャンペーンをこのデバイスから削除します。公開された記事はオンラインに残ります。",
+      "onlineOnlyTitle": "地域の歴史を含まない公開記事",
+      "onlineOnlyHelp": "これらの記事はまだオンラインにあります。ここで開いたり削除したりできます。",
+      "openStory": "オープンストーリー",
+      "removeStory": "オンライン ストーリーを削除します",
+      "removeStoryTitle": "この公開されたストーリーを削除しますか?",
+      "removeStoryHelp": "公開ストーリーを Web から削除します。ローカル キャンペーンの履歴は復元されず、元に戻すことはできません。",
+      "confirmRemoveStory": "オンライン ストーリーを削除します",
+      "publishedRemoved": "公開されたストーリーが削除されました。",
+      "safetyNote": "キャンペーンをゴミ箱に移動すると、元に戻すことができます。完全な削除はローカル データのみに影響します。",
+      "labelSaved": "キャンペーン ラベルが保存されました。",
+      "movedToTrash": "{{name}} はゴミ箱に移動されました。",
+      "restored": "キャンペーンが復元されました。",
+      "chronicleReset": "クロニクルをクリアしました。キャンペーン履歴も残っていました。",
+      "chronicleRestored": "クロニクルが復元されました。",
+      "deleted": "ローカル キャンペーン履歴は完全に削除されました。",
+      "bulkMoved": "{{count}} キャンペーンをゴミ箱に移動しました。",
+      "undo": "元に戻す",
+      "unknownError": "キャンペーン履歴を更新できませんでした。"
     }
   },
   "settings": {
@@ -260,14 +360,17 @@
       "data": "ゲームデータ",
       "communications": "通信リレー",
       "updates": "ソフトウェア更新",
-      "diagnostics": "診断"
+      "diagnostics": "診断",
+      "mcpRelay": "MCP リレー"
     },
     "panels": {
       "geminiAccess": "Gemini モデルアクセス",
       "saveSource": "セーブゲームフォルダー",
       "campaignHistory": "キャンペーン履歴",
       "discordLink": "Discord 接続",
-      "updateChannel": "更新トラック"
+      "updateChannel": "更新トラック",
+      "advisorAccess": "AI セットアップ",
+      "mcpRelay": "AI アプリの接続"
     },
     "api": {
       "label": "API キー",
@@ -298,7 +401,9 @@
       "qualityFirstHelp": "Gemini Flash を優先し、クォータが必要な場合にフォールバックします。",
       "conserveHelp": "顧問チャットで軽量モデルを使い、Gemini 使用量を減らします。",
       "toastError": "モデルルーティングを更新できませんでした。もう一度お試しください。",
-      "toastSuccess": "モデルルーティングを {{mode}} に設定しました。"
+      "toastSuccess": "モデルルーティングを {{mode}} に設定しました。",
+      "qualityFirstTag": "利用可能な場合はフラッシュを使用します",
+      "conserveTag": "FLASH-LITE ADVISOR"
     },
     "saveData": {
       "directoryLabel": "セーブフォルダー",
@@ -318,7 +423,11 @@
       "backingUp": "バックアップを作成中...",
       "backupSuccess": "キャンペーン履歴のバックアップを保存しました。",
       "revealError": "キャンペーン履歴フォルダーを開けませんでした。",
-      "historyHelp": "キャンペーン履歴をコピーするか、古いキャンペーンや重複を管理します。"
+      "historyHelp": "キャンペーン履歴をコピーするか、古いキャンペーンや重複を管理します。",
+      "savePlayerName": "マルチプレイヤー名を保存",
+      "playerNameSaved": "Multiplayer name saved.",
+      "folderSaved": "Save game location updated.",
+      "automaticSaved": "自動保存検出が有効になりました。"
     },
     "discord": {
       "loading": "ハンドシェイク確立中...",
@@ -368,6 +477,153 @@
       "auth": "認証に失敗しました。",
       "connection": "接続エラーです。ネットワークを確認してください。",
       "generic": "システムエラーです。再試行してください。"
+    },
+    "moreSettings": {
+      "title": "その他の設定",
+      "help": "オプションの接続、ソフトウェア更新、サポート ツール。",
+      "optional": "オプション"
+    },
+    "advisor": {
+      "providerLabel": "AI プロバイダー",
+      "providerChoiceLabel": "AI はどこで実行すべきですか?",
+      "localProviderLabel": "ローカルアプリ",
+      "otherProviderLabel": "プロバイダー",
+      "providerGroups": {
+        "gemini": "Gemini",
+        "geminiTag": "最も簡単なセットアップ",
+        "local": "このデバイス上",
+        "localTag": "デフォルトでプライベート",
+        "other": "オンラインプロバイダー",
+        "otherTag": "さらなる選択肢"
+      },
+      "selected": "が選択されました",
+      "apiKeyLabel": "OPENROUTER API キー",
+      "optionalApiKeyLabel": "API KEY",
+      "baseUrlLabel": "SERVER URL",
+      "modelLabel": "モデル",
+      "modelPlaceholder": "FIND AVAILABLE MODELS FIRST",
+      "selectModel": "Select a model",
+      "searchModels": "モデルを検索",
+      "searchPlaceholder": "Filter by model name or ID",
+      "showAllModels": "SHOW ALL MODELS",
+      "showRecommendedModels": "SHOW RECOMMENDED",
+      "recommended": "推奨",
+      "recommendedSummary": "Verified starting points",
+      "checkConnection": "利用可能なモデルを探す",
+      "checking": "探しています...",
+      "connected": "準備完了",
+      "failed": "NEEDS ATTENTION",
+      "modelsFound": "Ready // {{count}} models found",
+      "connectedNoModels": "接続が見つかりましたが、まだ使用可能なモデルがありません。",
+      "connectionError": "Could not check this provider.",
+      "testModel": "CHECK SELECTED MODEL",
+      "testingModel": "CHECKING MODEL...",
+      "modelReady": "READY // 構造化された応答がサポートされています",
+      "modelReadyPromptJson": "準備完了 // 互換モード",
+      "modelAdvisorOnly": "アドバイザの準備が完了しました // クロニクルには別のモデルが必要です",
+      "modelTestError": "このモデルは Chronicle 互換性チェックに合格しませんでした。",
+      "modelTestPrivacy": "接続チェックではキャンペーン データは送信されません。",
+      "modelContextLabel": "{{context}} コンテキスト",
+      "modelContextDetected": "報告されたコンテキスト // {{context}}",
+      "modelContextTooSmall": "{{context}} コンテキストが検出されました。 Advisor と Chronicle には通常、少なくとも 32K が必要です。",
+      "modelContextUnknown": "コンテキスト サイズが報告されませんでした。 Advisor と Chronicle の場合は、少なくとも 32K を使用してこのモデルをロードします。",
+      "sessionOnlySecrets": "このデバイスは現在、API キーを安全に保存できません。アプリが終了するまでは使用できますが、公開はできません。",
+      "remoteContextNotice": "質問とキャンペーンの関連部分は、このプロバイダーに送信されます。保存ファイルはアップロードされません。",
+      "ollamaCloudNotice": "この Ollama クラウド モデルは、このデバイスではなくリモートで Advisor と Chronicle プロンプトを処理します。",
+      "showAdvanced": "高度な接続を表示",
+      "hideAdvanced": "高度な接続を非表示にする",
+      "optional": "オプション",
+      "save": "AI セットアップを保存",
+      "saved": "AI セットアップが保存されました。",
+      "unsaved": "AI セットアップに保存されていない変更があります",
+      "savedState": "AI セットアップが保存されました",
+      "guide": {
+        "label": "セットアップ手順",
+        "gemini": {
+          "1": "Gemini キーを取得します",
+          "2": "以下に貼り付けてください",
+          "3": "Save AI setup"
+        },
+        "local": {
+          "1": "ローカル AI アプリを開きます",
+          "2": "Load a model",
+          "3": "利用可能なモデルを探す"
+        },
+        "hosted": {
+          "1": "プロバイダー キーを貼り付けます",
+          "2": "利用可能なモデルを探す",
+          "3": "1 つ選択して保存します"
+        },
+        "custom": {
+          "1": "サーバーアドレスを入力してください",
+          "2": "利用可能なモデルを探す",
+          "3": "1 つ選択して保存します"
+        }
+      },
+      "providers": {
+        "gemini": "GEMINI",
+        "ollama": "OLLAMA",
+        "lm_studio": "LM STUDIO",
+        "openrouter": "OPENROUTER",
+        "custom": "カスタム エンドポイント"
+      },
+      "providerHelp": {
+        "gemini": "Advisor と Chronicle を使用する最も簡単な方法。",
+        "ollama": "このデバイス上で Ollama を介して Advisor と Chronicle を実行します。続行する前に、Ollama を開いてモデルをロードします。",
+        "lm_studio": "このデバイス上で LM Studio を介して Advisor と Chronicle を実行します。続行する前に、LM Studio を開いてモデルをロードします。",
+        "openrouter": "OpenRouter アカウントを使用し、ホストされているモデルから選択できるようにします。",
+        "custom": "別の互換性のある AI サービスを Advisor と Chronicle に接続します。"
+      }
+    },
+    "geminiQuota": {
+      "label": "ジェミニの使用",
+      "description": "毎日のアドバイザーの回答とクロニクルの執筆のバランスをとる方法を選択してください。",
+      "standard": "無料に優しい",
+      "higher": "最高の品質",
+      "standardTag": "STRETCHES FREE LIMITS",
+      "higherTag": "はより多くの許可を使用します",
+      "standardHelp": "日常の質問を軽くして、お小遣いをより多くクロニクルの執筆に充てられるようにします。",
+      "higherHelp": "Advisor と Chronicle の両方に対して、利用可能な最も強力な Gemini モデルを優先します。",
+      "showAdvanced": "Show advanced quota controls",
+      "hideAdvanced": "Hide advanced quota controls",
+      "optional": "オプション",
+      "aria": "Gemini クォータ モードを {{mode}} に設定します"
+    },
+    "mcpRelay": {
+      "loading": "スキャン中...",
+      "ready": "準備完了",
+      "noDatabase": "キャンペーンキャッシュなし",
+      "loadingSummary": "ローカル AI アプリの接続を確認しています。",
+      "readySummary": "ローカル接続の準備ができました。",
+      "noDatabaseSummary": "キャンペーン アーカイブがまだ見つかりません。 AI アプリを接続する前に、保存フォルダーを開くか選択してください。",
+      "installed": "接続されました",
+      "installedNeedsRefresh": "アップデートが利用可能です",
+      "notInstalled": "が接続されていません",
+      "claudeDesktop": "クロード デスクトップ",
+      "otherApps": "その他の AI アプリ",
+      "otherAppsHelp": "Cursor、LM Studio、および同様のクライアントには手動 MCP セットアップを使用します。",
+      "localEndpoint": "ローカルアーカイブ",
+      "runCheck": "実行チェック",
+      "checking": "チェック中...",
+      "connectClaude": "クロードに追加",
+      "updateClaude": "クロードを更新",
+      "claudeConnected": "クロードに追加",
+      "installing": "インストール中...",
+      "copyClaude": "クロードをコピー JSON",
+      "copyClaudeCode": "クロード コードをコピー",
+      "copyCodexSetup": "CODEX セットアップをコピー",
+      "copyMcpJson": "MCP をコピー JSON",
+      "revealConfig": "設定を明らかにする",
+      "showAdvancedSetup": "手動 MCP セットアップを表示",
+      "hideAdvancedSetup": "手動 MCP セットアップを非表示にする",
+      "optional": "オプション",
+      "healthSuccess": "MCP Relay は正常に応答しました。",
+      "healthError": "MCP Relay ヘルスチェックが失敗しました。",
+      "copySuccess": "{{target}} セットアップがコピーされました。",
+      "copyError": "セットアップのコピーに失敗しました。",
+      "installConfirm": "Claude Desktop を Stellaris Companion に接続しますか?これにより、Claude のローカル構成ファイルが更新されます。",
+      "installSuccess": "Claude Desktop 接続が更新されました。 Claude Desktop を再起動してロードします。",
+      "installError": "Claude Desktop 接続を更新できませんでした。"
     }
   },
   "update": {
@@ -397,5 +653,87 @@
       "update": "更新",
       "tip": "ヒント"
     }
+  },
+  "onboarding": {
+    "step": "ステップ {{current}} / {{total}}",
+    "actions": {
+      "start": "始めましょう",
+      "back": "戻る",
+      "continue": "続行",
+      "later": "後でセットアップしてください",
+      "finish": "終了"
+    },
+    "welcome": {
+      "frameTitle": "最初の連絡先",
+      "logoAlt": "Stellaris Companion ロゴ",
+      "title": "Stellaris Companion へようこそ",
+      "body": "Advisor と Chronicle の動作方法を選択し、Stellaris セーブを接続します。"
+    },
+    "ai": {
+      "frameTitle": "AI を選択してください",
+      "geminiKey": "ジェミニキー",
+      "getGeminiKey": "GEMINI キーを入手",
+      "providerKey": "プロバイダーキー",
+      "serverAddress": "サーバーアドレス",
+      "optionalKey": "API キー",
+      "optional": "オプション",
+      "enterKey": "Enterキー",
+      "ready": "準備完了",
+      "notSet": "が設定されていません",
+      "findModels": "利用可能なモデルを探す",
+      "looking": "探しています...",
+      "model": "モデル",
+      "chooseModel": "モデルを選択してください",
+      "findModelsFirst": "まず利用可能なモデルを見つけてください",
+      "modelsFound_one": "準備完了 // {{count}} モデルが見つかりました",
+      "modelsFound_other": "準備完了 // {{count}} モデルが見つかりました",
+      "noModels": "接続が見つかりましたが、まだ使用可能なモデルがありません。",
+      "connectionError": "このプロバイダーに接続できませんでした。実行中であることを確認して、再試行してください。"
+    },
+    "saves": {
+      "frameTitle": "セーブデータを接続する",
+      "label": "ゲームを保存",
+      "title": "Stellaris キャンペーンを見つける",
+      "browseElsewhere": "他の場所を参照",
+      "scanAgain": "もう一度スキャンしてください",
+      "browseFolder": "フォルダーを参照",
+      "scanning": "Stellaris 保存ファイルを探しています...",
+      "found": "キャンペーンの準備が整いました。",
+      "count_one": "{{count}} 保存ファイルが見つかりました",
+      "count_other": "{{count}} 保存ファイルが見つかりました",
+      "notFound": "Stellaris の自動保存が見つかりませんでした。",
+      "notFoundIn": "{{path}} に .sav ファイルが見つかりませんでした。",
+      "notFoundDefault": "通常の保存場所を確認しましたが、.sav ファイルはまだ見つかりませんでした。",
+      "notFoundHelp": "[フォルダーの参照] を選択し、Stellaris セーブゲーム フォルダーを選択するか、後で [設定] でこれを設定します。"
+    }
+  },
+  "advisorPanel": {
+    "title": "アドバイザースタイル",
+    "close": "クローズ アドバイザ スタイル",
+    "noSave": "セーブがロードされていません",
+    "empireDetails": "あなたの帝国について",
+    "empireDetailsHelp": "アドバイザは、アドバイスの特徴を保つために、保存されたこれらの詳細を使用します。",
+    "ethics": "倫理",
+    "authority": "権限",
+    "civics": "公民",
+    "origin": "起源",
+    "noTraits": "帝国の詳細はまだ入手できません。",
+    "personality": "アドバイザーの性格",
+    "personalityHelp": "このキャンペーンでのアドバイザーのサウンドを選択します。これはゲーム分析ではなく、声を変えます。",
+    "personalityInstructions": "アドバイザーの性格に関する指示",
+    "placeholder": "例: 穏やか、率直、楽観的。",
+    "tryStyle": "スタイルを試してみる",
+    "styles": {
+      "intelligence": "誰も信用しない偏執的な諜報員",
+      "passiveAggressive": "自分の決定に対して受動的攻撃的",
+      "corporate": "銀河征服のために流行語を使う企業の中間管理職",
+      "enthusiastic": "何事にも熱中しすぎる、たとえ大惨事であっても"
+    },
+    "saveStyle": "スタイルの保存",
+    "saving": "保存中…",
+    "saved": "このキャンペーン用に保存されたスタイル。",
+    "savedWhenReady": "スタイルが保存され、分析の準備ができたときに適用されます。",
+    "saveError": "Advisor スタイルを保存できませんでした。",
+    "loadSaveHelp": "保存ファイルをロードして、このキャンペーンのアドバイザー スタイルを選択します。"
   }
 }

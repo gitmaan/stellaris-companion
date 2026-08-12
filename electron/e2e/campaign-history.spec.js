@@ -88,9 +88,10 @@ test('campaign manager supports bulk cleanup, restore, labels, reset undo, and p
     await expect(dialog.getByText('Clean Test Run')).toBeVisible()
 
     const currentRow = dialog.locator('article').filter({ hasText: 'United Nations of Earth' })
-    await currentRow.getByRole('button', { name: 'More' }).click()
-    await currentRow.getByRole('button', { name: 'Clear Chronicle' }).click()
-    await currentRow.getByRole('button', { name: 'Confirm clear' }).click()
+    await currentRow.getByRole('button', { name: 'Story actions' }).click()
+    await currentRow.getByRole('button', { name: 'Reset Chronicle' }).click()
+    await expect(currentRow.getByText(/Campaign history and save records stay/i)).toBeVisible()
+    await currentRow.getByRole('button', { name: 'Reset Chronicle' }).click()
     await expect(page.getByText('Chronicle cleared. Campaign history was kept.')).toBeVisible()
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
 
@@ -98,9 +99,10 @@ test('campaign manager supports bulk cleanup, restore, labels, reset undo, and p
     await cleanRow.getByRole('button', { name: 'Move to Trash' }).click()
     await dialog.getByRole('button', { name: 'Trash (2)' }).click()
     const deleteRow = dialog.locator('article').filter({ hasText: 'Clean Test Run' })
-    await deleteRow.getByRole('button', { name: 'More' }).click()
+    await deleteRow.getByRole('button', { name: 'Delete options' }).click()
     await deleteRow.getByRole('button', { name: 'Delete permanently' }).click()
-    await deleteRow.getByRole('button', { name: 'Confirm delete' }).click()
+    await expect(deleteRow.getByText(/This cannot be undone/i)).toBeVisible()
+    await deleteRow.getByRole('button', { name: 'Delete permanently' }).click()
     await expect(dialog.getByText('Clean Test Run')).not.toBeVisible()
   } finally {
     await app.close()
@@ -135,8 +137,8 @@ test('game data settings use plain language and open campaign management directl
     await page.waitForLoadState('domcontentloaded')
     await page.getByRole('button', { name: /Config/i }).click()
 
-    await expect(page.getByText('GAME DATA', { exact: true })).toBeVisible()
-    await expect(page.getByText('SAVE GAME FOLDER', { exact: true })).toBeVisible()
+    await expect(page.getByText('GAME & CAMPAIGNS', { exact: true })).toBeVisible()
+    await expect(page.getByText('SAVE GAME LOCATION', { exact: true })).toBeVisible()
     await expect(page.getByText('CAMPAIGN HISTORY', { exact: true })).toBeVisible()
     await expect(page.getByText('18.0 MB stored on this device')).toBeVisible()
 
@@ -210,7 +212,14 @@ test('selecting historical campaigns reads cache without generating Chronicle co
     await backend.waitForChronicleRequest(() => true)
     const generationCount = backend.getChronicleRequests().length
 
-    await page.locator('select').filter({ has: page.locator('option', { hasText: 'Duplicate Start One' }) }).selectOption('save-empty-1')
+    const sidebar = page.getByRole('complementary')
+    const currentEra = sidebar.getByRole('button', { name: 'Current Era' })
+    await currentEra.focus()
+    await currentEra.press('Enter')
+    await sidebar.getByRole('button', { name: 'Choose a campaign' }).click()
+    const historicalCampaign = sidebar.getByRole('option', { name: /Duplicate Start One/ })
+    await historicalCampaign.focus()
+    await historicalCampaign.press('Enter')
     await expect(page.getByText('A historical Chronicle read from cache.')).toBeVisible()
     await page.waitForTimeout(750)
 

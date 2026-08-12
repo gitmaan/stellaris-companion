@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import PersonIcon from './PersonIcon'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 
 interface AdvisorInfoPanelProps {
   isOpen: boolean
@@ -15,20 +16,11 @@ interface AdvisorInfoPanelProps {
   empireOrigin: string | null
 }
 
-function formatTraits(
-  ethicsList: string[],
-  civicsList: string[],
-  authority: string | null,
-): string {
-  const ethics = ethicsList.length ? ethicsList.join(', ') : null
-  const civics = civicsList.length ? civicsList.join(', ') : null
-
-  const parts: string[] = []
-  if (ethics) parts.push(`Ethics: ${ethics}`)
-  if (authority) parts.push(`Authority: ${authority}`)
-  if (civics) parts.push(`Civics: ${civics}`)
-  if (parts.length === 0) return 'No empire traits available'
-  return parts.join(' | ')
+function humanizeIdentifier(value: string): string {
+  return value
+    .replace(/^(ethic|civic|authority|origin)_/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, character => character.toUpperCase())
 }
 
 export default function AdvisorInfoPanel({
@@ -42,6 +34,7 @@ export default function AdvisorInfoPanel({
   empireAuthority,
   empireOrigin,
 }: AdvisorInfoPanelProps) {
+  const { t } = useTranslation()
   const panelTransition = {
     type: 'spring' as const,
     stiffness: 420,
@@ -80,10 +73,24 @@ export default function AdvisorInfoPanel({
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState<{ ok: boolean; message: string } | null>(null)
 
-  const traits = useMemo(
-    () => formatTraits(empireEthics, empireCivics, empireAuthority),
-    [empireEthics, empireCivics, empireAuthority],
-  )
+  const traitGroups = useMemo(() => [
+    {
+      label: t('advisorPanel.ethics'),
+      values: empireEthics.map(humanizeIdentifier),
+    },
+    {
+      label: t('advisorPanel.authority'),
+      values: empireAuthority ? [humanizeIdentifier(empireAuthority)] : [],
+    },
+    {
+      label: t('advisorPanel.civics'),
+      values: empireCivics.map(humanizeIdentifier),
+    },
+    {
+      label: t('advisorPanel.origin'),
+      values: empireOrigin ? [humanizeIdentifier(empireOrigin)] : [],
+    },
+  ].filter(group => group.values.length > 0), [empireAuthority, empireCivics, empireEthics, empireOrigin, t])
 
   useEffect(() => {
     if (!isOpen) return
@@ -128,14 +135,14 @@ export default function AdvisorInfoPanel({
         setCustomInstructions((res.data.custom_instructions || '') as string)
         setSaveResult({
           ok: true,
-          message: persisted ? 'Applied to this playthrough' : 'Applied (will persist when analysis completes)',
+          message: persisted ? t('advisorPanel.saved') : t('advisorPanel.savedWhenReady'),
         })
       } else {
-        const message = (res as any)?.error || 'Failed to apply customization'
+        const message = (res as any)?.error || t('advisorPanel.saveError')
         setSaveResult({ ok: false, message })
       }
     } catch (e) {
-      setSaveResult({ ok: false, message: e instanceof Error ? e.message : 'Failed to apply customization' })
+      setSaveResult({ ok: false, message: e instanceof Error ? e.message : t('advisorPanel.saveError') })
     } finally {
       setSaving(false)
     }
@@ -188,6 +195,9 @@ export default function AdvisorInfoPanel({
             animate="open"
             exit="closed"
             transition={panelTransition}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="advisor-style-title"
             className="absolute right-0 top-0 bottom-0 w-full max-w-[420px] bg-bg-secondary border-l border-border"
             style={{
               boxShadow:
@@ -207,11 +217,11 @@ export default function AdvisorInfoPanel({
                   <div className="flex items-center gap-3">
                     <PersonIcon className="w-5 h-5 text-accent-cyan" />
                     <div>
-                      <h2 className="font-display text-text-primary text-lg tracking-wider uppercase leading-tight">
-                        Advisor
+                      <h2 id="advisor-style-title" className="font-display text-text-primary text-lg tracking-wider uppercase leading-tight">
+                        {t('advisorPanel.title')}
                       </h2>
                       <p className="text-xs text-text-secondary">
-                        {empireName ?? 'No save loaded'}
+                        {empireName ?? t('advisorPanel.noSave')}
                         {gameDate ? ` • ${gameDate}` : ''}
                       </p>
                     </div>
@@ -220,7 +230,7 @@ export default function AdvisorInfoPanel({
                     type="button"
                     onClick={onClose}
                     className="text-text-secondary hover:text-text-primary transition-colors text-lg leading-none px-2 py-1 rounded hover:bg-bg-tertiary/60"
-                    aria-label="Close advisor panel"
+                    aria-label={t('advisorPanel.close')}
                   >
                     ×
                   </button>
@@ -232,14 +242,29 @@ export default function AdvisorInfoPanel({
                 <div className="stellaris-panel rounded-lg p-4">
                   <p className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-3 flex items-center gap-2">
                     <span className="text-accent-cyan/60">◇</span>
-                    Empire Traits (Auto-Detected)
+                    {t('advisorPanel.empireDetails')}
                   </p>
-                  <div className="px-3 py-2 rounded bg-bg-primary/50 border border-border/50 text-sm text-text-secondary font-mono">
-                    {saveLoaded ? traits : 'No save loaded'}
-                  </div>
-                  {empireOrigin && (
-                    <p className="text-xs text-text-secondary mt-2">
-                      Origin: <span className="text-text-primary">{empireOrigin}</span>
+                  <p className="mb-3 text-xs leading-relaxed text-text-muted">
+                    {t('advisorPanel.empireDetailsHelp')}
+                  </p>
+                  {saveLoaded && traitGroups.length > 0 ? (
+                    <div className="space-y-3">
+                      {traitGroups.map(group => (
+                        <div key={group.label}>
+                          <p className="mb-1.5 text-[10px] uppercase tracking-wider text-text-muted">{group.label}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {group.values.map(value => (
+                              <span key={value} className="rounded border border-border/70 bg-bg-primary/50 px-2.5 py-1 text-xs text-text-secondary">
+                                {value}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded border border-border/50 bg-bg-primary/50 px-3 py-2 text-sm text-text-secondary">
+                      {saveLoaded ? t('advisorPanel.noTraits') : t('advisorPanel.noSave')}
                     </p>
                   )}
                 </div>
@@ -247,12 +272,16 @@ export default function AdvisorInfoPanel({
                 <div className="stellaris-panel rounded-lg p-4">
                   <p className="text-xs text-text-secondary uppercase tracking-wider font-semibold mb-3 flex items-center gap-2">
                     <span className="text-accent-cyan/60">◇</span>
-                    Personality Customization (Optional)
+                    {t('advisorPanel.personality')}
+                  </p>
+                  <p className="mb-3 text-xs leading-relaxed text-text-muted">
+                    {t('advisorPanel.personalityHelp')}
                   </p>
                   <textarea
                     value={customInstructions}
                     onChange={(e) => setCustomInstructions(e.target.value)}
-                    placeholder="Describe the advisor's personality..."
+                    placeholder={t('advisorPanel.placeholder')}
+                    aria-label={t('advisorPanel.personalityInstructions')}
                     maxLength={300}
                     rows={4}
                     disabled={!saveLoaded}
@@ -261,13 +290,13 @@ export default function AdvisorInfoPanel({
 
                   {!customInstructions && (
                     <div className="mt-3">
-                      <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">Try a personality</p>
+                      <p className="text-[11px] text-text-secondary uppercase tracking-wider mb-2">{t('advisorPanel.tryStyle')}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {[
-                          'Paranoid intelligence officer who trusts no one',
-                          'Passive-aggressive about your decisions',
-                          'Corporate middle manager using buzzwords for galactic conquest',
-                          'Overly enthusiastic about everything, even catastrophes',
+                          t('advisorPanel.styles.intelligence'),
+                          t('advisorPanel.styles.passiveAggressive'),
+                          t('advisorPanel.styles.corporate'),
+                          t('advisorPanel.styles.enthusiastic'),
                         ].map((example) => (
                           <button
                             key={example}
@@ -294,7 +323,7 @@ export default function AdvisorInfoPanel({
                           : 'bg-bg-tertiary/50 border-border text-text-secondary opacity-50 cursor-not-allowed'
                       }`}
                     >
-                      {saving ? 'Applying…' : 'Apply'}
+                      {saving ? t('advisorPanel.saving') : t('advisorPanel.saveStyle')}
                     </button>
                   </div>
 
@@ -312,7 +341,7 @@ export default function AdvisorInfoPanel({
 
                   {!saveLoaded && (
                     <p className="text-xs text-text-secondary mt-3">
-                      Load a save to customize the advisor for this playthrough.
+                      {t('advisorPanel.loadSaveHelp')}
                     </p>
                   )}
                 </div>

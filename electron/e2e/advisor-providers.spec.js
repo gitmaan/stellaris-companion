@@ -84,6 +84,46 @@ async function launchApp(backendPort, userDataDir) {
   })
 }
 
+test('keeps response diagnostics optional and humanizes Advisor style details', async () => {
+  const backend = createMockChronicleBackend({
+    chatResponse: 'Fortify the northern choke point before expanding again.',
+    chatModel: 'Mock Advisor Model',
+  })
+  const backendPort = await backend.start()
+  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-advisor-surface-e2e-'))
+  const app = await launchApp(backendPort, userDataDir)
+
+  try {
+    const page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+
+    const chatInput = page.getByPlaceholder('HOW CAN WE HELP?')
+    await chatInput.fill('What should I do next?')
+    await page.getByRole('button', { name: 'SEND' }).click()
+    await expect(page.getByText('Fortify the northern choke point before expanding again.')).toBeVisible()
+
+    const responseDetails = page.getByText('Response details', { exact: true })
+    await expect(responseDetails).toBeVisible()
+    await expect(page.getByText('MODEL: Mock Advisor Model')).toBeHidden()
+    await responseDetails.click()
+    await expect(page.getByText('MODEL: Mock Advisor Model')).toBeVisible()
+    await expect(page.getByText('Response time: 0.01s')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'REPORT' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Advisor Info' }).click()
+    const styleDialog = page.getByRole('dialog', { name: 'Advisor style' })
+    await expect(styleDialog).toBeVisible()
+    await expect(styleDialog.getByText('Idealistic Foundation')).toBeVisible()
+    await expect(styleDialog.getByText('Prosperous Unification')).toBeVisible()
+    await expect(styleDialog.getByText('idealistic_foundation')).toHaveCount(0)
+    await expect(styleDialog.getByLabel('Advisor personality instructions')).toBeVisible()
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(userDataDir, { recursive: true, force: true })
+  }
+})
+
 test('configures a compatible Advisor provider and discovers its models', async () => {
   const backend = createMockChronicleBackend()
   const backendPort = await backend.start()
@@ -97,43 +137,44 @@ test('configures a compatible Advisor provider and discovers its models', async 
     await page.getByRole('button', { name: /Config/i }).click()
 
     await expect(page.getByRole('button', { name: /Gemini.*EASIEST SETUP/i })).toHaveAttribute('aria-pressed', 'true')
-    await page.getByRole('button', { name: /Other provider/i }).click()
+    await page.getByRole('button', { name: /Online provider/i }).click()
     const providerSelect = page.getByLabel('PROVIDER')
     await expect(providerSelect).toHaveValue('openrouter')
     await providerSelect.selectOption('custom')
-    await expect(page.getByText(/extracted game context are sent to this provider/i)).toBeVisible()
+    await expect(page.getByText(/relevant parts of your campaign are sent to this provider/i)).toBeVisible()
 
     await page.getByPlaceholder('https://provider.example/v1').fill(
       `http://127.0.0.1:${provider.port}/v1`,
     )
     await page.getByLabel('API KEY', { exact: true }).fill('tiny-key')
-    await page.getByLabel('AI MODEL').fill('local/manual-fallback')
-    await page.getByRole('button', { name: /Frequent/i }).click()
+    await page.getByLabel('MODEL').fill('local/manual-fallback')
+    await page.getByRole('button', { name: /Sooner/i }).click()
     await expect(providerSelect).toHaveValue('custom')
     await expect(page.getByPlaceholder('https://provider.example/v1')).toHaveValue(
       `http://127.0.0.1:${provider.port}/v1`,
     )
-    await expect(page.getByLabel('AI MODEL')).toHaveValue('local/manual-fallback')
-    await page.getByRole('button', { name: 'CHECK CONNECTION' }).click()
+    await expect(page.getByLabel('MODEL')).toHaveValue('local/manual-fallback')
+    await page.getByRole('button', { name: 'FIND AVAILABLE MODELS' }).click()
 
-    await expect(page.getByText('CONNECTED', { exact: true })).toBeVisible()
-    await expect(page.getByText(/2 models available/i)).toBeVisible()
+    await expect(page.getByText('READY', { exact: true })).toBeVisible()
+    await expect(page.getByText(/2 models found/i)).toBeVisible()
 
-    const modelSelect = page.getByLabel('AI MODEL')
+    const modelSelect = page.getByLabel('MODEL')
     await expect(modelSelect).toHaveValue('local/manual-fallback')
+    await page.getByText('SHOW ADVANCED CONNECTION', { exact: true }).click()
     await expect(page.getByText(/Context size was not reported/i)).toBeVisible()
     await modelSelect.selectOption('local/strategist-small')
     await expect(page.getByText(/8K context detected/i)).toBeVisible()
     await modelSelect.selectOption('local/strategist-large')
     await expect(page.getByText(/Reported context.*64K/i)).toBeVisible()
-    await page.getByRole('button', { name: 'APPLY CHANGES' }).click()
-    await expect(page.getByText(/CONFIGURATION SAVED/)).toBeVisible()
+    await page.getByRole('button', { name: 'SAVE AI SETUP' }).click()
+    await expect(page.getByText('AI setup saved.')).toBeVisible()
 
     await expect(providerSelect).toHaveValue('custom')
     await expect(modelSelect).toHaveValue('local/strategist-large')
-    await page.getByRole('button', { name: 'TEST MODEL' }).click()
-    await expect(page.getByText('STRUCTURED RESPONSES SUPPORTED')).toBeVisible()
-    await expect(page.getByText(/does not validate campaign-size context/i)).toBeVisible()
+    await page.getByRole('button', { name: 'CHECK SELECTED MODEL' }).click()
+    await expect(page.getByText(/STRUCTURED RESPONSES SUPPORTED/i)).toBeVisible()
+    await expect(page.getByText(/never send campaign data/i)).toBeVisible()
     expect(provider.getLastCompletionModel()).toBe('local/strategist-large')
 
     await app.close()
@@ -144,16 +185,16 @@ test('configures a compatible Advisor provider and discovers its models', async 
 
     await expect(reloadedPage.getByLabel('PROVIDER')).toHaveValue('custom')
     const sessionOnlyStorage = await reloadedPage
-      .getByText(/API keys work for this session but are not saved/i)
+      .getByText(/cannot securely save API keys right now/i)
       .isVisible()
     await expect(reloadedPage.getByLabel('API KEY', { exact: true })).toHaveValue(
       sessionOnlyStorage ? '' : '****...****',
     )
-    await reloadedPage.getByLabel('AI MODEL').fill('local/after-reload')
-    await reloadedPage.getByRole('button', { name: 'APPLY CHANGES' }).click()
-    await expect(reloadedPage.getByText(/CONFIGURATION SAVED/)).toBeVisible()
-    await reloadedPage.getByRole('button', { name: 'CHECK CONNECTION' }).click()
-    await expect(reloadedPage.getByText('CONNECTED', { exact: true })).toBeVisible()
+    await reloadedPage.getByLabel('MODEL').fill('local/after-reload')
+    await reloadedPage.getByRole('button', { name: 'SAVE AI SETUP' }).click()
+    await expect(reloadedPage.getByText('AI setup saved.')).toBeVisible()
+    await reloadedPage.getByRole('button', { name: 'FIND AVAILABLE MODELS' }).click()
+    await expect(reloadedPage.getByText('READY', { exact: true })).toBeVisible()
     expect(provider.getLastAuthorization()).toBe(sessionOnlyStorage ? '' : 'Bearer tiny-key')
   } finally {
     await app?.close()

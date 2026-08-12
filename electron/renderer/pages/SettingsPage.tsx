@@ -33,6 +33,7 @@ import { HUDSelect } from '../components/hud/HUDForm'
 import { useToast } from '../components/Toast'
 import { AdvisorProviderChooser } from '../components/settings/AdvisorProviderChooser'
 import { ChronicleRefreshControl } from '../components/settings/ChronicleRefreshControl'
+import { ProviderSetupGuide } from '../components/settings/ProviderSetupGuide'
 import type { McpRelayHealthResult, McpRelayStatus } from '../global'
 import type { HistoryStorageResponse } from '../hooks/useBackend'
 
@@ -188,8 +189,6 @@ function SettingsPage({
   const [languageSaving, setLanguageSaving] = useState(false)
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(DEFAULT_UPDATE_CHANNEL)
   const [updateChannelSaving, setUpdateChannelSaving] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
   const [mcpRelayStatus, setMcpRelayStatus] = useState<McpRelayStatus | null>(null)
   const [mcpRelayHealth, setMcpRelayHealth] = useState<McpRelayHealthResult | null>(null)
   const [mcpRelayLoading, setMcpRelayLoading] = useState(false)
@@ -197,16 +196,12 @@ function SettingsPage({
   const [mcpRelayInstalling, setMcpRelayInstalling] = useState(false)
   const [historyStorage, setHistoryStorage] = useState<HistoryStorageResponse | null>(null)
   const [historyBackupRunning, setHistoryBackupRunning] = useState(false)
-  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const settingsHydratedRef = useRef(false)
   const advisorCheckIdRef = useRef(0)
 
   useEffect(() => {
     return () => {
       advisorCheckIdRef.current += 1
-      if (successTimeoutRef.current) {
-        clearTimeout(successTimeoutRef.current)
-      }
     }
   }, [])
 
@@ -256,42 +251,6 @@ function SettingsPage({
   }, [onChronicleRefreshModeChange, onLanguageChange, onModelRoutingModeChange, onThemeChange, settings])
 
   useEffect(() => {
-    if (!settings) return
-    const hasApiKeyChange = settings.googleApiKeySet ? googleApiKey !== settings.googleApiKey : googleApiKey !== ''
-    const hasOpenRouterKeyChange = settings.openRouterApiKeySet
-      ? openRouterApiKey !== settings.openRouterApiKey
-      : openRouterApiKey !== ''
-    const hasCustomProviderKeyChange = settings.customProviderApiKeySet
-      ? customProviderApiKey !== settings.customProviderApiKey
-      : customProviderApiKey !== ''
-    const hasAdvisorProviderChange = advisorProvider !== settings.advisorProvider
-    const hasAdvisorModelChange = advisorModel !== (settings.advisorModel || '')
-    const hasAdvisorBaseUrlChange = advisorBaseUrl !== (settings.advisorBaseUrl || '')
-    const hasPathChange = saveDir !== (settings.saveDir || '')
-    const hasPlayerNameChange = playerName !== (settings.playerName || '')
-    setHasChanges(
-      hasApiKeyChange ||
-      hasOpenRouterKeyChange ||
-      hasCustomProviderKeyChange ||
-      hasAdvisorProviderChange ||
-      hasAdvisorModelChange ||
-      hasAdvisorBaseUrlChange ||
-      hasPathChange ||
-      hasPlayerNameChange,
-    )
-  }, [
-    advisorBaseUrl,
-    advisorModel,
-    advisorProvider,
-    customProviderApiKey,
-    googleApiKey,
-    openRouterApiKey,
-    playerName,
-    saveDir,
-    settings,
-  ])
-
-  useEffect(() => {
     let cancelled = false
     const loadMcpRelayStatus = async () => {
       if (!window.electronAPI?.mcpRelay?.status) return
@@ -313,7 +272,26 @@ function SettingsPage({
 
   const handleBrowse = async () => {
     const selectedPath = await showFolderDialog()
-    if (selectedPath) setSaveDir(selectedPath)
+    if (!selectedPath) return
+    const previousPath = saveDir
+    setSaveDir(selectedPath)
+    const success = await saveSettings({ saveDir: selectedPath })
+    if (!success) {
+      setSaveDir(previousPath)
+      return
+    }
+    showToast({ type: 'success', message: t('settings.saveData.folderSaved') })
+  }
+
+  const handleUseAutomaticSaveFolder = async () => {
+    const previousPath = saveDir
+    setSaveDir('')
+    const success = await saveSettings({ saveDir: '' })
+    if (!success) {
+      setSaveDir(previousPath)
+      return
+    }
+    showToast({ type: 'success', message: t('settings.saveData.automaticSaved') })
   }
 
   const handleRevealHistory = async () => {
@@ -339,11 +317,8 @@ function SettingsPage({
     }
   }
 
-  const handleSave = async () => {
-    setSaveSuccess(false)
+  const handleSaveAdvisor = async () => {
     const settingsToSave: Record<string, string | boolean> = {
-      saveDir,
-      playerName,
       advisorProvider,
       advisorModel,
       advisorBaseUrl,
@@ -360,9 +335,14 @@ function SettingsPage({
 
     const success = await saveSettings(settingsToSave)
     if (success) {
-      setSaveSuccess(true)
-      setHasChanges(false)
-      successTimeoutRef.current = setTimeout(() => setSaveSuccess(false), 3000)
+      showToast({ type: 'success', message: t('settings.advisor.saved') })
+    }
+  }
+
+  const handleSavePlayerName = async () => {
+    const success = await saveSettings({ playerName })
+    if (success) {
+      showToast({ type: 'success', message: t('settings.saveData.playerNameSaved') })
     }
   }
 
@@ -793,6 +773,19 @@ function SettingsPage({
   const updateChannelLabel = (channel: UpdateChannel) =>
     t(`settings.updateChannel.${channel}`)
   const providerDefaultUrl = ADVISOR_PROVIDER_DEFAULT_URLS[advisorProvider] || ''
+  const hasAdvisorChanges = Boolean(settings && (
+    (settings.googleApiKeySet ? googleApiKey !== settings.googleApiKey : googleApiKey !== '')
+    || (settings.openRouterApiKeySet
+      ? openRouterApiKey !== settings.openRouterApiKey
+      : openRouterApiKey !== '')
+    || (settings.customProviderApiKeySet
+      ? customProviderApiKey !== settings.customProviderApiKey
+      : customProviderApiKey !== '')
+    || advisorProvider !== settings.advisorProvider
+    || advisorModel !== (settings.advisorModel || '')
+    || advisorBaseUrl !== (settings.advisorBaseUrl || '')
+  ))
+  const hasPlayerNameChange = Boolean(settings && playerName !== (settings.playerName || ''))
   const recommendedAdvisorModels = advisorModels.filter(model => model.recommended)
   const advisorSearchQuery = advisorModelSearch.trim().toLowerCase()
   const advisorModelPool = advisorProvider === 'openrouter'
@@ -879,7 +872,7 @@ function SettingsPage({
   }
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar pr-2 pb-28">
+    <div className="h-full overflow-y-auto custom-scrollbar pr-2 pb-10">
       <div className="max-w-4xl mx-auto pt-2">
         
         {/* Header Area */}
@@ -939,17 +932,8 @@ function SettingsPage({
             </HUDPanel>
         )}
         
-        {saveSuccess && (
-            <HUDPanel variant="primary" className="mb-6 border-accent-green/50" decoration="scanline">
-                <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-accent-green shadow-glow-green" />
-                    <span className="font-mono text-accent-green text-sm">{t('settings.saveSuccess')}</span>
-                </div>
-            </HUDPanel>
-        )}
-
         {/* Main Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             
             {/* Column 1: Core Systems */}
             <div className="space-y-8">
@@ -963,6 +947,7 @@ function SettingsPage({
                                provider={advisorProvider}
                                onChange={handleAdvisorProviderChange}
                              />
+                             <ProviderSetupGuide provider={advisorProvider} />
                              {settings?.secretStorageAvailable === false && (
                                <HUDMicro className="block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
                                  {t('settings.advisor.sessionOnlySecrets')}
@@ -1099,29 +1084,6 @@ function SettingsPage({
                                    />
                                  )}
 
-                                 {advisorModel.trim() && selectedAdvisorContextLength !== undefined && (
-                                   <HUDMicro
-                                     className={`block border-l pl-2 normal-case tracking-[0.02em] ${
-                                       selectedAdvisorContextLength < RECOMMENDED_ADVISOR_CONTEXT_LENGTH
-                                         ? 'border-accent-yellow/50 text-accent-yellow/75'
-                                         : 'border-accent-green/40 text-white/55'
-                                     }`}
-                                   >
-                                     {selectedAdvisorContextLength < RECOMMENDED_ADVISOR_CONTEXT_LENGTH
-                                       ? t('settings.advisor.modelContextTooSmall', {
-                                         context: selectedAdvisorContextLabel,
-                                       })
-                                       : t('settings.advisor.modelContextDetected', {
-                                         context: selectedAdvisorContextLabel,
-                                       })}
-                                   </HUDMicro>
-                                 )}
-                                 {advisorModel.trim() && selectedAdvisorContextLength === undefined && (
-                                   <HUDMicro className="block border-l border-white/20 pl-2 normal-case tracking-[0.02em] text-white/45">
-                                     {t('settings.advisor.modelContextUnknown')}
-                                   </HUDMicro>
-                                 )}
-
                                  <div className="flex flex-wrap items-center gap-3">
                                    <HUDButton
                                      type="button"
@@ -1154,26 +1116,48 @@ function SettingsPage({
                                    </HUDMicro>
                                  )}
 
-                                 {advisorProvider !== 'custom' && (
-                                   <details className="group border-t border-white/10 pt-3">
+                                 <details className="group border-t border-white/10 pt-3">
                                      <summary className="cursor-pointer list-none font-display text-[10px] uppercase tracking-[0.18em] text-text-secondary hover:text-accent-cyan">
                                        <span className="group-open:hidden">{t('settings.advisor.showAdvanced')}</span>
                                        <span className="hidden group-open:inline">{t('settings.advisor.hideAdvanced')}</span>
                                      </summary>
-                                     <div className="mt-3">
-                                       <HUDInput
-                                         label={t('settings.advisor.baseUrlLabel')}
-                                         aria-label={t('settings.advisor.baseUrlLabel')}
-                                         value={advisorBaseUrl}
-                                         onChange={(e) => {
-                                           setAdvisorBaseUrl(e.target.value)
-                                           invalidateAdvisorConnection()
-                                         }}
-                                         placeholder={providerDefaultUrl}
-                                       />
+                                     <div className="mt-3 space-y-3">
+                                       {advisorModel.trim() && selectedAdvisorContextLength !== undefined && (
+                                         <HUDMicro
+                                           className={`block border-l pl-2 normal-case tracking-[0.02em] ${
+                                             selectedAdvisorContextLength < RECOMMENDED_ADVISOR_CONTEXT_LENGTH
+                                               ? 'border-accent-yellow/50 text-accent-yellow/75'
+                                               : 'border-accent-green/40 text-white/55'
+                                           }`}
+                                         >
+                                           {selectedAdvisorContextLength < RECOMMENDED_ADVISOR_CONTEXT_LENGTH
+                                             ? t('settings.advisor.modelContextTooSmall', {
+                                               context: selectedAdvisorContextLabel,
+                                             })
+                                             : t('settings.advisor.modelContextDetected', {
+                                               context: selectedAdvisorContextLabel,
+                                             })}
+                                         </HUDMicro>
+                                       )}
+                                       {advisorModel.trim() && selectedAdvisorContextLength === undefined && (
+                                         <HUDMicro className="block border-l border-white/20 pl-2 normal-case tracking-[0.02em] text-white/45">
+                                           {t('settings.advisor.modelContextUnknown')}
+                                         </HUDMicro>
+                                       )}
+                                       {advisorProvider !== 'custom' && (
+                                         <HUDInput
+                                           label={t('settings.advisor.baseUrlLabel')}
+                                           aria-label={t('settings.advisor.baseUrlLabel')}
+                                           value={advisorBaseUrl}
+                                           onChange={(e) => {
+                                             setAdvisorBaseUrl(e.target.value)
+                                             invalidateAdvisorConnection()
+                                           }}
+                                           placeholder={providerDefaultUrl}
+                                         />
+                                       )}
                                      </div>
                                    </details>
-                                 )}
                                </div>
                              )}
 
@@ -1309,9 +1293,30 @@ function SettingsPage({
                                saving={chronicleRefreshModeSaving}
                                onChange={(mode) => void handleChronicleRefreshModeChange(mode)}
                              />
+                             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+                               <HUDMicro className={hasAdvisorChanges ? 'text-accent-yellow' : 'text-accent-green'}>
+                                 {hasAdvisorChanges
+                                   ? t('settings.advisor.unsaved')
+                                   : t('settings.advisor.savedState')}
+                               </HUDMicro>
+                               <HUDButton
+                                 type="button"
+                                 variant="primary"
+                                 onClick={() => void handleSaveAdvisor()}
+                                 disabled={saving || !hasAdvisorChanges}
+                                 className="min-w-40 px-4 py-1.5 text-[10px]"
+                               >
+                                 {saving ? t('common.applying') : t('settings.advisor.save')}
+                               </HUDButton>
+                             </div>
                         </div>
                     </HUDPanel>
                 </section>
+
+            </div>
+
+            {/* Column 2: Game and campaign essentials */}
+            <div className="space-y-8">
 
                 {/* Save Data Section */}
                 <section>
@@ -1339,7 +1344,7 @@ function SettingsPage({
                               <HUDButton
                                 type="button"
                                 variant="ghost"
-                                onClick={() => setSaveDir('')}
+                                onClick={() => void handleUseAutomaticSaveFolder()}
                                 className="px-3 py-1.5 text-[10px]"
                               >
                                 {t('settings.saveData.useAutomatic')}
@@ -1376,6 +1381,17 @@ function SettingsPage({
                                 <HUDMicro className="mt-2 block normal-case tracking-[0.02em] text-white/45">
                                   {t('settings.saveData.playerNameHelp')}
                                 </HUDMicro>
+                                <div className="mt-3 flex justify-end">
+                                  <HUDButton
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => void handleSavePlayerName()}
+                                    disabled={saving || !hasPlayerNameChange}
+                                    className="px-3 py-1.5 text-[10px]"
+                                  >
+                                    {saving ? t('common.applying') : t('settings.saveData.savePlayerName')}
+                                  </HUDButton>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1429,7 +1445,25 @@ function SettingsPage({
 
             </div>
 
-            {/* Column 2: Comms & Feedback */}
+        </div>
+
+        <details className="group mt-8 rounded-sm border border-white/10 bg-black/15">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-white/5">
+            <span>
+              <span className="block font-display text-sm uppercase tracking-[0.16em] text-text-primary">
+                {t('settings.moreSettings.title')}
+              </span>
+              <HUDMicro className="mt-1 block normal-case tracking-[0.02em] text-white/45">
+                {t('settings.moreSettings.help')}
+              </HUDMicro>
+            </span>
+            <span className="flex items-center gap-3">
+              <HUDMicro>{t('settings.moreSettings.optional')}</HUDMicro>
+              <span aria-hidden="true" className="text-accent-cyan transition-transform group-open:rotate-90">›</span>
+            </span>
+          </summary>
+          <div className="grid grid-cols-1 gap-8 border-t border-white/10 p-4 md:grid-cols-2 md:p-6">
+            {/* Optional connections */}
             <div className="space-y-8">
                 {/* MCP Relay Section */}
                 <section>
@@ -1634,6 +1668,11 @@ function SettingsPage({
                     </HUDPanel>
                 </section>
 
+            </div>
+
+            {/* Updates and support */}
+            <div className="space-y-8">
+
                 {/* Software Updates Section */}
                 <section>
                     <HUDSectionTitle number="05">{t('settings.sections.updates')}</HUDSectionTitle>
@@ -1703,26 +1742,8 @@ function SettingsPage({
                     </div>
                 </section>
             </div>
-        </div>
-
-        {/* Floating Action Bar */}
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-             <div className="bg-black/70 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full shadow-[0_0_16px_rgba(0,0,0,0.35)] flex items-center gap-4">
-                 <div className="flex items-center gap-2">
-                     <div className={`w-2 h-2 rounded-full ${hasChanges ? 'bg-accent-yellow animate-pulse' : 'bg-white/20'}`} />
-                     <HUDMicro>{hasChanges ? t('settings.actionBar.unsaved') : t('settings.actionBar.ready')}</HUDMicro>
-                 </div>
-                 <div className="h-4 w-px bg-white/10" />
-                 <HUDButton 
-                    variant="primary" 
-                    onClick={handleSave} 
-                    disabled={saving || !hasChanges}
-                    className="min-w-[132px] px-4 py-1.5 text-[10px]"
-                 >
-                     {saving ? t('settings.actionBar.committing') : t('settings.actionBar.apply')}
-                 </HUDButton>
-             </div>
-        </div>
+          </div>
+        </details>
 
       </div>
     </div>

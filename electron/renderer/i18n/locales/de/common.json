@@ -60,11 +60,25 @@
       "latency": "LATENZ: {{seconds}}s",
       "report": "MELDEN",
       "reportTitle": "Diese Antwort melden",
-      "blockedLink": "Nicht-HTTP(S)-Link blockiert"
+      "blockedLink": "Nicht-HTTP(S)-Link blockiert",
+      "details": "Antwortdetails",
+      "responseTime": "Reaktionszeit: {{seconds}}s"
     },
     "errors": {
       "briefingNotReady": "Der Berater analysiert deine Speicherdatei noch. Bitte versuche es in {{seconds}} Sekunden erneut.",
-      "unexpected": "Ein unerwarteter Fehler ist aufgetreten"
+      "unexpected": "Ein unerwarteter Fehler ist aufgetreten",
+      "openProviderSettings": "ÖFFNEN SIE DIE ANBIETEREINSTELLUNGEN",
+      "providerNotConfigured": "{{provider}} ist nicht vollständig für den Berater-Chat konfiguriert. Wählen Sie ein Modell und vervollständigen Sie dessen Verbindungseinstellungen.",
+      "providerUnavailable": "{{provider}} konnte nicht erreicht werden. Stellen Sie sicher, dass der Server läuft und die konfigurierte Adresse korrekt ist.",
+      "providerAuthFailed": "{{provider}} hat den konfigurierten Schlüssel API abgelehnt. Überprüfen Sie den Schlüssel und versuchen Sie erneut, die Verbindung herzustellen.",
+      "providerModelNotFound": "Das ausgewählte {{provider}}-Modell ist nicht verfügbar. Aktualisieren Sie die Modellliste oder wählen Sie ein anderes Modell.",
+      "providerRateLimited": "{{provider}} ist derzeit ratenbegrenzt. Warten Sie kurz oder wählen Sie ein anderes Modell oder einen anderen Anbieter.",
+      "providerBillingFailed": "{{provider}} verfügt für diese Anfrage nicht über nutzbare Rechnungen oder Gutschriften. Überprüfen Sie das Anbieterkonto oder wählen Sie einen anderen Anbieter.",
+      "providerTimeout": "Die Antwort von {{provider}} hat zu lange gedauert. Möglicherweise wird noch ein lokales Modell geladen. Versuchen Sie es erneut oder überprüfen Sie den Server.",
+      "providerContextLimit": "Das aktive Kontextfenster passt nicht zu diesem Kampagnenbriefing. Erhöhen Sie die Kontexteinstellung des Anbieters auf mindestens 32K oder wählen Sie ein Modell mit größerem Kontext.",
+      "providerInvalidResponse": "{{provider}} hat eine Antwort zurückgegeben, die diese App nicht lesen konnte. Überprüfen Sie, ob der Endpunkt OpenAI-kompatible Chat-Abschlüsse unterstützt.",
+      "providerEmptyResponse": "{{provider}} hat eine leere Antwort zurückgegeben. Versuchen Sie es erneut oder wählen Sie ein anderes Modell.",
+      "providerRequestFailed": "{{provider}} konnte die Anfrage nicht abschließen. Überprüfen Sie das Modell und den Endpunkt und versuchen Sie es dann erneut."
     },
     "newChat": "Neuer Chat",
     "welcome": {
@@ -133,6 +147,10 @@
         "Was wuerden unsere Rivalen ueber uns sagen?"
       ],
       "roast": "Roaste mein Reich"
+    },
+    "providerSetup": {
+      "title": "Beraterverbindung erforderlich",
+      "description": "{{provider}} ist ausgewählt, aber nicht bereit. Öffnen Sie die Anbietereinstellungen, um die Verbindung abzuschließen und ein Modell auszuwählen."
     }
   },
   "chronicle": {
@@ -164,7 +182,14 @@
       "latest": "Neueste",
       "pending_one": "{{count}} Kapitel ausstehend",
       "pending_other": "{{count}} Kapitel ausstehend",
-      "generateMore": "Weitere Kapitel erzeugen"
+      "generateMore": "Weitere Kapitel erzeugen",
+      "campaigns": "Kampagnen",
+      "chooseCampaign": "Wählen Sie eine Kampagne",
+      "currentCampaignDate": "Aktuelle Kampagne · {{date}}",
+      "lastPlayed": "Zuletzt gespielt · {{date}}",
+      "current": "Aktuell",
+      "manageCampaigns": "Kampagnen verwalten",
+      "storyStyle": "Story-Stil"
     },
     "publish": {
       "eyebrow": "Teilen // Oeffentliche Akte",
@@ -242,6 +267,81 @@
         "pr": "Uebertrieben begeisterte imperiale PR-Abteilung",
         "earnings": "Trockener Quartalsbericht, aber fuer galaktische Eroberung"
       }
+    },
+    "providerSetup": {
+      "title": "AI-PROVIDER-VERBINDUNG ERFORDERLICH",
+      "description": "Sie können bestehende Kapitel weiterhin lesen. Verbinden Sie den ausgewählten Anbieter und wählen Sie ein Modell zum Generieren oder Umschreiben von Chronicle-Inhalten.",
+      "action": "ÖFFNEN SIE DIE ANBIETEREINSTELLUNGEN"
+    },
+    "history": {
+      "eyebrow": "Archiv // Lokale Aufzeichnungen",
+      "title": "Kampagnenverlauf",
+      "subtitle": "Benennen Sie Kampagnen um, entfernen Sie doppelte Starts oder stellen Sie Elemente aus dem Papierkorb wieder her.",
+      "close": "Kampagnenverlauf schließen",
+      "active": "Kampagnen ({{count}})",
+      "trash": "Papierkorb ({{count}})",
+      "search": "Suchkampagnen",
+      "selectEmpty": "Nicht verwendete Kampagnen auswählen ({{count}})",
+      "trashSelected": "Ausgewählte in den Papierkorb verschieben ({{count}})",
+      "emptyHelp": "Findet Kampagnen ohne Geschichte oder aufgezeichnete Ereignisse.",
+      "trashEmpty": "Der Papierkorb ist leer.",
+      "noMatches": "Zu dieser Suche passen keine Kampagnen.",
+      "current": "Aktuell",
+      "hasChronicle": "Chronik",
+      "noChronicle": "Keine Chronik",
+      "published": "Veröffentlicht",
+      "gameDates": "{{first}} — {{last}}",
+      "sessions_one": "{{count}} Sitzung",
+      "sessions_other": "{{count}} Sitzungen",
+      "snapshots_one": "{{count}} Schnappschuss",
+      "snapshots_other": "{{count}} Schnappschüsse",
+      "events_one": "{{count}}-Ereignis",
+      "events_other": "{{count}} Ereignisse",
+      "chapters_one": "Kapitel {{count}}",
+      "chapters_other": "{{count}} Kapitel",
+      "moreDetails": "Weitere Details",
+      "moreActions": "Mehr",
+      "storyActions": "Story-Aktionen",
+      "deleteOptions": "Optionen löschen",
+      "selectCampaign": "Wählen Sie {{name}}",
+      "labelPlaceholder": "Kampagnenetikett",
+      "rename": "Umbenennen",
+      "save": "Speichern",
+      "cancel": "Stornieren",
+      "reset": "Chronik zurücksetzen",
+      "resetTitle": "Diese Chronik zurücksetzen?",
+      "resetHelp": "Entfernt die generierte Chronikschrift. Der Kampagnenverlauf und die gespeicherten Datensätze bleiben erhalten, und Sie können dies rückgängig machen.",
+      "confirmReset": "Chronik zurücksetzen",
+      "undoReset": "Chronik wiederherstellen",
+      "moveToTrash": "In den Papierkorb verschieben",
+      "restore": "Wiederherstellen",
+      "delete": "Dauerhaft löschen",
+      "deleteLocal": "Lokale Daten löschen",
+      "deleteTitle": "Diese Kampagne dauerhaft löschen?",
+      "deleteHelp": "Löscht diesen Kampagnenverlauf von diesem Gerät. Dies kann nicht rückgängig gemacht werden.",
+      "deletePublishedHelp": "Löscht diesen Kampagnenverlauf von diesem Gerät. Die veröffentlichte Geschichte bleibt online. Dies kann nicht rückgängig gemacht werden.",
+      "confirmDelete": "Dauerhaft löschen",
+      "confirmDeleteLocal": "Lokale Daten löschen",
+      "currentProtected": "Die aktuell geladene Kampagne kann nicht in den Papierkorb verschoben oder gelöscht werden.",
+      "publishedDeleteWarning": "Löscht diese Kampagne von diesem Gerät. Die veröffentlichte Geschichte bleibt online.",
+      "onlineOnlyTitle": "Veröffentlichte Geschichten ohne lokale Geschichte",
+      "onlineOnlyHelp": "Diese Geschichten sind immer noch online. Sie können sie hier öffnen oder entfernen.",
+      "openStory": "Offene Geschichte",
+      "removeStory": "Online-Story entfernen",
+      "removeStoryTitle": "Diese veröffentlichte Geschichte entfernen?",
+      "removeStoryHelp": "Entfernt die öffentliche Story aus dem Web. Der lokale Kampagnenverlauf wird nicht wiederhergestellt und dies kann nicht rückgängig gemacht werden.",
+      "confirmRemoveStory": "Online-Story entfernen",
+      "publishedRemoved": "Veröffentlichte Geschichte entfernt.",
+      "safetyNote": "Das Verschieben von Kampagnen in den Papierkorb ist rückgängig zu machen. Das dauerhafte Löschen betrifft nur lokale Daten.",
+      "labelSaved": "Kampagnenlabel gespeichert.",
+      "movedToTrash": "{{name}} wurde in den Papierkorb verschoben.",
+      "restored": "Kampagne wiederhergestellt.",
+      "chronicleReset": "Chronik gelöscht. Der Kampagnenverlauf wurde aufbewahrt.",
+      "chronicleRestored": "Chronik restauriert.",
+      "deleted": "Lokaler Kampagnenverlauf endgültig gelöscht.",
+      "bulkMoved": "{{count}}-Kampagnen in den Papierkorb verschoben.",
+      "undo": "Rückgängig machen",
+      "unknownError": "Der Kampagnenverlauf konnte nicht aktualisiert werden."
     }
   },
   "settings": {
@@ -260,14 +360,17 @@
       "data": "SPIELDATEN",
       "communications": "KOMMUNIKATIONSRELAIS",
       "updates": "SOFTWARE-UPDATES",
-      "diagnostics": "DIAGNOSE"
+      "diagnostics": "DIAGNOSE",
+      "mcpRelay": "MCP-RELAIS"
     },
     "panels": {
       "geminiAccess": "GEMINI-MODELLZUGRIFF",
       "saveSource": "SPIELSTAND-ORDNER",
       "campaignHistory": "KAMPAGNENVERLAUF",
       "discordLink": "DISCORD-VERBINDUNG",
-      "updateChannel": "UPDATE-KANAL"
+      "updateChannel": "UPDATE-KANAL",
+      "advisorAccess": "KI-SETUP",
+      "mcpRelay": "KI-APP-VERBINDUNGEN"
     },
     "api": {
       "label": "API-SCHLUESSEL",
@@ -298,7 +401,9 @@
       "qualityFirstHelp": "Gemini Flash bevorzugen und nur bei Kontingentbedarf ausweichen.",
       "conserveHelp": "Leichtere Modelle fuer Berater-Chat nutzen, um Gemini-Kontingent zu sparen.",
       "toastError": "Modell-Routing konnte nicht geaendert werden. Bitte erneut versuchen.",
-      "toastSuccess": "Modell-Routing auf {{mode}} gesetzt."
+      "toastSuccess": "Modell-Routing auf {{mode}} gesetzt.",
+      "qualityFirstTag": "VERWENDET FLASH, WENN VERFÜGBAR",
+      "conserveTag": "FLASH-LITE-BERATER"
     },
     "saveData": {
       "directoryLabel": "SPEICHERORDNER",
@@ -318,7 +423,11 @@
       "backingUp": "SICHERUNG WIRD ERSTELLT...",
       "backupSuccess": "Sicherung des Kampagnenverlaufs gespeichert.",
       "revealError": "Der Ordner fuer den Kampagnenverlauf konnte nicht geoeffnet werden.",
-      "historyHelp": "Erstelle eine Kopie deines Kampagnenverlaufs oder verwalte alte und doppelte Kampagnen."
+      "historyHelp": "Erstelle eine Kopie deines Kampagnenverlaufs oder verwalte alte und doppelte Kampagnen.",
+      "savePlayerName": "SPEICHERN SIE DEN MEHRSPIELERNAMEN",
+      "playerNameSaved": "Multiplayer-Name gespeichert.",
+      "folderSaved": "Speicherort des Spiels aktualisiert.",
+      "automaticSaved": "Automatische Speichererkennung aktiviert."
     },
     "discord": {
       "loading": "HANDSHAKE WIRD HERGESTELLT...",
@@ -368,6 +477,153 @@
       "auth": "Autorisierung fehlgeschlagen.",
       "connection": "Verbindungsfehler. Netzwerk pruefen.",
       "generic": "Systemfehler. Erneut versuchen."
+    },
+    "moreSettings": {
+      "title": "WEITERE EINSTELLUNGEN",
+      "help": "Optionale Verbindungen, Software-Updates und Support-Tools.",
+      "optional": "OPTIONAL"
+    },
+    "advisor": {
+      "providerLabel": "KI-ANBIETER",
+      "providerChoiceLabel": "WO SOLL KI LAUFEN?",
+      "localProviderLabel": "LOKALE APP",
+      "otherProviderLabel": "ANBIETER",
+      "providerGroups": {
+        "gemini": "Gemini",
+        "geminiTag": "EINFACHSTE EINRICHTUNG",
+        "local": "Auf diesem Gerät",
+        "localTag": "STANDARDMÄßIG PRIVAT",
+        "other": "Online-Anbieter",
+        "otherTag": "MEHR AUSWAHL"
+      },
+      "selected": "AUSGEWÄHLT",
+      "apiKeyLabel": "OPENROUTER API SCHLÜSSEL",
+      "optionalApiKeyLabel": "API SCHLÜSSEL",
+      "baseUrlLabel": "SERVER URL",
+      "modelLabel": "MODELL",
+      "modelPlaceholder": "FINDEN SIE ZUERST VERFÜGBARE MODELLE",
+      "selectModel": "Wählen Sie ein Modell aus",
+      "searchModels": "MODELLE SUCHEN",
+      "searchPlaceholder": "Filtern Sie nach Modellname oder ID",
+      "showAllModels": "ALLE MODELLE ANZEIGEN",
+      "showRecommendedModels": "ANZEIGEN EMPFOHLEN",
+      "recommended": "EMPFOHLEN",
+      "recommendedSummary": "Verifizierte Ausgangspunkte",
+      "checkConnection": "FINDEN SIE VERFÜGBARE MODELLE",
+      "checking": "SUCHE...",
+      "connected": "BEREIT",
+      "failed": "BRAUCHT AUFMERKSAMKEIT",
+      "modelsFound": "Bereit // {{count}} Modelle gefunden",
+      "connectedNoModels": "Verbindung gefunden, aber noch keine Modelle verfügbar.",
+      "connectionError": "Dieser Anbieter konnte nicht überprüft werden.",
+      "testModel": "AUSGEWÄHLTES MODELL PRÜFEN",
+      "testingModel": "MODELL PRÜFEN...",
+      "modelReady": "BEREIT // STRUKTURIERTE ANTWORTEN UNTERSTÜTZT",
+      "modelReadyPromptJson": "BEREIT // KOMPATIBILITÄTSMODUS",
+      "modelAdvisorOnly": "BERATER BEREIT // CHRONICLE BRAUCHT EIN ANDERES MODELL",
+      "modelTestError": "Dieses Modell hat die Chronicle-Kompatibilitätsprüfung nicht bestanden.",
+      "modelTestPrivacy": "Verbindungsprüfungen senden niemals Kampagnendaten.",
+      "modelContextLabel": "{{context}}-Kontext",
+      "modelContextDetected": "Gemeldeter Kontext // {{context}}",
+      "modelContextTooSmall": "{{context}}-Kontext erkannt. Advisor und Chronicle benötigen im Allgemeinen mindestens 32K.",
+      "modelContextUnknown": "Die Kontextgröße wurde nicht gemeldet. Laden Sie dieses Modell für Advisor und Chronicle mit mindestens 32K.",
+      "sessionOnlySecrets": "Dieses Gerät kann derzeit keine API-Schlüssel sicher speichern. Sie können eine davon verwenden, bis die App geschlossen wird, die Veröffentlichung ist jedoch nicht möglich.",
+      "remoteContextNotice": "An diesen Anbieter werden Fragen und die relevanten Teile Ihrer Kampagne gesendet. Ihre Sicherungsdatei wird nie hochgeladen.",
+      "ollamaCloudNotice": "Dieses Ollama-Cloudmodell verarbeitet Advisor- und Chronicle-Eingabeaufforderungen remote und nicht auf diesem Gerät.",
+      "showAdvanced": "ERWEITERTE VERBINDUNG ANZEIGEN",
+      "hideAdvanced": "ERWEITERTE VERBINDUNG AUSblenden",
+      "optional": "OPTIONAL",
+      "save": "KI-SETUP SPEICHERN",
+      "saved": "KI-Setup gespeichert.",
+      "unsaved": "Das AI-Setup enthält nicht gespeicherte Änderungen",
+      "savedState": "KI-Setup gespeichert",
+      "guide": {
+        "label": "Einrichtungsschritte",
+        "gemini": {
+          "1": "Besorgen Sie sich einen Gemini-Schlüssel",
+          "2": "Fügen Sie es unten ein",
+          "3": "AI-Setup speichern"
+        },
+        "local": {
+          "1": "Öffnen Sie Ihre lokale KI-App",
+          "2": "Laden Sie ein Modell",
+          "3": "Finden Sie verfügbare Modelle"
+        },
+        "hosted": {
+          "1": "Fügen Sie Ihren Anbieterschlüssel ein",
+          "2": "Finden Sie verfügbare Modelle",
+          "3": "Wählen Sie eines aus und speichern Sie es"
+        },
+        "custom": {
+          "1": "Geben Sie die Serveradresse ein",
+          "2": "Finden Sie verfügbare Modelle",
+          "3": "Wählen Sie eines aus und speichern Sie es"
+        }
+      },
+      "providers": {
+        "gemini": "ZWILLINGE",
+        "ollama": "OLLAMA",
+        "lm_studio": "LM-STUDIO",
+        "openrouter": "OPENROUTER",
+        "custom": "BENUTZERDEFINIERTER ENDPUNKT"
+      },
+      "providerHelp": {
+        "gemini": "Der schnellste Weg, Advisor und Chronicle zu nutzen.",
+        "ollama": "Führt Advisor und Chronicle über Ollama auf diesem Gerät aus. Öffnen Sie Ollama und laden Sie ein Modell, bevor Sie fortfahren.",
+        "lm_studio": "Führt Advisor und Chronicle über LM Studio auf diesem Gerät aus. Öffnen Sie LM Studio und laden Sie ein Modell, bevor Sie fortfahren.",
+        "openrouter": "Verwendet Ihr OpenRouter-Konto und ermöglicht Ihnen die Auswahl aus gehosteten Modellen.",
+        "custom": "Verbindet einen anderen kompatiblen KI-Dienst mit Advisor und Chronicle."
+      }
+    },
+    "geminiQuota": {
+      "label": "VERWENDUNG ZWILLINGE",
+      "description": "Wählen Sie, wie Sie alltägliche Beraterantworten und das Schreiben von Chroniken in Einklang bringen möchten.",
+      "standard": "Freifreundlich",
+      "higher": "Beste Qualität",
+      "standardTag": "ERWEITERT DIE FREIGRENZEN",
+      "higherTag": "VERBRAUCHT MEHR ZULÄSSIGKEIT",
+      "standardHelp": "Hält alltägliche Fragen einfacher, sodass mehr Zeit für das Schreiben von Chroniken zur Verfügung steht.",
+      "higherHelp": "Bevorzugt das stärkste verfügbare Gemini-Modell sowohl für Advisor als auch für Chronicle.",
+      "showAdvanced": "Erweiterte Kontingentkontrollen anzeigen",
+      "hideAdvanced": "Erweiterte Kontingentkontrollen ausblenden",
+      "optional": "OPTIONAL",
+      "aria": "Setzen Sie den Gemini-Kontingentmodus auf {{mode}}"
+    },
+    "mcpRelay": {
+      "loading": "SCANNEN...",
+      "ready": "BEREIT",
+      "noDatabase": "KEIN KAMPAGNEN-CACHE",
+      "loadingSummary": "Überprüfen der lokalen AI-App-Verbindung.",
+      "readySummary": "Lokale Verbindung bereit.",
+      "noDatabaseSummary": "Noch kein Kampagnenarchiv gefunden. Öffnen Sie einen Speicherordner oder wählen Sie ihn aus, bevor Sie AI-Apps verbinden.",
+      "installed": "VERBUNDEN",
+      "installedNeedsRefresh": "UPDATE VERFÜGBAR",
+      "notInstalled": "NICHT VERBUNDEN",
+      "claudeDesktop": "CLAUDE DESKTOP",
+      "otherApps": "ANDERE KI-APPS",
+      "otherAppsHelp": "Verwenden Sie die manuelle MCP-Einrichtung für Cursor, LM Studio und ähnliche Clients.",
+      "localEndpoint": "LOKALES ARCHIV",
+      "runCheck": "DURCHFÜHREN SIE DIE PRÜFUNG",
+      "checking": "ÜBERPRÜFUNG...",
+      "connectClaude": "Zu CLAUDE hinzufügen",
+      "updateClaude": "UPDATE CLAUDE",
+      "claudeConnected": "HINZUGEFÜGT ZU CLAUDE",
+      "installing": "INSTALLIEREN...",
+      "copyClaude": "KOPIE CLAUDE JSON",
+      "copyClaudeCode": "CLAUDE-CODE KOPIEREN",
+      "copyCodexSetup": "CODEX-SETUP KOPIEREN",
+      "copyMcpJson": "KOPIEREN MCP JSON",
+      "revealConfig": "KONFIGURATION ANZEIGEN",
+      "showAdvancedSetup": "MANUELLES MCP-SETUP ANZEIGEN",
+      "hideAdvancedSetup": "MANUELLES MCP-SETUP AUSblenden",
+      "optional": "OPTIONAL",
+      "healthSuccess": "MCP Relay hat erfolgreich geantwortet.",
+      "healthError": "Die Integritätsprüfung von MCP Relay ist fehlgeschlagen.",
+      "copySuccess": "{{target}}-Setup kopiert.",
+      "copyError": "Setup konnte nicht kopiert werden.",
+      "installConfirm": "Claude Desktop mit Stellaris Companion verbinden? Dadurch wird die lokale Konfigurationsdatei von Claude aktualisiert.",
+      "installSuccess": "Claude Desktop-Verbindung aktualisiert. Starten Sie Claude Desktop neu, um es zu laden.",
+      "installError": "Die Claude Desktop-Verbindung konnte nicht aktualisiert werden."
     }
   },
   "update": {
@@ -397,5 +653,87 @@
       "update": "UPDATE",
       "tip": "TIPP"
     }
+  },
+  "onboarding": {
+    "step": "SCHRITT {{current}} / {{total}}",
+    "actions": {
+      "start": "Fangen Sie an",
+      "back": "ZURÜCK",
+      "continue": "WEITERMACHEN",
+      "later": "SPÄTER EINRICHTEN",
+      "finish": "BEENDEN"
+    },
+    "welcome": {
+      "frameTitle": "ERSTER KONTAKT",
+      "logoAlt": "Stellaris Companion-Logo",
+      "title": "Willkommen bei Stellaris Companion",
+      "body": "Wählen Sie aus, wie Advisor und Chronicle funktionieren, und verbinden Sie dann Ihre Stellaris-Speicherungen."
+    },
+    "ai": {
+      "frameTitle": "WÄHLEN SIE IHRE KI",
+      "geminiKey": "ZWILLINGSSCHLÜSSEL",
+      "getGeminiKey": "HOL DIR EINEN GEMINI-SCHLÜSSEL",
+      "providerKey": "ANBIETERSCHLÜSSEL",
+      "serverAddress": "SERVER-ADRESSE",
+      "optionalKey": "API SCHLÜSSEL",
+      "optional": "OPTIONAL",
+      "enterKey": "EINGABETASTE",
+      "ready": "BEREIT",
+      "notSet": "NICHT EINGESTELLT",
+      "findModels": "FINDEN SIE VERFÜGBARE MODELLE",
+      "looking": "SUCHE...",
+      "model": "MODELL",
+      "chooseModel": "Wählen Sie ein Modell",
+      "findModelsFirst": "FINDEN SIE ZUERST VERFÜGBARE MODELLE",
+      "modelsFound_one": "Bereit // {{count}} Modell gefunden",
+      "modelsFound_other": "Bereit // {{count}} Modelle gefunden",
+      "noModels": "Verbindung gefunden, aber noch keine Modelle verfügbar.",
+      "connectionError": "Dieser Anbieter konnte nicht erreicht werden. Überprüfen Sie, ob es läuft, und versuchen Sie es erneut."
+    },
+    "saves": {
+      "frameTitle": "VERBINDEN SIE IHRE SPEICHERN",
+      "label": "SPIELE SPEICHERN",
+      "title": "Finden Sie Ihre Stellaris-Kampagnen",
+      "browseElsewhere": "SUCHEN SIE ANDERSWO",
+      "scanAgain": "NOCHMALS SCANNEN",
+      "browseFolder": "ORDNER DURCHSUCHEN",
+      "scanning": "Auf der Suche nach Stellaris-Speicherdateien ...",
+      "found": "Ihre Kampagnen sind fertig.",
+      "count_one": "{{count}}-Speicherdatei gefunden",
+      "count_other": "{{count}} Sicherungsdateien gefunden",
+      "notFound": "Wir konnten Ihre Stellaris-Speicherungen nicht automatisch finden.",
+      "notFoundIn": "In {{path}} wurden keine .sav-Dateien gefunden.",
+      "notFoundDefault": "Wir haben die üblichen Speicherorte überprüft, aber noch keine .sav-Dateien gefunden.",
+      "notFoundHelp": "Wählen Sie „Ordner durchsuchen“ und wählen Sie Ihren Stellaris-Spielstandsordner aus oder richten Sie dies später in den Einstellungen ein."
+    }
+  },
+  "advisorPanel": {
+    "title": "Beraterstil",
+    "close": "Schließen Sie den Advisor-Stil",
+    "noSave": "Kein Speicherstand geladen",
+    "empireDetails": "Über dein Imperium",
+    "empireDetailsHelp": "Der Berater verwendet diese Details aus Ihrem Speicher, um den Charakter seiner Ratschläge beizubehalten.",
+    "ethics": "Ethik",
+    "authority": "Behörde",
+    "civics": "Staatsbürgerkunde",
+    "origin": "Herkunft",
+    "noTraits": "Es sind noch keine Details zum Imperium verfügbar.",
+    "personality": "Beraterpersönlichkeit",
+    "personalityHelp": "Wählen Sie, wie der Berater in dieser Kampagne klingen soll. Dadurch verändert sich die Stimme, nicht die Spielanalyse.",
+    "personalityInstructions": "Anweisungen zur Beraterpersönlichkeit",
+    "placeholder": "Zum Beispiel: ruhig, direkt und optimistisch.",
+    "tryStyle": "Probieren Sie einen Stil aus",
+    "styles": {
+      "intelligence": "Paranoider Geheimdienstoffizier, der niemandem vertraut",
+      "passiveAggressive": "Passiv-aggressiv gegenüber Ihren Entscheidungen",
+      "corporate": "Mittlerer Manager eines Unternehmens nutzt Schlagworte für die galaktische Eroberung",
+      "enthusiastic": "Übermäßig begeistert von allem, auch von Katastrophen"
+    },
+    "saveStyle": "Stil speichern",
+    "saving": "Sparen…",
+    "saved": "Stil für diese Kampagne gespeichert.",
+    "savedWhenReady": "Der Stil wird gespeichert und angewendet, wenn die Analyse fertig ist.",
+    "saveError": "Der Advisor-Stil konnte nicht gespeichert werden.",
+    "loadSaveHelp": "Laden Sie einen Speicherstand, um einen Advisor-Stil für diese Kampagne auszuwählen."
   }
 }

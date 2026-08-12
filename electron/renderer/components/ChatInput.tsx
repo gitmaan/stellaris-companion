@@ -100,6 +100,7 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
             type="button"
             onClick={onOpenAdvisorPanel}
             disabled={!onOpenAdvisorPanel}
+            aria-label={t('chat.input.advisorInfo')}
             className={`h-9 w-9 rounded-sm border border-white/10 flex items-center justify-center text-accent-cyan/70 hover:text-accent-cyan hover:border-accent-cyan/50 hover:bg-accent-cyan/10 transition-all duration-200 ${
               !onOpenAdvisorPanel ? 'opacity-30 cursor-not-allowed' : ''
             }`}

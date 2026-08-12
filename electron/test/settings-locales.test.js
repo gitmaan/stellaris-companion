@@ -5,6 +5,42 @@ const test = require('node:test')
 
 const localesDir = path.join(__dirname, '..', 'renderer', 'i18n', 'locales')
 
+function flattenMessages(value, prefix = '', result = {}) {
+  for (const [key, child] of Object.entries(value)) {
+    const childPath = prefix ? `${prefix}.${key}` : key
+    if (child && typeof child === 'object' && !Array.isArray(child)) {
+      flattenMessages(child, childPath, result)
+    } else {
+      result[childPath] = child
+    }
+  }
+  return result
+}
+
+function interpolationVariables(value) {
+  if (typeof value !== 'string') return []
+  return [...value.matchAll(/\{\{([^}]+)\}\}/g)].map(match => match[1]).sort()
+}
+
+test('keeps every locale aligned with the English message catalog', () => {
+  const english = JSON.parse(fs.readFileSync(path.join(localesDir, 'en', 'common.json'), 'utf8'))
+  const englishMessages = flattenMessages(english)
+
+  for (const locale of fs.readdirSync(localesDir).filter(locale => locale !== 'en')) {
+    const filePath = path.join(localesDir, locale, 'common.json')
+    const messages = flattenMessages(JSON.parse(fs.readFileSync(filePath, 'utf8')))
+
+    for (const [key, englishValue] of Object.entries(englishMessages)) {
+      assert.ok(key in messages, `${locale}: missing translation for ${key}`)
+      assert.deepEqual(
+        interpolationVariables(messages[key]),
+        interpolationVariables(englishValue),
+        `${locale}: interpolation variables differ for ${key}`,
+      )
+    }
+  }
+})
+
 test('ships complete update-channel and protected-storage copy in every locale', () => {
   for (const locale of fs.readdirSync(localesDir)) {
     const filePath = path.join(localesDir, locale, 'common.json')

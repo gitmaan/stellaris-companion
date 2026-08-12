@@ -27,6 +27,7 @@ async function openUpdateSettings(app) {
   const page = await app.firstWindow()
   await page.waitForLoadState('domcontentloaded')
   await page.getByRole('button', { name: 'Config' }).click()
+  await page.getByText('MORE SETTINGS', { exact: true }).click()
   const control = page.getByTestId('update-channel-control')
   await control.scrollIntoViewIfNeeded()
   return { page, control }

@@ -60,11 +60,25 @@
       "latency": "[!! LATENCY: {{seconds}}s !!]",
       "report": "[!! REPORT !!]",
       "reportTitle": "[!! Report this response !!]",
-      "blockedLink": "[!! Blocked non-http(s) link !!]"
+      "blockedLink": "[!! Blocked non-http(s) link !!]",
+      "details": "[!! Response details !!]",
+      "responseTime": "[!! Response time: {{seconds}}s !!]"
     },
     "errors": {
       "briefingNotReady": "[!! The advisor is still analyzing your save file. Please try again in {{seconds}} seconds. !!]",
-      "unexpected": "[!! An unexpected error occurred !!]"
+      "unexpected": "[!! An unexpected error occurred !!]",
+      "openProviderSettings": "[!! OPEN PROVIDER SETTINGS !!]",
+      "providerNotConfigured": "[!! {{provider}} is not fully configured for Advisor chat. Choose a model and complete its connection settings. !!]",
+      "providerUnavailable": "[!! {{provider}} could not be reached. Make sure its server is running and the configured address is correct. !!]",
+      "providerAuthFailed": "[!! {{provider}} rejected the configured API key. Check the key and try the connection again. !!]",
+      "providerModelNotFound": "[!! The selected {{provider}} model is unavailable. Refresh the model list or choose another model. !!]",
+      "providerRateLimited": "[!! {{provider}} is currently rate limited. Wait briefly, or choose another model or provider. !!]",
+      "providerBillingFailed": "[!! {{provider}} does not have usable billing or credits for this request. Check the provider account or choose another provider. !!]",
+      "providerTimeout": "[!! {{provider}} took too long to respond. A local model may still be loading; try again or check its server. !!]",
+      "providerContextLimit": "[!! The active context window cannot fit this campaign briefing. Increase the provider's context setting to at least 32K, or choose a larger-context model. !!]",
+      "providerInvalidResponse": "[!! {{provider}} returned a response this app could not read. Check that the endpoint supports OpenAI-compatible chat completions. !!]",
+      "providerEmptyResponse": "[!! {{provider}} returned an empty response. Try again or choose another model. !!]",
+      "providerRequestFailed": "[!! {{provider}} could not complete the request. Check the model and endpoint, then try again. !!]"
     },
     "newChat": "[!! New Chat !!]",
     "welcome": {
@@ -112,6 +126,10 @@
         "[!! Give me a state of the galaxy address !!]"
       ],
       "roast": "[!! Roast my empire !!]"
+    },
+    "providerSetup": {
+      "title": "[!! ADVISOR CONNECTION REQUIRED !!]",
+      "description": "[!! {{provider}} is selected but not ready. Open Provider Settings to finish the connection and choose a model. !!]"
     }
   },
   "chronicle": {
@@ -143,7 +161,14 @@
       "latest": "[!! Latest !!]",
       "pending_one": "[!! {{count}} chapter pending !!]",
       "pending_other": "[!! {{count}} chapters pending !!]",
-      "generateMore": "[!! Generate more chapters !!]"
+      "generateMore": "[!! Generate more chapters !!]",
+      "campaigns": "[!! Campaigns !!]",
+      "chooseCampaign": "[!! Choose a campaign !!]",
+      "currentCampaignDate": "[!! Current campaign · {{date}} !!]",
+      "lastPlayed": "[!! Last played · {{date}} !!]",
+      "current": "[!! Current !!]",
+      "manageCampaigns": "[!! Manage campaigns !!]",
+      "storyStyle": "[!! Story style !!]"
     },
     "publish": {
       "eyebrow": "[!! Share // Public Record !!]",
@@ -221,6 +246,81 @@
         "pr": "[!! Overly enthusiastic imperial PR department !!]",
         "earnings": "[!! Dry corporate quarterly earnings, but for galactic conquest !!]"
       }
+    },
+    "providerSetup": {
+      "title": "[!! AI PROVIDER CONNECTION REQUIRED !!]",
+      "description": "[!! You can still read existing chapters. Connect the selected provider and choose a model to generate or rewrite Chronicle content. !!]",
+      "action": "[!! OPEN PROVIDER SETTINGS !!]"
+    },
+    "history": {
+      "eyebrow": "[!! Archive // Local Records !!]",
+      "title": "[!! Campaign History !!]",
+      "subtitle": "[!! Rename campaigns, remove duplicate starts, or recover items from Trash. !!]",
+      "close": "[!! Close campaign history !!]",
+      "active": "[!! Campaigns ({{count}}) !!]",
+      "trash": "[!! Trash ({{count}}) !!]",
+      "search": "[!! Search campaigns !!]",
+      "selectEmpty": "[!! Select unused campaigns ({{count}}) !!]",
+      "trashSelected": "[!! Move selected to Trash ({{count}}) !!]",
+      "emptyHelp": "[!! Finds campaigns with no story or recorded events. !!]",
+      "trashEmpty": "[!! Trash is empty. !!]",
+      "noMatches": "[!! No campaigns match this search. !!]",
+      "current": "[!! Current !!]",
+      "hasChronicle": "[!! Chronicle !!]",
+      "noChronicle": "[!! No Chronicle !!]",
+      "published": "[!! Published !!]",
+      "gameDates": "[!! {{first}} — {{last}} !!]",
+      "sessions_one": "[!! {{count}} session !!]",
+      "sessions_other": "[!! {{count}} sessions !!]",
+      "snapshots_one": "[!! {{count}} snapshot !!]",
+      "snapshots_other": "[!! {{count}} snapshots !!]",
+      "events_one": "[!! {{count}} event !!]",
+      "events_other": "[!! {{count}} events !!]",
+      "chapters_one": "[!! {{count}} chapter !!]",
+      "chapters_other": "[!! {{count}} chapters !!]",
+      "moreDetails": "[!! More details !!]",
+      "moreActions": "[!! More !!]",
+      "storyActions": "[!! Story actions !!]",
+      "deleteOptions": "[!! Delete options !!]",
+      "selectCampaign": "[!! Select {{name}} !!]",
+      "labelPlaceholder": "[!! Campaign label !!]",
+      "rename": "[!! Rename !!]",
+      "save": "[!! Save !!]",
+      "cancel": "[!! Cancel !!]",
+      "reset": "[!! Reset Chronicle !!]",
+      "resetTitle": "[!! Reset this Chronicle? !!]",
+      "resetHelp": "[!! Removes the generated Chronicle writing. Campaign history and save records stay, and you can undo this. !!]",
+      "confirmReset": "[!! Reset Chronicle !!]",
+      "undoReset": "[!! Restore Chronicle !!]",
+      "moveToTrash": "[!! Move to Trash !!]",
+      "restore": "[!! Restore !!]",
+      "delete": "[!! Delete permanently !!]",
+      "deleteLocal": "[!! Delete local data !!]",
+      "deleteTitle": "[!! Delete this campaign permanently? !!]",
+      "deleteHelp": "[!! Deletes this campaign history from this device. This cannot be undone. !!]",
+      "deletePublishedHelp": "[!! Deletes this campaign history from this device. Its published story stays online. This cannot be undone. !!]",
+      "confirmDelete": "[!! Delete permanently !!]",
+      "confirmDeleteLocal": "[!! Delete local data !!]",
+      "currentProtected": "[!! The currently loaded campaign cannot be trashed or deleted. !!]",
+      "publishedDeleteWarning": "[!! Deletes this campaign from this device. Its published story stays online. !!]",
+      "onlineOnlyTitle": "[!! Published stories without local history !!]",
+      "onlineOnlyHelp": "[!! These stories are still online. You can open or remove them here. !!]",
+      "openStory": "[!! Open story !!]",
+      "removeStory": "[!! Remove online story !!]",
+      "removeStoryTitle": "[!! Remove this published story? !!]",
+      "removeStoryHelp": "[!! Removes the public story from the web. It does not restore local campaign history, and this cannot be undone. !!]",
+      "confirmRemoveStory": "[!! Remove online story !!]",
+      "publishedRemoved": "[!! Published story removed. !!]",
+      "safetyNote": "[!! Moving campaigns to Trash is reversible. Permanent deletion affects only local data. !!]",
+      "labelSaved": "[!! Campaign label saved. !!]",
+      "movedToTrash": "[!! {{name}} moved to Trash. !!]",
+      "restored": "[!! Campaign restored. !!]",
+      "chronicleReset": "[!! Chronicle cleared. Campaign history was kept. !!]",
+      "chronicleRestored": "[!! Chronicle restored. !!]",
+      "deleted": "[!! Local campaign history permanently deleted. !!]",
+      "bulkMoved": "[!! Moved {{count}} campaigns to Trash. !!]",
+      "undo": "[!! Undo !!]",
+      "unknownError": "[!! Campaign history could not be updated. !!]"
     }
   },
   "settings": {
@@ -239,14 +339,17 @@
       "data": "[!! GAME DATA !!]",
       "communications": "[!! COMMUNICATIONS RELAY !!]",
       "updates": "[!! SOFTWARE UPDATES !!]",
-      "diagnostics": "[!! DIAGNOSTICS !!]"
+      "diagnostics": "[!! DIAGNOSTICS !!]",
+      "mcpRelay": "[!! MCP RELAY !!]"
     },
     "panels": {
       "geminiAccess": "[!! GEMINI MODEL ACCESS !!]",
       "saveSource": "[!! SAVE GAME FOLDER !!]",
       "campaignHistory": "[!! CAMPAIGN HISTORY !!]",
       "discordLink": "[!! DISCORD LINK !!]",
-      "updateChannel": "[!! UPDATE TRACK !!]"
+      "updateChannel": "[!! UPDATE TRACK !!]",
+      "advisorAccess": "[!! AI SETUP !!]",
+      "mcpRelay": "[!! AI APP CONNECTIONS !!]"
     },
     "api": {
       "label": "[!! API KEY TOKEN !!]",
@@ -277,7 +380,9 @@
       "qualityFirstHelp": "[!! Prefer Gemini Flash, then fall back when quota requires it. !!]",
       "conserveHelp": "[!! Use lighter models for advisor chat to reduce Gemini usage. !!]",
       "toastError": "[!! Failed to update model routing. Please try again. !!]",
-      "toastSuccess": "[!! Model routing set to {{mode}}. !!]"
+      "toastSuccess": "[!! Model routing set to {{mode}}. !!]",
+      "qualityFirstTag": "[!! USES FLASH WHEN AVAILABLE !!]",
+      "conserveTag": "[!! FLASH-LITE ADVISOR !!]"
     },
     "saveData": {
       "directoryLabel": "[!! SAVE FOLDER !!]",
@@ -297,7 +402,11 @@
       "backingUp": "[!! CREATING BACKUP... !!]",
       "backupSuccess": "[!! Campaign history backup saved. !!]",
       "revealError": "[!! Could not reveal the campaign history folder. !!]",
-      "historyHelp": "[!! Create a copy of your campaign history, or manage old and duplicate campaigns. !!]"
+      "historyHelp": "[!! Create a copy of your campaign history, or manage old and duplicate campaigns. !!]",
+      "savePlayerName": "[!! SAVE MULTIPLAYER NAME !!]",
+      "playerNameSaved": "[!! Multiplayer name saved. !!]",
+      "folderSaved": "[!! Save game location updated. !!]",
+      "automaticSaved": "[!! Automatic save detection enabled. !!]"
     },
     "discord": {
       "loading": "[!! ESTABLISHING HANDSHAKE... !!]",
@@ -347,6 +456,153 @@
       "auth": "[!! Authorization failed. !!]",
       "connection": "[!! Connection error. Check network. !!]",
       "generic": "[!! System error. Retry. !!]"
+    },
+    "moreSettings": {
+      "title": "[!! MORE SETTINGS !!]",
+      "help": "[!! Optional connections, software updates, and support tools. !!]",
+      "optional": "[!! OPTIONAL !!]"
+    },
+    "advisor": {
+      "providerLabel": "[!! AI PROVIDER !!]",
+      "providerChoiceLabel": "[!! WHERE SHOULD AI RUN? !!]",
+      "localProviderLabel": "[!! LOCAL APP !!]",
+      "otherProviderLabel": "[!! PROVIDER !!]",
+      "providerGroups": {
+        "gemini": "[!! Gemini !!]",
+        "geminiTag": "[!! EASIEST SETUP !!]",
+        "local": "[!! On this device !!]",
+        "localTag": "[!! PRIVATE BY DEFAULT !!]",
+        "other": "[!! Online provider !!]",
+        "otherTag": "[!! MORE CHOICE !!]"
+      },
+      "selected": "[!! SELECTED !!]",
+      "apiKeyLabel": "[!! OPENROUTER API KEY !!]",
+      "optionalApiKeyLabel": "[!! API KEY !!]",
+      "baseUrlLabel": "[!! SERVER URL !!]",
+      "modelLabel": "[!! MODEL !!]",
+      "modelPlaceholder": "[!! FIND AVAILABLE MODELS FIRST !!]",
+      "selectModel": "[!! Select a model !!]",
+      "searchModels": "[!! SEARCH MODELS !!]",
+      "searchPlaceholder": "[!! Filter by model name or ID !!]",
+      "showAllModels": "[!! SHOW ALL MODELS !!]",
+      "showRecommendedModels": "[!! SHOW RECOMMENDED !!]",
+      "recommended": "[!! RECOMMENDED !!]",
+      "recommendedSummary": "[!! Verified starting points !!]",
+      "checkConnection": "[!! FIND AVAILABLE MODELS !!]",
+      "checking": "[!! LOOKING... !!]",
+      "connected": "[!! READY !!]",
+      "failed": "[!! NEEDS ATTENTION !!]",
+      "modelsFound": "[!! Ready // {{count}} models found !!]",
+      "connectedNoModels": "[!! Connection found, but no models are available yet. !!]",
+      "connectionError": "[!! Could not check this provider. !!]",
+      "testModel": "[!! CHECK SELECTED MODEL !!]",
+      "testingModel": "[!! CHECKING MODEL... !!]",
+      "modelReady": "[!! READY // STRUCTURED RESPONSES SUPPORTED !!]",
+      "modelReadyPromptJson": "[!! READY // COMPATIBILITY MODE !!]",
+      "modelAdvisorOnly": "[!! ADVISOR READY // CHRONICLE NEEDS ANOTHER MODEL !!]",
+      "modelTestError": "[!! This model did not pass the Chronicle compatibility check. !!]",
+      "modelTestPrivacy": "[!! Connection checks never send campaign data. !!]",
+      "modelContextLabel": "[!! {{context}} context !!]",
+      "modelContextDetected": "[!! Reported context // {{context}} !!]",
+      "modelContextTooSmall": "[!! {{context}} context detected. Advisor and Chronicle generally need at least 32K. !!]",
+      "modelContextUnknown": "[!! Context size was not reported. For Advisor and Chronicle, load this model with at least 32K. !!]",
+      "sessionOnlySecrets": "[!! This device cannot securely save API keys right now. You can use one until the app closes, but publishing is unavailable. !!]",
+      "remoteContextNotice": "[!! Questions and the relevant parts of your campaign are sent to this provider. Your save file is never uploaded. !!]",
+      "ollamaCloudNotice": "[!! This Ollama cloud model processes Advisor and Chronicle prompts remotely rather than on this device. !!]",
+      "showAdvanced": "[!! SHOW ADVANCED CONNECTION !!]",
+      "hideAdvanced": "[!! HIDE ADVANCED CONNECTION !!]",
+      "optional": "[!! OPTIONAL !!]",
+      "save": "[!! SAVE AI SETUP !!]",
+      "saved": "[!! AI setup saved. !!]",
+      "unsaved": "[!! AI setup has unsaved changes !!]",
+      "savedState": "[!! AI setup saved !!]",
+      "guide": {
+        "label": "[!! Setup steps !!]",
+        "gemini": {
+          "1": "[!! Get a Gemini key !!]",
+          "2": "[!! Paste it below !!]",
+          "3": "[!! Save AI setup !!]"
+        },
+        "local": {
+          "1": "[!! Open your local AI app !!]",
+          "2": "[!! Load a model !!]",
+          "3": "[!! Find available models !!]"
+        },
+        "hosted": {
+          "1": "[!! Paste your provider key !!]",
+          "2": "[!! Find available models !!]",
+          "3": "[!! Choose one and save !!]"
+        },
+        "custom": {
+          "1": "[!! Enter the server address !!]",
+          "2": "[!! Find available models !!]",
+          "3": "[!! Choose one and save !!]"
+        }
+      },
+      "providers": {
+        "gemini": "[!! GEMINI !!]",
+        "ollama": "[!! OLLAMA !!]",
+        "lm_studio": "[!! LM STUDIO !!]",
+        "openrouter": "[!! OPENROUTER !!]",
+        "custom": "[!! CUSTOM ENDPOINT !!]"
+      },
+      "providerHelp": {
+        "gemini": "[!! The quickest way to use Advisor and Chronicle. !!]",
+        "ollama": "[!! Runs Advisor and Chronicle through Ollama on this device. Open Ollama and load a model before continuing. !!]",
+        "lm_studio": "[!! Runs Advisor and Chronicle through LM Studio on this device. Open LM Studio and load a model before continuing. !!]",
+        "openrouter": "[!! Uses your OpenRouter account and lets you choose from hosted models. !!]",
+        "custom": "[!! Connects another compatible AI service to Advisor and Chronicle. !!]"
+      }
+    },
+    "geminiQuota": {
+      "label": "[!! GEMINI USE !!]",
+      "description": "[!! Choose how to balance everyday Advisor answers and Chronicle writing. !!]",
+      "standard": "[!! Free-friendly !!]",
+      "higher": "[!! Best quality !!]",
+      "standardTag": "[!! STRETCHES FREE LIMITS !!]",
+      "higherTag": "[!! USES MORE ALLOWANCE !!]",
+      "standardHelp": "[!! Keeps everyday questions lighter so more of your allowance is available for Chronicle writing. !!]",
+      "higherHelp": "[!! Prefers the strongest available Gemini model for both Advisor and Chronicle. !!]",
+      "showAdvanced": "[!! Show advanced quota controls !!]",
+      "hideAdvanced": "[!! Hide advanced quota controls !!]",
+      "optional": "[!! OPTIONAL !!]",
+      "aria": "[!! Set Gemini quota mode to {{mode}} !!]"
+    },
+    "mcpRelay": {
+      "loading": "[!! SCANNING... !!]",
+      "ready": "[!! READY !!]",
+      "noDatabase": "[!! NO CAMPAIGN CACHE !!]",
+      "loadingSummary": "[!! Checking the local AI app connection. !!]",
+      "readySummary": "[!! Local connection ready. !!]",
+      "noDatabaseSummary": "[!! No campaign archive found yet. Open or select a save folder before connecting AI apps. !!]",
+      "installed": "[!! CONNECTED !!]",
+      "installedNeedsRefresh": "[!! UPDATE AVAILABLE !!]",
+      "notInstalled": "[!! NOT CONNECTED !!]",
+      "claudeDesktop": "[!! CLAUDE DESKTOP !!]",
+      "otherApps": "[!! OTHER AI APPS !!]",
+      "otherAppsHelp": "[!! Use manual MCP setup for Cursor, LM Studio, and similar clients. !!]",
+      "localEndpoint": "[!! LOCAL ARCHIVE !!]",
+      "runCheck": "[!! RUN CHECK !!]",
+      "checking": "[!! CHECKING... !!]",
+      "connectClaude": "[!! ADD TO CLAUDE !!]",
+      "updateClaude": "[!! UPDATE CLAUDE !!]",
+      "claudeConnected": "[!! ADDED TO CLAUDE !!]",
+      "installing": "[!! INSTALLING... !!]",
+      "copyClaude": "[!! COPY CLAUDE JSON !!]",
+      "copyClaudeCode": "[!! COPY CLAUDE CODE !!]",
+      "copyCodexSetup": "[!! COPY CODEX SETUP !!]",
+      "copyMcpJson": "[!! COPY MCP JSON !!]",
+      "revealConfig": "[!! REVEAL CONFIG !!]",
+      "showAdvancedSetup": "[!! SHOW MANUAL MCP SETUP !!]",
+      "hideAdvancedSetup": "[!! HIDE MANUAL MCP SETUP !!]",
+      "optional": "[!! OPTIONAL !!]",
+      "healthSuccess": "[!! MCP Relay responded successfully. !!]",
+      "healthError": "[!! MCP Relay health check failed. !!]",
+      "copySuccess": "[!! {{target}} setup copied. !!]",
+      "copyError": "[!! Failed to copy setup. !!]",
+      "installConfirm": "[!! Connect Claude Desktop to Stellaris Companion? This updates Claude's local configuration file. !!]",
+      "installSuccess": "[!! Claude Desktop connection updated. Restart Claude Desktop to load it. !!]",
+      "installError": "[!! Failed to update the Claude Desktop connection. !!]"
     }
   },
   "update": {
@@ -376,5 +632,87 @@
       "update": "[!! UPDATE !!]",
       "tip": "[!! TIP !!]"
     }
+  },
+  "onboarding": {
+    "step": "[!! STEP {{current}} / {{total}} !!]",
+    "actions": {
+      "start": "[!! GET STARTED !!]",
+      "back": "[!! BACK !!]",
+      "continue": "[!! CONTINUE !!]",
+      "later": "[!! SET UP LATER !!]",
+      "finish": "[!! FINISH !!]"
+    },
+    "welcome": {
+      "frameTitle": "[!! FIRST CONTACT !!]",
+      "logoAlt": "[!! Stellaris Companion logo !!]",
+      "title": "[!! Welcome to Stellaris Companion !!]",
+      "body": "[!! Choose how Advisor and Chronicle work, then connect your Stellaris saves. !!]"
+    },
+    "ai": {
+      "frameTitle": "[!! CHOOSE YOUR AI !!]",
+      "geminiKey": "[!! GEMINI KEY !!]",
+      "getGeminiKey": "[!! GET A GEMINI KEY !!]",
+      "providerKey": "[!! PROVIDER KEY !!]",
+      "serverAddress": "[!! SERVER ADDRESS !!]",
+      "optionalKey": "[!! API KEY !!]",
+      "optional": "[!! OPTIONAL !!]",
+      "enterKey": "[!! ENTER KEY !!]",
+      "ready": "[!! READY !!]",
+      "notSet": "[!! NOT SET !!]",
+      "findModels": "[!! FIND AVAILABLE MODELS !!]",
+      "looking": "[!! LOOKING... !!]",
+      "model": "[!! MODEL !!]",
+      "chooseModel": "[!! Choose a model !!]",
+      "findModelsFirst": "[!! FIND AVAILABLE MODELS FIRST !!]",
+      "modelsFound_one": "[!! Ready // {{count}} model found !!]",
+      "modelsFound_other": "[!! Ready // {{count}} models found !!]",
+      "noModels": "[!! Connection found, but no models are available yet. !!]",
+      "connectionError": "[!! Could not reach this provider. Check that it is running and try again. !!]"
+    },
+    "saves": {
+      "frameTitle": "[!! CONNECT YOUR SAVES !!]",
+      "label": "[!! SAVE GAMES !!]",
+      "title": "[!! Find your Stellaris campaigns !!]",
+      "browseElsewhere": "[!! BROWSE ELSEWHERE !!]",
+      "scanAgain": "[!! SCAN AGAIN !!]",
+      "browseFolder": "[!! BROWSE FOLDER !!]",
+      "scanning": "[!! Looking for Stellaris save files... !!]",
+      "found": "[!! Your campaigns are ready. !!]",
+      "count_one": "[!! {{count}} save file found !!]",
+      "count_other": "[!! {{count}} save files found !!]",
+      "notFound": "[!! We could not find your Stellaris saves automatically. !!]",
+      "notFoundIn": "[!! No .sav files were found in {{path}}. !!]",
+      "notFoundDefault": "[!! We checked the usual save locations but did not find any .sav files yet. !!]",
+      "notFoundHelp": "[!! Choose Browse Folder and select your Stellaris save-games folder, or set this up later in Settings. !!]"
+    }
+  },
+  "advisorPanel": {
+    "title": "[!! Advisor style !!]",
+    "close": "[!! Close Advisor style !!]",
+    "noSave": "[!! No save loaded !!]",
+    "empireDetails": "[!! About your empire !!]",
+    "empireDetailsHelp": "[!! The Advisor uses these details from your save to keep its advice in character. !!]",
+    "ethics": "[!! Ethics !!]",
+    "authority": "[!! Authority !!]",
+    "civics": "[!! Civics !!]",
+    "origin": "[!! Origin !!]",
+    "noTraits": "[!! No empire details are available yet. !!]",
+    "personality": "[!! Advisor personality !!]",
+    "personalityHelp": "[!! Choose how the Advisor sounds in this campaign. This changes the voice, not the game analysis. !!]",
+    "personalityInstructions": "[!! Advisor personality instructions !!]",
+    "placeholder": "[!! For example: calm, direct, and optimistic. !!]",
+    "tryStyle": "[!! Try a style !!]",
+    "styles": {
+      "intelligence": "[!! Paranoid intelligence officer who trusts no one !!]",
+      "passiveAggressive": "[!! Passive-aggressive about your decisions !!]",
+      "corporate": "[!! Corporate middle manager using buzzwords for galactic conquest !!]",
+      "enthusiastic": "[!! Overly enthusiastic about everything, even catastrophes !!]"
+    },
+    "saveStyle": "[!! Save style !!]",
+    "saving": "[!! Saving… !!]",
+    "saved": "[!! Style saved for this campaign. !!]",
+    "savedWhenReady": "[!! Style saved and will apply when analysis is ready. !!]",
+    "saveError": "[!! The Advisor style could not be saved. !!]",
+    "loadSaveHelp": "[!! Load a save to choose an Advisor style for this campaign. !!]"
   }
 }

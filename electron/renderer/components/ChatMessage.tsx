@@ -175,29 +175,38 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
           </button>
         )}
 
-        {/* Footer Metadata (Tech Readout) */}
+        {/* Response actions and optional technical details */}
         {!isUser && !isError && (responseTimeMs !== undefined || !!modelReadout || !!onReport) && (
-          <div className="flex items-center gap-4 mt-2 pt-1 border-t border-white/5 opacity-50 group-hover:opacity-100 transition-opacity">
-              {responseTimeMs !== undefined && (
-                <HUDMicro>{t('chat.message.latency', { seconds: (responseTimeMs / 1000).toFixed(3) })}</HUDMicro>
-              )}
-              {modelReadout && (
-                <HUDMicro
-                  className={routingNotice ? 'text-accent-yellow/80' : undefined}
-                  title={routingNotice || undefined}
-                >
-                  {modelReadout}
-                </HUDMicro>
-              )}
+          <div className="mt-2 flex items-start gap-4 border-t border-white/5 pt-2">
               {onReport && (
                 <button
                   type="button"
                   onClick={onReport}
-                  className="font-mono text-[10px] uppercase tracking-wide text-accent-cyan/80 hover:text-accent-cyan transition-colors"
+                  className="font-mono text-[10px] uppercase tracking-wide text-text-muted transition-colors hover:text-accent-cyan"
                   title={t('chat.message.reportTitle')}
                 >
                   {t('chat.message.report')}
                 </button>
+              )}
+              {(responseTimeMs !== undefined || modelReadout) && (
+                <details className="group/details ml-auto text-right">
+                  <summary className="cursor-pointer list-none font-mono text-[10px] uppercase tracking-wide text-text-muted transition-colors hover:text-text-secondary">
+                    {t('chat.message.details')}
+                  </summary>
+                  <div className="mt-2 flex max-w-sm flex-col items-end gap-1">
+                    {responseTimeMs !== undefined && (
+                      <HUDMicro>{t('chat.message.responseTime', { seconds: (responseTimeMs / 1000).toFixed(2) })}</HUDMicro>
+                    )}
+                    {modelReadout && (
+                      <HUDMicro
+                        className={routingNotice ? 'text-accent-yellow/80' : undefined}
+                        title={routingNotice || undefined}
+                      >
+                        {modelReadout}
+                      </HUDMicro>
+                    )}
+                  </div>
+                </details>
               )}
           </div>
         )}

@@ -446,11 +446,15 @@ function ChroniclePage({
     if (!isDocumentVisible()) return
     if (!isMountedRef.current) return
 
+    const requestTokenAtStart = chronicleRequestTokenRef.current
     visibleCatchupInFlightRef.current = true
 
     try {
       await loadSaves({ silent: true })
       if (!isMountedRef.current) return
+      // Campaign selection invalidates a refresh that was queued for the
+      // previously visible campaign while metadata was loading.
+      if (requestTokenAtStart !== chronicleRequestTokenRef.current) return
       await loadChronicle(false, false)
     } finally {
       visibleCatchupInFlightRef.current = false

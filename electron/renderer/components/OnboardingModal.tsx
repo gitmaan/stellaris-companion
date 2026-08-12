@@ -1,10 +1,19 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { HUDButton } from './hud/HUDButton'
 import { HUDInput } from './hud/HUDInput'
+import { HUDSelect } from './hud/HUDForm'
 import { HUDLabel, HUDMicro } from './hud/HUDText'
 import { HUDPanel } from './hud/HUDPanel'
+import { AdvisorProviderChooser } from './settings/AdvisorProviderChooser'
+import { ProviderSetupGuide } from './settings/ProviderSetupGuide'
+import {
+  DEFAULT_ADVISOR_PROVIDER,
+  normalizeAdvisorProvider,
+  type AdvisorProvider,
+} from '../hooks/useSettings'
 import appLogo from '../assets/app_logo.svg'
 
 interface OnboardingModalProps {
@@ -18,6 +27,12 @@ interface SaveDetectionResult {
   directory: string | null
   saveCount: number
   latest: { name: string; modified: string } | null
+}
+
+interface AdvisorProviderModel {
+  id: string
+  name: string
+  recommended?: boolean
 }
 
 const slideVariants = {
@@ -43,6 +58,7 @@ const slideTransition = {
 const ACTION_ROW_DRIFT_TOLERANCE_PX = 2
 
 export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
+  const { t } = useTranslation()
   const [step, setStep] = useState<Step>(1)
   const [direction, setDirection] = useState(1)
   const autoRescanAttemptedRef = useRef(false)
@@ -51,7 +67,16 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const actionRowBaselineTopRef = useRef<number | null>(null)
 
   // Step 2 state
-  const [apiKey, setApiKey] = useState('')
+  const [advisorProvider, setAdvisorProvider] = useState<AdvisorProvider>(DEFAULT_ADVISOR_PROVIDER)
+  const [googleApiKey, setGoogleApiKey] = useState('')
+  const [openRouterApiKey, setOpenRouterApiKey] = useState('')
+  const [customProviderApiKey, setCustomProviderApiKey] = useState('')
+  const [advisorBaseUrl, setAdvisorBaseUrl] = useState('')
+  const [advisorModel, setAdvisorModel] = useState('')
+  const [advisorModels, setAdvisorModels] = useState<AdvisorProviderModel[]>([])
+  const [advisorChecking, setAdvisorChecking] = useState(false)
+  const [advisorConnectionMessage, setAdvisorConnectionMessage] = useState<string | null>(null)
+  const [advisorConnectionOk, setAdvisorConnectionOk] = useState(false)
 
   // Step 3 state
   const [saveResult, setSaveResult] = useState<SaveDetectionResult | null>(null)
@@ -169,7 +194,85 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
     })
 
     return () => cancelAnimationFrame(rafId)
-  }, [step, scanning, saveResult?.found, apiKey])
+  }, [
+    step,
+    scanning,
+    saveResult?.found,
+    advisorProvider,
+    googleApiKey,
+    openRouterApiKey,
+    customProviderApiKey,
+    advisorBaseUrl,
+    advisorModel,
+  ])
+
+  const invalidateAdvisorConnection = () => {
+    setAdvisorModels([])
+    setAdvisorModel('')
+    setAdvisorConnectionMessage(null)
+    setAdvisorConnectionOk(false)
+  }
+
+  const handleAdvisorProviderChange = (rawValue: string) => {
+    const nextProvider = normalizeAdvisorProvider(rawValue)
+    if (nextProvider === advisorProvider) return
+    setAdvisorProvider(nextProvider)
+    setAdvisorBaseUrl('')
+    invalidateAdvisorConnection()
+  }
+
+  const handleOpenRouterApiKeyChange = (value: string) => {
+    setOpenRouterApiKey(value)
+    invalidateAdvisorConnection()
+  }
+
+  const handleCustomProviderApiKeyChange = (value: string) => {
+    setCustomProviderApiKey(value)
+    invalidateAdvisorConnection()
+  }
+
+  const handleAdvisorBaseUrlChange = (value: string) => {
+    setAdvisorBaseUrl(value)
+    invalidateAdvisorConnection()
+  }
+
+  const handleFindAdvisorModels = async () => {
+    if (!window.electronAPI?.advisorProviders?.listModels || advisorProvider === 'gemini') return
+    const apiKey = advisorProvider === 'openrouter'
+      ? openRouterApiKey
+      : advisorProvider === 'custom'
+        ? customProviderApiKey
+        : ''
+    setAdvisorChecking(true)
+    setAdvisorConnectionMessage(null)
+    setAdvisorConnectionOk(false)
+    try {
+      const result = await window.electronAPI.advisorProviders.listModels({
+        provider: advisorProvider,
+        baseUrl: advisorBaseUrl,
+        apiKey,
+      })
+      if (!result.ok) {
+        setAdvisorModels([])
+        setAdvisorConnectionMessage(result.error || t('onboarding.ai.connectionError'))
+        return
+      }
+      const models = (result.models || []) as AdvisorProviderModel[]
+      setAdvisorModels(models)
+      const suggested = models.find(model => model.recommended) || (models.length === 1 ? models[0] : null)
+      if (suggested) setAdvisorModel(suggested.id)
+      setAdvisorConnectionOk(true)
+      setAdvisorConnectionMessage(
+        models.length
+          ? t('onboarding.ai.modelsFound', { count: models.length })
+          : t('onboarding.ai.noModels'),
+      )
+    } catch {
+      setAdvisorConnectionMessage(t('onboarding.ai.connectionError'))
+    } finally {
+      setAdvisorChecking(false)
+    }
+  }
 
   async function detectSaves(targetDirectory?: string) {
     clearAutoRescanTimer()
@@ -210,10 +313,16 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
 
   async function handleComplete() {
     // Save settings (triggers backend start via restartPythonBackend)
-    await window.electronAPI?.saveSettings({
-      googleApiKey: apiKey,
+    const settingsToSave: Record<string, string> = {
+      advisorProvider,
+      advisorModel,
+      advisorBaseUrl,
       saveDir: selectedPath || '',
-    })
+    }
+    if (googleApiKey) settingsToSave.googleApiKey = googleApiKey
+    if (openRouterApiKey) settingsToSave.openRouterApiKey = openRouterApiKey
+    if (customProviderApiKey) settingsToSave.customProviderApiKey = customProviderApiKey
+    await window.electronAPI?.saveSettings(settingsToSave)
 
     // Mark onboarding complete
     await window.electronAPI?.onboarding.complete()
@@ -246,7 +355,7 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ duration: 0.25 }}
-        className="relative mx-4 h-[min(27.5rem,calc(100vh-4.5rem))] w-[min(41rem,calc(100%-2rem))] outline-none"
+        className="relative mx-4 h-[min(36rem,calc(100vh-3rem))] w-[min(54rem,calc(100%-2rem))] outline-none"
       >
         <div className="relative h-full overflow-hidden">
           <AnimatePresence mode="wait" custom={direction}>
@@ -275,9 +384,24 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
                 transition={slideTransition}
                 className="h-full p-1"
               >
-                <StepApiKey
-                  apiKey={apiKey}
-                  onChange={setApiKey}
+                <StepAiSetup
+                  provider={advisorProvider}
+                  googleApiKey={googleApiKey}
+                  openRouterApiKey={openRouterApiKey}
+                  customProviderApiKey={customProviderApiKey}
+                  baseUrl={advisorBaseUrl}
+                  model={advisorModel}
+                  models={advisorModels}
+                  checking={advisorChecking}
+                  connectionOk={advisorConnectionOk}
+                  connectionMessage={advisorConnectionMessage}
+                  onProviderChange={handleAdvisorProviderChange}
+                  onGoogleApiKeyChange={setGoogleApiKey}
+                  onOpenRouterApiKeyChange={handleOpenRouterApiKeyChange}
+                  onCustomProviderApiKeyChange={handleCustomProviderApiKeyChange}
+                  onBaseUrlChange={handleAdvisorBaseUrlChange}
+                  onModelChange={setAdvisorModel}
+                  onFindModels={() => void handleFindAdvisorModels()}
                   onBack={() => goTo(1)}
                   onNext={() => goTo(3)}
                 />
@@ -319,13 +443,14 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
 // =============================================================================
 
 function StepWelcome({ onNext }: { onNext: () => void }) {
+  const { t } = useTranslation()
   return (
     <StepFrame
       step={1}
-      title="FIRST CONTACT PROTOCOL"
+      title={t('onboarding.welcome.frameTitle')}
       actions={(
         <HUDButton data-onboarding-primary="true" onClick={onNext}>
-          Initialize
+          {t('onboarding.actions.start')}
         </HUDButton>
       )}
     >
@@ -333,7 +458,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
         <div className="relative">
           <img
             src={appLogo}
-            alt="Stellaris Companion logo"
+            alt={t('onboarding.welcome.logoAlt')}
             className="relative h-20 w-20 rounded-xl border border-accent-cyan/40 shadow-glow-sm"
             style={{ filter: 'var(--theme-logo-filter) drop-shadow(0 0 26px rgb(var(--color-accent-cyan) / 0.55))' }}
           />
@@ -341,10 +466,10 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
 
         <div className="max-w-xl space-y-2">
           <p className="font-display text-base tracking-wide text-text-primary uppercase">
-            Welcome to Stellaris Companion
+            {t('onboarding.welcome.title')}
           </p>
           <p className="text-sm text-text-secondary leading-relaxed">
-            We will set up your advisor and save data link in two quick steps.
+            {t('onboarding.welcome.body')}
           </p>
         </div>
       </div>
@@ -353,75 +478,160 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
 }
 
 // =============================================================================
-// Step 2: API Key
+// Step 2: AI setup
 // =============================================================================
 
-function StepApiKey({
-  apiKey,
-  onChange,
+function StepAiSetup({
+  provider,
+  googleApiKey,
+  openRouterApiKey,
+  customProviderApiKey,
+  baseUrl,
+  model,
+  models,
+  checking,
+  connectionOk,
+  connectionMessage,
+  onProviderChange,
+  onGoogleApiKeyChange,
+  onOpenRouterApiKeyChange,
+  onCustomProviderApiKeyChange,
+  onBaseUrlChange,
+  onModelChange,
+  onFindModels,
   onBack,
   onNext,
 }: {
-  apiKey: string
-  onChange: (v: string) => void
+  provider: AdvisorProvider
+  googleApiKey: string
+  openRouterApiKey: string
+  customProviderApiKey: string
+  baseUrl: string
+  model: string
+  models: AdvisorProviderModel[]
+  checking: boolean
+  connectionOk: boolean
+  connectionMessage: string | null
+  onProviderChange: (value: string) => void
+  onGoogleApiKeyChange: (value: string) => void
+  onOpenRouterApiKeyChange: (value: string) => void
+  onCustomProviderApiKeyChange: (value: string) => void
+  onBaseUrlChange: (value: string) => void
+  onModelChange: (value: string) => void
+  onFindModels: () => void
   onBack: () => void
   onNext: () => void
 }) {
-  const hasKey = apiKey.trim().length > 0
+  const { t } = useTranslation()
+  const isGemini = provider === 'gemini'
+  const hasSetup = isGemini
+    ? googleApiKey.trim().length > 0
+    : connectionOk && model.trim().length > 0
+  const modelOptions = [
+    { value: '', label: t('onboarding.ai.chooseModel') },
+    ...models.slice(0, 100).map(option => ({ value: option.id, label: option.name || option.id })),
+  ]
 
   return (
     <StepFrame
       step={2}
-      title="INTELLIGENCE UPLINK"
+      title={t('onboarding.ai.frameTitle')}
       actions={(
         <>
           <HUDButton variant="secondary" onClick={onBack}>
-            Back
+            {t('onboarding.actions.back')}
           </HUDButton>
-          {!hasKey && (
+          {!hasSetup && (
             <HUDButton variant="secondary" onClick={onNext}>
-              Skip
+              {t('onboarding.actions.later')}
             </HUDButton>
           )}
-          <HUDButton data-onboarding-primary="true" onClick={onNext} disabled={!hasKey}>
-            Next
+          <HUDButton data-onboarding-primary="true" onClick={onNext} disabled={!hasSetup}>
+            {t('onboarding.actions.continue')}
           </HUDButton>
         </>
       )}
     >
-      <div className="mx-auto w-full max-w-2xl space-y-5">
-        <div className="space-y-1">
-          <HUDLabel className="text-accent-cyan/80">Default Provider</HUDLabel>
-          <h2 className="font-display text-lg tracking-[0.1em] uppercase text-text-primary">
-            Google Gemini API Key (Optional)
-          </h2>
-        </div>
-        <p className="text-sm text-text-secondary leading-relaxed">
-          Gemini is the default for Advisor and Chronicle. You can skip this step and configure
-          Ollama, LM Studio, or OpenRouter from Settings.
-        </p>
+      <div className="mx-auto w-full max-w-4xl space-y-4">
+        <AdvisorProviderChooser provider={provider} onChange={value => onProviderChange(value)} />
+        <ProviderSetupGuide provider={provider} />
 
-        <div className="relative">
-          <HUDInput
-            label="API KEY TOKEN"
-            type="password"
-            placeholder="AIza..."
-            value={apiKey}
-            onChange={(e) => onChange(e.target.value)}
-            statusText={hasKey ? 'READY' : 'MISSING'}
-            statusClassName={hasKey ? 'text-accent-green' : 'text-accent-yellow'}
-            autoFocus
-          />
-        </div>
-
-        <a
-          href="https://aistudio.google.com/app/apikey"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
-        >
-          GENERATE KEY &gt;
-        </a>
+        {isGemini ? (
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            <HUDInput
+              label={t('onboarding.ai.geminiKey')}
+              type="password"
+              placeholder="AIza..."
+              value={googleApiKey}
+              onChange={(event) => onGoogleApiKeyChange(event.target.value)}
+              statusText={hasSetup ? t('onboarding.ai.ready') : t('onboarding.ai.notSet')}
+              statusClassName={hasSetup ? 'text-accent-green' : 'text-accent-yellow'}
+              autoFocus
+            />
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="pb-3 font-display text-[10px] tracking-wider text-accent-cyan hover:underline"
+            >
+              {t('onboarding.ai.getGeminiKey')} &gt;
+            </a>
+          </div>
+        ) : (
+          <div className="space-y-3 border-t border-white/10 pt-3">
+            {provider === 'openrouter' && (
+              <HUDInput
+                label={t('onboarding.ai.providerKey')}
+                type="password"
+                value={openRouterApiKey}
+                onChange={(event) => onOpenRouterApiKeyChange(event.target.value)}
+                placeholder={t('onboarding.ai.enterKey')}
+              />
+            )}
+            {provider === 'custom' && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <HUDInput
+                  label={t('onboarding.ai.serverAddress')}
+                  value={baseUrl}
+                  onChange={(event) => onBaseUrlChange(event.target.value)}
+                  placeholder="https://provider.example/v1"
+                />
+                <HUDInput
+                  label={t('onboarding.ai.optionalKey')}
+                  type="password"
+                  value={customProviderApiKey}
+                  onChange={(event) => onCustomProviderApiKeyChange(event.target.value)}
+                  placeholder={t('onboarding.ai.optional')}
+                />
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <HUDButton type="button" variant="secondary" onClick={onFindModels} disabled={checking}>
+                {checking ? t('onboarding.ai.looking') : t('onboarding.ai.findModels')}
+              </HUDButton>
+              {connectionMessage && (
+                <HUDMicro className={connectionOk ? 'text-accent-green' : 'text-accent-red'}>
+                  {connectionMessage}
+                </HUDMicro>
+              )}
+            </div>
+            {models.length > 0 ? (
+              <HUDSelect
+                label={t('onboarding.ai.model')}
+                value={model}
+                onChange={event => onModelChange(event.target.value)}
+                options={modelOptions}
+              />
+            ) : (
+              <HUDInput
+                label={t('onboarding.ai.model')}
+                value={model}
+                onChange={event => onModelChange(event.target.value)}
+                placeholder={t('onboarding.ai.findModelsFirst')}
+              />
+            )}
+          </div>
+        )}
       </div>
     </StepFrame>
   )
@@ -450,34 +660,35 @@ function StepSaveDirectory({
   onBack: () => void
   onComplete: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <StepFrame
       step={3}
-      title="DATA LINK"
+      title={t('onboarding.saves.frameTitle')}
       actions={(
         <>
           <HUDButton variant="secondary" onClick={onBack}>
-            Back
+            {t('onboarding.actions.back')}
           </HUDButton>
           {scanning ? null : saveResult?.found ? (
             <>
               <HUDButton variant="secondary" onClick={onBrowse}>
-                Browse Elsewhere
+                {t('onboarding.saves.browseElsewhere')}
               </HUDButton>
               <HUDButton data-onboarding-primary="true" onClick={onComplete}>
-                Confirm
+                {t('onboarding.actions.finish')}
               </HUDButton>
             </>
           ) : (
             <>
               <HUDButton variant="ghost" onClick={onComplete}>
-                Set Up Later
+                {t('onboarding.actions.later')}
               </HUDButton>
               <HUDButton variant="secondary" onClick={onRetry}>
-                Scan Again
+                {t('onboarding.saves.scanAgain')}
               </HUDButton>
               <HUDButton data-onboarding-primary="true" onClick={onBrowse}>
-                Browse Folder
+                {t('onboarding.saves.browseFolder')}
               </HUDButton>
             </>
           )}
@@ -485,9 +696,9 @@ function StepSaveDirectory({
       )}
     >
       <div className="mx-auto w-full max-w-2xl pt-2">
-        <HUDLabel className="block mb-3 text-accent-cyan/80">Save Source</HUDLabel>
+        <HUDLabel className="block mb-3 text-accent-cyan/80">{t('onboarding.saves.label')}</HUDLabel>
         <h2 className="font-display text-lg tracking-[0.1em] uppercase text-text-primary mb-5">
-          Stellaris Save Directory
+          {t('onboarding.saves.title')}
         </h2>
         {scanning ? (
           <SaveScanning />
@@ -516,6 +727,7 @@ interface StepFrameProps {
 }
 
 function StepFrame({ step, title, children, actions }: StepFrameProps) {
+  const { t } = useTranslation()
   return (
     <div data-onboarding-frame-step={step} className="h-full">
       <HUDPanel
@@ -525,7 +737,9 @@ function StepFrame({ step, title, children, actions }: StepFrameProps) {
       >
         <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] px-6 pt-4 pb-4">
           <div className="mb-3">
-            <HUDMicro className="text-accent-cyan">{`STEP 0${step} / 03`}</HUDMicro>
+            <HUDMicro className="text-accent-cyan">
+              {t('onboarding.step', { current: `0${step}`, total: '03' })}
+            </HUDMicro>
             <h1 id="onboarding-step-title" className="mt-1.5 font-display text-xl tracking-[0.12em] uppercase text-text-primary">
               {title}
             </h1>
@@ -546,10 +760,11 @@ function StepFrame({ step, title, children, actions }: StepFrameProps) {
 }
 
 function SaveScanning() {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center gap-3 py-8">
       <div className="w-3 h-3 border border-accent-cyan border-t-transparent rounded-full animate-spin" />
-      <span className="text-sm text-text-secondary">Scanning for save files...</span>
+      <span className="text-sm text-text-secondary">{t('onboarding.saves.scanning')}</span>
     </div>
   )
 }
@@ -563,16 +778,17 @@ function SaveFound({
   selectedPath: string | null
   shortenPath: (p: string) => string
 }) {
+  const { t } = useTranslation()
   const displayPath = selectedPath || result.directory
   return (
     <div className="space-y-4">
-      <p className="text-sm text-text-primary">Found your saves.</p>
+      <p className="text-sm text-text-primary">{t('onboarding.saves.found')}</p>
       <div className="p-4 bg-white/5 border border-white/10 rounded-sm">
         <div className="font-mono text-xs text-accent-cyan mb-1">
           {displayPath ? shortenPath(displayPath) : ''}
         </div>
         <div className="text-xs text-text-secondary">
-          {result.saveCount} save file{result.saveCount !== 1 ? 's' : ''} detected
+          {t('onboarding.saves.count', { count: result.saveCount })}
         </div>
       </div>
     </div>
@@ -586,18 +802,19 @@ function SaveNotFound({
   selectedPath: string | null
   shortenPath: (p: string) => string
 }) {
+  const { t } = useTranslation()
   return (
     <div className="space-y-4">
       <p className="text-sm text-text-primary leading-relaxed">
-        We couldn't find your Stellaris saves automatically.
+        {t('onboarding.saves.notFound')}
       </p>
       <p className="text-sm text-text-secondary leading-relaxed">
         {selectedPath
-          ? `No .sav files were found in ${shortenPath(selectedPath)}.`
-          : 'We checked the default save locations but did not find any .sav files yet.'}
+          ? t('onboarding.saves.notFoundIn', { path: shortenPath(selectedPath) })
+          : t('onboarding.saves.notFoundDefault')}
       </p>
       <p className="text-sm text-text-secondary leading-relaxed">
-        Click Browse Folder and select your "Stellaris/save games" folder, or choose Set Up Later and configure it in Settings.
+        {t('onboarding.saves.notFoundHelp')}
       </p>
     </div>
   )
