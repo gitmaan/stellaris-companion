@@ -60,11 +60,25 @@
       "latency": "LATENCE : {{seconds}}s",
       "report": "SIGNALER",
       "reportTitle": "Signaler cette reponse",
-      "blockedLink": "Lien non HTTP(S) bloque"
+      "blockedLink": "Lien non HTTP(S) bloque",
+      "details": "Détails de la réponse",
+      "responseTime": "Temps de réponse : {{seconds}}s"
     },
     "errors": {
       "briefingNotReady": "Le conseiller analyse encore votre sauvegarde. Reessayez dans {{seconds}} secondes.",
-      "unexpected": "Une erreur inattendue est survenue"
+      "unexpected": "Une erreur inattendue est survenue",
+      "openProviderSettings": "Réglages du fournisseur",
+      "providerNotConfigured": "{{provider}} n'est pas entièrement configuré pour le chat avec le conseiller. Choisissez un modèle et complétez ses paramètres de connexion.",
+      "providerUnavailable": "{{provider}} n'a pas pu être joint. Assurez-vous que son serveur est en cours d'exécution et que l'adresse configurée est correcte.",
+      "providerAuthFailed": "{{provider}} a rejeté la clé API configurée. Vérifiez la clé et réessayez la connexion.",
+      "providerModelNotFound": "Le modèle {{provider}} sélectionné n'est pas disponible. Actualisez la liste des modèles ou choisissez un autre modèle.",
+      "providerRateLimited": "{{provider}} limite actuellement le débit. Attendez un instant ou choisissez un autre modèle ou fournisseur.",
+      "providerBillingFailed": "{{provider}} n'a pas de facturation ou de crédit utilisable pour cette demande. Vérifiez le compte du fournisseur ou choisissez un autre fournisseur.",
+      "providerTimeout": "{{provider}} a mis trop de temps à répondre. Un modèle local est peut-être encore en cours de chargement ; réessayez ou vérifiez son serveur.",
+      "providerContextLimit": "La fenêtre de contexte actif ne peut pas correspondre à ce briefing de campagne. Augmentez le paramètre de contexte du fournisseur à au moins __ SCX15__, ou choisissez un modèle de contexte plus large.",
+      "providerInvalidResponse": "{{provider}} a renvoyé une réponse que cette application n'a pas pu lire. Vérifiez que le point de terminaison prend en charge les complétions de chat compatibles OpenAI.",
+      "providerEmptyResponse": "{{provider}} a renvoyé une réponse vide. Réessayez ou choisissez un autre modèle.",
+      "providerRequestFailed": "{{provider}} n'a pas pu traiter la demande. Vérifiez le modèle et le point de terminaison, puis réessayez."
     },
     "newChat": "Nouveau chat",
     "welcome": {
@@ -133,6 +147,10 @@
         "Que diraient nos rivaux de nous ?"
       ],
       "roast": "Moque-toi de mon empire"
+    },
+    "providerSetup": {
+      "title": "CONNEXION DE CONSEILLER REQUISE",
+      "description": "{{provider}} est sélectionné mais n'est pas prêt. Ouvrez les paramètres du fournisseur pour terminer la connexion et choisir un modèle."
     }
   },
   "chronicle": {
@@ -164,7 +182,14 @@
       "latest": "Dernier",
       "pending_one": "{{count}} chapitre en attente",
       "pending_other": "{{count}} chapitres en attente",
-      "generateMore": "Generer plus de chapitres"
+      "generateMore": "Generer plus de chapitres",
+      "campaigns": "Campagnes",
+      "chooseCampaign": "Choisissez une campagne",
+      "currentCampaignDate": "Campagne actuelle · {{date}}",
+      "lastPlayed": "Dernière lecture · {{date}}",
+      "current": "Actuel",
+      "manageCampaigns": "Gérer les campagnes",
+      "storyStyle": "Style d'histoire"
     },
     "publish": {
       "eyebrow": "Partager // Registre public",
@@ -242,6 +267,81 @@
         "pr": "Service RP imperial beaucoup trop enthousiaste",
         "earnings": "Resultats trimestriels tres secs, mais pour la conquete galactique"
       }
+    },
+    "providerSetup": {
+      "title": "CONNEXION DU FOURNISSEUR D'IA REQUISE",
+      "description": "Vous pouvez toujours lire les chapitres existants. Connectez le fournisseur sélectionné et choisissez un modèle pour générer ou réécrire le contenu de Chronicle.",
+      "action": "Réglages du fournisseur"
+    },
+    "history": {
+      "eyebrow": "Archiver //Dossiers locaux",
+      "title": "Historique de campagne",
+      "subtitle": "Renommez les campagnes, supprimez les démarrages en double ou récupérez des éléments de la corbeille.",
+      "close": "Fermer l'historique de la campagne",
+      "active": "Campagnes ({{count}})",
+      "trash": "Corbeille ({{count}})",
+      "search": "Chercher des campagnes",
+      "selectEmpty": "Sélectionner les campagnes inutilisées ({{count}})",
+      "trashSelected": "Déplacer la sélection vers la corbeille ({{count}})",
+      "emptyHelp": "Recherche des campagnes sans histoire ni événement enregistré.",
+      "trashEmpty": "La corbeille est vide.",
+      "noMatches": "Aucune campagne ne correspond à cette recherche.",
+      "current": "Actuel",
+      "hasChronicle": "Chronicle",
+      "noChronicle": "Pas de chronique",
+      "published": "Publié",
+      "gameDates": "{{first}} — {{last}}",
+      "sessions_one": "{{count}} session",
+      "sessions_other": "{{count}} sessions",
+      "snapshots_one": "{{count}} instantané",
+      "snapshots_other": "{{count}} instantanés",
+      "events_one": "{{count}} événement",
+      "events_other": "{{count}} événements",
+      "chapters_one": "{{count}} chapitre",
+      "chapters_other": "{{count}} chapitres",
+      "moreDetails": "Plus de détails",
+      "moreActions": "Plus",
+      "storyActions": "Actions de l'histoire",
+      "deleteOptions": "Supprimer les options",
+      "selectCampaign": "Sélectionnez {{name}}",
+      "labelPlaceholder": "Label de campagne",
+      "rename": "Renommer",
+      "save": "Sauvegarder",
+      "cancel": "Annuler",
+      "reset": "Réinitialiser la chronique",
+      "resetTitle": "Réinitialiser cette chronique ?",
+      "resetHelp": "Supprime l'écriture de la Chronique générée. L'historique de la campagne et les enregistrements restent, et vous pouvez annuler cela.",
+      "confirmReset": "Réinitialiser la chronique",
+      "undoReset": "Restaurer la chronique",
+      "moveToTrash": "Mettre à la Corbeille",
+      "restore": "Restaurer",
+      "delete": "Supprimer définitivement",
+      "deleteLocal": "Supprimer les données locales",
+      "deleteTitle": "Supprimer définitivement cette campagne ?",
+      "deleteHelp": "Supprime cet historique de campagne de cet appareil. Cela ne peut pas être annulé.",
+      "deletePublishedHelp": "Supprime cet historique de campagne de cet appareil. Son histoire publiée reste en ligne. Cela ne peut pas être annulé.",
+      "confirmDelete": "Supprimer définitivement",
+      "confirmDeleteLocal": "Supprimer les données locales",
+      "currentProtected": "La campagne actuellement chargée ne peut pas être mise à la corbeille ou supprimée.",
+      "publishedDeleteWarning": "Supprime cette campagne de cet appareil. Son histoire publiée reste en ligne.",
+      "onlineOnlyTitle": "Histoires publiées sans histoire locale",
+      "onlineOnlyHelp": "Ces histoires sont toujours en ligne. Vous pouvez les ouvrir ou les supprimer ici.",
+      "openStory": "Histoire ouverte",
+      "removeStory": "Supprimer l'histoire en ligne",
+      "removeStoryTitle": "Supprimer cette histoire publiée ?",
+      "removeStoryHelp": "Supprime l'histoire publique du Web. Il ne restaure pas l'historique de la campagne locale, et cela ne peut pas être annulé.",
+      "confirmRemoveStory": "Supprimer l'histoire en ligne",
+      "publishedRemoved": "Histoire publiée supprimée.",
+      "safetyNote": "Le déplacement des campagnes vers la corbeille est réversible. La suppression permanente n'affecte que les données locales.",
+      "labelSaved": "Étiquette de campagne enregistrée.",
+      "movedToTrash": "{{name}} a été déplacé vers la corbeille.",
+      "restored": "Campagne restaurée.",
+      "chronicleReset": "Chronique effacée. L'historique de la campagne a été conservé.",
+      "chronicleRestored": "Chronique restaurée.",
+      "deleted": "Historique de la campagne locale définitivement supprimé.",
+      "bulkMoved": "{{count}} campagnes ont été déplacées vers la corbeille.",
+      "undo": "Annuler",
+      "unknownError": "L'historique de la campagne n'a pas pu être mis à jour."
     }
   },
   "settings": {
@@ -260,14 +360,17 @@
       "data": "DONNEES DU JEU",
       "communications": "RELAIS COMMUNICATIONS",
       "updates": "MISES A JOUR LOGICIELLES",
-      "diagnostics": "DIAGNOSTIC"
+      "diagnostics": "DIAGNOSTIC",
+      "mcpRelay": "RELAIS MCP"
     },
     "panels": {
       "geminiAccess": "ACCES AU MODELE GEMINI",
       "saveSource": "DOSSIER DE SAUVEGARDE",
       "campaignHistory": "HISTORIQUE DES CAMPAGNES",
       "discordLink": "LIEN DISCORD",
-      "updateChannel": "CANAL DE MISE A JOUR"
+      "updateChannel": "CANAL DE MISE A JOUR",
+      "advisorAccess": "CONFIGURATION DE L'IA",
+      "mcpRelay": "CONNEXIONS DE L'APPLICATION IA"
     },
     "api": {
       "label": "CLE API",
@@ -298,7 +401,9 @@
       "qualityFirstHelp": "Preferer Gemini Flash, puis basculer si le quota l'exige.",
       "conserveHelp": "Utiliser des modeles plus legers pour le chat conseiller afin de reduire l'usage Gemini.",
       "toastError": "Impossible de mettre a jour le routage modele. Reessayez.",
-      "toastSuccess": "Routage modele defini sur {{mode}}."
+      "toastSuccess": "Routage modele defini sur {{mode}}.",
+      "qualityFirstTag": "UTILISE LE FLASH LORSQU'IL EST DISPONIBLE",
+      "conserveTag": "CONSEILLER FLASH-LITE"
     },
     "saveData": {
       "directoryLabel": "DOSSIER DE SAUVEGARDE",
@@ -318,7 +423,11 @@
       "backingUp": "CREATION DE LA SAUVEGARDE...",
       "backupSuccess": "Sauvegarde de l'historique des campagnes enregistree.",
       "revealError": "Impossible d'ouvrir le dossier de l'historique des campagnes.",
-      "historyHelp": "Creez une copie de votre historique ou gerez les campagnes anciennes et en double."
+      "historyHelp": "Creez une copie de votre historique ou gerez les campagnes anciennes et en double.",
+      "savePlayerName": "ENREGISTRER LE NOM DU MULTIJOUEUR",
+      "playerNameSaved": "Nom du multijoueur enregistré.",
+      "folderSaved": "Enregistrez l'emplacement du jeu mis à jour.",
+      "automaticSaved": "Détection de sauvegarde automatique activée."
     },
     "discord": {
       "loading": "ETABLISSEMENT DE LA POIGNEE DE MAIN...",
@@ -368,6 +477,153 @@
       "auth": "Autorisation echouee.",
       "connection": "Erreur de connexion. Verifiez le reseau.",
       "generic": "Erreur systeme. Reessayez."
+    },
+    "moreSettings": {
+      "title": "PLUS DE PARAMETRES",
+      "help": "Connexions facultatives, mises à jour logicielles et outils d'assistance.",
+      "optional": "FACULTATIF"
+    },
+    "advisor": {
+      "providerLabel": "FOURNISSEUR D'IA",
+      "providerChoiceLabel": "OÙ L'IA DEVRAIT-ELLE FONCTIONNER ?",
+      "localProviderLabel": "Application locale",
+      "otherProviderLabel": "PIÈCES THERMIQUES",
+      "providerGroups": {
+        "gemini": "Gemini",
+        "geminiTag": "CONFIGURATION LA PLUS FACILE",
+        "local": "SUR CE PERIPHERIQUE",
+        "localTag": "PRIVÉ PAR DÉFAUT",
+        "other": "Prestataire en ligne",
+        "otherTag": "plus de choix"
+      },
+      "selected": "SELECTIONNE",
+      "apiKeyLabel": "CLÉ API OPENROUTER",
+      "optionalApiKeyLabel": "CLÉ API",
+      "baseUrlLabel": "SERVEUR URL",
+      "modelLabel": "MODÈLE",
+      "modelPlaceholder": "TROUVEZ D'ABORD LES MODÈLES DISPONIBLES",
+      "selectModel": "Sélectionnez un modèle",
+      "searchModels": "Rechercher un modèles",
+      "searchPlaceholder": "Filtrer par nom de modèle ou ID",
+      "showAllModels": "Afficher tous les modèles",
+      "showRecommendedModels": "Afficher recommandé",
+      "recommended": "RECOMMANDÉ",
+      "recommendedSummary": "Points de départ vérifiés",
+      "checkConnection": "Modèles disponibles",
+      "checking": "EN",
+      "connected": "PRÊT",
+      "failed": "Nécessite de l’attention",
+      "modelsFound": "Prêt // {{count}} modèles trouvés",
+      "connectedNoModels": "Connexion trouvée, mais aucun modèle n'est encore disponible.",
+      "connectionError": "Impossible de vérifier ce fournisseur.",
+      "testModel": "VÉRIFIER LE MODÈLE SÉLECTIONNÉ",
+      "testingModel": "Vérification du modèle",
+      "modelReady": "RÉPONSES PRÊTES // STRUCTURÉES PRISES EN CHARGE",
+      "modelReadyPromptJson": "MODE PRÊT // COMPATIBILITÉ",
+      "modelAdvisorOnly": "CONSEILLER PRÊT // CHRONICLE A BESOIN D'UN AUTRE MODÈLE",
+      "modelTestError": "Ce modèle n'a pas réussi le contrôle de compatibilité de Chronicle.",
+      "modelTestPrivacy": "Les contrôles de connexion n'envoient jamais de données de campagne.",
+      "modelContextLabel": "{{context}} contexte",
+      "modelContextDetected": "Contexte signalé// {{context}}",
+      "modelContextTooSmall": "{{context}} contexte détecté. Le conseiller et la chronique ont généralement besoin d'au moins 32K.",
+      "modelContextUnknown": "La taille du contexte n'a pas été signalée. Pour Advisor et Chronicle, chargez ce modèle avec au moins 32K.",
+      "sessionOnlySecrets": "Cet appareil ne peut pas enregistrer en toute sécurité les clés __ SCX13 __ pour le moment. Vous pouvez en utiliser un jusqu'à la fermeture de l'application, mais la publication n'est pas disponible.",
+      "remoteContextNotice": "Les questions et les parties pertinentes de votre campagne sont envoyées à ce fournisseur. Votre fichier de sauvegarde n'est jamais téléchargé.",
+      "ollamaCloudNotice": "Ce modèle de nuage __ SCX7 __ traite les invites Advisor et Chronicle à distance plutôt que sur cet appareil.",
+      "showAdvanced": "Connexion avancée",
+      "hideAdvanced": "Connexion avancée",
+      "optional": "FACULTATIF",
+      "save": "ENREGISTRER LA CONFIGURATION DE L'IA",
+      "saved": "Configuration de l'IA enregistrée.",
+      "unsaved": "La configuration de l'IA a des modifications non enregistrées",
+      "savedState": "Configuration de l'IA enregistrée",
+      "guide": {
+        "label": "&Eacute;tapes de configuration",
+        "gemini": {
+          "1": "Obtenir une clé Gemini",
+          "2": "et collez-le ci-dessous",
+          "3": "Enregistrer la configuration de l'IA"
+        },
+        "local": {
+          "1": "Ouvrez votre application IA locale",
+          "2": "Charger un modèle",
+          "3": "Modèles disponibles"
+        },
+        "hosted": {
+          "1": "Coller votre clé de fournisseur",
+          "2": "Modèles disponibles",
+          "3": "Choisissez-en un et économisez"
+        },
+        "custom": {
+          "1": "Entrez l’adresse du serveur.",
+          "2": "Modèles disponibles",
+          "3": "Choisissez-en un et économisez"
+        }
+      },
+      "providers": {
+        "gemini": "GEMINI",
+        "ollama": "OLLAMA",
+        "lm_studio": "LM STUDIO",
+        "openrouter": "OPENROUTER",
+        "custom": "POINT DE TERMINAISON PERSONNALISÉ"
+      },
+      "providerHelp": {
+        "gemini": "Le moyen le plus rapide d'utiliser Advisor et Chronicle.",
+        "ollama": "Exécute Advisor et Chronicle via Ollama sur cet appareil. Ouvrez Ollama et chargez un modèle avant de continuer.",
+        "lm_studio": "Exécute Advisor et Chronicle via LM Studio sur cet appareil. Ouvrez LM Studio et chargez un modèle avant de continuer.",
+        "openrouter": "Utilise votre compte OpenRouter et vous permet de choisir parmi les modèles hébergés.",
+        "custom": "Connecte un autre service d'IA compatible à Advisor et Chronicle."
+      }
+    },
+    "geminiQuota": {
+      "label": "UTILISATION DES GÉMEAUX",
+      "description": "Choisissez comment équilibrer les réponses quotidiennes des conseillers et l'écriture des chroniques.",
+      "standard": "Free-friendly",
+      "higher": "Meilleure qualité",
+      "standardTag": "ÉTIRE LES LIMITES LIBRES",
+      "higherTag": "UTILISE PLUS D'ALLOCATION",
+      "standardHelp": "Permet de garder les questions quotidiennes plus légères afin qu'une plus grande partie de votre allocation soit disponible pour la rédaction de Chronicle.",
+      "higherHelp": "Préfère le modèle __ SCX6__ le plus puissant disponible pour Advisor et Chronicle.",
+      "showAdvanced": "Afficher les contrôles de quotas avancés",
+      "hideAdvanced": "Masquer les contrôles de quotas avancés",
+      "optional": "FACULTATIF",
+      "aria": "Définir le mode de quota __ SCX7 __ sur {{mode}}"
+    },
+    "mcpRelay": {
+      "loading": "Scanning...",
+      "ready": "PRÊT",
+      "noDatabase": "PAS DE CACHE DE CAMPAGNE",
+      "loadingSummary": "Vérification de la connexion de l'application IA locale.",
+      "readySummary": "Connexion locale prête.",
+      "noDatabaseSummary": "Aucune archive de campagne trouvée pour le moment. Ouvrez ou sélectionnez un dossier de sauvegarde avant de connecter des applications d'IA.",
+      "installed": "CONNECTÉ",
+      "installedNeedsRefresh": "mise à jour disponible",
+      "notInstalled": "Soumettre et entrer la boîte connectée",
+      "claudeDesktop": "CLAUDE DESKTOP",
+      "otherApps": "AUTRES APPLICATIONS D'IA",
+      "otherAppsHelp": "Utilisez la configuration MCP manuelle pour Cursor, LM Studio et des clients similaires.",
+      "localEndpoint": "Archives locales",
+      "runCheck": "Exécuter la vérification",
+      "checking": "VÉRIFICATION",
+      "connectClaude": "AJOUTER À CLAUDE",
+      "updateClaude": "MISE À JOUR CLAUDE",
+      "claudeConnected": "AJOUTÉ À CLAUDE",
+      "installing": "INSTALLATION",
+      "copyClaude": "COPIE CLAUDE JSON",
+      "copyClaudeCode": "COPIER LE CODE CLAUDE",
+      "copyCodexSetup": "COPIER LA CONFIGURATION DU CODEX",
+      "copyMcpJson": "COPIER MCP JSON",
+      "revealConfig": "RÉVÉLER LA CONFIGURATION",
+      "showAdvancedSetup": "AFFICHER LA CONFIGURATION MANUELLE DU MCP",
+      "hideAdvancedSetup": "MASQUER LA CONFIGURATION MANUELLE DU MCP",
+      "optional": "FACULTATIF",
+      "healthSuccess": "__ SCX3__ a répondu avec succès.",
+      "healthError": "Le contrôle de santé __ SCX3 __ a échoué.",
+      "copySuccess": "Configuration de {{target}} copiée.",
+      "copyError": "Échec de la copie de la configuration.",
+      "installConfirm": "Connecter Claude Desktop à Stellaris Companion ? Ceci met à jour le fichier de configuration local de __ SCX9 __.",
+      "installSuccess": "Connexion Claude Desktop mise à jour. Redémarrez Claude Desktop pour la charger.",
+      "installError": "Échec de la mise à jour de la connexion__ SCX1 __."
     }
   },
   "update": {
@@ -397,5 +653,87 @@
       "update": "MISE A JOUR",
       "tip": "ASTUCE"
     }
+  },
+  "onboarding": {
+    "step": "ÉTAPE {{current}} / {{total}}",
+    "actions": {
+      "start": "COMMENCER",
+      "back": "ARRIÈRE",
+      "continue": "CONTINUER",
+      "later": "Configuration ultérieure",
+      "finish": "TERMINER"
+    },
+    "welcome": {
+      "frameTitle": "PREMIER CONTACT",
+      "logoAlt": "Logo Stellaris Companion",
+      "title": "Bienvenue à Stellaris Companion",
+      "body": "Choisissez le mode de fonctionnement de Advisor et Chronicle, puis associez vos Stellaris sauvegardes."
+    },
+    "ai": {
+      "frameTitle": "Choisissez votre icône personnalisée pour cette entête",
+      "geminiKey": "CLÉ GÉMEAUX",
+      "getGeminiKey": "OBTENEZ UNE CLÉ GÉMEAUX",
+      "providerKey": "Clé du fournisseur",
+      "serverAddress": "Adresse du serveur",
+      "optionalKey": "CLÉ API",
+      "optional": "FACULTATIF",
+      "enterKey": "TOUCHE ENTRÉE",
+      "ready": "PRÊT",
+      "notSet": "PAS RÉGLER",
+      "findModels": "Modèles disponibles",
+      "looking": "EN",
+      "model": "MODÈLE",
+      "chooseModel": "Choisir un modèle",
+      "findModelsFirst": "TROUVEZ D'ABORD LES MODÈLES DISPONIBLES",
+      "modelsFound_one": "Prêt // {{count}} modèle trouvé",
+      "modelsFound_other": "Prêt // {{count}} modèles trouvés",
+      "noModels": "Connexion trouvée, mais aucun modèle n'est encore disponible.",
+      "connectionError": "Impossible de joindre ce fournisseur. Vérifiez qu'il est en cours d'exécution et réessayez."
+    },
+    "saves": {
+      "frameTitle": "CONNECTEZ VOS SAUVEGARDES",
+      "label": "ENREGISTRER LES JEUX",
+      "title": "Trouvez vos campagnes Stellaris",
+      "browseElsewhere": "PARCOURIR AILLEURS",
+      "scanAgain": "Numériser à nouveau",
+      "browseFolder": "Parcourir le dosssier",
+      "scanning": "Vous cherchez Stellaris enregistrer des fichiers...",
+      "found": "Vos campagnes sont prêtes.",
+      "count_one": "{{count}} fichier DE sauvegarde trouvé",
+      "count_other": "{{count}} enregistrer les fichiers trouvés",
+      "notFound": "Nous n'avons pas trouvé vos Stellaris sauvegardes automatiquement.",
+      "notFoundIn": "Aucun fichier .sav n'a été trouvé dans {{path}}.",
+      "notFoundDefault": "Nous avons vérifié les emplacements de sauvegarde habituels, mais nous n'avons pas encore trouvé de fichiers __ SCX16 __.",
+      "notFoundHelp": "Choisissez Parcourir le dossier et sélectionnez votre dossier de sauvegarde de jeux __ SCX8 __, ou configurez-le plus tard dans les paramètres."
+    }
+  },
+  "advisorPanel": {
+    "title": "Style conseiller",
+    "close": "Fermer le style du conseiller",
+    "noSave": "Aucune sauvegarde chargée",
+    "empireDetails": "À propos de votre empire",
+    "empireDetailsHelp": "Le conseiller utilise ces informations de votre sauvegarde pour conserver son caractère de conseil.",
+    "ethics": "Éthique",
+    "authority": "Autorité",
+    "civics": "Civisme",
+    "origin": "Origine",
+    "noTraits": "Aucun détail sur l'empire n'est encore disponible.",
+    "personality": "Personnalité du conseiller",
+    "personalityHelp": "Choisissez le son du Conseiller dans cette campagne. Cela change la voix, pas l'analyse du jeu.",
+    "personalityInstructions": "Instructions de personnalité du conseiller",
+    "placeholder": "Par exemple : calme, direct et optimiste.",
+    "tryStyle": "Essayez un style",
+    "styles": {
+      "intelligence": "Officier du renseignement paranoïaque qui ne fait confiance à personne",
+      "passiveAggressive": "Passif-agressif sur vos décisions",
+      "corporate": "Gestionnaire intermédiaire d'entreprise utilisant des mots à la mode pour la conquête galactique",
+      "enthusiastic": "Trop enthousiaste à propos de tout, même des catastrophes"
+    },
+    "saveStyle": "Enregistrez le style",
+    "saving": "Enregistrement…",
+    "saved": "Style enregistré pour cette campagne.",
+    "savedWhenReady": "Style enregistré et s'appliquera lorsque l'analyse sera prête.",
+    "saveError": "Le style Conseiller n'a pas pu être enregistré.",
+    "loadSaveHelp": "Chargez une sauvegarde pour choisir un style de conseiller pour cette campagne."
   }
 }

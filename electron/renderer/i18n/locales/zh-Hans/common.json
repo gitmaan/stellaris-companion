@@ -60,11 +60,25 @@
       "latency": "延迟：{{seconds}}s",
       "report": "报告",
       "reportTitle": "报告此回复",
-      "blockedLink": "已阻止非 HTTP(S) 链接"
+      "blockedLink": "已阻止非 HTTP(S) 链接",
+      "details": "响应详细信息",
+      "responseTime": "响应时间：{{seconds}}s"
     },
     "errors": {
       "briefingNotReady": "顾问仍在分析你的存档。请在 {{seconds}} 秒后重试。",
-      "unexpected": "发生意外错误"
+      "unexpected": "发生意外错误",
+      "openProviderSettings": "打开提供商设置",
+      "providerNotConfigured": "{{provider}} 未完全配置为顾问聊天。选择型号并完成连接设置。",
+      "providerUnavailable": "{{provider}}。确保其服务器正在运行并且配置的地址正确。",
+      "providerAuthFailed": "{{provider}} 拒绝了配置的 API 密钥。检查密钥并再次尝试连接。",
+      "providerModelNotFound": "所选的 {{provider}} 模型不可用。刷新型号列表或选择其他型号。",
+      "providerRateLimited": "{{provider}} 目前受到速率限制。稍等片刻，或选择其他型号或提供商。",
+      "providerBillingFailed": "{{provider}} 没有用于此请求的可用帐单或积分。检查提供商帐户或选择其他提供商。",
+      "providerTimeout": "{{provider}} 响应时间过长。本地模型可能仍在加载；再试一次或检查其服务器。",
+      "providerContextLimit": "活动上下文窗口无法容纳此活动简报。将提供程序的上下文设置增加到至少 32K，或选择更大的上下文模型。",
+      "providerInvalidResponse": "{{provider}} 返回此应用程序无法读取的响应。检查端点是否支持 OpenAI 兼容的聊天完成。",
+      "providerEmptyResponse": "{{provider}} 返回空响应。再试一次或选择其他型号。",
+      "providerRequestFailed": "{{provider}} 无法完成请求。检查模型和端点，然后重试。"
     },
     "newChat": "新聊天",
     "welcome": {
@@ -133,6 +147,10 @@
         "我们的对手会怎么评价我们？"
       ],
       "roast": "吐槽我的帝国"
+    },
+    "providerSetup": {
+      "title": "需要顾问连接",
+      "description": "{{provider}} 已选择但尚未准备好。打开提供商设置以完成连接并选择型号。"
     }
   },
   "chronicle": {
@@ -164,7 +182,14 @@
       "latest": "最新",
       "pending_one": "{{count}} 个章节待处理",
       "pending_other": "{{count}} 个章节待处理",
-      "generateMore": "生成更多章节"
+      "generateMore": "生成更多章节",
+      "campaigns": "活动",
+      "chooseCampaign": "选择一个活动",
+      "currentCampaignDate": "当前活动 · {{date}}",
+      "lastPlayed": "最后播放· {{date}}",
+      "current": "当前",
+      "manageCampaigns": "管理活动",
+      "storyStyle": "故事风格"
     },
     "publish": {
       "eyebrow": "分享 // 公共记录",
@@ -242,6 +267,81 @@
         "pr": "过分热情的帝国公关部门",
         "earnings": "像季度财报一样冷静汇报银河征服"
       }
+    },
+    "providerSetup": {
+      "title": "需要连接人工智能提供商",
+      "description": "您仍然可以阅读现有章节。连接所选的提供商并选择一个模型来生成或重写 Chronicle 内容。",
+      "action": "打开提供商设置"
+    },
+    "history": {
+      "eyebrow": "存档 // 本地记录",
+      "title": "活动历史",
+      "subtitle": "重命名战役、删除重复的开头或从垃圾箱中恢复项目。",
+      "close": "关闭活动历史记录",
+      "active": "活动 ({{count}})",
+      "trash": "垃圾 ({{count}})",
+      "search": "搜索广告系列",
+      "selectEmpty": "选择未使用的广告系列 ({{count}})",
+      "trashSelected": "将所选内容移至废纸篓 ({{count}})",
+      "emptyHelp": "查找没有故事或记录事件的战役。",
+      "trashEmpty": "垃圾箱已空。",
+      "noMatches": "没有与此搜索匹配的广告系列。",
+      "current": "当前",
+      "hasChronicle": "编年史",
+      "noChronicle": "无编年史",
+      "published": "已发布",
+      "gameDates": "{{first}} — {{last}}",
+      "sessions_one": "{{count}} 会话",
+      "sessions_other": "{{count}} 会话",
+      "snapshots_one": "{{count}} 快照",
+      "snapshots_other": "{{count}} 快照",
+      "events_one": "{{count}} 事件",
+      "events_other": "{{count}} 事件",
+      "chapters_one": "{{count}} 章",
+      "chapters_other": "{{count}} 章节",
+      "moreDetails": "更多详情",
+      "moreActions": "更多",
+      "storyActions": "故事动作",
+      "deleteOptions": "删除选项",
+      "selectCampaign": "选择 {{name}}",
+      "labelPlaceholder": "战役标签",
+      "rename": "重命名",
+      "save": "保存",
+      "cancel": "取消",
+      "reset": "重置编年史",
+      "resetTitle": "重置此编年史？",
+      "resetHelp": "删除生成的历史记录写入。活动历史记录和保存记录会保留，并且您可以撤消此操作。",
+      "confirmReset": "重置编年史",
+      "undoReset": "恢复编年史",
+      "moveToTrash": "移至垃圾箱",
+      "restore": "恢复",
+      "delete": "永久删除",
+      "deleteLocal": "删除本地数据",
+      "deleteTitle": "永久删除此战役吗？",
+      "deleteHelp": "从此设备中删除此战役历史记录。此操作无法撤消。",
+      "deletePublishedHelp": "从此设备中删除此战役历史记录。其发表的故事仍在网上。此操作无法撤消。",
+      "confirmDelete": "永久删除",
+      "confirmDeleteLocal": "删除本地数据",
+      "currentProtected": "当前加载的战役无法删除或删除。",
+      "publishedDeleteWarning": "从此设备中删除此战役。其发表的故事仍在网上。",
+      "onlineOnlyTitle": "发表了没有当地历史的故事",
+      "onlineOnlyHelp": "这些故事仍然在线。您可以在此处打开或删除它们。",
+      "openStory": "开放故事",
+      "removeStory": "删除在线故事",
+      "removeStoryTitle": "删除此已发布的故事？",
+      "removeStoryHelp": "从网络上删除公共故事。它不会恢复本地战役历史记录，并且无法撤消。",
+      "confirmRemoveStory": "删除在线故事",
+      "publishedRemoved": "已发布的故事已删除。",
+      "safetyNote": "将战役移至垃圾箱是可逆的。永久删除仅影响本地数据。",
+      "labelSaved": "战役标签已保存。",
+      "movedToTrash": "{{name}} 已移至垃圾箱。",
+      "restored": "战役已恢复。",
+      "chronicleReset": "历史记录已清除。活动历史记录被保留。",
+      "chronicleRestored": "编年史已恢复。",
+      "deleted": "本地战役历史记录永久删除。",
+      "bulkMoved": "将 {{count}} 战役移至垃圾箱。",
+      "undo": "撤消",
+      "unknownError": "战役历史记录无法更新。"
     }
   },
   "settings": {
@@ -260,14 +360,17 @@
       "data": "游戏数据",
       "communications": "通信中继",
       "updates": "软件更新",
-      "diagnostics": "诊断"
+      "diagnostics": "诊断",
+      "mcpRelay": "MCP 继电器"
     },
     "panels": {
       "geminiAccess": "Gemini 模型访问",
       "saveSource": "游戏存档文件夹",
       "campaignHistory": "战役历史",
       "discordLink": "Discord 连接",
-      "updateChannel": "更新轨道"
+      "updateChannel": "更新轨道",
+      "advisorAccess": "人工智能设置",
+      "mcpRelay": "人工智能应用程序连接"
     },
     "api": {
       "label": "API 密钥",
@@ -298,7 +401,9 @@
       "qualityFirstHelp": "优先使用 Gemini Flash，在额度需要时回退。",
       "conserveHelp": "顾问聊天使用较轻量模型以减少 Gemini 使用量。",
       "toastError": "无法更新模型路由。请重试。",
-      "toastSuccess": "模型路由已设置为 {{mode}}。"
+      "toastSuccess": "模型路由已设置为 {{mode}}。",
+      "qualityFirstTag": "在可用时使用闪存",
+      "conserveTag": "FLASH-LITE 顾问"
     },
     "saveData": {
       "directoryLabel": "存档文件夹",
@@ -318,7 +423,11 @@
       "backingUp": "正在创建备份...",
       "backupSuccess": "战役历史备份已保存。",
       "revealError": "无法打开战役历史文件夹。",
-      "historyHelp": "创建战役历史副本，或管理旧战役和重复战役。"
+      "historyHelp": "创建战役历史副本，或管理旧战役和重复战役。",
+      "savePlayerName": "保存多人游戏名称",
+      "playerNameSaved": "多人游戏名称已保存。",
+      "folderSaved": "保存游戏位置已更新。",
+      "automaticSaved": "启用自动保存检测。"
     },
     "discord": {
       "loading": "正在建立握手...",
@@ -368,6 +477,153 @@
       "auth": "授权失败。",
       "connection": "连接错误。请检查网络。",
       "generic": "系统错误。请重试。"
+    },
+    "moreSettings": {
+      "title": "更多设置",
+      "help": "可选连接、软件更新和支持工具。",
+      "optional": "可选"
+    },
+    "advisor": {
+      "providerLabel": "人工智能提供商",
+      "providerChoiceLabel": "人工智能应该跑到哪里？",
+      "localProviderLabel": "本地应用程序",
+      "otherProviderLabel": "提供商",
+      "providerGroups": {
+        "gemini": "Gemini",
+        "geminiTag": "最简单的设置",
+        "local": "在此设备上",
+        "localTag": "默认为私有",
+        "other": "在线提供商",
+        "otherTag": "更多选择"
+      },
+      "selected": "已选择",
+      "apiKeyLabel": "打开路由器 API 密钥",
+      "optionalApiKeyLabel": "API 密钥",
+      "baseUrlLabel": "服务器 URL",
+      "modelLabel": "模型",
+      "modelPlaceholder": "首先查找可用型号",
+      "selectModel": "选择型号",
+      "searchModels": "搜索模型",
+      "searchPlaceholder": "按型号名称或 ID 过滤",
+      "showAllModels": "显示所有型号",
+      "showRecommendedModels": "推荐演出",
+      "recommended": "推荐",
+      "recommendedSummary": "已验证的起点",
+      "checkConnection": "查找可用型号",
+      "checking": "寻找...",
+      "connected": "准备就绪",
+      "failed": "需要注意",
+      "modelsFound": "就绪 // 找到 {{count}} 模型",
+      "connectedNoModels": "已找到连接，但尚无可用模型。",
+      "connectionError": "无法检查此提供程序。",
+      "testModel": "检查所选型号",
+      "testingModel": "检查模型...",
+      "modelReady": "就绪 // 支持结构化响应",
+      "modelReadyPromptJson": "就绪 // 兼容模式",
+      "modelAdvisorOnly": "顾问准备就绪 // 纪事需要另一种模型",
+      "modelTestError": "此模型未通过 Chronicle 兼容性检查。",
+      "modelTestPrivacy": "连接检查从不发送活动数据。",
+      "modelContextLabel": "{{context}} 上下文",
+      "modelContextDetected": "报告上下文 // {{context}}",
+      "modelContextTooSmall": "{{context}} 上下文。 Advisor 和 Chronicle 通常至少需要 32K。",
+      "modelContextUnknown": "未报告上下文大小。对于 Advisor 和 Chronicle，至少使用 32K 加载此模型。",
+      "sessionOnlySecrets": "该设备目前无法安全地保存 API 密钥。您可以在应用程序关闭之前使用其中之一，但无法发布。",
+      "remoteContextNotice": "问题和活动的相关部分将发送至此提供商。您的保存文件永远不会被上传。",
+      "ollamaCloudNotice": "此 Ollama 云模型远程处理 Advisor 和 Chronicle 提示，而不是在此设备上。",
+      "showAdvanced": "显示高级连接",
+      "hideAdvanced": "隐藏高级连接",
+      "optional": "可选",
+      "save": "保存人工智能设置",
+      "saved": "AI 设置已保存。",
+      "unsaved": "AI 设置有未保存的更改",
+      "savedState": "AI 设置已保存",
+      "guide": {
+        "label": "设置步骤",
+        "gemini": {
+          "1": "获取 Gemini 密钥",
+          "2": "将其粘贴在下面",
+          "3": "保存 AI 设置"
+        },
+        "local": {
+          "1": "打开您本地的 AI 应用程序",
+          "2": "加载模型",
+          "3": "查找可用型号"
+        },
+        "hosted": {
+          "1": "粘贴您的提供商密钥",
+          "2": "查找可用型号",
+          "3": "选择一项并保存"
+        },
+        "custom": {
+          "1": "输入服务器地址",
+          "2": "查找可用型号",
+          "3": "选择一项并保存"
+        }
+      },
+      "providers": {
+        "gemini": "双子座",
+        "ollama": "奥拉玛",
+        "lm_studio": "LM工作室",
+        "openrouter": "开放路由器",
+        "custom": "自定义端点"
+      },
+      "providerHelp": {
+        "gemini": "使用 Advisor 和 Chronicle 的最快方法。",
+        "ollama": "通过此设备上的 Ollama 运行 Advisor 和 Chronicle。在继续之前打开 Ollama 并加载模型。",
+        "lm_studio": "通过此设备上的 LM Studio 运行 Advisor 和 Chronicle。在继续之前打开 LM Studio 并加载模型。",
+        "openrouter": "使用您的 OpenRouter 帐户并允许您从托管模型中进行选择。",
+        "custom": "将另一个兼容的 AI 服务连接到 Advisor 和 Chronicle。"
+      }
+    },
+    "geminiQuota": {
+      "label": "双子座使用",
+      "description": "选择如何平衡日常顾问答案和记录写作。",
+      "standard": "免费友好",
+      "higher": "最好的品质",
+      "standardTag": "延伸自由限制",
+      "higherTag": "使用更多津贴",
+      "standardHelp": "让日常问题变得更轻松，这样您就有更多的津贴可以用于纪事写作。",
+      "higherHelp": "更喜欢 Advisor 和 Chronicle 中可用的最强 Gemini 模型。",
+      "showAdvanced": "显示高级配额控制",
+      "hideAdvanced": "隐藏高级配额控制",
+      "optional": "可选",
+      "aria": "将 Gemini 配额模式设置为 {{mode}}"
+    },
+    "mcpRelay": {
+      "loading": "扫描...",
+      "ready": "准备就绪",
+      "noDatabase": "无战役缓存",
+      "loadingSummary": "检查本地 AI 应用程序连接。",
+      "readySummary": "本地连接准备就绪。",
+      "noDatabaseSummary": "尚未找到活动档案。连接 AI 应用程序之前打开或选择保存文件夹。",
+      "installed": "已连接",
+      "installedNeedsRefresh": "有更新",
+      "notInstalled": "未连接",
+      "claudeDesktop": "克劳德桌面",
+      "otherApps": "其他人工智能应用程序",
+      "otherAppsHelp": "对 Cursor、LM Studio 和类似客户端使用手动 MCP 设置。",
+      "localEndpoint": "本地档案",
+      "runCheck": "运行检查",
+      "checking": "检查...",
+      "connectClaude": "添加到克劳德",
+      "updateClaude": "更新克劳德",
+      "claudeConnected": "添加到克劳德",
+      "installing": "安装...",
+      "copyClaude": "复制克劳德 JSON",
+      "copyClaudeCode": "复制克劳德代码",
+      "copyCodexSetup": "复制法典设置",
+      "copyMcpJson": "复制 MCP JSON",
+      "revealConfig": "显示配置",
+      "showAdvancedSetup": "显示手动 MCP 设置",
+      "hideAdvancedSetup": "隐藏手动 MCP 设置",
+      "optional": "可选",
+      "healthSuccess": "MCP Relay 响应成功。",
+      "healthError": "MCP Relay 运行状况检查失败。",
+      "copySuccess": "{{target}} 设置已复制。",
+      "copyError": "无法复制设置。",
+      "installConfirm": "将 Claude Desktop 连接到 Stellaris Companion？这会更新 Claude 的本地配置文件。",
+      "installSuccess": "Claude Desktop 连接已更新。重新启动 Claude Desktop 来加载它。",
+      "installError": "无法更新 Claude Desktop 连接。"
     }
   },
   "update": {
@@ -397,5 +653,87 @@
       "update": "更新",
       "tip": "提示"
     }
+  },
+  "onboarding": {
+    "step": "步骤 {{current}} / {{total}}",
+    "actions": {
+      "start": "开始",
+      "back": "返回",
+      "continue": "继续",
+      "later": "稍后设置",
+      "finish": "完成"
+    },
+    "welcome": {
+      "frameTitle": "第一次接触",
+      "logoAlt": "Stellaris Companion 徽标",
+      "title": "欢迎来到 Stellaris Companion",
+      "body": "选择 Advisor 和 Chronicle 的工作方式，然后连接您的 Stellaris 保存。"
+    },
+    "ai": {
+      "frameTitle": "选择你的人工智能",
+      "geminiKey": "双子座钥匙",
+      "getGeminiKey": "获取双子座钥匙",
+      "providerKey": "提供商密钥",
+      "serverAddress": "服务器地址",
+      "optionalKey": "API 密钥",
+      "optional": "可选",
+      "enterKey": "输入键",
+      "ready": "准备就绪",
+      "notSet": "未设置",
+      "findModels": "查找可用型号",
+      "looking": "寻找...",
+      "model": "模型",
+      "chooseModel": "选择型号",
+      "findModelsFirst": "首先查找可用型号",
+      "modelsFound_one": "就绪 // 找到 {{count}} 模型",
+      "modelsFound_other": "就绪 // 找到 {{count}} 模型",
+      "noModels": "已找到连接，但尚无可用模型。",
+      "connectionError": "无法访问此提供程序。检查它是否正在运行，然后重试。"
+    },
+    "saves": {
+      "frameTitle": "连接您的保存",
+      "label": "保存游戏",
+      "title": "查找您的 Stellaris 战役",
+      "browseElsewhere": "浏览其他地方",
+      "scanAgain": "再次扫描",
+      "browseFolder": "浏览文件夹",
+      "scanning": "正在寻找 Stellaris 保存文件...",
+      "found": "您的战役已准备就绪。",
+      "count_one": "{{count}} 保存文件",
+      "count_other": "{{count}} 找到保存文件",
+      "notFound": "我们无法找到您的 Stellaris 自动保存。",
+      "notFoundIn": "在 {{path}} 中找不到 .sav 文件。",
+      "notFoundDefault": "我们检查了常用的保存位置，但尚未找到任何 .sav 文件。",
+      "notFoundHelp": "选择浏览文件夹并选择 Stellaris 保存游戏文件夹，或稍后在“设置”中进行设置。"
+    }
+  },
+  "advisorPanel": {
+    "title": "顾问风格",
+    "close": "关闭顾问风格",
+    "noSave": "未加载保存",
+    "empireDetails": "关于你的帝国",
+    "empireDetailsHelp": "顾问使用您保存的这些详细信息来保持其建议的特色。",
+    "ethics": "道德规范",
+    "authority": "权限",
+    "civics": "公民",
+    "origin": "起源",
+    "noTraits": "尚无帝国详细信息。",
+    "personality": "顾问个性",
+    "personalityHelp": "选择顾问在此活动中的声音。这改变了声音，而不是游戏分析。",
+    "personalityInstructions": "顾问个性说明",
+    "placeholder": "例如：冷静、直接、乐观。",
+    "tryStyle": "尝试一种风格",
+    "styles": {
+      "intelligence": "不相信任何人的偏执情报官员",
+      "passiveAggressive": "对你的决定采取被动攻击态度",
+      "corporate": "企业中层经理使用流行语征服银河",
+      "enthusiastic": "对一切都过于热情，甚至是灾难"
+    },
+    "saveStyle": "保存样式",
+    "saving": "保存...",
+    "saved": "为此活动保存的样式。",
+    "savedWhenReady": "样式已保存，分析准备就绪后将应用。",
+    "saveError": "无法保存 Advisor 样式。",
+    "loadSaveHelp": "加载保存以为此活动选择顾问风格。"
   }
 }
