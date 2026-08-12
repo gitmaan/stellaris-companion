@@ -1,6 +1,6 @@
-**More trustworthy war assessments.**
+**The largest Stellaris Companion update yet.**
 
-- Corrected war victories, defeats, and casualties when tactical battle sides appear reversed in Stellaris saves.
-- Added occupation and capital-control evidence so the Advisor considers strategic progress as well as battle history.
-- Prevented stale Advisor responses from overriding evidence from the current save.
-- Added privacy-safe war diagnostics for future reports without uploading save files.
+- Choose the AI service that suits you, including Gemini, Ollama, LM Studio, OpenRouter, and other compatible providers.
+- Quickly find, rename, restore, or clean up previous campaigns.
+- Get more reliable Advisor guidance based on your current save and the latest Stellaris mechanics.
+- Enjoy improved performance, security, and reliability throughout the app.
