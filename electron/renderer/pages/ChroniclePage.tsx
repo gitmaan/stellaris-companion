@@ -198,6 +198,7 @@ function ChroniclePage({
   const lastAutoSavesRefreshAtRef = useRef(0)
   const autoSavesRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastFocusChronicleRefreshAtRef = useRef(0)
+  const lastChronicleLoadStartedAtRef = useRef(0)
   const lastSeenIngestionUpdatedAtRef = useRef<number | null>(null)
   const didInitChapterSelectionRef = useRef(false)
   const pendingVisibleChronicleRefreshRef = useRef(false)
@@ -288,6 +289,7 @@ function ChroniclePage({
       return
     }
 
+    if (!chapterOnly) lastChronicleLoadStartedAtRef.current = Date.now()
     chronicleInFlightRef.current = true
     const token = ++chronicleRequestTokenRef.current
 
@@ -446,6 +448,8 @@ function ChroniclePage({
     if (!isDocumentVisible()) return
     if (!isMountedRef.current) return
 
+    const catchupStartedAt = Date.now()
+    if (catchupStartedAt - lastChronicleLoadStartedAtRef.current < 2000) return
     const requestTokenAtStart = chronicleRequestTokenRef.current
     visibleCatchupInFlightRef.current = true
 
@@ -455,6 +459,9 @@ function ChroniclePage({
       // Campaign selection invalidates a refresh that was queued for the
       // previously visible campaign while metadata was loading.
       if (requestTokenAtStart !== chronicleRequestTokenRef.current) return
+      // Initial activation may have loaded the Chronicle while this focus
+      // catch-up was refreshing metadata. Do not immediately load it again.
+      if (lastChronicleLoadStartedAtRef.current >= catchupStartedAt) return
       await loadChronicle(false, false)
     } finally {
       visibleCatchupInFlightRef.current = false
