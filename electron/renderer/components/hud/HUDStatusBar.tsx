@@ -3,13 +3,14 @@ import { useTranslation } from 'react-i18next'
 import { BackendStatusEvent } from '../../hooks/useBackend'
 import { HUDLabel, HUDValue } from './HUDText'
 
-type ConnectionStatus = 'ready' | 'analyzing' | 'connecting' | 'no-save' | 'not-configured' | 'disconnected'
+type ConnectionStatus = 'ready' | 'warning' | 'analyzing' | 'connecting' | 'no-save' | 'not-configured' | 'disconnected'
 
 interface StatusState {
   connectionStatus: ConnectionStatus
   empireName: string | null
   gameDate: string | null
   stage: string | null
+  error: string | null
 }
 
 function getConnectionStatus(payload: BackendStatusEvent | null): ConnectionStatus {
@@ -23,6 +24,7 @@ function getConnectionStatus(payload: BackendStatusEvent | null): ConnectionStat
   if (!healthy) return 'disconnected'
 
   if (!payload.save_loaded) return 'no-save'
+  if (payload.precompute_ready && payload.ingestion?.last_error) return 'warning'
   return payload.precompute_ready ? 'ready' : 'analyzing'
 }
 
@@ -38,6 +40,7 @@ function getStageLabel(
 function getStatusLabel(status: ConnectionStatus, stage: string | null, t: (key: string, options?: Record<string, unknown>) => string): string {
   switch (status) {
     case 'ready': return t('status.ready')
+    case 'warning': return t('status.historyNotSaved')
     case 'analyzing': {
       const label = getStageLabel(stage, t)
       return label ? t('status.analyzingWithStage', { stage: label }) : t('status.analyzing')
@@ -51,6 +54,7 @@ function getStatusLabel(status: ConnectionStatus, stage: string | null, t: (key:
 
 const statusColors: Record<ConnectionStatus, string> = {
   ready: 'text-accent-green',
+  warning: 'text-accent-yellow',
   analyzing: 'text-accent-yellow',
   connecting: 'text-accent-yellow',
   'no-save': 'text-accent-cyan',
@@ -77,6 +81,7 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
     empireName: null,
     gameDate: null,
     stage: null,
+    error: null,
   })
 
   useEffect(() => {
@@ -92,6 +97,7 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
         empireName: health?.empire_name ?? null,
         gameDate: health?.game_date ?? null,
         stage,
+        error: health?.ingestion?.last_error ?? null,
       })
     })
 
@@ -120,7 +126,7 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
       </div>
 
       {/* Right: Status */}
-      <div className="flex items-center gap-2 pointer-events-auto">
+      <div className="flex items-center gap-2 pointer-events-auto" title={state.error ?? undefined}>
         {onToggleTransmissions && transmissionsTotal > 0 && (
           <button
             onClick={onToggleTransmissions}

@@ -23,6 +23,7 @@
   },
   "status": {
     "ready": "システムオンライン",
+    "historyNotSaved": "履歴が保存されていません",
     "analyzing": "帝国を調査中...",
     "analyzingWithStage": "調査中 ({{stage}})...",
     "connecting": "接続中...",
@@ -545,6 +546,7 @@
       "modelContextTooSmall": "{{context}} コンテキストが検出されました。 Advisor と Chronicle には通常、少なくとも 32K が必要です。",
       "modelContextUnknown": "コンテキスト サイズが報告されませんでした。 Advisor と Chronicle の場合は、少なくとも 32K を使用してこのモデルをロードします。",
       "sessionOnlySecrets": "このデバイスは現在、API キーを安全に保存できません。アプリが終了するまでは使用できますが、公開はできません。",
+      "lockedSecrets": "保存された認証情報を読み取れませんでした。認証情報ストレージのロックを解除してアプリを再起動するか、キーを再入力してください。保存済みの値は保持されています。",
       "remoteContextNotice": "質問とキャンペーンの関連部分は、このプロバイダーに送信されます。保存ファイルはアップロードされません。",
       "ollamaCloudNotice": "この Ollama クラウド モデルは、このデバイスではなくリモートで Advisor と Chronicle プロンプトを処理します。",
       "showAdvanced": "高度な接続を表示",

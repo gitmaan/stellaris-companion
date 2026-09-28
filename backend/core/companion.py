@@ -469,6 +469,7 @@ class Companion:
         situation: dict[str, Any] | None,
         metadata: dict[str, Any] | None = None,
         save_hash: str | None = None,
+        custom_instructions: str | None = None,
     ) -> None:
         """Activate a precomputed briefing produced externally (e.g., worker process)."""
         with self._briefing_lock:
@@ -490,6 +491,7 @@ class Companion:
         if isinstance(situation, dict):
             self.situation = situation
         self._last_known_date = game_date
+        self.custom_instructions = custom_instructions
         self._build_personality()
 
     def start_background_precompute(self, save_path: Path | None = None) -> None:

@@ -71,6 +71,7 @@ function createMockChronicleBackend(options = {}) {
   let healthUpdatedAt = 1_000
   let publication = null
   let chronicleError = options.chronicleError ?? null
+  let healthOverrides = {}
   const chronicleRequests = []
   const chatRequests = []
   const publicationRequests = []
@@ -97,6 +98,7 @@ function createMockChronicleBackend(options = {}) {
   const healthPayload = () => ({
     status: 'ok',
     save_loaded: true,
+    save_id: 'save-1',
     empire_name: 'United Nations of Earth',
     game_date: phase === 'initial' ? '2205.01.01' : '2208.01.01',
     precompute_ready: true,
@@ -114,6 +116,8 @@ function createMockChronicleBackend(options = {}) {
       current_save_path: 'C:\\\\mock\\\\save.sav',
     },
   })
+
+  const currentHealthPayload = () => ({ ...healthPayload(), ...healthOverrides })
 
   const sessionsPayload = () => ({
     sessions: [
@@ -176,6 +180,7 @@ function createMockChronicleBackend(options = {}) {
   })
 
   const chroniclePayload = (body) => {
+    if (options.emptyChronicle) return buildEmptyChronicleResponse()
     if (phase === 'initial') {
       return buildChronicleResponse({
         narrative: initialNarrative,
@@ -227,7 +232,7 @@ function createMockChronicleBackend(options = {}) {
     const url = new URL(req.url, 'http://127.0.0.1')
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      sendJson(res, 200, healthPayload())
+      sendJson(res, 200, currentHealthPayload())
       return
     }
 
@@ -343,7 +348,7 @@ function createMockChronicleBackend(options = {}) {
         return
       }
       sendJson(res, 200, {
-        text: options.chatResponse ?? 'Mock strategic response.',
+        text: options.onChat ? await options.onChat(body) : (options.chatResponse ?? 'Mock strategic response.'),
         game_date: healthPayload().game_date,
         response_time_ms: 12,
         model: options.chatModel ?? 'mock-advisor-model',
@@ -493,6 +498,7 @@ function createMockChronicleBackend(options = {}) {
     start,
     stop,
     advanceCampaign,
+    setHealth: (payload) => { healthOverrides = payload },
     setChronicleError,
     waitForChronicleRequest,
     waitForPublicationRequest,

@@ -104,6 +104,7 @@
   },
   "status": {
     "ready": "SYSTEMS ONLINE",
+    "historyNotSaved": "HISTORY NOT SAVED",
     "analyzing": "SURVEYING EMPIRE...",
     "analyzingWithStage": "SURVEYING ({{stage}})...",
     "connecting": "CONNECTING...",
@@ -559,6 +560,7 @@
       "modelContextTooSmall": "{{context}} context detected. Advisor and Chronicle generally need at least 32K.",
       "modelContextUnknown": "Context size was not reported. For Advisor and Chronicle, load this model with at least 32K.",
       "sessionOnlySecrets": "This device cannot securely save API keys right now. You can use one until the app closes, but publishing is unavailable.",
+      "lockedSecrets": "Saved credentials could not be read. Unlock your credential storage and restart the app, or enter the key again. The saved values have been preserved.",
       "remoteContextNotice": "Questions and the relevant parts of your campaign are sent to this provider. Your save file is never uploaded.",
       "ollamaCloudNotice": "This Ollama cloud model processes Advisor and Chronicle prompts remotely rather than on this device.",
       "showAdvanced": "SHOW ADVANCED CONNECTION",

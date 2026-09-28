@@ -1736,7 +1736,8 @@ Do NOT give advice. You are a historian, not an advisor.
             contents=prompt,
             response_schema=CurrentEraOutput,
             temperature=1.0,
-            max_output_tokens=1024,
+            # Thinking models share this budget with the final structured response.
+            max_output_tokens=4096,
             purpose_label="Chronicle current era",
             game_knowledge_context=_chronicle_game_knowledge(briefing),
         )

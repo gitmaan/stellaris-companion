@@ -23,6 +23,7 @@
   },
   "status": {
     "ready": "SYSTEMES EN LIGNE",
+    "historyNotSaved": "HISTORIQUE NON ENREGISTRÉ",
     "analyzing": "ANALYSE DE L'EMPIRE...",
     "analyzingWithStage": "ANALYSE ({{stage}})...",
     "connecting": "CONNEXION...",
@@ -552,6 +553,7 @@
       "modelContextTooSmall": "{{context}} contexte détecté. Le conseiller et la chronique ont généralement besoin d'au moins 32K.",
       "modelContextUnknown": "La taille du contexte n'a pas été signalée. Pour Advisor et Chronicle, chargez ce modèle avec au moins 32K.",
       "sessionOnlySecrets": "Cet appareil ne peut pas enregistrer en toute sécurité les clés __ SCX13 __ pour le moment. Vous pouvez en utiliser un jusqu'à la fermeture de l'application, mais la publication n'est pas disponible.",
+      "lockedSecrets": "Impossible de lire les identifiants enregistrés. Déverrouillez votre stockage sécurisé et redémarrez l’application, ou saisissez à nouveau la clé. Les valeurs enregistrées ont été conservées.",
       "remoteContextNotice": "Les questions et les parties pertinentes de votre campagne sont envoyées à ce fournisseur. Votre fichier de sauvegarde n'est jamais téléchargé.",
       "ollamaCloudNotice": "Ce modèle de nuage __ SCX7 __ traite les invites Advisor et Chronicle à distance plutôt que sur cet appareil.",
       "showAdvanced": "Connexion avancée",

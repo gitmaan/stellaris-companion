@@ -31,27 +31,16 @@ function createSecretStorage({
   platform = process.platform,
 }) {
   const sessionSecrets = new Map()
+  const unreadableSecrets = new Set()
   let persistenceFailed = false
 
   function getStatus() {
     const status = getSecretStorageStatus(safeStorage, platform)
-    return persistenceFailed
-      ? { ...status, persistentEncryptionAvailable: false }
-      : status
-  }
-
-  function decryptStoredSecret(stored) {
-    if (!stored) return null
-    const buffer = Buffer.from(stored, 'base64')
-    const status = getStatus()
-    if (status.encryptionAvailable) {
-      try {
-        return { value: safeStorage.decryptString(buffer), legacyPlaintext: false }
-      } catch {
-        // Older builds stored base64 plaintext when safeStorage was unavailable.
-      }
+    return {
+      ...status,
+      persistentEncryptionAvailable: status.persistentEncryptionAvailable && !persistenceFailed,
+      decryptionFailed: unreadableSecrets.size > 0,
     }
-    return { value: buffer.toString('utf8'), legacyPlaintext: true }
   }
 
   function getSecret(key) {
@@ -60,18 +49,27 @@ function createSecretStorage({
     const stored = store.get(key)
     if (!stored) return null
 
-    const { value, legacyPlaintext } = decryptStoredSecret(stored)
     const status = getStatus()
+    let value
+    try {
+      if (!status.encryptionAvailable) throw new Error('Credential storage unavailable')
+      value = safeStorage.decryptString(Buffer.from(stored, 'base64'))
+      unreadableSecrets.delete(key)
+    } catch {
+      // A failed decrypt cannot distinguish ciphertext from old base64 plaintext.
+      // Preserve the original so a temporarily unavailable keychain can recover.
+      unreadableSecrets.add(key)
+      return null
+    }
     if (!status.persistentEncryptionAvailable) {
       if (value) sessionSecrets.set(key, value)
       store.delete(key)
-    } else if (legacyPlaintext && value) {
-      setSecret(key, value)
     }
     return value
   }
 
   function setSecret(key, value) {
+    unreadableSecrets.delete(key)
     if (!value) {
       sessionSecrets.delete(key)
       store.delete(key)

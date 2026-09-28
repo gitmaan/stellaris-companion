@@ -49,8 +49,9 @@ function ChronicleContent({
       )}
 
       {chapters.length === 0 && !currentEra && !legacyChronicle?.trim() && (
-        <div className="flex items-center justify-center text-text-secondary text-sm h-[200px]">
-          <p>{t('chronicle.content.selectChapter')}</p>
+        <div className="flex flex-col items-center justify-center text-center text-text-secondary text-sm h-[200px] gap-3">
+          <h2>{t('chronicle.page.emptyTitle')}</h2>
+          <p>{t('chronicle.page.emptyBody')}</p>
         </div>
       )}
 

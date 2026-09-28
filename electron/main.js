@@ -847,11 +847,13 @@ function stepUiScale(direction) {
  * @returns {Object} Settings with masked secrets
  */
 function getSettings() {
-  const secretStorageStatus = secretStorage.getStatus()
   const googleApiKey = getSecret(SECRET_STORE_KEYS.googleApiKey)
   const openRouterApiKey = getSecret(SECRET_STORE_KEYS.openRouterApiKey)
   const customProviderApiKey = getSecret(SECRET_STORE_KEYS.customProviderApiKey)
   const discordToken = getSecret(SECRET_STORE_KEYS.discordToken)
+  const secretStorageStatus = secretStorage.getStatus()
+  // Preserve masked fields during an ordinary settings save if a key is locked.
+  const maskedStoredSecret = (key, value) => maskSecret(value) || (store.get(key) ? '...' : '')
 
   const saveDir = store.get('saveDir', '')
   const playerName = store.get('playerName', '')
@@ -871,19 +873,20 @@ function getSettings() {
   const updateChannel = getUpdateChannelSetting()
 
   return {
-    googleApiKey: maskSecret(googleApiKey),
-    googleApiKeySet: !!googleApiKey,
-    openRouterApiKey: maskSecret(openRouterApiKey),
-    openRouterApiKeySet: !!openRouterApiKey,
-    customProviderApiKey: maskSecret(customProviderApiKey),
-    customProviderApiKeySet: !!customProviderApiKey,
+    googleApiKey: maskedStoredSecret(SECRET_STORE_KEYS.googleApiKey, googleApiKey),
+    googleApiKeySet: !!(googleApiKey || store.get(SECRET_STORE_KEYS.googleApiKey)),
+    openRouterApiKey: maskedStoredSecret(SECRET_STORE_KEYS.openRouterApiKey, openRouterApiKey),
+    openRouterApiKeySet: !!(openRouterApiKey || store.get(SECRET_STORE_KEYS.openRouterApiKey)),
+    customProviderApiKey: maskedStoredSecret(SECRET_STORE_KEYS.customProviderApiKey, customProviderApiKey),
+    customProviderApiKeySet: !!(customProviderApiKey || store.get(SECRET_STORE_KEYS.customProviderApiKey)),
     secretStorageAvailable: secretStorageStatus.persistentEncryptionAvailable,
+    secretStorageReadFailed: secretStorageStatus.decryptionFailed,
     secretStorageBackend: secretStorageStatus.backend,
     advisorProvider,
     advisorModel,
     advisorBaseUrl,
-    discordToken: maskSecret(discordToken),
-    discordTokenSet: !!discordToken,
+    discordToken: maskedStoredSecret(SECRET_STORE_KEYS.discordToken, discordToken),
+    discordTokenSet: !!(discordToken || store.get(SECRET_STORE_KEYS.discordToken)),
     saveDir,
     // Backwards-compat: older renderer builds expect `savePath`.
     savePath: saveDir,

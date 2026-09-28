@@ -146,6 +146,7 @@ function createChroniclePublishingService({
     }
 
     let publisherId = store.get('chroniclePublisherId', '')
+    const existingIdentity = typeof publisherId === 'string' && UUID_PATTERN.test(publisherId)
     if (typeof publisherId !== 'string' || !UUID_PATTERN.test(publisherId)) {
       publisherId = crypto.randomUUID()
       store.set('chroniclePublisherId', publisherId)
@@ -153,6 +154,12 @@ function createChroniclePublishingService({
 
     let publisherSecret = getSecret(secretStoreKey)
     if (typeof publisherSecret !== 'string' || !SECRET_PATTERN.test(publisherSecret)) {
+      if (existingIdentity || store.get(secretStoreKey)) {
+        throw new ChroniclePublishingError(
+          'The saved publishing key could not be read. Unlock your credential storage and restart the app.',
+          'secure_storage_unavailable',
+        )
+      }
       publisherSecret = crypto.randomBytes(32).toString('base64url')
       setSecret(secretStoreKey, publisherSecret)
     }
