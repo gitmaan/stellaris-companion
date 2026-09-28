@@ -29,6 +29,7 @@ EXPORT_METHODS: list[tuple[str, dict]] = [
     ("get_missing_dlcs", {}),
     ("get_player_status", {}),
     ("get_empire_identity", {}),
+    ("get_active_policies", {}),
     ("get_naval_capacity", {}),
     ("get_traditions", {}),
     ("get_ascension_perks", {}),

@@ -27,6 +27,10 @@ def _find_default_patches_dir(module_file: Path = Path(__file__)) -> Path:
 DEFAULT_PATCHES_DIR = _find_default_patches_dir()
 DEFAULT_SNAPSHOTS_DIR = DEFAULT_PATCHES_DIR / "snapshots"
 
+# Cygnus changed the Pop Group data model, so Pegasus' compiled mechanics cannot
+# serve as its baseline. Add future release lines here only after a breaking audit.
+BREAKING_SNAPSHOT_BOUNDARIES = frozenset({(4, 5)})
+
 _VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")
 _MARKDOWN_SECTION_PATTERN = re.compile(r"(?m)^(#{1,3})\s+(.+?)\s*$")
 _SEARCH_ALIASES: dict[str, tuple[str, ...]] = {
@@ -206,6 +210,18 @@ def load_game_knowledge(
 
     patch_versions = list_versioned_markdown(patches_dir)
     snapshot_versions = list_versioned_markdown(snapshots_dir)
+    snapshot_keys = [parse_version(item) for item in snapshot_versions]
+    newest_snapshot_key = max((key for key in snapshot_keys if key is not None), default=None)
+    # Release-note deltas for a newer game line are useful, but combining them
+    # with an older complete snapshot would reintroduce superseded mechanics.
+    notes_only_line = bool(
+        target_key[:2] in BREAKING_SNAPSHOT_BOUNDARIES
+        and (newest_snapshot_key is None or target_key[:2] > newest_snapshot_key[:2])
+        and any(
+            (key := parse_version(item)) is not None and key[:2] == target_key[:2]
+            for item in patch_versions
+        )
+    )
     known_versions = patch_versions + snapshot_versions
     known_keys = [parse_version(item) for item in known_versions]
     comparable_keys = [item for item in known_keys if item is not None]
@@ -232,7 +248,9 @@ def load_game_knowledge(
                 if content:
                     content_parts.append(content)
                     loaded_version = patch_version
-        status: KnowledgeStatus = "exact" if loaded_version == target_version else "partial"
+        status: KnowledgeStatus = (
+            "exact" if loaded_version == target_version and not notes_only_line else "partial"
+        )
         return GameKnowledgeContext(
             version,
             target_version,
@@ -245,7 +263,7 @@ def load_game_knowledge(
     loaded_version = None
     snapshot_key: tuple[int, int, int] | None = None
 
-    if prefer_snapshot:
+    if prefer_snapshot and not notes_only_line:
         eligible = [
             (parsed, snapshot_version)
             for snapshot_version in snapshot_versions
@@ -264,6 +282,8 @@ def load_game_knowledge(
         patch_key = parse_version(patch_version)
         if patch_key is None or patch_key > target_key:
             continue
+        if notes_only_line and patch_key[:2] != target_key[:2]:
+            continue
         if snapshot_key is not None and patch_key <= snapshot_key:
             continue
         content = _load_file(patch_version, patches_dir)
@@ -271,7 +291,7 @@ def load_game_knowledge(
             content_parts.append(content)
             loaded_version = patch_version
 
-    status = "exact" if loaded_version == target_version else "partial"
+    status = "exact" if loaded_version == target_version and not notes_only_line else "partial"
     return GameKnowledgeContext(
         version,
         target_version,
@@ -339,16 +359,43 @@ def build_game_knowledge_prompt(
             ]
         )
     elif knowledge_content:
-        lines.extend(
-            [
-                "",
-                f"Mechanics coverage is verified only through {knowledge.loaded_through}.",
-                f"The campaign reports {version}; do not assume older details remained unchanged.",
-                "Use the following only when it agrees with supplied campaign evidence:",
-                "",
-                knowledge_content,
-            ]
+        loaded_key = parse_version(knowledge.loaded_through or "")
+        target_key = parse_version(knowledge.target_version or "")
+        notes_only = bool(
+            loaded_key is not None
+            and target_key is not None
+            and target_key[:2] in BREAKING_SNAPSHOT_BOUNDARIES
+            and loaded_key[:2] == target_key[:2]
+            and not any(
+                (key := parse_version(item)) is not None
+                and key[:2] == target_key[:2]
+                and key <= target_key
+                for item in list_versioned_markdown(snapshots_dir)
+            )
         )
+        if notes_only:
+            lines.extend(
+                [
+                    "",
+                    f"Only the listed mechanics changes are verified through {knowledge.loaded_through}.",
+                    f"The campaign reports {version}; other mechanics remain unverified for this version.",
+                    "Do not carry forward older-version rules without campaign evidence.",
+                    "Use the following only when it agrees with supplied campaign evidence:",
+                    "",
+                    knowledge_content,
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "",
+                    f"Mechanics coverage is verified only through {knowledge.loaded_through}.",
+                    f"The campaign reports {version}; do not assume older details remained unchanged.",
+                    "Use the following only when it agrees with supplied campaign evidence:",
+                    "",
+                    knowledge_content,
+                ]
+            )
     elif knowledge.content and topics is not None:
         lines.extend(
             [

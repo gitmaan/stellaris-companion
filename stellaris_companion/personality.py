@@ -33,7 +33,9 @@ def load_patch_notes(
 
     Args:
         version: Game version string, e.g., "Corvus v4.2.4"
-        cumulative: If True, load all patches from 4.0 up to this version
+        cumulative: If True, load the latest compatible snapshot and later
+            overlays. A breaking release with no current snapshot receives
+            only its own release-note deltas.
         prefer_snapshot: If True, prefer a compiled cumulative snapshot when available
 
     Returns:

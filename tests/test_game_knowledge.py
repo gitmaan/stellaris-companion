@@ -16,7 +16,7 @@ def test_patch_resources_resolve_from_pyinstaller_sibling_layout(tmp_path: Path)
     assert _find_default_patches_dir(package_dir / "game_knowledge.py") == patches_dir
 
 
-def test_current_stable_uses_exact_compiled_snapshot():
+def test_pegasus_uses_exact_compiled_snapshot():
     knowledge = load_game_knowledge("Pegasus v4.4.6 (fdde)")
 
     assert knowledge.status == "exact"
@@ -26,7 +26,7 @@ def test_current_stable_uses_exact_compiled_snapshot():
     assert "3:1 rule" not in (knowledge.content or "")
 
 
-def test_current_snapshot_is_self_sufficient_for_foundational_4x_mechanics():
+def test_pegasus_snapshot_is_self_sufficient_for_foundational_4x_mechanics():
     knowledge = load_game_knowledge("Pegasus v4.4.6")
     content = knowledge.content or ""
 
@@ -41,7 +41,7 @@ def test_current_snapshot_is_self_sufficient_for_foundational_4x_mechanics():
     assert "Sub-Species Integration" in content
 
 
-def test_current_snapshot_covers_material_mechanics_from_each_stable_4x_release():
+def test_pegasus_snapshot_covers_material_mechanics_through_4_4_6():
     knowledge = load_game_knowledge("Pegasus v4.4.6")
     content = knowledge.content or ""
 
@@ -70,14 +70,58 @@ def test_new_hotfix_uses_honestly_labeled_partial_coverage():
     assert "Treat these as the current baseline" not in prompt
 
 
-def test_new_minor_version_does_not_receive_stale_mechanics():
-    knowledge = load_game_knowledge("Cygnus v4.5.0")
-    prompt = build_game_knowledge_prompt("Cygnus v4.5.0", purpose="chronicle")
+def test_cygnus_uses_partial_release_notes_without_stale_pegasus_mechanics():
+    for version in ("Cygnus v4.5.0", "Cygnus v4.5.1"):
+        knowledge = load_game_knowledge(version)
+        prompt = build_game_knowledge_prompt(version, purpose="chronicle")
+
+        assert knowledge.status == "partial"
+        assert "rather than splitting into separate groups" in prompt
+        assert "Cybernetic Pops gain 10% Job Efficiency" in prompt
+        assert "Building a Branch Office costs 75 Influence" in prompt
+        assert "The Stellar Cannon is a Tier 3 technology" in prompt
+        assert "Temporary Purge Vassals are special subjects" in prompt
+        assert "Eligible Deep Scans can reveal anomalies" in prompt
+        assert "Only the listed mechanics changes are verified" in prompt
+        assert "other mechanics remain unverified" in prompt
+        assert "Do not carry forward older-version rules" in prompt
+        assert "A normal Anchorage adds 5 Naval Capacity" not in prompt
+        assert "grouped for calculation by Species" not in prompt
+        assert "Treat these as the current baseline" not in prompt
+
+
+def test_cygnus_hotfix_only_applies_to_4_5_1_and_later():
+    initial = load_game_knowledge("Cygnus v4.5.0")
+    hotfix = load_game_knowledge("Cygnus v4.5.1")
+
+    assert "Ships do not automatically disengage" not in (initial.content or "")
+    assert "Ships do not automatically disengage" in (hotfix.content or "")
+    assert hotfix.loaded_through == "4.5.1"
+
+
+def test_cygnus_boundary_stays_safe_when_snapshot_resources_are_missing(tmp_path: Path):
+    patches_dir = tmp_path / "patches"
+    patches_dir.mkdir()
+    (patches_dir / "4.4.md").write_text("obsolete Pegasus mechanic", encoding="utf-8")
+    (patches_dir / "4.5.md").write_text("Cygnus pop groups", encoding="utf-8")
+
+    knowledge = load_game_knowledge(
+        "Cygnus v4.5.0",
+        patches_dir=patches_dir,
+        snapshots_dir=tmp_path / "missing_snapshots",
+    )
+
+    assert knowledge.status == "partial"
+    assert knowledge.content == "Cygnus pop groups"
+
+
+def test_unknown_newer_release_still_does_not_receive_old_mechanics():
+    knowledge = load_game_knowledge("v4.6.0")
+    prompt = build_game_knowledge_prompt("v4.6.0", purpose="advisor")
 
     assert knowledge.status == "unsupported_newer"
     assert knowledge.content is None
-    assert "No verified mechanics pack covers Cygnus v4.5.0" in prompt
-    assert "A normal Anchorage adds 5 Naval Capacity" not in prompt
+    assert "No verified mechanics pack covers v4.6.0" in prompt
 
 
 def test_chronicle_prompt_keeps_mechanics_subordinate_to_recorded_evidence():

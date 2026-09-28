@@ -1,13 +1,14 @@
 # Model Game Knowledge
 
-Stellaris Companion gives every supported model a curated mechanics snapshot for the version in
-the player's save. This provides Gemini, OpenRouter, Ollama, LM Studio, and custom providers with
-the same factual baseline even when a model's training cutoff predates the game release.
+Stellaris Companion gives every supported model versioned mechanics context for the player's
+save. Complete snapshots provide a factual baseline; focused release-note packs provide partial
+coverage when a new game version has not yet been fully audited.
 
 ## How It Works
 
 1. The app reads the Stellaris version from the save.
-2. The shared resolver selects an exact snapshot or the newest compatible snapshot and overlays.
+2. The shared resolver selects an exact snapshot, a compatible snapshot and overlays, or a
+   notes-only pack for an audited breaking release line.
 3. The context is added to both Advisor and Chronicle prompts alongside extracted campaign facts.
 4. Unknown newer release lines do not receive older mechanics presented as current.
 
@@ -31,6 +32,10 @@ by a maintainer for substantive correctness, allowing normal variation in wordin
 - Use final Paradox release notes first, followed by shipped unmodded game data for numerical rules.
 - Keep the current stable snapshot self-contained, including foundational mechanics that remain true.
 - Add small overlays for hotfixes, then fold them into a fresh snapshot before history accumulates.
+- When a new release changes an underlying mechanic before shipped data can be checked, add
+  source-backed release-note deltas for that release line. The resolver labels these partial
+  and does not import the prior release's snapshot. Publish a complete snapshot only after
+  its current-state claims have been checked against the shipped game.
 - Do not add open-beta mechanics to a stable snapshot.
 - Avoid subjective benchmarks unless authoritative sources and relevant game settings support them.
 
