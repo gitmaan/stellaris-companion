@@ -14,7 +14,7 @@
     "dev:electron": "cross-env NODE_ENV=development electron .",
     "build": "../scripts/build-all.sh",
     "build:renderer": "cd renderer && npm run build",
-    "build:electron": "electron-builder",
+    "build:electron": "npm run build:mcpb && electron-builder",
     "build:mcpb": "python3 ../scripts/package_mcpb.py",
     "test": "node --test test/*.test.js",
     "test:e2e": "npm run build:renderer && playwright test",

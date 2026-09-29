@@ -283,6 +283,10 @@ jobs:
         working-directory: electron
         run: npx electron-builder ${{ matrix.electron_args }} --publish "$PUBLISH_MODE" --config.publish.channel="$RELEASE_CHANNEL"
 
+      - name: Re-package Claude Desktop MCPB release asset
+        working-directory: electron
+        run: npm run build:mcpb
+
       - name: Upload Claude Desktop MCPB to draft release
         if: ${{ matrix.name == 'linux-x64' && needs.setup.outputs.publish == 'true' }}
         uses: softprops/action-gh-release@v2

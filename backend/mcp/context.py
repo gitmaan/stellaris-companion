@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,6 +20,10 @@ MAX_EVENT_LIMIT = 120
 MAX_CHRONICLE_EVENTS = 250
 MAX_CHRONICLE_WRITEBACK_CHARS = 20_000
 MAX_CHRONICLE_SUMMARY_CHARS = 2_000
+MAX_CHRONICLE_TITLE_CHARS = 200
+MAX_CHRONICLE_EPIGRAPH_CHARS = 1_000
+MAX_CHRONICLE_DATE_CHARS = 64
+MAX_CHRONICLE_SECTIONS = 12
 MAX_CHRONICLE_EDIT_HISTORY_ITEMS = 10
 MAX_TEXT_LENGTH = 1600
 MAX_LIST_ITEMS_COMPACT = 12
@@ -200,8 +207,7 @@ class StellarisMcpContext:
 
         return {
             "save_loaded": True,
-            "save_id": save_id,
-            "active_session_id": session.get("id"),
+            "campaign_ref": _campaign_ref(save_id),
             "empire_name": session.get("empire_name")
             or identity.get("name")
             or meta.get("empire_name")
@@ -219,6 +225,10 @@ class StellarisMcpContext:
             "is_active": session.get("ended_at") is None,
             "version": meta.get("version"),
             "language": self.language,
+            "updated_at": session.get("last_updated_at") or session.get("started_at"),
+            "freshness": _freshness_payload(
+                session.get("last_updated_at") or session.get("started_at")
+            ),
         }
 
     def get_strategy_context(
@@ -305,9 +315,9 @@ class StellarisMcpContext:
         session = self._require_current_session()
         lim = _clamp_int(limit, default=DEFAULT_EVENT_LIMIT, minimum=1, maximum=MAX_EVENT_LIMIT)
         rows = self.db.get_recent_events(session_id=str(session["id"]), limit=lim)
-        events = [_event_payload(row) for row in rows]
         if notable_only:
-            events = [event for event in events if event.get("event_type") in NOTABLE_EVENT_TYPES]
+            rows = [row for row in rows if row.get("event_type") in NOTABLE_EVENT_TYPES]
+        events = [_event_payload(row) for row in rows]
         return {
             "campaign": self.get_active_campaign(),
             "limit": lim,
@@ -325,8 +335,11 @@ class StellarisMcpContext:
             cached = self.db.get_cached_chronicle(str(session["id"]), language=self.language)
 
         if not cached:
+            empty_revision = _chronicle_revision(DEFAULT_CHAPTERS_DATA)
             return {
                 "campaign": self.get_active_campaign(),
+                "campaign_ref": _campaign_ref(save_id),
+                "chronicle_revision": empty_revision,
                 "cached": False,
                 "chapters": [],
                 "current_era": None,
@@ -350,9 +363,9 @@ class StellarisMcpContext:
 
         return {
             "campaign": self.get_active_campaign(),
+            "campaign_ref": _campaign_ref(save_id),
+            "chronicle_revision": _chronicle_revision(chapters_data),
             "cached": True,
-            "save_id": cached.get("save_id") or save_id,
-            "session_id": cached.get("session_id") or session.get("id"),
             "language": cached.get("language") or self.language,
             "generated_at": cached.get("generated_at"),
             "event_count": cached.get("event_count"),
@@ -379,6 +392,8 @@ class StellarisMcpContext:
 
         lim = _clamp_int(max_events, default=80, minimum=1, maximum=MAX_CHRONICLE_EVENTS)
         cached = self.db.get_chronicle_by_save_id(save_id, language=self.language)
+        if not cached:
+            cached = self.db.get_cached_chronicle(str(session["id"]), language=self.language)
         chapters_data = _parse_json_object(cached.get("chapters_json")) if cached else {}
         normalized_scope = str(scope or "current_era").strip().lower()
         if normalized_scope.startswith("chapter:") and chapter_number is None:
@@ -434,6 +449,8 @@ class StellarisMcpContext:
         briefing = self._load_briefing(str(session["id"]))
         return {
             "campaign": self.get_active_campaign(),
+            "campaign_ref": _campaign_ref(save_id),
+            "chronicle_revision": _chronicle_revision(chapters_data or DEFAULT_CHAPTERS_DATA),
             "event_range": event_range,
             "events": [_event_payload(row) for row in events],
             "truncated": truncated,
@@ -447,6 +464,8 @@ class StellarisMcpContext:
     def save_chronicle_current_era(
         self,
         *,
+        campaign_ref: str,
+        expected_revision: str,
         narrative: str,
         title: str | None = None,
         start_date: str | None = None,
@@ -455,79 +474,95 @@ class StellarisMcpContext:
         """Persist externally written current-era Chronicle prose to the local cache."""
         cleaned_narrative = str(narrative or "").strip()
         self._validate_chronicle_text(cleaned_narrative, field_name="narrative")
-
-        state = self._load_chronicle_state()
-        session = state["session"]
-        save_id = state["save_id"]
-        chapters_data = state["chapters_data"]
-        snapshot_range = state["snapshot_range"]
-        before = _json_clone(chapters_data)
-        era_start_date = (
-            start_date
-            or chapters_data.get("current_era_start_date")
-            or snapshot_range.get("first_game_date")
-            or session.get("first_game_date")
-            or session.get("last_game_date")
-            or "2200.01.01"
+        cleaned_title = str(title or "External Chronicle Draft").strip()
+        self._validate_bounded_text(
+            cleaned_title, field_name="title", maximum=MAX_CHRONICLE_TITLE_CHARS
         )
-        era_start_snapshot_id = chapters_data.get("current_era_start_snapshot_id")
-        if era_start_snapshot_id is None:
-            era_start_snapshot_id = snapshot_range.get("first_snapshot_id")
-
-        latest_snapshot_id = snapshot_range.get("last_snapshot_id")
-        era_events = self.db.get_events_in_snapshot_range(
-            save_id=save_id,
-            from_snapshot_id=era_start_snapshot_id,
-            to_snapshot_id=None,
-        )
-        resolved_events_covered = (
-            int(events_covered)
-            if isinstance(events_covered, int) and events_covered >= 0
-            else len(era_events)
+        self._validate_optional_text(
+            start_date, field_name="start_date", maximum=MAX_CHRONICLE_DATE_CHARS
         )
 
-        generated_at = datetime.now(timezone.utc).isoformat()
-        current_era = {
-            "title": (title or "External Chronicle Draft").strip(),
-            "start_date": str(era_start_date),
-            "narrative": cleaned_narrative,
-            "sections": [{"type": "prose", "text": cleaned_narrative, "attribution": ""}],
-            "events_covered": resolved_events_covered,
-            "source": "mcp_writeback",
-            "external_edit": {
-                "operation": "save_current_era",
-                "source": "external_ai",
-                "updated_at": generated_at,
-            },
-        }
-        chapters_data["current_era_start_date"] = str(era_start_date)
-        chapters_data["current_era_start_snapshot_id"] = era_start_snapshot_id
-        chapters_data["current_era_cache"] = {
-            "start_date": str(era_start_date),
-            "start_snapshot_id": era_start_snapshot_id,
-            "last_snapshot_id": latest_snapshot_id,
-            "generated_at": generated_at,
-            "language": self.language,
-            "source": "mcp_writeback",
-            "current_era": current_era,
-        }
-        self._record_external_edit(
-            chapters_data,
-            before=before,
-            operation="save_current_era",
-            target="chronicle.current_era",
-            updated_at=generated_at,
-        )
+        edit_receipt = _new_edit_receipt()
+        with self._chronicle_write_state(
+            campaign_ref=campaign_ref,
+            expected_revision=expected_revision,
+        ) as state:
+            session = state["session"]
+            save_id = state["save_id"]
+            chapters_data = state["chapters_data"]
+            snapshot_range = state["snapshot_range"]
+            before = _json_clone(chapters_data)
+            era_start_date = (
+                start_date
+                or chapters_data.get("current_era_start_date")
+                or snapshot_range.get("first_game_date")
+                or session.get("first_game_date")
+                or session.get("last_game_date")
+                or "2200.01.01"
+            )
+            era_start_snapshot_id = chapters_data.get("current_era_start_snapshot_id")
+            if era_start_snapshot_id is None:
+                era_start_snapshot_id = snapshot_range.get("first_snapshot_id")
 
-        self._persist_chronicle_state(
-            session=session,
-            save_id=save_id,
-            chapters_data=chapters_data,
-            snapshot_range=snapshot_range,
-        )
+            latest_snapshot_id = snapshot_range.get("last_snapshot_id")
+            era_events = self.db.get_events_in_snapshot_range(
+                save_id=save_id,
+                from_snapshot_id=era_start_snapshot_id,
+                to_snapshot_id=None,
+            )
+            resolved_events_covered = (
+                int(events_covered)
+                if isinstance(events_covered, int) and events_covered >= 0
+                else len(era_events)
+            )
+
+            generated_at = datetime.now(timezone.utc).isoformat()
+            current_era = {
+                "title": cleaned_title,
+                "start_date": str(era_start_date),
+                "narrative": cleaned_narrative,
+                "sections": [{"type": "prose", "text": cleaned_narrative, "attribution": ""}],
+                "events_covered": resolved_events_covered,
+                "source": "mcp_writeback",
+                "external_edit": {
+                    "operation": "save_current_era",
+                    "source": "external_ai",
+                    "updated_at": generated_at,
+                },
+            }
+            chapters_data["current_era_start_date"] = str(era_start_date)
+            chapters_data["current_era_start_snapshot_id"] = era_start_snapshot_id
+            chapters_data["current_era_cache"] = {
+                "start_date": str(era_start_date),
+                "start_snapshot_id": era_start_snapshot_id,
+                "last_snapshot_id": latest_snapshot_id,
+                "generated_at": generated_at,
+                "language": self.language,
+                "source": "mcp_writeback",
+                "current_era": current_era,
+            }
+            self._record_external_edit(
+                chapters_data,
+                before=before,
+                operation="save_current_era",
+                target="chronicle.current_era",
+                updated_at=generated_at,
+                edit_receipt=edit_receipt,
+                base_revision=state["base_revision"],
+            )
+            chronicle_revision = self._finalize_external_edit(chapters_data)
+            self._persist_chronicle_state(
+                session=session,
+                save_id=save_id,
+                chapters_data=chapters_data,
+                snapshot_range=snapshot_range,
+            )
 
         return {
             "campaign": self.get_active_campaign(),
+            "campaign_ref": campaign_ref,
+            "chronicle_revision": chronicle_revision,
+            "edit_receipt": edit_receipt,
             "saved": True,
             "write_back_enabled": True,
             "message": (
@@ -546,6 +581,8 @@ class StellarisMcpContext:
     def update_chronicle_chapter(
         self,
         *,
+        campaign_ref: str,
+        expected_revision: str,
         chapter_number: int,
         narrative: str,
         title: str | None = None,
@@ -556,53 +593,69 @@ class StellarisMcpContext:
         """Persist an externally revised finalized Chronicle chapter."""
         cleaned_narrative = str(narrative or "").strip()
         self._validate_chronicle_text(cleaned_narrative, field_name="narrative")
-        if summary is not None and len(str(summary)) > MAX_CHRONICLE_SUMMARY_CHARS:
-            raise McpContextError(
-                f"Chronicle summary is too long ({len(str(summary))} > {MAX_CHRONICLE_SUMMARY_CHARS} chars)."
+        self._validate_optional_text(title, field_name="title", maximum=MAX_CHRONICLE_TITLE_CHARS)
+        self._validate_optional_text(
+            summary, field_name="summary", maximum=MAX_CHRONICLE_SUMMARY_CHARS
+        )
+        self._validate_optional_text(
+            epigraph, field_name="epigraph", maximum=MAX_CHRONICLE_EPIGRAPH_CHARS
+        )
+
+        edit_receipt = _new_edit_receipt()
+        with self._chronicle_write_state(
+            campaign_ref=campaign_ref,
+            expected_revision=expected_revision,
+            require_cached=True,
+        ) as state:
+            session = state["session"]
+            save_id = state["save_id"]
+            chapters_data = state["chapters_data"]
+            chapter = self._find_chapter(chapters_data, int(chapter_number))
+            if not chapter:
+                raise McpContextError(f"Chapter {chapter_number} is not available in the cache.")
+
+            before = _json_clone(chapters_data)
+            updated_at = datetime.now(timezone.utc).isoformat()
+            chapter["narrative"] = cleaned_narrative
+            chapter["sections"] = self._normalize_sections(
+                sections, fallback_text=cleaned_narrative
             )
+            if title is not None and str(title).strip():
+                chapter["title"] = str(title).strip()
+            if summary is not None:
+                chapter["summary"] = str(summary).strip()
+            if epigraph is not None:
+                chapter["epigraph"] = str(epigraph).strip()
+            chapter["source"] = "mcp_writeback"
+            chapter["external_edit"] = {
+                "operation": "update_chapter",
+                "source": "external_ai",
+                "updated_at": updated_at,
+            }
+            chapter["manual_edit_locked"] = True
 
-        state = self._load_chronicle_state(require_cached=True)
-        session = state["session"]
-        save_id = state["save_id"]
-        chapters_data = state["chapters_data"]
-        chapter = self._find_chapter(chapters_data, int(chapter_number))
-        if not chapter:
-            raise McpContextError(f"Chapter {chapter_number} is not available in the cache.")
-
-        before = _json_clone(chapters_data)
-        updated_at = datetime.now(timezone.utc).isoformat()
-        chapter["narrative"] = cleaned_narrative
-        chapter["sections"] = self._normalize_sections(sections, fallback_text=cleaned_narrative)
-        if title is not None and str(title).strip():
-            chapter["title"] = str(title).strip()
-        if summary is not None:
-            chapter["summary"] = str(summary).strip()
-        if epigraph is not None:
-            chapter["epigraph"] = str(epigraph).strip()
-        chapter["source"] = "mcp_writeback"
-        chapter["external_edit"] = {
-            "operation": "update_chapter",
-            "source": "external_ai",
-            "updated_at": updated_at,
-        }
-        chapter["manual_edit_locked"] = True
-
-        self._record_external_edit(
-            chapters_data,
-            before=before,
-            operation="update_chapter",
-            target=f"chronicle.chapter.{chapter_number}",
-            updated_at=updated_at,
-        )
-        self._persist_chronicle_state(
-            session=session,
-            save_id=save_id,
-            chapters_data=chapters_data,
-            snapshot_range=state["snapshot_range"],
-        )
+            self._record_external_edit(
+                chapters_data,
+                before=before,
+                operation="update_chapter",
+                target=f"chronicle.chapter.{chapter_number}",
+                updated_at=updated_at,
+                edit_receipt=edit_receipt,
+                base_revision=state["base_revision"],
+            )
+            chronicle_revision = self._finalize_external_edit(chapters_data)
+            self._persist_chronicle_state(
+                session=session,
+                save_id=save_id,
+                chapters_data=chapters_data,
+                snapshot_range=state["snapshot_range"],
+            )
 
         return {
             "campaign": self.get_active_campaign(),
+            "campaign_ref": campaign_ref,
+            "chronicle_revision": chronicle_revision,
+            "edit_receipt": edit_receipt,
             "saved": True,
             "message": (
                 f"Saved Chapter {chapter.get('number') or chapter_number}, "
@@ -620,6 +673,8 @@ class StellarisMcpContext:
     def create_chronicle_chapter(
         self,
         *,
+        campaign_ref: str,
+        expected_revision: str,
         narrative: str,
         title: str,
         summary: str | None = None,
@@ -636,101 +691,124 @@ class StellarisMcpContext:
         cleaned_title = str(title or "").strip()
         if not cleaned_title:
             raise McpContextError("Chapter title is required.")
-        if summary is not None and len(str(summary)) > MAX_CHRONICLE_SUMMARY_CHARS:
-            raise McpContextError(
-                f"Chronicle summary is too long ({len(str(summary))} > {MAX_CHRONICLE_SUMMARY_CHARS} chars)."
-            )
-
-        state = self._load_chronicle_state()
-        session = state["session"]
-        save_id = state["save_id"]
-        chapters_data = state["chapters_data"]
-        chapters = self._ensure_chapters(chapters_data)
-        before = _json_clone(chapters_data)
-        snapshot_range = state["snapshot_range"]
-        previous_chapter = chapters[-1] if chapters else None
-        next_number = (
-            max(
-                (_safe_int(ch.get("number")) or 0 for ch in chapters if isinstance(ch, dict)),
-                default=0,
-            )
-            + 1
+        self._validate_bounded_text(
+            cleaned_title, field_name="title", maximum=MAX_CHRONICLE_TITLE_CHARS
         )
-        resolved_start_date = (
-            start_date
-            or (previous_chapter.get("end_date") if isinstance(previous_chapter, dict) else None)
-            or chapters_data.get("current_era_start_date")
-            or snapshot_range.get("first_game_date")
-            or session.get("first_game_date")
-            or "2200.01.01"
+        self._validate_optional_text(
+            summary, field_name="summary", maximum=MAX_CHRONICLE_SUMMARY_CHARS
         )
-        resolved_end_date = (
-            end_date
-            or session.get("last_game_date")
-            or session.get("last_game_date_computed")
-            or snapshot_range.get("last_game_date")
-            or resolved_start_date
+        self._validate_optional_text(
+            epigraph, field_name="epigraph", maximum=MAX_CHRONICLE_EPIGRAPH_CHARS
         )
-        resolved_start_snapshot_id = (
-            start_snapshot_id
-            if start_snapshot_id is not None
-            else (
-                previous_chapter.get("end_snapshot_id")
-                if isinstance(previous_chapter, dict)
-                else chapters_data.get("current_era_start_snapshot_id")
-            )
+        self._validate_optional_text(
+            start_date, field_name="start_date", maximum=MAX_CHRONICLE_DATE_CHARS
         )
-        if resolved_start_snapshot_id is None:
-            resolved_start_snapshot_id = snapshot_range.get("first_snapshot_id")
-        resolved_end_snapshot_id = (
-            end_snapshot_id
-            if end_snapshot_id is not None
-            else snapshot_range.get("last_snapshot_id")
+        self._validate_optional_text(
+            end_date, field_name="end_date", maximum=MAX_CHRONICLE_DATE_CHARS
         )
 
-        updated_at = datetime.now(timezone.utc).isoformat()
-        chapter = {
-            "number": next_number,
-            "title": cleaned_title,
-            "start_date": str(resolved_start_date),
-            "end_date": str(resolved_end_date),
-            "start_snapshot_id": resolved_start_snapshot_id,
-            "end_snapshot_id": resolved_end_snapshot_id,
-            "summary": str(summary or "").strip(),
-            "narrative": cleaned_narrative,
-            "sections": self._normalize_sections(sections, fallback_text=cleaned_narrative),
-            "epigraph": str(epigraph or "").strip(),
-            "is_finalized": True,
-            "context_stale": False,
-            "source": "mcp_writeback",
-            "external_edit": {
-                "operation": "create_chapter",
-                "source": "external_ai",
-                "updated_at": updated_at,
-            },
-            "manual_edit_locked": True,
-        }
-        chapters.append(_drop_empty(chapter))
-        chapters_data["current_era_start_date"] = str(resolved_end_date)
-        chapters_data["current_era_start_snapshot_id"] = resolved_end_snapshot_id
-        chapters_data.pop("current_era_cache", None)
+        edit_receipt = _new_edit_receipt()
+        with self._chronicle_write_state(
+            campaign_ref=campaign_ref,
+            expected_revision=expected_revision,
+        ) as state:
+            session = state["session"]
+            save_id = state["save_id"]
+            chapters_data = state["chapters_data"]
+            chapters = self._ensure_chapters(chapters_data)
+            before = _json_clone(chapters_data)
+            snapshot_range = state["snapshot_range"]
+            previous_chapter = chapters[-1] if chapters else None
+            next_number = (
+                max(
+                    (_safe_int(ch.get("number")) or 0 for ch in chapters if isinstance(ch, dict)),
+                    default=0,
+                )
+                + 1
+            )
+            resolved_start_date = (
+                start_date
+                or (
+                    previous_chapter.get("end_date") if isinstance(previous_chapter, dict) else None
+                )
+                or chapters_data.get("current_era_start_date")
+                or snapshot_range.get("first_game_date")
+                or session.get("first_game_date")
+                or "2200.01.01"
+            )
+            resolved_end_date = (
+                end_date
+                or session.get("last_game_date")
+                or session.get("last_game_date_computed")
+                or snapshot_range.get("last_game_date")
+                or resolved_start_date
+            )
+            resolved_start_snapshot_id = (
+                start_snapshot_id
+                if start_snapshot_id is not None
+                else (
+                    previous_chapter.get("end_snapshot_id")
+                    if isinstance(previous_chapter, dict)
+                    else chapters_data.get("current_era_start_snapshot_id")
+                )
+            )
+            if resolved_start_snapshot_id is None:
+                resolved_start_snapshot_id = snapshot_range.get("first_snapshot_id")
+            resolved_end_snapshot_id = (
+                end_snapshot_id
+                if end_snapshot_id is not None
+                else snapshot_range.get("last_snapshot_id")
+            )
 
-        self._record_external_edit(
-            chapters_data,
-            before=before,
-            operation="create_chapter",
-            target=f"chronicle.chapter.{next_number}",
-            updated_at=updated_at,
-        )
-        self._persist_chronicle_state(
-            session=session,
-            save_id=save_id,
-            chapters_data=chapters_data,
-            snapshot_range=snapshot_range,
-        )
+            updated_at = datetime.now(timezone.utc).isoformat()
+            chapter = {
+                "number": next_number,
+                "title": cleaned_title,
+                "start_date": str(resolved_start_date),
+                "end_date": str(resolved_end_date),
+                "start_snapshot_id": resolved_start_snapshot_id,
+                "end_snapshot_id": resolved_end_snapshot_id,
+                "summary": str(summary or "").strip(),
+                "narrative": cleaned_narrative,
+                "sections": self._normalize_sections(sections, fallback_text=cleaned_narrative),
+                "epigraph": str(epigraph or "").strip(),
+                "is_finalized": True,
+                "context_stale": False,
+                "source": "mcp_writeback",
+                "external_edit": {
+                    "operation": "create_chapter",
+                    "source": "external_ai",
+                    "updated_at": updated_at,
+                },
+                "manual_edit_locked": True,
+            }
+            chapters.append(_drop_empty(chapter))
+            chapters_data["current_era_start_date"] = str(resolved_end_date)
+            chapters_data["current_era_start_snapshot_id"] = resolved_end_snapshot_id
+            chapters_data.pop("current_era_cache", None)
+
+            self._record_external_edit(
+                chapters_data,
+                before=before,
+                operation="create_chapter",
+                target=f"chronicle.chapter.{next_number}",
+                updated_at=updated_at,
+                edit_receipt=edit_receipt,
+                base_revision=state["base_revision"],
+            )
+            chronicle_revision = self._finalize_external_edit(chapters_data)
+            self._persist_chronicle_state(
+                session=session,
+                save_id=save_id,
+                chapters_data=chapters_data,
+                snapshot_range=snapshot_range,
+            )
 
         return {
             "campaign": self.get_active_campaign(),
+            "campaign_ref": campaign_ref,
+            "chronicle_revision": chronicle_revision,
+            "edit_receipt": edit_receipt,
             "saved": True,
             "message": (
                 f'Saved Chapter {next_number}, "{chapter.get("title") or "Untitled"}", '
@@ -743,35 +821,54 @@ class StellarisMcpContext:
             "app_visibility": ("The Chronicle page will show this new chapter after it refreshes."),
         }
 
-    def undo_chronicle_edit(self) -> dict[str, Any]:
-        """Undo the last external MCP Chronicle edit."""
-        state = self._load_chronicle_state(require_cached=True)
-        session = state["session"]
-        save_id = state["save_id"]
-        chapters_data = state["chapters_data"]
-        history = self._external_edit_history(chapters_data)
-        if not history:
-            raise McpContextError("There is no external Chronicle edit to undo.")
+    def undo_chronicle_edit(
+        self,
+        *,
+        campaign_ref: str,
+        expected_revision: str,
+        edit_receipt: str,
+    ) -> dict[str, Any]:
+        """Undo the exact external MCP Chronicle edit identified by its receipt."""
+        with self._chronicle_write_state(
+            campaign_ref=campaign_ref,
+            expected_revision=expected_revision,
+            require_cached=True,
+        ) as state:
+            session = state["session"]
+            save_id = state["save_id"]
+            chapters_data = state["chapters_data"]
+            history = self._external_edit_history(chapters_data)
+            if not history:
+                raise McpContextError("There is no external Chronicle edit to undo.")
 
-        last_edit = history[-1]
-        previous = last_edit.get("previous_chapters_data")
-        if not isinstance(previous, dict):
-            raise McpContextError(
-                "The last Chronicle edit cannot be undone because its backup is missing."
+            last_edit = history[-1]
+            if last_edit.get("edit_receipt") != str(edit_receipt or "").strip():
+                raise McpContextError(
+                    "That edit receipt is no longer the latest Chronicle change. "
+                    "Read the Chronicle again before choosing what to undo."
+                )
+            previous = last_edit.get("previous_chapters_data")
+            if not isinstance(previous, dict):
+                raise McpContextError(
+                    "The selected Chronicle edit cannot be undone because its backup is missing."
+                )
+
+            restored = _json_clone(previous)
+            restored["external_edit_history"] = history[:-1]
+            restored["external_edit_last_updated_at"] = datetime.now(timezone.utc).isoformat()
+            chronicle_revision = _chronicle_revision(restored)
+            self._persist_chronicle_state(
+                session=session,
+                save_id=save_id,
+                chapters_data=restored,
+                snapshot_range=state["snapshot_range"],
             )
-
-        restored = _json_clone(previous)
-        restored["external_edit_history"] = history[:-1]
-        restored["external_edit_last_updated_at"] = datetime.now(timezone.utc).isoformat()
-        self._persist_chronicle_state(
-            session=session,
-            save_id=save_id,
-            chapters_data=restored,
-            snapshot_range=state["snapshot_range"],
-        )
 
         return {
             "campaign": self.get_active_campaign(),
+            "campaign_ref": campaign_ref,
+            "chronicle_revision": chronicle_revision,
+            "undone_edit_receipt": edit_receipt,
             "undone": True,
             "message": f"Undid the most recent Chronicle edit{_undo_target_phrase(last_edit)}.",
             "remaining_undo_count": len(history) - 1,
@@ -804,6 +901,41 @@ class StellarisMcpContext:
             "chapters_data": chapters_data,
             "snapshot_range": snapshot_range,
         }
+
+    @contextmanager
+    def _chronicle_write_state(
+        self,
+        *,
+        campaign_ref: str,
+        expected_revision: str,
+        require_cached: bool = False,
+    ):
+        """Yield Chronicle state while holding an atomic compare-and-swap transaction."""
+        supplied_campaign = str(campaign_ref or "").strip()
+        supplied_revision = str(expected_revision or "").strip()
+        if not supplied_campaign or not supplied_revision:
+            raise McpContextError(
+                "Read Chronicle source material or the Chronicle archive immediately before "
+                "saving so campaign_ref and expected_revision are available."
+            )
+
+        with self.db.transaction(immediate=True):
+            state = self._load_chronicle_state(require_cached=require_cached)
+            current_campaign = _campaign_ref(state["save_id"])
+            if supplied_campaign != current_campaign:
+                raise McpContextError(
+                    "The active campaign changed after this Chronicle draft was prepared. "
+                    "Read the Chronicle source material again before saving."
+                )
+
+            current_revision = _chronicle_revision(state["chapters_data"])
+            if supplied_revision != current_revision:
+                raise McpContextError(
+                    "The Chronicle changed after this draft was prepared. Read the Chronicle "
+                    f"again and reconcile the newer version (current revision: {current_revision})."
+                )
+            state["base_revision"] = current_revision
+            yield state
 
     def _persist_chronicle_state(
         self,
@@ -844,6 +976,22 @@ class StellarisMcpContext:
                 f"({len(value)} > {MAX_CHRONICLE_WRITEBACK_CHARS} chars)."
             )
 
+    def _validate_bounded_text(self, value: str, *, field_name: str, maximum: int) -> None:
+        if len(value) > maximum:
+            raise McpContextError(
+                f"Chronicle {field_name} is too long ({len(value)} > {maximum} chars)."
+            )
+
+    def _validate_optional_text(
+        self,
+        value: str | None,
+        *,
+        field_name: str,
+        maximum: int,
+    ) -> None:
+        if value is not None:
+            self._validate_bounded_text(str(value), field_name=field_name, maximum=maximum)
+
     def _ensure_chapters(self, chapters_data: dict[str, Any]) -> list[dict[str, Any]]:
         chapters = chapters_data.get("chapters")
         if not isinstance(chapters, list):
@@ -859,12 +1007,24 @@ class StellarisMcpContext:
     ) -> list[dict[str, str]]:
         normalized: list[dict[str, str]] = []
         if isinstance(sections, list):
-            for section in sections[:12]:
+            if len(sections) > MAX_CHRONICLE_SECTIONS:
+                raise McpContextError(
+                    f"Chronicle sections has too many items ({len(sections)} > {MAX_CHRONICLE_SECTIONS})."
+                )
+            total_chars = 0
+            for section in sections:
                 if not isinstance(section, dict):
                     continue
                 text = str(section.get("text") or "").strip()
                 if not text:
                     continue
+                self._validate_chronicle_text(text, field_name="section text")
+                total_chars += len(text)
+                if total_chars > MAX_CHRONICLE_WRITEBACK_CHARS:
+                    raise McpContextError(
+                        "Chronicle section text exceeds the total write-back limit "
+                        f"({total_chars} > {MAX_CHRONICLE_WRITEBACK_CHARS} chars)."
+                    )
                 raw_type = str(section.get("type") or "prose").strip().lower()
                 section_type = (
                     raw_type if raw_type in {"prose", "quote", "declaration"} else "prose"
@@ -874,7 +1034,7 @@ class StellarisMcpContext:
                         {
                             "type": section_type,
                             "text": text,
-                            "attribution": str(section.get("attribution") or "").strip(),
+                            "attribution": str(section.get("attribution") or "").strip()[:200],
                         }
                     )
                 )
@@ -890,6 +1050,8 @@ class StellarisMcpContext:
         operation: str,
         target: str,
         updated_at: str,
+        edit_receipt: str,
+        base_revision: str,
     ) -> None:
         history = self._external_edit_history(chapters_data)
         history.append(
@@ -898,11 +1060,21 @@ class StellarisMcpContext:
                 "target": target,
                 "updated_at": updated_at,
                 "source": "external_ai",
+                "edit_receipt": edit_receipt,
+                "base_revision": base_revision,
                 "previous_chapters_data": _visible_chapters_snapshot(before),
             }
         )
         chapters_data["external_edit_history"] = history[-MAX_CHRONICLE_EDIT_HISTORY_ITEMS:]
         chapters_data["external_edit_last_updated_at"] = updated_at
+
+    def _finalize_external_edit(self, chapters_data: dict[str, Any]) -> str:
+        revision = _chronicle_revision(chapters_data)
+        history = self._external_edit_history(chapters_data)
+        if history:
+            history[-1]["resulting_revision"] = revision
+            chapters_data["external_edit_history"] = history
+        return revision
 
     def _external_edit_history(self, chapters_data: dict[str, Any]) -> list[dict[str, Any]]:
         raw = chapters_data.get("external_edit_history")
@@ -1293,10 +1465,50 @@ def _json_clone(value: Any) -> Any:
     return json.loads(json.dumps(value, ensure_ascii=False))
 
 
+def _campaign_ref(save_id: str) -> str:
+    digest = hashlib.sha256(f"stellaris-companion:{save_id}".encode()).hexdigest()[:24]
+    return f"campaign_{digest}"
+
+
+def _chronicle_revision(chapters_data: dict[str, Any]) -> str:
+    visible = _visible_chapters_snapshot(chapters_data)
+    encoded = json.dumps(
+        visible,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return f"chronicle_{hashlib.sha256(encoded).hexdigest()[:24]}"
+
+
+def _new_edit_receipt() -> str:
+    return f"edit_{uuid.uuid4().hex}"
+
+
+def _freshness_payload(updated_at: Any) -> dict[str, Any]:
+    try:
+        updated = datetime.fromtimestamp(float(updated_at), tz=timezone.utc)
+    except (TypeError, ValueError, OSError):
+        return {"state": "unknown", "message": "Campaign update time is unavailable."}
+    seconds = max(0, int((datetime.now(timezone.utc) - updated).total_seconds()))
+    if seconds < 120:
+        state = "fresh"
+        message = "Campaign data updated moments ago."
+    elif seconds < 3600:
+        state = "recent"
+        message = f"Campaign data updated {max(2, seconds // 60)} minutes ago."
+    else:
+        state = "stale"
+        hours = max(1, seconds // 3600)
+        message = f"Campaign data was last updated {hours} hour{'s' if hours != 1 else ''} ago."
+    return {"state": state, "seconds": seconds, "message": message}
+
+
 def _visible_chapters_snapshot(chapters_data: dict[str, Any]) -> dict[str, Any]:
     snapshot = _json_clone(chapters_data)
     if isinstance(snapshot, dict):
         snapshot.pop("external_edit_history", None)
+        snapshot.pop("external_edit_last_updated_at", None)
     return snapshot if isinstance(snapshot, dict) else {}
 
 

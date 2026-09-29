@@ -31,3 +31,6 @@ npm run build:mcpb
 
 echo "Step 4: Publishing Electron app..."
 npx electron-builder "$@" --publish always
+
+echo "Step 5: Recreating versioned Claude Desktop MCPB release asset..."
+npm run build:mcpb

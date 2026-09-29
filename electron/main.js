@@ -162,6 +162,7 @@ const store = new Store({
     chronicleRefreshMode: 'balanced',
     modelRoutingMode: 'conserve',
     language: 'system',
+    resolvedLanguage: 'en',
     hasCompletedOnboarding: false,
     // Window state persistence
     windowState: {
@@ -275,17 +276,19 @@ function getPythonPath() {
       return path.join(resourcePath, 'python-backend', 'stellaris-backend')
     }
   } else {
-    // In development, try venv first, then system Python
-    const venvRoot = path.join(__dirname, '..', 'venv')
-    const venvPythonCandidates = process.platform === 'win32'
-      ? [
-        path.join(venvRoot, 'Scripts', 'python.exe'),
-        path.join(venvRoot, 'Scripts', 'python'),
-      ]
-      : [
-        path.join(venvRoot, 'bin', 'python3'),
-        path.join(venvRoot, 'bin', 'python'),
-      ]
+    // In development, support both uv's .venv convention and the legacy venv.
+    const venvRoots = ['.venv', 'venv'].map(name => path.join(__dirname, '..', name))
+    const venvPythonCandidates = venvRoots.flatMap(venvRoot => (
+      process.platform === 'win32'
+        ? [
+          path.join(venvRoot, 'Scripts', 'python.exe'),
+          path.join(venvRoot, 'Scripts', 'python'),
+        ]
+        : [
+          path.join(venvRoot, 'bin', 'python3'),
+          path.join(venvRoot, 'bin', 'python'),
+        ]
+    ))
 
     for (const candidate of venvPythonCandidates) {
       if (fs.existsSync(candidate)) return candidate
@@ -810,7 +813,9 @@ function getLanguageSetting() {
 }
 
 function getResolvedLanguageSetting() {
-  return resolveLanguage(getLanguageSetting())
+  const resolved = resolveLanguage(getLanguageSetting())
+  if (store.get('resolvedLanguage') !== resolved) store.set('resolvedLanguage', resolved)
+  return resolved
 }
 
 function getUpdateChannelSetting() {

@@ -180,17 +180,45 @@ function resolveBackendLaunch() {
 }
 
 function buildArgs(baseArgs) {
+  const userDataDir = defaultUserDataDir()
   const dbPath = cleanConfigValue(process.env.STELLARIS_COMPANION_DB_PATH) ||
-    path.join(defaultUserDataDir(), 'stellaris_history.db')
-  const language = cleanConfigValue(process.env.STELLARIS_COMPANION_LANGUAGE) || 'en'
+    path.join(userDataDir, 'stellaris_history.db')
   return [
     ...baseArgs,
     '--mcp',
     '--db-path',
     dbPath,
-    '--language',
-    language,
+    '--settings-path',
+    path.join(userDataDir, 'settings.json'),
   ]
+}
+
+function buildChildEnv(extraEnv = {}) {
+  const safeKeys = [
+    'APPDATA',
+    'HOME',
+    'LANG',
+    'LC_ALL',
+    'LOCALAPPDATA',
+    'PATH',
+    'PATHEXT',
+    'SystemRoot',
+    'TEMP',
+    'TMP',
+    'USERPROFILE',
+  ]
+  const env = {}
+  safeKeys.forEach((key) => {
+    if (process.env[key]) env[key] = process.env[key]
+  })
+  const userDataDir = defaultUserDataDir()
+  return {
+    ...env,
+    STELLARIS_DB_PATH: path.join(userDataDir, 'stellaris_history.db'),
+    STELLARIS_LOG_DIR: path.join(userDataDir, 'logs'),
+    STELLARIS_LOG_FILE_NAME: 'stellaris-companion-mcp.log',
+    ...extraEnv,
+  }
 }
 
 function main() {
@@ -206,44 +234,13 @@ function main() {
   }
 
   const child = spawn(launch.command, buildArgs(launch.baseArgs), {
-    env: {
-      ...process.env,
-      ...(launch.env || {}),
-    },
+    env: buildChildEnv(launch.env || {}),
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   })
 
-  let stdoutBuffer = ''
-  const stdoutQueue = []
-  let stdoutFlushScheduled = false
-
-  const flushStdoutQueue = () => {
-    const line = stdoutQueue.shift()
-    if (line !== undefined) {
-      process.stdout.write(`${line}\n`)
-      setTimeout(flushStdoutQueue, 5)
-      return
-    }
-    stdoutFlushScheduled = false
-  }
-
-  const enqueueStdoutLine = (line) => {
-    if (!line) return
-    stdoutQueue.push(line)
-    if (!stdoutFlushScheduled) {
-      stdoutFlushScheduled = true
-      setImmediate(flushStdoutQueue)
-    }
-  }
-
   process.stdin.pipe(child.stdin)
-  child.stdout.on('data', (chunk) => {
-    stdoutBuffer += chunk.toString('utf8')
-    const lines = stdoutBuffer.split(/\r?\n/)
-    stdoutBuffer = lines.pop() || ''
-    lines.forEach(enqueueStdoutLine)
-  })
+  child.stdout.pipe(process.stdout)
   child.stderr.pipe(process.stderr)
 
   child.on('error', (error) => {
@@ -252,8 +249,6 @@ function main() {
   })
 
   child.on('exit', (code, signal) => {
-    const remainingStdout = stdoutBuffer.trim()
-    if (remainingStdout) process.stdout.write(`${remainingStdout}\n`)
     if (signal) {
       process.kill(process.pid, signal)
       return

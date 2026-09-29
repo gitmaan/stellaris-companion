@@ -72,6 +72,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     status: () => ipcRenderer.invoke('mcp-relay:status'),
     healthCheck: () => ipcRenderer.invoke('mcp-relay:health-check'),
     installClaudeDesktop: () => ipcRenderer.invoke('mcp-relay:install-claude-desktop'),
+    connectClient: (client) => ipcRenderer.invoke('mcp-relay:connect-client', { client }),
+    disconnectClient: (client) => ipcRenderer.invoke('mcp-relay:disconnect-client', { client }),
+    openClaudeExtension: () => ipcRenderer.invoke('mcp-relay:open-claude-extension'),
+    revealPath: (filePath) => ipcRenderer.invoke('mcp-relay:reveal-path', { path: filePath }),
     openClaudeConfigFolder: () => ipcRenderer.invoke('mcp-relay:open-claude-config-folder'),
   },
 

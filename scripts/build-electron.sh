@@ -53,11 +53,12 @@ cd renderer
 npm run build
 cd ..
 
-# Build the Electron app
+# Build the Electron app. build:electron stages the stable MCPB first.
 echo "Running electron-builder..."
 npm run build:electron
 
-echo "Packaging Claude Desktop MCPB extension..."
+# electron-builder cleans its output folder, so recreate the versioned release asset.
+echo "Packaging Claude Desktop MCPB release asset..."
 npm run build:mcpb
 
 echo "Electron app build complete!"
