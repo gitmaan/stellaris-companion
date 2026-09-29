@@ -23,6 +23,7 @@
   },
   "status": {
     "ready": "系统在线",
+    "historyNotSaved": "历史记录未保存",
     "analyzing": "正在扫描帝国...",
     "analyzingWithStage": "正在扫描 ({{stage}})...",
     "connecting": "正在连接...",
@@ -545,6 +546,7 @@
       "modelContextTooSmall": "{{context}} 上下文。 Advisor 和 Chronicle 通常至少需要 32K。",
       "modelContextUnknown": "未报告上下文大小。对于 Advisor 和 Chronicle，至少使用 32K 加载此模型。",
       "sessionOnlySecrets": "该设备目前无法安全地保存 API 密钥。您可以在应用程序关闭之前使用其中之一，但无法发布。",
+      "lockedSecrets": "无法读取已保存的凭据。请解锁凭据存储并重启应用，或重新输入密钥。已保存的值已保留。",
       "remoteContextNotice": "问题和战役的相关部分将发送至此提供商。您的保存文件永远不会被上传。",
       "ollamaCloudNotice": "此 Ollama 云模型远程处理 Advisor 和 Chronicle 提示，而不是在此设备上。",
       "showAdvanced": "显示高级连接",

@@ -104,6 +104,7 @@ export interface Settings {
   customProviderApiKey: string
   customProviderApiKeySet: boolean
   secretStorageAvailable: boolean
+  secretStorageReadFailed?: boolean
   secretStorageBackend: string | null
   advisorProvider: AdvisorProvider
   advisorModel: string
@@ -184,6 +185,7 @@ export function useSettings(): UseSettingsResult {
         customProviderApiKeySet: !!loaded.customProviderApiKeySet,
         updateChannel: normalizeUpdateChannel(loaded.updateChannel),
         secretStorageAvailable: loaded.secretStorageAvailable === true,
+        secretStorageReadFailed: loaded.secretStorageReadFailed === true,
         secretStorageBackend: typeof loaded.secretStorageBackend === 'string'
           ? loaded.secretStorageBackend
           : null,

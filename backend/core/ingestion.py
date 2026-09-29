@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from backend.core.database import DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
-from backend.core.history import record_snapshot_from_briefing
+from backend.core.history import compute_save_id, record_snapshot_from_briefing
 from backend.core.ingestion_worker import WorkerJob, run_worker_job
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,7 @@ class IngestionStatus:
     updated_at: float = field(default_factory=time.time)
 
     save_loaded: bool = False
+    save_id: str | None = None
     current_save_path: str | None = None
     current_save_mtime: float | None = None
 
@@ -129,6 +130,7 @@ class IngestionManager:
             game_date = meta.get("date") or self._status.t2_game_date
             payload = {
                 "save_loaded": bool(self._status.save_loaded),
+                "save_id": self._status.save_id,
                 "empire_name": empire_name,
                 "game_date": game_date,
                 "precompute_ready": bool(self._status.t2_ready),
@@ -388,6 +390,14 @@ class IngestionManager:
 
             # Persist + activate cache (main process only).
             persist_start = time.time()
+            persist_error = None
+            custom_instructions = None
+            save_id = compute_save_id(
+                campaign_id=merged_meta.get("campaign_id"),
+                player_id=merged_meta.get("player_id"),
+                empire_name=merged_meta.get("empire_name") or merged_meta.get("name"),
+                save_path=save_path,
+            )
             try:
                 parsed = json.loads(briefing_json)
                 if isinstance(parsed, dict):
@@ -398,16 +408,11 @@ class IngestionManager:
                         briefing=parsed,
                         briefing_json=briefing_json,
                     )
-                    # If the UI has already set per-playthrough customization in memory,
-                    # persist it once the session row exists (session_id is stable here).
-                    with contextlib.suppress(Exception):
-                        custom = getattr(self._companion, "custom_instructions", None)
-                        if isinstance(custom, str) and custom.strip():
-                            self._db.update_session_advisor_custom(
-                                session_id=session_id,
-                                text=custom,
-                            )
+                    custom_instructions = self._db.get_session_advisor_custom(
+                        session_id=session_id,
+                    )
             except Exception as e:
+                persist_error = f"Campaign history could not be saved: {e}"
                 logger.warning("snapshot_persist_failed error=%s", e)
             logger.info("[TIMING] DB persist: %.1fms", (time.time() - persist_start) * 1000)
 
@@ -421,6 +426,7 @@ class IngestionManager:
                     situation=situation if isinstance(situation, dict) else None,
                     metadata=merged_meta or None,
                     save_hash=save_hash if isinstance(save_hash, str) else None,
+                    custom_instructions=custom_instructions,
                 )
             except Exception as e:
                 with self._lock:
@@ -436,6 +442,7 @@ class IngestionManager:
                 if request_id != self._request_id:
                     continue
                 self._status.t2_ready = True
+                self._status.save_id = save_id
                 self._status.t2_meta = merged_meta
                 self._status.t2_game_date = str(game_date) if game_date is not None else None
                 self._status.t2_updated_at = time.time()
@@ -443,7 +450,7 @@ class IngestionManager:
                     float(duration_ms) if duration_ms is not None else None
                 )
                 self._status.t2_last_save_hash = save_hash if isinstance(save_hash, str) else None
-                self._status.last_error = None
+                self._status.last_error = persist_error
                 self._set_stage_locked("ready", "complete briefing ready")
                 logger.info("[TIMING] T2 complete - status now 'ready'")
 

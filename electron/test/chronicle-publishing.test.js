@@ -89,6 +89,21 @@ test('normalizes only the structured Chronicle fields and drops local-only data'
   assert.equal('attribution' in normalized.document.chapters[0].sections[0], false)
 })
 
+test('does not replace an established publisher identity when its secret is unreadable', () => {
+  const { service, store, secrets } = createHarness(() => {
+    throw new Error('No network request expected')
+  })
+  const publisherId = '84b66f39-ccab-4d60-8d50-82b34537cb5d'
+  store.set('chroniclePublisherId', publisherId)
+  store.set('chronicle-secret', 'original-encrypted-bytes')
+  assert.throws(() => service.ensurePublisherIdentity(), {
+    code: 'secure_storage_unavailable',
+  })
+  assert.equal(store.get('chroniclePublisherId'), publisherId)
+  assert.equal(store.get('chronicle-secret'), 'original-encrypted-bytes')
+  assert.equal(secrets.size, 0)
+})
+
 test('publishes, updates, checks status, and deletes with an encrypted anonymous identity', async () => {
   const requests = []
   const { service, store, secrets } = createHarness(async (url, init) => {

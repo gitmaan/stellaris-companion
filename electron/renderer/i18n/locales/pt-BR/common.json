@@ -23,6 +23,7 @@
   },
   "status": {
     "ready": "SISTEMAS ONLINE",
+    "historyNotSaved": "HISTÓRICO NÃO SALVO",
     "analyzing": "ANALISANDO IMPERIO...",
     "analyzingWithStage": "ANALISANDO ({{stage}})...",
     "connecting": "CONECTANDO...",
@@ -552,6 +553,7 @@
       "modelContextTooSmall": "{{context}} detectado. Advisor e Chronicle geralmente precisam de pelo menos 32K.",
       "modelContextUnknown": "O tamanho do contexto não foi informado. Para Advisor e Chronicle, carregue este modelo com pelo menos 32K.",
       "sessionOnlySecrets": "Este dispositivo não pode salvar chaves API com segurança no momento. Você pode usar um até o aplicativo fechar, mas a publicação não estará disponível.",
+      "lockedSecrets": "Não foi possível ler as credenciais salvas. Desbloqueie o armazenamento de credenciais e reinicie o aplicativo, ou insira a chave novamente. Os valores salvos foram preservados.",
       "remoteContextNotice": "As perguntas e as partes relevantes da sua campanha são enviadas para este provedor. Seu arquivo salvo nunca é carregado.",
       "ollamaCloudNotice": "Este modelo de nuvem Ollama processa prompts do Advisor e Chronicle remotamente, em vez de neste dispositivo.",
       "showAdvanced": "MOSTRAR CONEXÃO AVANÇADA",

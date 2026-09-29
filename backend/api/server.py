@@ -595,10 +595,11 @@ def create_app() -> FastAPI:
         custom = (body.custom_instructions or "").strip()
         custom = custom[:300]
 
-        # Apply immediately in-memory so the very next chat uses the new personality,
-        # even if the session row hasn't been persisted yet.
-        with contextlib.suppress(Exception):
-            companion.set_custom_instructions(custom or None)
+        ingestion = getattr(request.app.state, "ingestion", None)
+        if ingestion is not None and not ingestion.get_status().get("t2_ready"):
+            raise HTTPException(
+                status_code=409, detail={"error": "Wait for the save to finish loading"}
+            )
 
         save_id, err = _resolve_current_save_id(request)
         if err or not save_id:
@@ -606,10 +607,10 @@ def create_app() -> FastAPI:
 
         session_id = db.get_active_session_id(save_id)
         if not session_id:
-            # Persist later when the ingestion pipeline creates the session row.
-            return {"custom_instructions": custom or None, "persisted": False}
+            raise HTTPException(status_code=409, detail={"error": "Campaign history is not ready"})
 
         db.update_session_advisor_custom(session_id=session_id, text=custom or None)
+        companion.set_custom_instructions(custom or None)
         return {"custom_instructions": custom or None, "persisted": True}
 
     @app.get("/api/chronicle-custom-instructions", dependencies=[Depends(verify_token)])

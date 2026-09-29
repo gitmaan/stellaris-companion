@@ -196,6 +196,8 @@ function ChatPage({
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [sessionKey, setSessionKey] = useState(() => createSessionKey())
+  const campaignIdRef = useRef<string | null>(null)
+  const chatGenerationRef = useRef(0)
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0)
   const [empireType, setEmpireType] = useState<EmpireType | null>(null)
   const [saveLoaded, setSaveLoaded] = useState(false)
@@ -259,6 +261,17 @@ function ChatPage({
     if (!window.electronAPI?.onBackendStatus) return
 
     const cleanup = window.electronAPI.onBackendStatus((status) => {
+      const campaignId = status?.save_id
+      if (campaignId && campaignId !== campaignIdRef.current) {
+        if (campaignIdRef.current !== null) {
+          chatGenerationRef.current += 1
+          setMessages([])
+          setSessionKey(createSessionKey())
+          setIsLoading(false)
+          setAdvisorPanelOpen(false)
+        }
+        campaignIdRef.current = campaignId
+      }
       if (status?.empire_type) {
         setEmpireType(status.empire_type)
       }
@@ -305,6 +318,7 @@ function ChatPage({
   }, [isWelcomeCompact, roastSuggestion, suggestions])
 
   const handleSend = useCallback(async (text: string) => {
+    const generation = chatGenerationRef.current
     // Add user message
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -321,7 +335,7 @@ function ChatPage({
       const result = await backend.chat(text, sessionKey, undefined, modelRoutingMode)
 
       // Only update state if component is still mounted
-      if (!isMountedRef.current) return
+      if (!isMountedRef.current || generation !== chatGenerationRef.current) return
 
       if (result.error) {
         // Retryable backend state (precompute not ready)
@@ -375,7 +389,7 @@ function ChatPage({
       }
     } catch (err) {
       // Only update state if component is still mounted
-      if (!isMountedRef.current) return
+      if (!isMountedRef.current || generation !== chatGenerationRef.current) return
 
       // Unexpected error
       const errorMessage: Message = {
@@ -387,7 +401,7 @@ function ChatPage({
       }
       setMessages(prev => capMessages([...prev, errorMessage]))
     } finally {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && generation === chatGenerationRef.current) {
         setIsLoading(false)
       }
     }
@@ -462,9 +476,10 @@ function ChatPage({
   return (
     <div className="flex flex-col h-full min-h-0 relative">
       <AdvisorInfoPanel
+        key={campaignIdRef.current}
         isOpen={advisorPanelOpen}
         onClose={() => setAdvisorPanelOpen(false)}
-        saveLoaded={saveLoaded}
+        saveLoaded={saveLoaded && precomputeReady}
         empireName={empireName}
         gameDate={gameDate}
         empireEthics={empireEthics}

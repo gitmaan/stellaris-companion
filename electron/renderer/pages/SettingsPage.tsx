@@ -932,9 +932,11 @@ function SettingsPage({
                                onChange={handleAdvisorProviderChange}
                              />
                              <ProviderSetupGuide provider={advisorProvider} />
-                             {settings?.secretStorageAvailable === false && (
+                             {(settings?.secretStorageReadFailed || settings?.secretStorageAvailable === false) && (
                                <HUDMicro className="block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
-                                 {t('settings.advisor.sessionOnlySecrets')}
+                                 {t(settings.secretStorageReadFailed
+                                   ? 'settings.advisor.lockedSecrets'
+                                   : 'settings.advisor.sessionOnlySecrets')}
                                </HUDMicro>
                              )}
 

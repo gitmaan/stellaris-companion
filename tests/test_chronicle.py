@@ -880,6 +880,44 @@ class TestGenerateChronicleCurrentEraPolicy:
         assert result["current_era"]["narrative"] == "Existing teaser text."
         assert result["cached"] is True
 
+    def test_incomplete_responses_do_not_replace_saved_current_era(self, generator):
+        existing = {
+            "format_version": 1,
+            "chapters": [],
+            "current_era_start_date": "2200.01.01",
+            "current_era_start_snapshot_id": 1,
+            "current_era_cache": {
+                "start_date": "2200.01.01",
+                "start_snapshot_id": 1,
+                "last_snapshot_id": 1,
+                "current_era": {"narrative": "Keep this story.", "events_covered": 1},
+            },
+        }
+        generator.db.get_chronicle_by_save_id.return_value = {
+            "chapters_json": json.dumps(existing),
+            "event_count": 1,
+            "snapshot_count": 2,
+        }
+        generator.db.get_events_in_snapshot_range.return_value = [
+            {"event_type": "war_started", "summary": "War begun", "game_date": "2205.01.01"}
+        ]
+        generator._should_finalize_chapter = MagicMock(return_value=(False, None))
+        generator._count_pending_chapters = MagicMock(return_value=0)
+        client = MagicMock()
+        client.models.generate_content.return_value = MagicMock(text='{"sections":[')
+        generator._client = client
+
+        with pytest.raises(AdvisorProviderError, match="valid structured output"):
+            generator.generate_chronicle("session-1", force_refresh=True)
+
+        assert client.models.generate_content.call_count == 2
+        assert client.models.generate_content.call_args.kwargs["config"].max_output_tokens == 4096
+        generator.db.upsert_chronicle_by_save_id.assert_not_called()
+        assert (
+            json.loads(generator.db.get_chronicle_by_save_id.return_value["chapters_json"])
+            == existing
+        )
+
     def test_skips_current_era_generation_while_chapters_pending(self, generator):
         """When chapters are pending, current era should not consume additional model calls."""
         generator.db.get_chronicle_by_save_id.return_value = {

@@ -95,3 +95,28 @@ test('fails closed when Linux cannot identify the selected storage backend', () 
     false,
   )
 })
+
+for (const failure of ['decrypt failure', 'unavailable keychain']) {
+  test(`preserves stored credentials through ${failure} and recovers on a later read`, () => {
+    const original = Buffer.from('encrypted:original-secret').toString('base64')
+    const store = new MemoryStore({ 'api-key': original })
+    let locked = true
+    const safeStorage = protectedSafeStorage()
+    const decrypt = safeStorage.decryptString
+    safeStorage.isEncryptionAvailable = () => failure !== 'unavailable keychain' || !locked
+    safeStorage.decryptString = buffer => {
+      if (locked) throw new Error('Keychain locked')
+      return decrypt(buffer)
+    }
+    const storage = createSecretStorage({ safeStorage, store, platform: 'linux' })
+
+    assert.equal(storage.getSecret('api-key'), null)
+    assert.equal(storage.getSecret('api-key'), null)
+    assert.equal(store.get('api-key'), original)
+    assert.equal(storage.getStatus().decryptionFailed, true)
+    locked = false
+    assert.equal(storage.getSecret('api-key'), 'original-secret')
+    assert.equal(store.get('api-key'), original)
+    assert.equal(storage.getStatus().decryptionFailed, false)
+  })
+}

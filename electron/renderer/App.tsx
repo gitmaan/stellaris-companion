@@ -282,8 +282,10 @@ function App() {
                     pointerEvents: isActive ? 'auto' : 'none',
                     zIndex: isActive ? 1 : 0,
                   }}
-                  // @ts-expect-error inert is valid HTML; framer-motion types lag
-                  inert={!isActive || undefined}
+                  // React 18 forwards inert as a string attribute, not a boolean.
+                  // @ts-expect-error framer-motion types do not include inert yet
+                  inert={isActive ? undefined : ''}
+                  aria-hidden={!isActive}
                 >
                   <div className="h-full w-full">
                     {tab === 'chat' && (

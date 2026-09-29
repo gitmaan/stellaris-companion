@@ -23,6 +23,7 @@
   },
   "status": {
     "ready": "SYSTEME ONLINE",
+    "historyNotSaved": "VERLAUF NICHT GESPEICHERT",
     "analyzing": "IMPERIUM WIRD SONDIERT...",
     "analyzingWithStage": "SONDIERUNG ({{stage}})...",
     "connecting": "VERBINDE...",
@@ -545,6 +546,7 @@
       "modelContextTooSmall": "{{context}}-Kontext erkannt. Advisor und Chronicle benötigen im Allgemeinen mindestens 32K.",
       "modelContextUnknown": "Die Kontextgröße wurde nicht gemeldet. Laden Sie dieses Modell für Advisor und Chronicle mit mindestens 32K.",
       "sessionOnlySecrets": "Dieses Gerät kann derzeit keine API-Schlüssel sicher speichern. Sie können eine davon verwenden, bis die App geschlossen wird, die Veröffentlichung ist jedoch nicht möglich.",
+      "lockedSecrets": "Gespeicherte Zugangsdaten konnten nicht gelesen werden. Entsperre den Zugangsdaten-Speicher und starte die App neu oder gib den Schlüssel erneut ein. Die gespeicherten Werte bleiben erhalten.",
       "remoteContextNotice": "An diesen Anbieter werden Fragen und die relevanten Teile Ihrer Kampagne gesendet. Ihre Sicherungsdatei wird nie hochgeladen.",
       "ollamaCloudNotice": "Dieses Ollama-Cloudmodell verarbeitet Advisor- und Chronicle-Eingabeaufforderungen remote und nicht auf diesem Gerät.",
       "showAdvanced": "ERWEITERTE VERBINDUNG ANZEIGEN",

@@ -24,6 +24,7 @@ export type EmpireType = 'machine' | 'hive_mind' | 'standard'
 export interface HealthResponse {
   status: string
   save_loaded: boolean
+  save_id?: string | null
   empire_name: string | null
   game_date: string | null
   precompute_ready: boolean
