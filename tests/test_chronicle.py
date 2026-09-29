@@ -21,11 +21,11 @@ from backend.core.chronicle import (
     ChronicleGenerator,
     CurrentEraOutput,
     _chapter_narrative_scope,
-    _repair_json_string,
     _sections_to_text,
     get_current_era_regen_min_new_events,
 )
 from backend.core.model_routing import clear_model_state
+from backend.core.structured_output import repair_json_string as _repair_json_string
 
 
 class TestRepairJsonString:
@@ -911,7 +911,7 @@ class TestGenerateChronicleCurrentEraPolicy:
             generator.generate_chronicle("session-1", force_refresh=True)
 
         assert client.models.generate_content.call_count == 2
-        assert client.models.generate_content.call_args.kwargs["config"].max_output_tokens == 4096
+        assert client.models.generate_content.call_args.kwargs["config"].max_output_tokens == 8192
         generator.db.upsert_chronicle_by_save_id.assert_not_called()
         assert (
             json.loads(generator.db.get_chronicle_by_save_id.return_value["chapters_json"])

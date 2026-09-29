@@ -36,6 +36,9 @@ from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
 from backend.core.model_briefing import build_model_briefing
 from backend.core.model_routing import display_model_name, normalize_model_routing_mode
+from backend.core.structured_output import (
+    validate_structured_response as _validate_structured_response,
+)
 from stellaris_companion.game_knowledge import build_game_knowledge_prompt
 
 logger = logging.getLogger(__name__)
@@ -99,96 +102,6 @@ def _sections_to_text(sections: list[dict], epigraph: str = "") -> str:
             parts.append(text)
             parts.append("")
     return "\n".join(parts).strip()
-
-
-def _repair_json_string(text: str) -> str:
-    """Repair JSON with unescaped newlines in string values.
-
-    Gemini sometimes returns JSON with literal newlines inside strings,
-    which is invalid JSON. This function escapes them properly.
-    """
-    # Strategy: Find string values and escape newlines within them
-    # This regex finds content between quotes (handling escaped quotes)
-    result = []
-    in_string = False
-    escape_next = False
-    i = 0
-
-    while i < len(text):
-        char = text[i]
-
-        if escape_next:
-            result.append(char)
-            escape_next = False
-            i += 1
-            continue
-
-        if char == "\\":
-            result.append(char)
-            escape_next = True
-            i += 1
-            continue
-
-        if char == '"':
-            result.append(char)
-            in_string = not in_string
-            i += 1
-            continue
-
-        if in_string and char == "\n":
-            # Escape the newline
-            result.append("\\n")
-            i += 1
-            continue
-
-        if in_string and char == "\r":
-            # Skip carriage returns (will be part of \r\n -> \n)
-            i += 1
-            continue
-
-        if in_string and char == "\t":
-            # Escape tabs
-            result.append("\\t")
-            i += 1
-            continue
-
-        result.append(char)
-        i += 1
-
-    return "".join(result)
-
-
-def _extract_json_object(text: str) -> str:
-    """Extract a JSON object from plain text or a fenced provider response."""
-    candidate = str(text or "").strip()
-    if candidate.startswith("```"):
-        lines = candidate.splitlines()
-        if lines:
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        candidate = "\n".join(lines).strip()
-
-    start = candidate.find("{")
-    end = candidate.rfind("}")
-    if start < 0 or end < start:
-        raise ValueError("Response did not contain a JSON object")
-    return candidate[start : end + 1]
-
-
-def _validate_structured_response(
-    text: str,
-    response_schema: type[BaseModel],
-) -> BaseModel:
-    """Validate provider JSON, repairing literal control characters once."""
-    candidate = _extract_json_object(text)
-    try:
-        return response_schema.model_validate_json(candidate)
-    except Exception as initial_error:
-        repaired = _repair_json_string(candidate)
-        if repaired == candidate:
-            raise initial_error
-        return response_schema.model_validate_json(repaired)
 
 
 # Era-ending event types that trigger chapter finalization
@@ -1088,7 +1001,9 @@ class ChronicleGenerator:
         validation_error: Exception | None = None
         prompt = contents
 
-        for attempt in range(2):
+        # Native Gemini owns schema recovery and model fallback in one two-call loop.
+        attempts = 1 if self.provider_config.provider == ADVISOR_PROVIDER_GEMINI else 2
+        for attempt in range(attempts):
             try:
                 result = self._generate_content_with_routing(
                     contents=prompt,
@@ -1102,7 +1017,7 @@ class ChronicleGenerator:
                     game_knowledge_context=game_knowledge_context,
                 )
             except AdvisorProviderError as exc:
-                if attempt == 0 and exc.code == "PROVIDER_EMPTY_RESPONSE":
+                if attempt + 1 < attempts and exc.code == "PROVIDER_EMPTY_RESPONSE":
                     logger.warning("%s returned an empty response; retrying once", purpose_label)
                     prompt = (
                         f"{contents.rstrip()}\n\n"
@@ -1114,7 +1029,7 @@ class ChronicleGenerator:
                 return _validate_structured_response(result.text, response_schema), result
             except Exception as exc:
                 validation_error = exc
-                if attempt == 0 and not result.schema_fallback_used:
+                if attempt + 1 < attempts and not result.schema_fallback_used:
                     logger.warning(
                         "%s returned invalid structured output; retrying once: %s",
                         purpose_label,
@@ -1151,6 +1066,7 @@ class ChronicleGenerator:
         event.setdefault("notice", None)
         event.setdefault("error", None)
         event["provider"] = result.provider
+        event["diagnostics"] = result.diagnostics
         self._model_route_events.append(event)
 
     def _model_routing_response(self) -> dict[str, Any]:

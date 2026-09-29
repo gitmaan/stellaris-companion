@@ -196,6 +196,8 @@ function ChroniclePage({
   // Prevent concurrent chronicle requests and ignore stale results.
   const chronicleRequestTokenRef = useRef(0)
   const chronicleInFlightRef = useRef(false)
+  // A provider failure pauses automatic spending for this campaign until Retry.
+  const failedAutoRefreshSavesRef = useRef(new Set<string>())
   const queuedForceRefreshRef = useRef(false)
   const chronicleRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastAutoSavesRefreshAtRef = useRef(0)
@@ -273,6 +275,9 @@ function ChroniclePage({
     chapterOnly = false,
   ) => {
     if (!selectedSaveId) return
+    const autoRefreshPaused = !forceRefresh && failedAutoRefreshSavesRef.current.has(selectedSaveId)
+    if (autoRefreshPaused && chapterOnly) return
+    if (forceRefresh) failedAutoRefreshSavesRef.current.delete(selectedSaveId)
 
     // Use cached sessions instead of fetching again
     const session = latestSessionBySaveId.get(selectedSaveId)
@@ -297,7 +302,7 @@ function ChroniclePage({
     const token = ++chronicleRequestTokenRef.current
 
     setLoading(true)
-    setError(null)
+    if (!autoRefreshPaused) setError(null)
     setErrorNeedsSettings(false)
 
     let shouldRetrySoon = false
@@ -330,6 +335,8 @@ function ChroniclePage({
         }
       }
 
+      if (autoRefreshPaused) return
+
       const chronicleResult = await backend.chronicle(
         session.id,
         forceRefresh,
@@ -349,6 +356,9 @@ function ChroniclePage({
           setChronicleConfigured(false)
           setError(null)
         } else {
+          if (isProviderError(chronicleResult.errorCode)) {
+            failedAutoRefreshSavesRef.current.add(selectedSaveId)
+          }
           setError(getChronicleProviderErrorMessage({
             code: chronicleResult.errorCode,
             fallback: chronicleResult.error,
@@ -947,6 +957,15 @@ function ChroniclePage({
                   className="px-3 py-1.5 text-[10px]"
                 >
                   {t('chronicle.providerSetup.action')}
+                </HUDButton>
+              </div>
+            )}
+
+            {selectedSaveId && failedAutoRefreshSavesRef.current.has(selectedSaveId) && (
+              <div className="flex items-center gap-3 text-text-secondary text-sm mb-4">
+                <p role="status">{t('chronicle.page.autoRefreshPaused')}</p>
+                <HUDButton type="button" variant="secondary" onClick={handleRefresh} disabled={loading}>
+                  {t('common.retry')}
                 </HUDButton>
               </div>
             )}

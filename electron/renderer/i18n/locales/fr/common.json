@@ -81,7 +81,7 @@
       "providerBillingFailed": "{{provider}} n'a pas de facturation ou de crédit utilisable pour cette demande. Vérifiez le compte du fournisseur ou choisissez un autre fournisseur.",
       "providerTimeout": "{{provider}} a mis trop de temps à répondre. Un modèle local est peut-être encore en cours de chargement ; réessayez ou vérifiez son serveur.",
       "providerContextLimit": "La fenêtre de contexte est trop petite pour ce briefing de campagne. Augmentez le contexte du fournisseur à au moins 32K ou choisissez un modèle avec un contexte plus large.",
-      "providerInvalidResponse": "{{provider}} a renvoyé une réponse que cette application n'a pas pu lire. Vérifiez que le point de terminaison prend en charge les complétions de chat compatibles OpenAI.",
+      "providerInvalidResponse": "{{provider}} a renvoyé une réponse incomplète ou illisible. Veuillez réessayer.",
       "providerEmptyResponse": "{{provider}} a renvoyé une réponse vide. Réessayez ou choisissez un autre modèle.",
       "providerRequestFailed": "{{provider}} n’a pas pu répondre. Vérifiez la connexion dans la configuration IA, puis réessayez."
     },
@@ -166,7 +166,8 @@
       "retrieving": "Recuperation de la chronique...",
       "emptyTitle": "Aucune chronique",
       "emptyBody": "Jouez votre partie et accumulez de l'histoire. Les chroniques sont generees automatiquement quand votre empire traverse les ages.",
-      "noSession": "Aucune session trouvee pour cette sauvegarde"
+      "noSession": "Aucune session trouvee pour cette sauvegarde",
+      "autoRefreshPaused": "Les mises à jour automatiques sont en pause pour préserver votre quota. Votre Chronique enregistrée reste inchangée. Réessayez quand vous le souhaitez."
     },
     "sidebar": {
       "empireArchives": "Archives de l'empire",

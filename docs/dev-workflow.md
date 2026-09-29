@@ -87,3 +87,31 @@ node --check electron/main.js
 ```bash
 pyinstaller --clean stellaris-backend.spec
 ```
+
+## Gemini generation limits
+
+`GeminiAdvisorGenerator.generate` owns recovery for both Advisor and Chronicle.
+Keep this policy in one place; Chronicle must not wrap native Gemini in another
+retry loop. SDK transport retries are disabled for these calls.
+
+| Generation | Initial output ceiling | Ceiling after `MAX_TOKENS` |
+| --- | ---: | ---: |
+| Advisor | 4,096 | 8,192 |
+| Chronicle | 8,192 | 16,384 |
+
+These are ceilings, not target response lengths. Each answer or Chronicle piece
+gets at most two API requests total, including JSON repair and the existing quota
+fallback to Flash-Lite. A Chronicle refresh may generate several pieces. Only a
+confirmed `MAX_TOKENS` finish increases the ceiling; empty or invalid JSON gets
+one repair at the same ceiling. Other provider failures stop immediately unless
+the existing quota fallback is available within the two-request allowance.
+
+Gemini 3 Chronicle generation uses low thinking; Flash-Lite retains its default.
+Advisor thinking and model selection remain unchanged. After a provider failure,
+the Chronicle page pauses automatic generation for that campaign until an
+explicit Retry or app reload, and keeps the saved story available.
+
+Local diagnostics record requested/returned model, token counts, output ceiling,
+finish reason and attempt number. They add no remote telemetry and do not record
+prompts, save contents or API keys. Regression coverage lives in
+`tests/test_gemini_recovery.py` and `electron/e2e/chronicle-refresh.spec.js`.

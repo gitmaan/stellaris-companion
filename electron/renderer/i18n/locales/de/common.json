@@ -81,7 +81,7 @@
       "providerBillingFailed": "{{provider}} verfügt für diese Anfrage nicht über nutzbare Rechnungen oder Gutschriften. Überprüfen Sie das Anbieterkonto oder wählen Sie einen anderen Anbieter.",
       "providerTimeout": "Die Antwort von {{provider}} hat zu lange gedauert. Möglicherweise wird noch ein lokales Modell geladen. Versuchen Sie es erneut oder überprüfen Sie den Server.",
       "providerContextLimit": "Das aktive Kontextfenster passt nicht zu diesem Kampagnenbriefing. Erhöhen Sie die Kontexteinstellung des Anbieters auf mindestens 32K oder wählen Sie ein Modell mit größerem Kontext.",
-      "providerInvalidResponse": "{{provider}} hat eine Antwort zurückgegeben, die diese App nicht lesen konnte. Überprüfen Sie, ob der Endpunkt OpenAI-kompatible Chat-Abschlüsse unterstützt.",
+      "providerInvalidResponse": "{{provider}} hat eine unvollständige oder unlesbare Antwort zurückgegeben. Bitte versuche es erneut.",
       "providerEmptyResponse": "{{provider}} hat eine leere Antwort zurückgegeben. Versuchen Sie es erneut oder wählen Sie ein anderes Modell.",
       "providerRequestFailed": "{{provider}} konnte nicht antworten. In der KI-Einrichtung die Verbindung prüfen und erneut versuchen."
     },
@@ -166,7 +166,8 @@
       "retrieving": "Chronik wird abgerufen...",
       "emptyTitle": "Noch keine Chronik",
       "emptyBody": "Spiele weiter und sammle Geschichte. Chroniken werden automatisch erzeugt, waehrend dein Reich durch die Zeitalter voranschreitet.",
-      "noSession": "Keine Sitzung fuer diesen Speicherstand gefunden"
+      "noSession": "Keine Sitzung fuer diesen Speicherstand gefunden",
+      "autoRefreshPaused": "Automatische Aktualisierungen sind pausiert, um dein Kontingent zu schonen. Deine gespeicherte Chronik bleibt unverändert. Versuche es erneut, wenn du bereit bist."
     },
     "sidebar": {
       "empireArchives": "Reichsarchive",
