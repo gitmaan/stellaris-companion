@@ -9,6 +9,7 @@ function registerSettingsIpcHandlers({
   onSettingsSaved,
   discoverAdvisorModels,
   testAdvisorModel,
+  translate,
 }) {
   ipcMain.handle('load-settings', async (event) => {
     validateSender(event)
@@ -22,14 +23,15 @@ function registerSettingsIpcHandlers({
     const fullSettings = await getSettingsWithSecrets()
     await onSettingsSaved(fullSettings, settings || {})
 
-    return { success: true }
+    const saved = getSettings()
+    return { success: true, language: saved.language, resolvedLanguage: saved.resolvedLanguage }
   })
 
   ipcMain.handle('select-folder', async (event) => {
     validateSender(event)
     const result = await dialog.showOpenDialog(getMainWindow(), {
       properties: ['openDirectory'],
-      title: 'Select Stellaris Save Folder',
+      title: translate('dialogs.selectSaveFolder'),
     })
 
     if (result.canceled || !result.filePaths.length) {

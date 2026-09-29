@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import Tooltip from './Tooltip'
 import PersonIcon from './PersonIcon'
+import { isCompositionKey } from '../lib/compositionKey'
 
 interface ChatInputProps {
   onSend: (message: string) => void
@@ -64,7 +65,7 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
   }, [message, isDisabled, onSend])
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+    if (e.key === 'Enter' && !e.shiftKey && !isCompositionKey(e)) {
       e.preventDefault()
       if (message.trim() && !isDisabled) {
         onSend(message.trim())

@@ -36,7 +36,7 @@ function ChronicleContent({
       {/* Empire header */}
       <header className="text-center mb-10 relative">
         <div className="text-accent-cyan text-3xl mb-3">◈</div>
-        <h1 className="font-display text-2xl tracking-[0.2em] text-text-primary uppercase">
+        <h1 className="chronicle-display-title font-display text-2xl tracking-[0.2em] text-text-primary uppercase">
           {t('chronicle.content.title', { empireName })}
         </h1>
         <div className="energy-line mt-4 max-w-[200px] mx-auto" />
@@ -89,7 +89,7 @@ function ChapterBlock({
   regeneratingChapter: number | null
   justRegenerated: number | null
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const isRegenerating = regeneratingChapter === chapter.number
   const wasJustRegenerated = justRegenerated === chapter.number
   const isConfirming = confirmingRegen === chapter.number
@@ -120,7 +120,7 @@ function ChapterBlock({
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold text-accent-cyan uppercase tracking-wider flex items-center gap-2">
             <span>◇</span>
-            {t('chronicle.content.chapter', { number: toRoman(chapter.number) })}
+            {t('chronicle.content.chapter', { number: /^(ja|zh)/.test(i18n.language) ? chapter.number : toRoman(chapter.number) })}
           </span>
           <h2 className="text-xl font-semibold text-text-primary m-0">{cleanTitle(chapter.title)}</h2>
           <span className="text-sm text-text-secondary font-mono">{chapter.start_date} – {chapter.end_date}</span>

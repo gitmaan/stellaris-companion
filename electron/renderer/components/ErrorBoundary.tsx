@@ -1,4 +1,5 @@
 import React from 'react'
+import i18n from '../i18n'
 
 type ErrorBoundaryProps = {
   children: React.ReactNode
@@ -47,11 +48,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           {/* Header */}
           <div className="flex items-center gap-3 mb-4">
             <span className="text-accent-red text-2xl">⚠</span>
-            <h2 className="text-xl text-accent-red font-semibold">Anomaly Detected</h2>
+            <h2 className="text-xl text-accent-red font-semibold">{i18n.t('recovery.title')}</h2>
           </div>
 
           <p className="text-text-secondary mb-6">
-            An unexpected error has disrupted operations.
+            {i18n.t('recovery.description')}
           </p>
 
           {/* Action buttons */}
@@ -60,7 +61,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               onClick={this.handleReload}
               className="px-5 py-2.5 border border-accent-cyan/50 rounded text-accent-cyan hover:bg-accent-cyan/20 transition-colors font-medium"
             >
-              Reload
+              {i18n.t('recovery.reload')}
             </button>
           </div>
 
@@ -68,7 +69,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           {this.state.errorMessage && (
             <div className="stellaris-panel rounded-lg p-4">
               <div className="text-xs text-text-secondary uppercase tracking-wider mb-2">
-                Error Details
+                {i18n.t('recovery.details')}
               </div>
               <pre className="text-xs text-text-secondary font-mono whitespace-pre-wrap overflow-auto max-h-[200px]">
                 {this.state.errorMessage}

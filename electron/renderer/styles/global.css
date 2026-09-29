@@ -57,15 +57,16 @@
   src: url('./fonts/JetBrainsMono.woff2') format('woff2');
 }
 
-html[lang='ja'],
-html[lang='zh-Hans'] {
-  word-break: keep-all;
-}
-
-html[lang='ja'] .tracking-tech,
-html[lang='zh-Hans'] .tracking-tech {
-  letter-spacing: 0.08em;
-}
+html[lang='ja'], html[lang='ja'] body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', sans-serif; }
+html[lang='zh-Hans'], html[lang='zh-Hans'] body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif; }
+html[lang='ja'], html[lang='zh-Hans'] { word-break: normal; line-break: strict; }
+html[lang='ja'] .font-display, html[lang='ja'] .font-sans,
+html[lang='zh-Hans'] .font-display, html[lang='zh-Hans'] .font-sans { font-family: inherit; }
+html[lang='ja'] .font-display, html[lang='zh-Hans'] .font-display,
+html[lang='ja'] .tracking-wider, html[lang='zh-Hans'] .tracking-wider,
+html[lang='ja'] .tracking-widest, html[lang='zh-Hans'] .tracking-widest,
+html[lang='ja'] .tracking-tech, html[lang='zh-Hans'] .tracking-tech { letter-spacing: normal; }
+html[lang='ja'] .chronicle-display-title, html[lang='zh-Hans'] .chronicle-display-title { letter-spacing: normal; text-transform: none; }
 
 /* ============================================
    Theme Variables
@@ -453,6 +454,17 @@ html[lang='zh-Hans'] .tracking-tech {
     margin-top: 0.05em;
     color: theme('colors.accent.cyan');
     font-family: theme('fontFamily.display');
+  }
+
+  html[lang='ja'] .chronicle-drop-cap::first-letter,
+  html[lang='zh-Hans'] .chronicle-drop-cap::first-letter {
+    font-size: inherit;
+    float: none;
+    line-height: inherit;
+    padding-right: 0;
+    margin-top: 0;
+    color: inherit;
+    font-family: inherit;
   }
 }
 

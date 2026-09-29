@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
+import { isCompositionKey } from '../lib/compositionKey'
 import type { ChronicleResponse } from '../hooks/useBackend'
 import type {
   ChroniclePublicationReceipt,
@@ -76,7 +77,7 @@ function ChroniclePublishDialog({
   useEffect(() => {
     if (!isOpen) return
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !submitting && !removing) onClose()
+      if (event.key === 'Escape' && !isCompositionKey(event) && !submitting && !removing) onClose()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)

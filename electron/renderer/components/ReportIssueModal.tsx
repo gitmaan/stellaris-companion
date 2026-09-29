@@ -5,6 +5,7 @@ import { HUDButton } from './hud/HUDButton'
 import { HUDSelect, HUDCheckbox } from './hud/HUDForm'
 import { HUDTextArea } from './hud/HUDInput'
 import type { WarDiagnostics } from '../hooks/useBackend'
+import { useTranslation } from 'react-i18next'
 
 interface ReportContext {
   appVersion: string
@@ -55,6 +56,7 @@ const ISSUE_URL = import.meta.env.VITE_ISSUES_URL || 'https://github.com/gitmaan
 const REPORT_ENDPOINT = import.meta.env.VITE_REPORT_ENDPOINT || ''
 
 export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIssueModalProps) {
+  const { t } = useTranslation()
   const [category, setCategory] = useState(prefill?.category || '')
   const [description, setDescription] = useState('')
   const [context, setContext] = useState<ReportContext | null>(null)
@@ -88,8 +90,8 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     setIncludeDiagnostics(false)
     setIncludeBackendLogs(false)
     setIncludeScreenshot(false)
-    setIncludeErrorContext(!!prefill?.error)
-    setIncludeLlmContext(!!prefill?.llm)
+    setIncludeErrorContext(false)
+    setIncludeLlmContext(false)
     setStatus(null)
   }, [isOpen, prefill])
 
@@ -142,39 +144,41 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
 
   function formatReportMarkdown(ctx: ReportContext, backendLogTail?: string): string {
     const lines: string[] = []
+    const field = (key: string, value: string | number | boolean) =>
+      `- ${t(`report.markdown.fields.${key}`, { value })}`
 
-    lines.push(`# ${category || 'Report'}`)
+    lines.push(`# ${category ? t(`report.categories.${category}`) : t('report.markdown.report')}`)
     lines.push('')
-    lines.push('## What happened')
-    lines.push(description.trim() || '(fill in)')
+    lines.push(`## ${t('report.markdown.whatHappened')}`)
+    lines.push(description.trim() || t('report.markdown.fillIn'))
     lines.push('')
-    lines.push('## Environment')
-    lines.push(`- App version: ${ctx.appVersion}`)
-    lines.push(`- Platform: ${ctx.platform}`)
-    lines.push(`- Electron: ${ctx.electronVersion}`)
+    lines.push(`## ${t('report.markdown.environment')}`)
+    lines.push(field('appVersion', ctx.appVersion))
+    lines.push(field('platform', ctx.platform))
+    lines.push(field('electronVersion', ctx.electronVersion))
     lines.push('')
 
     if (includeDiagnostics) {
-      lines.push('## Game context (opt-in)')
-      if (ctx.stellarisVersion) lines.push(`- Stellaris version: ${ctx.stellarisVersion}`)
-      if (typeof ctx.saveFileSizeMb === 'number') lines.push(`- Save size: ${ctx.saveFileSizeMb} MB`)
-      if (ctx.galaxySize) lines.push(`- Galaxy size: ${ctx.galaxySize}`)
-      if (ctx.gameYear) lines.push(`- Game date/year: ${ctx.gameYear}`)
-      if (ctx.ingestionStage) lines.push(`- Ingestion stage: ${ctx.ingestionStage}`)
-      if (ctx.ingestionStageDetail) lines.push(`- Ingestion detail: ${ctx.ingestionStageDetail}`)
-      if (typeof ctx.precomputeReady === 'boolean') lines.push(`- Precompute ready: ${ctx.precomputeReady}`)
-      if (typeof ctx.t2Ready === 'boolean') lines.push(`- Tier 2 ready: ${ctx.t2Ready}`)
-      if (ctx.empireName) lines.push(`- Empire: ${ctx.empireName}`)
-      if (ctx.empireType) lines.push(`- Empire type: ${ctx.empireType}`)
-      if (ctx.empireOrigin) lines.push(`- Origin: ${ctx.empireOrigin}`)
-      if (ctx.empireEthics?.length) lines.push(`- Ethics: ${ctx.empireEthics.join(', ')}`)
-      if (ctx.empireCivics?.length) lines.push(`- Civics: ${ctx.empireCivics.join(', ')}`)
-      if (ctx.dlcs?.length) lines.push(`- DLCs: ${ctx.dlcs.length} enabled`)
-      if (ctx.ingestionLastError) lines.push(`- Ingestion last error: ${ctx.ingestionLastError}`)
+      lines.push(`## ${t('report.markdown.gameContext')}`)
+      if (ctx.stellarisVersion) lines.push(field('stellarisVersion', ctx.stellarisVersion))
+      if (typeof ctx.saveFileSizeMb === 'number') lines.push(field('saveSize', ctx.saveFileSizeMb))
+      if (ctx.galaxySize) lines.push(field('galaxySize', ctx.galaxySize))
+      if (ctx.gameYear) lines.push(field('gameYear', ctx.gameYear))
+      if (ctx.ingestionStage) lines.push(field('ingestionStage', ctx.ingestionStage))
+      if (ctx.ingestionStageDetail) lines.push(field('ingestionDetail', ctx.ingestionStageDetail))
+      if (typeof ctx.precomputeReady === 'boolean') lines.push(field('precomputeReady', ctx.precomputeReady))
+      if (typeof ctx.t2Ready === 'boolean') lines.push(field('t2Ready', ctx.t2Ready))
+      if (ctx.empireName) lines.push(field('empire', ctx.empireName))
+      if (ctx.empireType) lines.push(field('empireType', ctx.empireType))
+      if (ctx.empireOrigin) lines.push(field('origin', ctx.empireOrigin))
+      if (ctx.empireEthics?.length) lines.push(field('ethics', ctx.empireEthics.join(', ')))
+      if (ctx.empireCivics?.length) lines.push(field('civics', ctx.empireCivics.join(', ')))
+      if (ctx.dlcs?.length) lines.push(`- ${t('report.markdown.fields.dlcs', { count: ctx.dlcs.length })}`)
+      if (ctx.ingestionLastError) lines.push(field('ingestionLastError', ctx.ingestionLastError))
       if (ctx.warDiagnostics) {
         const warDiagnosticsJson = JSON.stringify(ctx.warDiagnostics, null, 2)
         lines.push('')
-        lines.push('<details><summary>War calculation diagnostics</summary>')
+        lines.push(`<details><summary>${t('report.markdown.warDiagnostics')}</summary>`)
         lines.push('')
         lines.push('```json')
         lines.push(warDiagnosticsJson.length > 24_000
@@ -188,12 +192,12 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     }
 
     if (ctx.error) {
-      lines.push('## Error context (opt-in)')
-      lines.push(`- Source: ${ctx.error.source}`)
-      lines.push(`- Message: ${ctx.error.message}`)
+      lines.push(`## ${t('report.markdown.errorContext')}`)
+      lines.push(field('source', ctx.error.source))
+      lines.push(field('message', ctx.error.message))
       if (ctx.error.stack) {
         lines.push('')
-        lines.push('<details><summary>Stack trace</summary>')
+        lines.push(`<details><summary>${t('report.markdown.stackTrace')}</summary>`)
         lines.push('')
         lines.push('```text')
         lines.push(ctx.error.stack)
@@ -205,31 +209,31 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     }
 
     if (ctx.llm) {
-      lines.push('## LLM context (opt-in)')
-      lines.push('<details><summary>Prompt/response</summary>')
+      lines.push(`## ${t('report.markdown.llmContext')}`)
+      lines.push(`<details><summary>${t('report.markdown.promptResponse')}</summary>`)
       lines.push('')
-      if (ctx.llm.model) lines.push(`- Model: ${ctx.llm.model}`)
-      if (typeof ctx.llm.responseTimeMs === 'number') lines.push(`- Response time: ${ctx.llm.responseTimeMs}ms`)
+      if (ctx.llm.model) lines.push(field('model', ctx.llm.model))
+      if (typeof ctx.llm.responseTimeMs === 'number') lines.push(field('responseTime', ctx.llm.responseTimeMs))
       if (ctx.llm.model || typeof ctx.llm.responseTimeMs === 'number') lines.push('')
       if (ctx.llm.lastPrompt) {
-        lines.push('### Prompt')
+        lines.push(`### ${t('report.markdown.prompt')}`)
         lines.push('```text')
         lines.push(ctx.llm.lastPrompt)
         lines.push('```')
         lines.push('')
       }
       if (ctx.llm.lastResponse) {
-        lines.push('### Response')
+        lines.push(`### ${t('report.markdown.response')}`)
         lines.push('```text')
         lines.push(ctx.llm.lastResponse)
         lines.push('```')
         lines.push('')
       }
       if (ctx.llm.recentTurns?.length) {
-        lines.push('### Recent turns')
+        lines.push(`### ${t('report.markdown.recentTurns')}`)
         lines.push('```text')
         for (const turn of ctx.llm.recentTurns) {
-          lines.push(`${turn.role === 'user' ? 'User' : 'Advisor'}: ${turn.content}`)
+          lines.push(`${t(turn.role === 'user' ? 'report.markdown.user' : 'report.markdown.advisor')}: ${turn.content}`)
         }
         lines.push('```')
         lines.push('')
@@ -239,8 +243,8 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     }
 
     if (backendLogTail) {
-      lines.push('## Backend log tail (opt-in)')
-      lines.push('<details><summary>Last ~32KB</summary>')
+      lines.push(`## ${t('report.markdown.backendLogTail')}`)
+      lines.push(`<details><summary>${t('report.markdown.last32KB')}</summary>`)
       lines.push('')
       lines.push('```text')
       lines.push(backendLogTail)
@@ -251,14 +255,14 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     }
 
     if (includeScreenshot) {
-      lines.push('## Screenshot (opt-in)')
-      lines.push('- Screenshot requested.')
-      lines.push('- Use "Submit" for automatic screenshot upload; clipboard report omits raw image bytes.')
+      lines.push(`## ${t('report.markdown.screenshot')}`)
+      lines.push(`- ${t('report.markdown.screenshotRequested')}`)
+      lines.push(`- ${t('report.markdown.screenshotHelp')}`)
       lines.push('')
     }
 
-    lines.push('## Steps to reproduce')
-    lines.push('1. (fill in)')
+    lines.push(`## ${t('report.markdown.stepsToReproduce')}`)
+    lines.push(`1. ${t('report.markdown.fillIn')}`)
     lines.push('2. ')
     lines.push('3. ')
     lines.push('')
@@ -290,7 +294,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
   async function submitToWorker() {
     if (!category || !description.trim()) return
     if (!REPORT_ENDPOINT) {
-      setStatus('Submit is not configured for this build. Use “Copy Report” instead.')
+      setStatus(t('report.submitUnavailable'))
       return
     }
 
@@ -370,13 +374,13 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
         const issueUrl = typeof data.issueUrl === 'string' ? data.issueUrl : undefined
-        setStatus(issueUrl ? `Submitted. Issue: ${issueUrl}` : 'Submitted. Thank you!')
+        setStatus(issueUrl ? t('report.submittedIssue', { issueUrl }) : t('report.submitted'))
       } else {
         const msg = typeof data.error === 'string' ? data.error : `Submit failed (${res.status})`
-        setStatus(msg)
+        setStatus(t('report.submitFailedDetail', { detail: msg }))
       }
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Submit failed')
+      setStatus(t('report.submitFailedDetail', { detail: e instanceof Error ? e.message : '' }))
     } finally {
       setBusy(false)
     }
@@ -388,9 +392,9 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     try {
       const report = await buildReport()
       const resp = await window.electronAPI?.copyToClipboard?.(report)
-      setStatus(resp?.success ? 'Copied report to clipboard. Paste it into your issue/feedback.' : 'Failed to copy to clipboard.')
+      setStatus(t(resp?.success ? 'report.copied' : 'report.copyFailed'))
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Failed to build report')
+      setStatus(t('report.buildFailedDetail', { detail: e instanceof Error ? e.message : '' }))
     } finally {
       setBusy(false)
     }
@@ -403,16 +407,16 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
       const report = await buildReport()
       const resp = await window.electronAPI?.copyToClipboard?.(report)
       if (!resp?.success) {
-        setStatus('Failed to copy report to clipboard.')
+        setStatus(t('report.copyFailed'))
         return
       }
       const title = encodeURIComponent(`[${category}] ${description.trim().slice(0, 60)}`)
-      const body = encodeURIComponent('Paste the report from your clipboard here.\n\n(Generated by Stellaris Companion)')
+      const body = encodeURIComponent(t('report.markdown.issueBody'))
       const url = `${ISSUE_URL}?title=${title}&body=${body}`
       await window.electronAPI?.openExternal?.(url)
-      setStatus('Opened GitHub. Paste the report from your clipboard into the editor.')
+      setStatus(t('report.openedGithub'))
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : 'Failed to open issue page')
+      setStatus(t('report.openFailedDetail', { detail: e instanceof Error ? e.message : '' }))
     } finally {
       setBusy(false)
     }
@@ -430,11 +434,14 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
         onClick={onClose}
       >
         <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-issue-title"
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ duration: 0.2 }}
-          className="relative w-full max-w-lg mx-4 p-6 bg-bg-elevated border border-border rounded-lg"
+          className="relative w-full max-w-lg mx-4 p-6 bg-bg-elevated border border-border rounded-lg max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
           style={{ boxShadow: '0 0 40px rgb(var(--color-accent-cyan) / 0.1), 0 8px 32px rgb(0 0 0 / 0.5)' }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -443,17 +450,17 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
           <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-accent-cyan/60" />
           <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-accent-cyan/60" />
 
-          <h2 className="text-lg font-semibold text-text-primary uppercase tracking-wider mb-5 flex items-center gap-2">
+          <h2 id="report-issue-title" className="text-lg font-semibold text-text-primary uppercase tracking-wider mb-5 flex items-center gap-2">
             <span className="text-accent-cyan">◈</span>
-            Report Issue / Feedback
+            {t('report.title')}
           </h2>
 
           <div className="space-y-5">
             <HUDSelect
-              label="Category"
+              label={t('report.category')}
               options={[
-                { value: '', label: 'Select category...' },
-                ...CATEGORIES.map(cat => ({ value: cat, label: cat })),
+                { value: '', label: t('report.selectCategory') },
+                ...CATEGORIES.map(cat => ({ value: cat, label: t(`report.categories.${cat}`) })),
               ]}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -461,12 +468,12 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
 
             <div className="flex flex-col gap-1.5">
               <span className="font-display text-[10px] tracking-widest text-text-secondary uppercase pl-1">
-                Description
+                {t('report.description')}
               </span>
               <HUDTextArea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What happened? What did you expect?"
+                placeholder={t('report.descriptionPlaceholder')}
                 rows={4}
               />
             </div>
@@ -474,11 +481,11 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
             {context && (
               <div className="p-3 bg-black/20 border border-white/5 rounded-sm">
                 <div className="font-display text-[10px] tracking-widest text-text-secondary uppercase mb-2">
-                  Auto-captured
+                  {t('report.autoCaptured')}
                 </div>
                 <div className="space-y-1 text-xs text-text-secondary font-mono">
-                  <div>App <span className="text-text-primary">{context.appVersion}</span></div>
-                  <div>Platform <span className="text-text-primary">{context.platform}</span></div>
+                  <div>{t('report.app')} <span className="text-text-primary">{context.appVersion}</span></div>
+                  <div>{t('report.platform')} <span className="text-text-primary">{context.platform}</span></div>
                   <div>Electron <span className="text-text-primary">{context.electronVersion}</span></div>
                 </div>
               </div>
@@ -486,33 +493,33 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
 
             <div className="space-y-3">
               <span className="font-display text-[10px] tracking-widest text-text-secondary uppercase pl-1">
-                Optional (opt-in)
+                {t('report.optional')}
               </span>
               <HUDCheckbox
-                label="Include game diagnostics (metadata and bounded war calculations)"
+                label={t('report.includeDiagnostics')}
                 checked={includeDiagnostics}
                 onChange={(e) => setIncludeDiagnostics(e.target.checked)}
               />
               <HUDCheckbox
-                label="Include recent backend logs"
+                label={t('report.includeLogs')}
                 checked={includeBackendLogs}
                 onChange={(e) => setIncludeBackendLogs(e.target.checked)}
               />
               <HUDCheckbox
-                label="Include screenshot"
+                label={t('report.includeScreenshot')}
                 checked={includeScreenshot}
                 onChange={(e) => setIncludeScreenshot(e.target.checked)}
               />
               {prefill?.error && (
                 <HUDCheckbox
-                  label="Include error details (message/stack)"
+                  label={t('report.includeError')}
                   checked={includeErrorContext}
                   onChange={(e) => setIncludeErrorContext(e.target.checked)}
                 />
               )}
               {prefill?.llm && (
                 <HUDCheckbox
-                  label="Include last prompt/response"
+                  label={t('report.includeLlm')}
                   checked={includeLlmContext}
                   onChange={(e) => setIncludeLlmContext(e.target.checked)}
                 />
@@ -530,10 +537,10 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
                 variant="primary"
                 onClick={submitToWorker}
                 disabled={!category || !description.trim() || busy || !REPORT_ENDPOINT}
-                title={!REPORT_ENDPOINT ? 'Submit is not configured for this build' : undefined}
+                title={!REPORT_ENDPOINT ? t('report.submitUnavailableHint') : undefined}
                 className="w-full"
               >
-                {busy ? 'Working…' : 'Submit'}
+                {busy ? t('report.working') : t('report.submit')}
               </HUDButton>
               <HUDButton
                 variant="primary"
@@ -541,7 +548,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
                 disabled={!category || !description.trim() || busy}
                 className="w-full"
               >
-                {busy ? 'Working…' : 'Copy Report'}
+                {busy ? t('report.working') : t('report.copy')}
               </HUDButton>
               <HUDButton
                 variant="secondary"
@@ -549,7 +556,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
                 disabled={!category || !description.trim() || busy}
                 className="w-full"
               >
-                GitHub Issue
+                {t('report.github')}
               </HUDButton>
             </div>
 
@@ -558,7 +565,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               onClick={onClose}
               className="w-full"
             >
-              Close
+              {t('report.close')}
             </HUDButton>
           </div>
         </motion.div>

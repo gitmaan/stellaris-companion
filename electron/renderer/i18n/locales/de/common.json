@@ -41,9 +41,9 @@
     "system": "Systemstandard",
     "en": "English",
     "de": "Deutsch",
-    "fr": "Francais",
-    "es": "Espanol",
-    "pt-BR": "Portugues (Brasil)",
+    "fr": "Français",
+    "es": "Español",
+    "pt-BR": "Português (Brasil)",
     "ja": "日本語",
     "zh-Hans": "简体中文",
     "en-XA": "Pseudo"
@@ -62,7 +62,10 @@
       "reportTitle": "Diese Antwort melden",
       "blockedLink": "Nicht-HTTP(S)-Link blockiert",
       "details": "Antwortdetails",
-      "responseTime": "Reaktionszeit: {{seconds}}s"
+      "responseTime": "Reaktionszeit: {{seconds}}s",
+      "routingNotice": "Weiterleitung über {{model}}.",
+      "routingVia": "WEITERLEITUNG ÜBER {{model}}",
+      "modelReadout": "MODELL: {{model}}"
     },
     "errors": {
       "briefingNotReady": "Der Berater analysiert deine Speicherdatei noch. Bitte versuche es in {{seconds}} Sekunden erneut.",
@@ -342,6 +345,20 @@
       "bulkMoved": "{{count}}-Kampagnen in den Papierkorb verschoben.",
       "undo": "Rückgängig machen",
       "unknownError": "Der Kampagnenverlauf konnte nicht aktualisiert werden."
+    },
+    "exportHtml": {
+      "title": "Chronik von {empire}",
+      "chapter": "Kapitel {number}",
+      "summary": "Zusammenfassung",
+      "currentEra": "Aktuelle Ära",
+      "storyContinues": "Die Geschichte geht weiter…",
+      "present": "Gegenwart",
+      "events_one": "{count} Ereignis in dieser Ära",
+      "events_other": "{count} Ereignisse in dieser Ära",
+      "footer": "Exportiert aus Stellaris Companion",
+      "filename": "Chronik",
+      "success": "Chronik exportiert.",
+      "failure": "Chronik konnte nicht exportiert werden. Details: {{detail}}"
     }
   },
   "settings": {
@@ -540,9 +557,9 @@
       "guide": {
         "label": "Einrichtungsschritte",
         "gemini": {
-          "1": "Besorgen Sie sich einen Gemini-Schlüssel",
-          "2": "Fügen Sie es unten ein",
-          "3": "AI-Setup speichern"
+          "1": "Gemini-API-Schlüssel holen",
+          "2": "Schlüssel unten einfügen",
+          "3": "KI-Einstellungen speichern"
         },
         "local": {
           "1": "Öffnen Sie Ihre lokale KI-App",
@@ -561,9 +578,9 @@
         }
       },
       "providers": {
-        "gemini": "ZWILLINGE",
+        "gemini": "GEMINI",
         "ollama": "OLLAMA",
-        "lm_studio": "LM-STUDIO",
+        "lm_studio": "LM STUDIO",
         "openrouter": "OPENROUTER",
         "custom": "BENUTZERDEFINIERTER ENDPUNKT"
       },
@@ -576,14 +593,14 @@
       }
     },
     "geminiQuota": {
-      "label": "VERWENDUNG ZWILLINGE",
-      "description": "Wählen Sie, wie Sie alltägliche Beraterantworten und das Schreiben von Chroniken in Einklang bringen möchten.",
-      "standard": "Freifreundlich",
-      "higher": "Beste Qualität",
-      "standardTag": "ERWEITERT DIE FREIGRENZEN",
-      "higherTag": "VERBRAUCHT MEHR ZULÄSSIGKEIT",
-      "standardHelp": "Hält alltägliche Fragen einfacher, sodass mehr Zeit für das Schreiben von Chroniken zur Verfügung steht.",
-      "higherHelp": "Bevorzugt das stärkste verfügbare Gemini-Modell sowohl für Advisor als auch für Chronicle.",
+      "label": "GEMINI-NUTZUNG",
+      "description": "Legen Sie fest, wie Sie Antworten des Advisors und das Schreiben der Chronicle gewichten.",
+      "standard": "SPARSAM",
+      "higher": "HÖCHSTE QUALITÄT",
+      "standardTag": "SCHONT DAS FREIKONTINGENT",
+      "higherTag": "VERBRAUCHT MEHR KONTINGENT",
+      "standardHelp": "Spart Kontingent bei alltäglichen Fragen und lässt mehr für die Chronicle übrig.",
+      "higherHelp": "Nutzt nach Möglichkeit das leistungsstärkste Gemini-Modell für Advisor und Chronicle.",
       "showAdvanced": "Erweiterte Kontingentkontrollen anzeigen",
       "hideAdvanced": "Erweiterte Kontingentkontrollen ausblenden",
       "optional": "OPTIONAL",
@@ -623,7 +640,42 @@
       "copyError": "Setup konnte nicht kopiert werden.",
       "installConfirm": "Claude Desktop mit Stellaris Companion verbinden? Dadurch wird die lokale Konfigurationsdatei von Claude aktualisiert.",
       "installSuccess": "Claude Desktop-Verbindung aktualisiert. Starten Sie Claude Desktop neu, um es zu laden.",
-      "installError": "Die Claude Desktop-Verbindung konnte nicht aktualisiert werden."
+      "installError": "Die Claude Desktop-Verbindung konnte nicht aktualisiert werden.",
+      "serverUnavailableSummary": "Der lokale MCP-Server antwortet nicht. Fuehre unten die Pruefung aus.",
+      "readyCampaignSummary": "Bereit fuer {{empire}} am {{date}}.",
+      "noCampaignSummary": "Die Verbindung funktioniert, aber noch keine Kampagne ist zwischengespeichert. Lade zuerst einen Stellaris-Spielstand.",
+      "unknownEmpire": "das aktive Reich",
+      "campaignReadiness": "KAMPAGNENBEREITSCHAFT",
+      "waitingForCampaign": "WARTE AUF KAMPAGNE",
+      "offline": "OFFLINE",
+      "connected": "VERBUNDEN",
+      "needsUpdate": "UPDATE NOETIG",
+      "notConnected": "NICHT VERBUNDEN",
+      "unavailable": "NICHT GEFUNDEN",
+      "connect": "VERBINDEN",
+      "update": "AKTUALISIEREN",
+      "disconnect": "TRENNEN",
+      "working": "ARBEITET...",
+      "diagnostics": "MCP-DIAGNOSE",
+      "copyDiagnostics": "DIAGNOSE KOPIEREN",
+      "installClaudeExtension": "CLAUDE-ERWEITERUNG OEFFNEN",
+      "revealLog": "MCP-LOG ANZEIGEN",
+      "disconnectConfirm": "{{target}} von Stellaris Companion trennen? Andere MCP-Server bleiben erhalten.",
+      "disconnectSuccess": "{{target}} wurde getrennt.",
+      "clients": {
+        "claude": {
+          "name": "CLAUDE DESKTOP",
+          "description": "Lokale Kampagnenwerkzeuge in Claude, mit automatischer Konfigurationssicherung."
+        },
+        "codex": {
+          "name": "CHATGPT + CODEX",
+          "description": "Eine gemeinsame Verbindung fuer ChatGPT Desktop, Codex CLI und die IDE-Erweiterung."
+        },
+        "cursor": {
+          "name": "CURSOR",
+          "description": "Lokale Kampagnenwerkzeuge in Cursor-Chats und Agenten."
+        }
+      }
     }
   },
   "update": {
@@ -657,55 +709,83 @@
   "onboarding": {
     "step": "SCHRITT {{current}} / {{total}}",
     "actions": {
-      "start": "Fangen Sie an",
+      "start": "LOSLEGEN",
       "back": "ZURÜCK",
-      "continue": "WEITERMACHEN",
+      "continue": "WEITER",
       "later": "SPÄTER EINRICHTEN",
-      "finish": "BEENDEN"
+      "finish": "FERTIG",
+      "initialize": "Loslegen",
+      "skip": "Überspringen",
+      "next": "Weiter",
+      "browseElsewhere": "Anderen Ordner wählen",
+      "confirm": "Bestätigen",
+      "setUpLater": "Später einrichten",
+      "scanAgain": "Erneut suchen",
+      "browseFolder": "Ordner wählen"
     },
     "welcome": {
       "frameTitle": "ERSTER KONTAKT",
       "logoAlt": "Stellaris Companion-Logo",
       "title": "Willkommen bei Stellaris Companion",
-      "body": "Wählen Sie aus, wie Advisor und Chronicle funktionieren, und verbinden Sie dann Ihre Stellaris-Speicherungen."
+      "body": "Wählen Sie Ihren KI-Anbieter und verbinden Sie anschließend Ihre Stellaris-Spielstände.",
+      "stepTitle": "Willkommen",
+      "description": "Richte deinen Berater ein und finde deine Stellaris-Spielstände in zwei kurzen Schritten."
     },
     "ai": {
-      "frameTitle": "WÄHLEN SIE IHRE KI",
-      "geminiKey": "ZWILLINGSSCHLÜSSEL",
-      "getGeminiKey": "HOL DIR EINEN GEMINI-SCHLÜSSEL",
-      "providerKey": "ANBIETERSCHLÜSSEL",
+      "frameTitle": "KI-ANBIETER WÄHLEN",
+      "geminiKey": "GEMINI-API-SCHLÜSSEL",
+      "getGeminiKey": "GEMINI-API-SCHLÜSSEL HOLEN",
+      "providerKey": "ANBIETER-API-SCHLÜSSEL",
       "serverAddress": "SERVER-ADRESSE",
-      "optionalKey": "API SCHLÜSSEL",
+      "optionalKey": "API-SCHLÜSSEL",
       "optional": "OPTIONAL",
-      "enterKey": "EINGABETASTE",
+      "enterKey": "API-SCHLÜSSEL EINGEBEN",
       "ready": "BEREIT",
-      "notSet": "NICHT EINGESTELLT",
-      "findModels": "FINDEN SIE VERFÜGBARE MODELLE",
-      "looking": "SUCHE...",
+      "notSet": "NICHT EINGERICHTET",
+      "findModels": "VERFÜGBARE MODELLE SUCHEN",
+      "looking": "SUCHE LÄUFT ...",
       "model": "MODELL",
       "chooseModel": "Wählen Sie ein Modell",
-      "findModelsFirst": "FINDEN SIE ZUERST VERFÜGBARE MODELLE",
+      "findModelsFirst": "ZUERST MODELLE SUCHEN",
       "modelsFound_one": "Bereit // {{count}} Modell gefunden",
       "modelsFound_other": "Bereit // {{count}} Modelle gefunden",
-      "noModels": "Verbindung gefunden, aber noch keine Modelle verfügbar.",
-      "connectionError": "Dieser Anbieter konnte nicht erreicht werden. Überprüfen Sie, ob es läuft, und versuchen Sie es erneut."
+      "noModels": "Verbindung hergestellt, aber keine Modelle gefunden.",
+      "connectionError": "Der Anbieter ist nicht erreichbar. Prüfen Sie die Verbindung und versuchen Sie es erneut.",
+      "serverAddressPlaceholder": "https://provider.example/v1"
     },
     "saves": {
-      "frameTitle": "VERBINDEN SIE IHRE SPEICHERN",
-      "label": "SPIELE SPEICHERN",
-      "title": "Finden Sie Ihre Stellaris-Kampagnen",
-      "browseElsewhere": "SUCHEN SIE ANDERSWO",
-      "scanAgain": "NOCHMALS SCANNEN",
-      "browseFolder": "ORDNER DURCHSUCHEN",
-      "scanning": "Auf der Suche nach Stellaris-Speicherdateien ...",
-      "found": "Ihre Kampagnen sind fertig.",
-      "count_one": "{{count}}-Speicherdatei gefunden",
-      "count_other": "{{count}} Sicherungsdateien gefunden",
-      "notFound": "Wir konnten Ihre Stellaris-Speicherungen nicht automatisch finden.",
+      "frameTitle": "SPIELSTÄNDE VERBINDEN",
+      "label": "SPIELSTÄNDE",
+      "title": "Stellaris-Spielstände finden",
+      "browseElsewhere": "ANDEREN ORDNER WÄHLEN",
+      "scanAgain": "ERNEUT SUCHEN",
+      "browseFolder": "ORDNER WÄHLEN",
+      "scanning": "Stellaris-Spielstände werden gesucht ...",
+      "found": "Ihre Spielstände sind bereit.",
+      "count_one": "{{count}} Spielstand gefunden",
+      "count_other": "{{count}} Spielstände gefunden",
+      "notFound": "Stellaris-Spielstände wurden nicht automatisch gefunden.",
       "notFoundIn": "In {{path}} wurden keine .sav-Dateien gefunden.",
       "notFoundDefault": "Wir haben die üblichen Speicherorte überprüft, aber noch keine .sav-Dateien gefunden.",
-      "notFoundHelp": "Wählen Sie „Ordner durchsuchen“ und wählen Sie Ihren Stellaris-Spielstandsordner aus oder richten Sie dies später in den Einstellungen ein."
-    }
+      "notFoundHelp": "Wählen Sie Ihren Stellaris-Spielstandsordner aus oder richten Sie ihn später in den Einstellungen ein.",
+      "stepTitle": "Spielstände finden",
+      "source": "Speicherort",
+      "help": "Wähle „Ordner wählen“ und dann „Stellaris/save games“, oder richte den Pfad später in den Einstellungen ein."
+    },
+    "language": "Sprache",
+    "languageError": "Sprache konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "logoAlt": "Stellaris Companion-Logo",
+    "provider": {
+      "stepTitle": "KI einrichten",
+      "defaultProvider": "Standardanbieter",
+      "title": "Google Gemini-API-Schlüssel (optional)",
+      "description": "Gemini unterstützt standardmäßig Berater und Chronik. Du kannst diesen Schritt überspringen und Ollama, LM Studio oder OpenRouter in den Einstellungen einrichten.",
+      "keyLabel": "API-Schlüssel",
+      "ready": "Bereit",
+      "missing": "Nicht eingegeben",
+      "generateKey": "API-Schlüssel erstellen"
+    },
+    "completionError": "Die Einrichtung konnte nicht abgeschlossen werden. Bitte erneut versuchen."
   },
   "advisorPanel": {
     "title": "Beraterstil",
@@ -735,5 +815,150 @@
     "savedWhenReady": "Der Stil wird gespeichert und angewendet, wenn die Analyse fertig ist.",
     "saveError": "Der Advisor-Stil konnte nicht gespeichert werden.",
     "loadSaveHelp": "Laden Sie einen Speicherstand, um einen Advisor-Stil für diese Kampagne auszuwählen."
+  },
+  "native": {
+    "tray": {
+      "open": "Stellaris Companion öffnen",
+      "status": "Status: {status}",
+      "connected": "Verbunden",
+      "disconnected": "Getrennt",
+      "notConfigured": "Nicht eingerichtet",
+      "quit": "Beenden"
+    },
+    "dialogs": {
+      "selectSaveFolder": "Stellaris-Spielstandordner wählen",
+      "exportChronicle": "Chronik exportieren",
+      "htmlFile": "HTML-Dokument",
+      "historyBackup": "Stellaris Companion-Verlaufssicherung",
+      "backupHistory": "Kampagnenverlauf sichern",
+      "sqliteFile": "SQLite-Datenbank"
+    },
+    "crash": {
+      "title": "Stellaris Companion ist abgestürzt",
+      "message": "In der App ist ein unerwarteter Fehler aufgetreten."
+    }
+  },
+  "recovery": {
+    "title": "Ein Fehler ist aufgetreten",
+    "description": "In der App ist ein unerwarteter Fehler aufgetreten. Lade sie neu und versuche es erneut.",
+    "reload": "Neu laden",
+    "details": "Technische Details",
+    "somethingWentWrong": "Ein Fehler ist aufgetreten",
+    "report": "Melden",
+    "responseOff": "Wirkt die Antwort falsch?"
+  },
+  "advisorInfo": {
+    "title": "Berater",
+    "noSave": "Kein Spielstand geladen",
+    "close": "Beraterfenster schließen",
+    "traitsTitle": "Reichsmerkmale (aus Spielstand)",
+    "ethics": "Ethik: {{value}}",
+    "authority": "Staatsform: {{value}}",
+    "civics": "Staatsprinzipien: {{value}}",
+    "noTraits": "Keine Reichsmerkmale verfügbar",
+    "origin": "Ursprung:",
+    "customizationTitle": "Persönlichkeit anpassen (optional)",
+    "placeholder": "Beschreibe die Persönlichkeit deines Beraters…",
+    "tryPersonality": "Persönlichkeit ausprobieren",
+    "examples": {
+      "0": "Ein vorsichtiger Geheimdienstoffizier, der niemandem traut",
+      "1": "Trocken und skeptisch gegenüber meinen Entscheidungen",
+      "2": "Ein Manager, der in Geschäftsjargon spricht",
+      "3": "Begeistert von allem, selbst von Katastrophen"
+    },
+    "applying": "Wird angewendet…",
+    "apply": "Anwenden",
+    "applied": "Für diese Kampagne angewendet.",
+    "appliedLater": "Angewendet. Wird nach Abschluss der Analyse gespeichert.",
+    "applyFailed": "Anpassung konnte nicht angewendet werden.",
+    "applyFailedDetail": "Anpassung konnte nicht angewendet werden. Details: {{detail}}",
+    "loadSaveHelp": "Lade einen Spielstand, um den Berater für diese Kampagne anzupassen."
+  },
+  "report": {
+    "title": "Problem melden oder Feedback senden",
+    "category": "Kategorie",
+    "selectCategory": "Kategorie wählen…",
+    "categories": {
+      "Bug": "Fehler",
+      "Strange LLM Response": "Seltsame KI-Antwort",
+      "Missing Content": "Fehlender Inhalt",
+      "Suggestion": "Vorschlag",
+      "Other": "Sonstiges"
+    },
+    "description": "Beschreibung",
+    "descriptionPlaceholder": "Was ist passiert? Was hast du erwartet?",
+    "autoCaptured": "Automatisch erfasst",
+    "app": "App",
+    "platform": "Plattform",
+    "optional": "Optionale Angaben (standardmäßig aus)",
+    "includeDiagnostics": "Spieldiagnosen beifügen (Metadaten und begrenzte Kriegsberechnungen)",
+    "includeLogs": "Aktuelle Backend-Protokolle beifügen",
+    "includeScreenshot": "Screenshot beifügen",
+    "includeError": "Fehlerdetails beifügen (Meldung und Stack)",
+    "includeLlm": "Letzte Eingabe und Antwort beifügen",
+    "submitUnavailable": "Senden ist in diesem Build nicht verfügbar. Nutze stattdessen „Bericht kopieren“.",
+    "submitUnavailableHint": "Senden ist in diesem Build nicht verfügbar",
+    "submittedIssue": "Gesendet. Ticket: {{issueUrl}}",
+    "submitted": "Gesendet. Vielen Dank!",
+    "submitFailedDetail": "Senden fehlgeschlagen. {{detail}}",
+    "copied": "Bericht kopiert. Füge ihn in dein Ticket oder Feedback ein.",
+    "copyFailed": "Bericht konnte nicht kopiert werden.",
+    "buildFailedDetail": "Bericht konnte nicht erstellt werden. {{detail}}",
+    "openedGithub": "GitHub geöffnet. Füge den kopierten Bericht in den Editor ein.",
+    "openFailedDetail": "GitHub konnte nicht geöffnet werden. {{detail}}",
+    "working": "In Bearbeitung…",
+    "submit": "Senden",
+    "copy": "Bericht kopieren",
+    "github": "GitHub-Ticket",
+    "close": "Schließen",
+    "markdown": {
+      "report": "Meldung",
+      "whatHappened": "Was ist passiert?",
+      "fillIn": "(bitte ausfüllen)",
+      "environment": "Systemumgebung",
+      "gameContext": "Spielkontext (optional freigegeben)",
+      "warDiagnostics": "Diagnosedaten zur Kriegsberechnung",
+      "errorContext": "Fehlerkontext (optional freigegeben)",
+      "stackTrace": "Stacktrace",
+      "llmContext": "KI-Kontext (optional freigegeben)",
+      "promptResponse": "Eingabe und Antwort",
+      "prompt": "Eingabe",
+      "response": "Antwort",
+      "recentTurns": "Letzte Gesprächsbeiträge",
+      "user": "Spieler",
+      "advisor": "Berater",
+      "backendLogTail": "Letzte Backend-Protokolle (optional freigegeben)",
+      "last32KB": "Letzte ca. 32 KB",
+      "screenshot": "Screenshot (optional freigegeben)",
+      "screenshotRequested": "Screenshot angefordert.",
+      "screenshotHelp": "Zum Hochladen des Screenshots „Senden“ verwenden; die kopierte Meldung enthält keine Bilddaten.",
+      "stepsToReproduce": "Schritte zum Reproduzieren",
+      "issueBody": "Füge den Bericht aus der Zwischenablage hier ein.\n\n(Erstellt mit Stellaris Companion)",
+      "fields": {
+        "appVersion": "App-Version: {{value}}",
+        "platform": "Plattform: {{value}}",
+        "electronVersion": "Electron: {{value}}",
+        "stellarisVersion": "Stellaris-Version: {{value}}",
+        "saveSize": "Größe des Spielstands: {{value}} MB",
+        "galaxySize": "Galaxiegröße: {{value}}",
+        "gameYear": "Spieldatum/-jahr: {{value}}",
+        "ingestionStage": "Einlesephase: {{value}}",
+        "ingestionDetail": "Einlesedetails: {{value}}",
+        "precomputeReady": "Vorberechnung bereit: {{value}}",
+        "t2Ready": "Stufe 2 bereit: {{value}}",
+        "empire": "Imperium: {{value}}",
+        "empireType": "Imperiumstyp: {{value}}",
+        "origin": "Ursprung: {{value}}",
+        "ethics": "Ethik: {{value}}",
+        "civics": "Staatselemente: {{value}}",
+        "dlcs_one": "{{count}} DLC aktiviert",
+        "dlcs_other": "{{count}} DLCs aktiviert",
+        "ingestionLastError": "Letzter Einlesefehler: {{value}}",
+        "source": "Quelle: {{value}}",
+        "message": "Meldung: {{value}}",
+        "model": "Modell: {{value}}",
+        "responseTime": "Antwortzeit: {{value}} ms"
+      }
+    }
   }
 }

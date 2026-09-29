@@ -10,9 +10,9 @@ const BASE_LANGUAGE_OPTIONS: LanguageOption[] = [
   { value: 'system', label: 'System default', nativeLabel: 'System default' },
   { value: 'en', label: 'English', nativeLabel: 'English' },
   { value: 'de', label: 'German', nativeLabel: 'Deutsch' },
-  { value: 'fr', label: 'French', nativeLabel: 'Francais' },
-  { value: 'es', label: 'Spanish', nativeLabel: 'Espanol' },
-  { value: 'pt-BR', label: 'Portuguese (Brazil)', nativeLabel: 'Portugues (Brasil)' },
+  { value: 'fr', label: 'French', nativeLabel: 'Français' },
+  { value: 'es', label: 'Spanish', nativeLabel: 'Español' },
+  { value: 'pt-BR', label: 'Portuguese (Brazil)', nativeLabel: 'Português (Brasil)' },
   { value: 'ja', label: 'Japanese', nativeLabel: '日本語' },
   { value: 'zh-Hans', label: 'Simplified Chinese', nativeLabel: '简体中文' },
 ]

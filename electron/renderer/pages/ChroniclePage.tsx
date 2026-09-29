@@ -8,6 +8,8 @@ import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
 import ChroniclePublishDialog from '../components/ChroniclePublishDialog'
 import { useBackend, ChronicleResponse, type Playthrough } from '../hooks/useBackend'
 import { generateChronicleHtml } from '../lib/chronicleExport'
+import { normalizeResolvedLanguage } from '../hooks/useSettings'
+import { useToast } from '../components/Toast'
 import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
   type ChronicleRefreshMode,
@@ -125,7 +127,8 @@ function ChroniclePage({
   onOpenSettings,
   historyOpenRequest = 0,
 }: ChroniclePageProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const { showToast } = useToast()
   const backend = useBackend()
   const isMountedRef = useRef(true)
 
@@ -844,17 +847,38 @@ function ChroniclePage({
   // Export chronicle as standalone HTML
   const handleExport = useCallback(async () => {
     if (!chronicle) return
+    const exportLocale = chronicle.language ? normalizeResolvedLanguage(chronicle.language) : normalizeResolvedLanguage(i18n.language)
+    const translate = i18n.getFixedT(exportLocale)
     const activeTheme = document.documentElement.getAttribute('data-theme')
     const html = generateChronicleHtml(
       empireName,
       chronicle.chapters,
       chronicle.current_era,
-      activeTheme || undefined,
-      chronicle.chronicle,
+      {
+        locale: exportLocale,
+        theme: activeTheme || undefined,
+        legacyChronicle: chronicle.chronicle,
+        labels: {
+          title: translate('chronicle.exportHtml.title', { empire: '{empire}' }),
+          chapter: translate('chronicle.exportHtml.chapter'),
+          summary: translate('chronicle.exportHtml.summary'),
+          currentEra: translate('chronicle.exportHtml.currentEra'),
+          storyContinues: translate('chronicle.exportHtml.storyContinues'),
+          present: translate('chronicle.exportHtml.present'),
+          events: translate('chronicle.exportHtml.events', { count: chronicle.current_era?.events_covered ?? 0 }).replace(String(chronicle.current_era?.events_covered ?? 0), '{count}'),
+          footer: translate('chronicle.exportHtml.footer'),
+        },
+      },
     )
-    const filename = `Chronicle - ${empireName}.html`
-    await window.electronAPI?.exportChronicle(html, filename)
-  }, [chronicle, empireName])
+    const filename = `${translate('chronicle.exportHtml.filename')} - ${empireName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')}.html`
+    try {
+      const result = await window.electronAPI?.exportChronicle(html, filename)
+      if (result?.success === false) showToast({ type: 'error', message: t('chronicle.exportHtml.failure', { detail: result.error || '' }) })
+      else if (result?.success) showToast({ type: 'success', message: t('chronicle.exportHtml.success') })
+    } catch (error) {
+      showToast({ type: 'error', message: t('chronicle.exportHtml.failure', { detail: error instanceof Error ? error.message : String(error) }) })
+    }
+  }, [chronicle, empireName, i18n, showToast, t])
 
   return (
     <div className="h-full">

@@ -15,9 +15,13 @@ import {
   type AdvisorProvider,
 } from '../hooks/useSettings'
 import appLogo from '../assets/app_logo.svg'
+import { LANGUAGE_OPTIONS } from '../i18n/languages'
+import type { LanguageSetting } from '../hooks/useSettings'
 
 interface OnboardingModalProps {
   onComplete: () => void
+  language: LanguageSetting
+  onLanguageSelect: (language: LanguageSetting) => Promise<boolean>
 }
 
 type Step = 1 | 2 | 3
@@ -57,7 +61,7 @@ const slideTransition = {
 
 const ACTION_ROW_DRIFT_TOLERANCE_PX = 2
 
-export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
+export default function OnboardingModal({ onComplete, language, onLanguageSelect }: OnboardingModalProps) {
   const { t } = useTranslation()
   const [step, setStep] = useState<Step>(1)
   const [direction, setDirection] = useState(1)
@@ -82,6 +86,22 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
   const [saveResult, setSaveResult] = useState<SaveDetectionResult | null>(null)
   const [scanning, setScanning] = useState(false)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const [languageSaving, setLanguageSaving] = useState(false)
+  const [languageError, setLanguageError] = useState(false)
+  const [completionSaving, setCompletionSaving] = useState(false)
+  const [completionError, setCompletionError] = useState(false)
+
+  async function selectLanguage(value: string) {
+    setLanguageSaving(true)
+    setLanguageError(false)
+    try {
+      setLanguageError(!await onLanguageSelect(value as LanguageSetting))
+    } catch {
+      setLanguageError(true)
+    } finally {
+      setLanguageSaving(false)
+    }
+  }
 
   const goTo = useCallback((next: Step) => {
     setDirection(next > step ? 1 : -1)
@@ -311,23 +331,42 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
     await detectSaves(selectedPath || undefined)
   }
 
-  async function handleComplete() {
-    // Save settings (triggers backend start via restartPythonBackend)
-    const settingsToSave: Record<string, string> = {
-      advisorProvider,
-      advisorModel,
-      advisorBaseUrl,
-      saveDir: selectedPath || '',
+  async function handleComplete(useFoundSaves: boolean) {
+    if (completionSaving) return
+    setCompletionSaving(true)
+    setCompletionError(false)
+    try {
+      if (!window.electronAPI) throw new Error('Electron API unavailable')
+      const settingsToSave: Record<string, string> = {}
+      const configuredProvider = advisorProvider === 'gemini'
+        ? googleApiKey.trim().length > 0
+        : advisorProvider === 'openrouter'
+          ? openRouterApiKey.trim().length > 0 || advisorModel.trim().length > 0
+          : advisorBaseUrl.trim().length > 0 || customProviderApiKey.trim().length > 0 || advisorModel.trim().length > 0
+      if (configuredProvider) {
+        settingsToSave.advisorProvider = advisorProvider
+        if (advisorModel.trim()) settingsToSave.advisorModel = advisorModel.trim()
+        if (advisorBaseUrl.trim()) settingsToSave.advisorBaseUrl = advisorBaseUrl.trim()
+        if (googleApiKey.trim()) settingsToSave.googleApiKey = googleApiKey.trim()
+        if (openRouterApiKey.trim()) settingsToSave.openRouterApiKey = openRouterApiKey.trim()
+        if (customProviderApiKey.trim()) settingsToSave.customProviderApiKey = customProviderApiKey.trim()
+      }
+      if (useFoundSaves && saveResult?.found) {
+        const saveDir = selectedPath || saveResult.directory
+        if (saveDir) settingsToSave.saveDir = saveDir
+      }
+      if (Object.keys(settingsToSave).length) {
+        const saved = await window.electronAPI.saveSettings(settingsToSave)
+        if (saved?.success === false) throw new Error('Settings save failed')
+      }
+      const completed = await window.electronAPI.onboarding.complete()
+      if (completed?.success === false) throw new Error('Onboarding completion failed')
+      onComplete()
+    } catch {
+      setCompletionError(true)
+    } finally {
+      setCompletionSaving(false)
     }
-    if (googleApiKey) settingsToSave.googleApiKey = googleApiKey
-    if (openRouterApiKey) settingsToSave.openRouterApiKey = openRouterApiKey
-    if (customProviderApiKey) settingsToSave.customProviderApiKey = customProviderApiKey
-    await window.electronAPI?.saveSettings(settingsToSave)
-
-    // Mark onboarding complete
-    await window.electronAPI?.onboarding.complete()
-
-    onComplete()
   }
 
   function shortenPath(p: string): string {
@@ -358,6 +397,13 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
         className="relative mx-4 h-[min(36rem,calc(100vh-3rem))] w-[min(54rem,calc(100%-2rem))] outline-none"
       >
         <div className="relative h-full overflow-hidden">
+          <div className="absolute right-6 top-5 z-10 flex flex-col items-end gap-1">
+            <label htmlFor="onboarding-language" className="sr-only">{t('onboarding.language')}</label>
+            <select id="onboarding-language" data-testid="onboarding-language" value={language} disabled={languageSaving} onChange={event => void selectLanguage(event.target.value)} className="max-w-[11rem] rounded border border-accent-cyan/40 bg-bg-secondary px-2 py-1 text-sm text-text-primary">
+              {LANGUAGE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.value === 'system' ? t('languages.system') : option.nativeLabel}</option>)}
+            </select>
+            {languageError && <p role="alert" className="text-xs text-accent-red">{t('onboarding.languageError')}</p>}
+          </div>
           <AnimatePresence mode="wait" custom={direction}>
             {step === 1 && (
               <motion.div
@@ -427,6 +473,8 @@ export default function OnboardingModal({ onComplete }: OnboardingModalProps) {
                   onRetry={handleRescan}
                   onBack={() => goTo(2)}
                   onComplete={handleComplete}
+                  completing={completionSaving}
+                  completionError={completionError}
                 />
               </motion.div>
             )}
@@ -594,7 +642,7 @@ function StepAiSetup({
                   label={t('onboarding.ai.serverAddress')}
                   value={baseUrl}
                   onChange={(event) => onBaseUrlChange(event.target.value)}
-                  placeholder="https://provider.example/v1"
+                  placeholder={t('onboarding.ai.serverAddressPlaceholder')}
                 />
                 <HUDInput
                   label={t('onboarding.ai.optionalKey')}
@@ -650,6 +698,8 @@ function StepSaveDirectory({
   onRetry,
   onBack,
   onComplete,
+  completing,
+  completionError,
 }: {
   scanning: boolean
   saveResult: SaveDetectionResult | null
@@ -658,7 +708,9 @@ function StepSaveDirectory({
   onBrowse: () => void
   onRetry: () => void
   onBack: () => void
-  onComplete: () => void
+  onComplete: (useFoundSaves: boolean) => void
+  completing: boolean
+  completionError: boolean
 }) {
   const { t } = useTranslation()
   return (
@@ -667,27 +719,27 @@ function StepSaveDirectory({
       title={t('onboarding.saves.frameTitle')}
       actions={(
         <>
-          <HUDButton variant="secondary" onClick={onBack}>
+          <HUDButton variant="secondary" onClick={onBack} disabled={completing}>
             {t('onboarding.actions.back')}
           </HUDButton>
           {scanning ? null : saveResult?.found ? (
             <>
-              <HUDButton variant="secondary" onClick={onBrowse}>
+              <HUDButton variant="secondary" onClick={onBrowse} disabled={completing}>
                 {t('onboarding.saves.browseElsewhere')}
               </HUDButton>
-              <HUDButton data-onboarding-primary="true" onClick={onComplete}>
+              <HUDButton data-onboarding-primary="true" onClick={() => onComplete(true)} disabled={completing}>
                 {t('onboarding.actions.finish')}
               </HUDButton>
             </>
           ) : (
             <>
-              <HUDButton variant="ghost" onClick={onComplete}>
+              <HUDButton variant="ghost" onClick={() => onComplete(false)} disabled={completing}>
                 {t('onboarding.actions.later')}
               </HUDButton>
-              <HUDButton variant="secondary" onClick={onRetry}>
+              <HUDButton variant="secondary" onClick={onRetry} disabled={completing}>
                 {t('onboarding.saves.scanAgain')}
               </HUDButton>
-              <HUDButton data-onboarding-primary="true" onClick={onBrowse}>
+              <HUDButton data-onboarding-primary="true" onClick={onBrowse} disabled={completing}>
                 {t('onboarding.saves.browseFolder')}
               </HUDButton>
             </>
@@ -696,8 +748,9 @@ function StepSaveDirectory({
       )}
     >
       <div className="mx-auto w-full max-w-2xl pt-2">
+        {completionError && <p role="alert" className="mb-3 text-sm text-accent-red">{t('onboarding.completionError')}</p>}
         <HUDLabel className="block mb-3 text-accent-cyan/80">{t('onboarding.saves.label')}</HUDLabel>
-        <h2 className="font-display text-lg tracking-[0.1em] uppercase text-text-primary mb-5">
+        <h2 className="font-display text-lg tracking-[0.1em] uppercase text-text-primary mb-5 break-words">
           {t('onboarding.saves.title')}
         </h2>
         {scanning ? (
@@ -735,8 +788,8 @@ function StepFrame({ step, title, children, actions }: StepFrameProps) {
         decoration="brackets"
         noPadding
       >
-        <div className="grid h-full grid-rows-[auto_minmax(0,1fr)_auto] px-6 pt-4 pb-4">
-          <div className="mb-3">
+        <div className="grid h-full min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] px-6 pt-4 pb-4">
+          <div className="mb-3 pr-44">
             <HUDMicro className="text-accent-cyan">
               {t('onboarding.step', { current: `0${step}`, total: '03' })}
             </HUDMicro>
@@ -744,12 +797,12 @@ function StepFrame({ step, title, children, actions }: StepFrameProps) {
               {title}
             </h1>
           </div>
-          <div className="min-h-0 overflow-y-auto custom-scrollbar">
+          <div className="min-h-0 min-w-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             {children}
           </div>
           <div
             data-onboarding-actions-row="true"
-            className="mt-3 h-11 flex items-center justify-end gap-3 flex-nowrap [&>button]:h-11 [&>button]:min-w-[10rem]"
+            className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end [&>button]:min-h-11 [&>button]:min-w-0 [&>button]:px-3 sm:[&>button]:min-w-[8rem]"
           >
             {actions}
           </div>
@@ -784,7 +837,7 @@ function SaveFound({
     <div className="space-y-4">
       <p className="text-sm text-text-primary">{t('onboarding.saves.found')}</p>
       <div className="p-4 bg-white/5 border border-white/10 rounded-sm">
-        <div className="font-mono text-xs text-accent-cyan mb-1">
+        <div className="font-mono text-xs text-accent-cyan mb-1 break-all">
           {displayPath ? shortenPath(displayPath) : ''}
         </div>
         <div className="text-xs text-text-secondary">
@@ -808,7 +861,7 @@ function SaveNotFound({
       <p className="text-sm text-text-primary leading-relaxed">
         {t('onboarding.saves.notFound')}
       </p>
-      <p className="text-sm text-text-secondary leading-relaxed">
+      <p className="text-sm text-text-secondary leading-relaxed break-all">
         {selectedPath
           ? t('onboarding.saves.notFoundIn', { path: shortenPath(selectedPath) })
           : t('onboarding.saves.notFoundDefault')}

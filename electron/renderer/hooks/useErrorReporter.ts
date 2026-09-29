@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useToast } from '../components/Toast'
+import { useTranslation } from 'react-i18next'
 
 interface ErrorContext {
   message: string
@@ -35,6 +36,7 @@ interface ModalPrefill {
  * - openReportModal: Open report modal directly (for Settings page)
  */
 export function useErrorReporter() {
+  const { t } = useTranslation()
   const { showToast } = useToast()
   const [modalOpen, setModalOpen] = useState(false)
   const [modalPrefill, setModalPrefill] = useState<ModalPrefill | null>(null)
@@ -59,17 +61,17 @@ export function useErrorReporter() {
 
     showToast({
       type: 'error',
-      message: 'Something went wrong',
+      message: t('recovery.somethingWentWrong'),
       duration: 10000,
       action: {
-        label: 'Report',
+        label: t('recovery.report'),
         onClick: () => {
           setModalPrefill({ category: 'Bug', error: errorContext })
           setModalOpen(true)
         },
       },
     })
-  }, [showToast])
+  }, [showToast, t])
 
   /**
    * Prompt user to report a suspicious LLM response
@@ -77,14 +79,14 @@ export function useErrorReporter() {
   const promptLLMReport = useCallback((llm: LlmContext) => {
     showToast({
       type: 'warning',
-      message: 'Response seem off?',
+      message: t('recovery.responseOff'),
       duration: 15000,
       action: {
-        label: 'Report',
+        label: t('recovery.report'),
         onClick: () => openLLMReportModal(llm),
       },
     })
-  }, [showToast, openLLMReportModal])
+  }, [showToast, openLLMReportModal, t])
 
   /**
    * Open the report modal directly (without toast)

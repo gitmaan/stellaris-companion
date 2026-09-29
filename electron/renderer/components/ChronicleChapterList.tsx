@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { isCompositionKey } from '../lib/compositionKey'
 import { ChronicleChapter, CurrentEra } from '../hooks/useBackend'
 import Tooltip from './Tooltip'
 import PersonIcon from './PersonIcon'
@@ -74,7 +75,7 @@ function ChronicleChapterList({
   collapsed = false,
   onToggleCollapse,
 }: ChronicleChapterListProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const isRegenerating = regeneratingChapter !== null
   const selectedSave = saves.find(s => s.save_id === selectedSaveId)
 
@@ -195,7 +196,7 @@ function ChronicleChapterList({
                       {isThisRegenerating ? (
                         <span className="inline-block w-3 h-3 border border-accent-yellow border-t-transparent rounded-full animate-spin-loader" />
                       ) : (
-                        toRoman(chapter.number)
+                        /^(ja|zh)/.test(i18n.language) ? chapter.number : toRoman(chapter.number)
                       )}
                     </span>
                     <span className={`flex-1 truncate text-sm ${isSelected ? 'font-medium text-text-primary' : 'text-text-secondary'}`}>
@@ -374,7 +375,7 @@ function CampaignPicker({
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
       }}
       onKeyDown={event => {
-        if (event.key !== 'Escape') return
+        if (event.key !== 'Escape' || isCompositionKey(event)) return
         setOpen(false)
         event.currentTarget.querySelector<HTMLElement>('[aria-haspopup="listbox"]')?.focus()
       }}

@@ -11,14 +11,12 @@ import {
   normalizeChronicleRefreshMode,
   normalizeLanguage,
   normalizeModelRoutingMode,
-  normalizeResolvedLanguage,
   normalizeUpdateChannel,
   normalizeUiTheme,
   type AdvisorProvider,
   type ChronicleRefreshMode,
   type LanguageSetting,
   type ModelRoutingMode,
-  type ResolvedLanguage,
   type UpdateChannel,
   type UiTheme,
   useSettings,
@@ -54,7 +52,7 @@ interface SettingsPageProps {
   onThemeChange?: (theme: UiTheme) => void
   onChronicleRefreshModeChange?: (mode: ChronicleRefreshMode) => void
   onModelRoutingModeChange?: (mode: ModelRoutingMode) => void
-  onLanguageChange?: (language: ResolvedLanguage) => void
+  onLanguageSelect?: (language: LanguageSetting) => Promise<boolean>
   onOpenCampaignHistory?: () => void
 }
 
@@ -131,7 +129,7 @@ function SettingsPage({
   onThemeChange,
   onChronicleRefreshModeChange,
   onModelRoutingModeChange,
-  onLanguageChange,
+  onLanguageSelect,
   onOpenCampaignHistory,
 }: SettingsPageProps) {
   const { t } = useTranslation()
@@ -237,7 +235,6 @@ function SettingsPage({
     )
     const normalizedModelRoutingMode = normalizeModelRoutingMode(settings.modelRoutingMode)
     const normalizedLanguage = normalizeLanguage(settings.language)
-    const normalizedResolvedLanguage = normalizeResolvedLanguage(settings.resolvedLanguage)
     const normalizedUpdateChannel = normalizeUpdateChannel(settings.updateChannel)
     setUiTheme(normalizedTheme)
     setChronicleRefreshMode(normalizedChronicleRefreshMode)
@@ -247,8 +244,7 @@ function SettingsPage({
     onThemeChange?.(normalizedTheme)
     onChronicleRefreshModeChange?.(normalizedChronicleRefreshMode)
     onModelRoutingModeChange?.(normalizedModelRoutingMode)
-    onLanguageChange?.(normalizedResolvedLanguage)
-  }, [onChronicleRefreshModeChange, onLanguageChange, onModelRoutingModeChange, onThemeChange, settings])
+  }, [onChronicleRefreshModeChange, onModelRoutingModeChange, onThemeChange, settings])
 
   useEffect(() => {
     let cancelled = false
@@ -709,7 +705,7 @@ function SettingsPage({
     setLanguage(nextLanguage)
     setLanguageSaving(true)
 
-    const success = await saveSettings({ language: nextLanguage })
+    const success = await onLanguageSelect?.(nextLanguage) ?? false
     setLanguageSaving(false)
 
     if (!success) {
@@ -720,18 +716,6 @@ function SettingsPage({
         duration: 4000,
       })
       return
-    }
-
-    try {
-      const loaded = await window.electronAPI?.getSettings()
-      const loadedLanguage = normalizeLanguage((loaded as { language?: unknown } | undefined)?.language)
-      const loadedResolved = normalizeResolvedLanguage(
-        (loaded as { resolvedLanguage?: unknown } | undefined)?.resolvedLanguage,
-      )
-      setLanguage(loadedLanguage)
-      onLanguageChange?.(loadedResolved)
-    } catch {
-      onLanguageChange?.(normalizeResolvedLanguage(nextLanguage))
     }
 
     showToast({
@@ -757,7 +741,7 @@ function SettingsPage({
 
   const languageOptions = LANGUAGE_OPTIONS.map((option) => ({
     value: option.value,
-    label: t(`languages.${option.value}`),
+    label: option.value === 'system' ? t('languages.system') : option.nativeLabel,
   }))
 
   const modelRoutingLabel = (mode: ModelRoutingMode) =>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import PersonIcon from './PersonIcon'
+import { isCompositionKey } from '../lib/compositionKey'
 
 interface ChronicleInfoPanelProps {
   isOpen: boolean
@@ -67,7 +68,7 @@ export default function ChronicleInfoPanel({
     setSaveResult(null)
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !isCompositionKey(e)) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

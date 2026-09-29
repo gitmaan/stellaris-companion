@@ -177,7 +177,7 @@ declare global {
       }
       // Settings
       getSettings: () => Promise<unknown>
-      saveSettings: (settings: unknown) => Promise<unknown>
+      saveSettings: (settings: unknown) => Promise<{ success: boolean; language?: string; resolvedLanguage?: string }>
       showFolderDialog: () => Promise<string | null>
       advisorProviders: {
         listModels: (config: {

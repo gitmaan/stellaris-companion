@@ -43,7 +43,9 @@ jobs:
 
       - name: Run main-process tests
         working-directory: electron
-        run: npm test
+        run: |
+          npm test
+          npm run test:localization
 
       - name: Build renderer
         working-directory: electron
@@ -82,3 +84,43 @@ jobs:
         run: xvfb-run --auto-servernum npx playwright test
         env:
           E2E_NO_SANDBOX: '1'
+
+  desktop-e2e-windows:
+    name: Desktop E2E - Windows localization smoke
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            electron/package-lock.json
+            electron/renderer/package-lock.json
+
+      - name: Install Electron dependencies
+        working-directory: electron
+        run: npm ci
+
+      - name: Install renderer dependencies
+        working-directory: electron/renderer
+        run: npm ci
+
+      - name: Build renderer
+        working-directory: electron
+        run: npm run build:renderer
+
+      - name: Run Windows Electron localization smoke
+        working-directory: electron
+        run: npx playwright test e2e/windows-localization-smoke.spec.js
+
+      - name: Upload Windows smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-localization-smoke
+          path: electron/test-results
+          if-no-files-found: ignore
