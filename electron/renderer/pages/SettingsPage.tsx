@@ -29,9 +29,8 @@ import { HUDInput } from '../components/hud/HUDInput'
 import { HUDButton } from '../components/hud/HUDButton'
 import { HUDSelect } from '../components/hud/HUDForm'
 import { useToast } from '../components/Toast'
-import { AdvisorProviderChooser } from '../components/settings/AdvisorProviderChooser'
+import { AISetupForm } from '../components/settings/AISetupForm'
 import { ChronicleRefreshControl } from '../components/settings/ChronicleRefreshControl'
-import { ProviderSetupGuide } from '../components/settings/ProviderSetupGuide'
 import type { McpRelayClientStatus, McpRelayHealthResult, McpRelayStatus } from '../global'
 import type { HistoryStorageResponse } from '../hooks/useBackend'
 
@@ -47,7 +46,15 @@ function getUserFriendlyErrorMessage(error: string | null, t: (key: string) => s
   return t('settings.discordErrors.generic')
 }
 
+function revealSettingsSection(id: string) {
+  const section = document.getElementById(id)
+  const disclosure = section?.closest('details')
+  if (disclosure) disclosure.open = true
+  section?.scrollIntoView()
+}
+
 interface SettingsPageProps {
+  openTarget?: { id: string; request: number }
   onReportIssue?: () => void
   onThemeChange?: (theme: UiTheme) => void
   onChronicleRefreshModeChange?: (mode: ChronicleRefreshMode) => void
@@ -75,35 +82,6 @@ const UI_THEME_LABELS: Record<UiTheme, string> = {
   'command-amber': 'Command Amber',
 }
 
-const ADVISOR_PROVIDER_DEFAULT_URLS: Partial<Record<AdvisorProvider, string>> = {
-  ollama: 'http://127.0.0.1:11434/v1',
-  lm_studio: 'http://127.0.0.1:1234/v1',
-  openrouter: 'https://openrouter.ai/api/v1',
-}
-
-const RECOMMENDED_ADVISOR_CONTEXT_LENGTH = 32_768
-
-interface AdvisorProviderModel {
-  id: string
-  name: string
-  contextLength?: number
-  supportedParameters?: string[]
-  outputModalities?: string[]
-  recommended?: boolean
-}
-
-function formatContextLength(contextLength: number): string {
-  if (contextLength >= 1_000_000) {
-    const millions = contextLength / 1_000_000
-    return `${Number.isInteger(millions) ? millions : millions.toFixed(1)}M`
-  }
-  if (contextLength >= 1024) {
-    const thousands = contextLength / 1024
-    return `${Number.isInteger(thousands) ? thousands : thousands.toFixed(1)}K`
-  }
-  return String(contextLength)
-}
-
 function formatBytes(bytes: number | null | undefined): string {
   if (typeof bytes !== 'number' || !Number.isFinite(bytes)) return '—'
   if (bytes < 1024) return `${bytes} B`
@@ -125,6 +103,7 @@ function routingModeToQuotaMode(mode: ModelRoutingMode): GeminiQuotaMode {
 }
 
 function SettingsPage({
+  openTarget,
   onReportIssue,
   onThemeChange,
   onChronicleRefreshModeChange,
@@ -136,6 +115,12 @@ function SettingsPage({
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
   const { showToast } = useToast()
 
+  useEffect(() => {
+    if (loading || !openTarget?.request) return
+    const frame = requestAnimationFrame(() => revealSettingsSection(openTarget.id))
+    return () => cancelAnimationFrame(frame)
+  }, [loading, openTarget])
+
   const {
     status: discordStatus,
     relayStatus: discordRelayStatus,
@@ -146,28 +131,7 @@ function SettingsPage({
     disconnectDiscord,
   } = useDiscord()
 
-  const [googleApiKey, setGoogleApiKey] = useState('')
-  const [openRouterApiKey, setOpenRouterApiKey] = useState('')
-  const [customProviderApiKey, setCustomProviderApiKey] = useState('')
-  const [advisorProvider, setAdvisorProvider] = useState<AdvisorProvider>(
-    DEFAULT_ADVISOR_PROVIDER,
-  )
-  const [advisorModel, setAdvisorModel] = useState('')
-  const [advisorBaseUrl, setAdvisorBaseUrl] = useState('')
-  const [advisorModels, setAdvisorModels] = useState<AdvisorProviderModel[]>([])
-  const [advisorModelSearch, setAdvisorModelSearch] = useState('')
-  const [showAllAdvisorModels, setShowAllAdvisorModels] = useState(false)
-  const [advisorChecking, setAdvisorChecking] = useState(false)
-  const [advisorConnection, setAdvisorConnection] = useState<{
-    ok: boolean
-    message: string
-  } | null>(null)
-  const [advisorTesting, setAdvisorTesting] = useState(false)
-  const [advisorModelTest, setAdvisorModelTest] = useState<{
-    ok: boolean
-    message: string
-    chronicleReady?: boolean
-  } | null>(null)
+  const [advisorProvider, setAdvisorProvider] = useState<AdvisorProvider>(DEFAULT_ADVISOR_PROVIDER)
   const [saveDir, setSaveDir] = useState('')
   const [playerName, setPlayerName] = useState('')
   const [multiplayerOpen, setMultiplayerOpen] = useState(false)
@@ -195,14 +159,6 @@ function SettingsPage({
   const [historyStorage, setHistoryStorage] = useState<HistoryStorageResponse | null>(null)
   const [historyBackupRunning, setHistoryBackupRunning] = useState(false)
   const settingsHydratedRef = useRef(false)
-  const advisorCheckIdRef = useRef(0)
-
-  useEffect(() => {
-    return () => {
-      advisorCheckIdRef.current += 1
-    }
-  }, [])
-
   useEffect(() => {
     let cancelled = false
     void window.electronAPI?.backend.historyStorage().then(result => {
@@ -215,16 +171,7 @@ function SettingsPage({
     if (!settings || settingsHydratedRef.current) return
     settingsHydratedRef.current = true
 
-    setGoogleApiKey(settings.googleApiKeySet ? settings.googleApiKey : '')
-    setOpenRouterApiKey(
-      settings.openRouterApiKeySet ? settings.openRouterApiKey : '',
-    )
-    setCustomProviderApiKey(
-      settings.customProviderApiKeySet ? settings.customProviderApiKey : '',
-    )
     setAdvisorProvider(normalizeAdvisorProvider(settings.advisorProvider))
-    setAdvisorModel(settings.advisorModel || '')
-    setAdvisorBaseUrl(settings.advisorBaseUrl || '')
     setSaveDir(settings.saveDir || '')
     setPlayerName(settings.playerName || '')
     setMultiplayerOpen(Boolean(settings.playerName?.trim()))
@@ -319,154 +266,10 @@ function SettingsPage({
     }
   }
 
-  const handleSaveAdvisor = async () => {
-    const settingsToSave: Record<string, string | boolean> = {
-      advisorProvider,
-      advisorModel,
-      advisorBaseUrl,
-    }
-    if (!googleApiKey.includes('...')) {
-      settingsToSave.googleApiKey = googleApiKey
-    }
-    if (!openRouterApiKey.includes('...')) {
-      settingsToSave.openRouterApiKey = openRouterApiKey
-    }
-    if (!customProviderApiKey.includes('...')) {
-      settingsToSave.customProviderApiKey = customProviderApiKey
-    }
-
-    const success = await saveSettings(settingsToSave)
-    if (success) {
-      showToast({ type: 'success', message: t('settings.advisor.saved') })
-    }
-  }
-
   const handleSavePlayerName = async () => {
     const success = await saveSettings({ playerName })
     if (success) {
       showToast({ type: 'success', message: t('settings.saveData.playerNameSaved') })
-    }
-  }
-
-  const invalidateAdvisorConnection = () => {
-    advisorCheckIdRef.current += 1
-    setAdvisorChecking(false)
-    setAdvisorTesting(false)
-    setAdvisorConnection(null)
-    setAdvisorModelTest(null)
-  }
-
-  const handleAdvisorProviderChange = (rawValue: string) => {
-    const nextProvider = normalizeAdvisorProvider(rawValue)
-    if (nextProvider === advisorProvider) return
-    invalidateAdvisorConnection()
-    setAdvisorProvider(nextProvider)
-    setAdvisorModel('')
-    setAdvisorBaseUrl('')
-    setAdvisorModels([])
-    setAdvisorModelSearch('')
-    setShowAllAdvisorModels(false)
-  }
-
-  const handleCheckAdvisorProvider = async () => {
-    if (!window.electronAPI?.advisorProviders?.listModels) return
-    const checkId = ++advisorCheckIdRef.current
-    const apiKey = advisorProvider === 'openrouter'
-      ? openRouterApiKey
-      : advisorProvider === 'custom'
-        ? customProviderApiKey
-        : ''
-    setAdvisorChecking(true)
-    setAdvisorConnection(null)
-    try {
-      const result = await window.electronAPI.advisorProviders.listModels({
-        provider: advisorProvider,
-        baseUrl: advisorBaseUrl,
-        apiKey,
-      })
-      if (checkId !== advisorCheckIdRef.current) return
-      if (!result.ok) {
-        setAdvisorModels([])
-        setAdvisorConnection({ ok: false, message: result.error || t('settings.advisor.connectionError') })
-        return
-      }
-      const models = result.models || []
-      setAdvisorModels(models)
-      setShowAllAdvisorModels(false)
-      const suggestedModel = advisorProvider === 'openrouter'
-        ? models.find(model => model.recommended)
-        : models.length === 1
-          ? models[0]
-          : undefined
-      if (suggestedModel) {
-        setAdvisorModel(current => current || suggestedModel.id)
-        setAdvisorModelTest(null)
-      }
-      setAdvisorConnection({
-        ok: true,
-        message: models.length
-          ? t('settings.advisor.modelsFound', { count: models.length })
-          : t('settings.advisor.connectedNoModels'),
-      })
-    } catch (e) {
-      if (checkId !== advisorCheckIdRef.current) return
-      setAdvisorConnection({
-        ok: false,
-        message: e instanceof Error ? e.message : t('settings.advisor.connectionError'),
-      })
-    } finally {
-      if (checkId === advisorCheckIdRef.current) {
-        setAdvisorChecking(false)
-      }
-    }
-  }
-
-  const handleAdvisorModelChange = (nextModel: string) => {
-    advisorCheckIdRef.current += 1
-    setAdvisorTesting(false)
-    setAdvisorModelTest(null)
-    setAdvisorModel(nextModel)
-  }
-
-  const handleTestAdvisorModel = async () => {
-    if (!window.electronAPI?.advisorProviders?.testModel || !advisorModel.trim()) return
-    const checkId = ++advisorCheckIdRef.current
-    const apiKey = advisorProvider === 'openrouter'
-      ? openRouterApiKey
-      : advisorProvider === 'custom'
-        ? customProviderApiKey
-        : ''
-    setAdvisorTesting(true)
-    setAdvisorModelTest(null)
-    try {
-      const result = await window.electronAPI.advisorProviders.testModel({
-        provider: advisorProvider,
-        baseUrl: advisorBaseUrl,
-        apiKey,
-        model: advisorModel,
-      })
-      if (checkId !== advisorCheckIdRef.current) return
-      setAdvisorModelTest({
-        ok: result.ok,
-        chronicleReady: result.chronicleReady,
-        message: result.ok
-          ? result.chronicleReady === false
-            ? t('settings.advisor.modelAdvisorOnly')
-            : result.structuredOutput === false
-              ? t('settings.advisor.modelReadyPromptJson')
-              : t('settings.advisor.modelReady')
-          : result.error || t('settings.advisor.modelTestError'),
-      })
-    } catch (e) {
-      if (checkId !== advisorCheckIdRef.current) return
-      setAdvisorModelTest({
-        ok: false,
-        message: e instanceof Error ? e.message : t('settings.advisor.modelTestError'),
-      })
-    } finally {
-      if (checkId === advisorCheckIdRef.current) {
-        setAdvisorTesting(false)
-      }
     }
   }
 
@@ -803,83 +606,13 @@ function SettingsPage({
     label: option.value === 'system' ? t('languages.system') : option.nativeLabel,
   }))
 
-  const modelRoutingLabel = (mode: ModelRoutingMode) =>
-    t(`settings.modelRouting.${mode === 'quality_first' ? 'qualityFirst' : 'conserve'}`)
-
-  const modelRoutingHelper = (mode: ModelRoutingMode) =>
-    t(`settings.modelRouting.${mode === 'quality_first' ? 'qualityFirstHelp' : 'conserveHelp'}`)
-
   const geminiQuotaMode = routingModeToQuotaMode(modelRoutingMode)
   const geminiQuotaLabel = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}`)
   const geminiQuotaTag = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}Tag`)
   const geminiQuotaHelper = (mode: GeminiQuotaMode) => t(`settings.geminiQuota.${mode}Help`)
   const updateChannelLabel = (channel: UpdateChannel) =>
     t(`settings.updateChannel.${channel}`)
-  const providerDefaultUrl = ADVISOR_PROVIDER_DEFAULT_URLS[advisorProvider] || ''
-  const hasAdvisorChanges = Boolean(settings && (
-    (settings.googleApiKeySet ? googleApiKey !== settings.googleApiKey : googleApiKey !== '')
-    || (settings.openRouterApiKeySet
-      ? openRouterApiKey !== settings.openRouterApiKey
-      : openRouterApiKey !== '')
-    || (settings.customProviderApiKeySet
-      ? customProviderApiKey !== settings.customProviderApiKey
-      : customProviderApiKey !== '')
-    || advisorProvider !== settings.advisorProvider
-    || advisorModel !== (settings.advisorModel || '')
-    || advisorBaseUrl !== (settings.advisorBaseUrl || '')
-  ))
   const hasPlayerNameChange = Boolean(settings && playerName !== (settings.playerName || ''))
-  const recommendedAdvisorModels = advisorModels.filter(model => model.recommended)
-  const advisorSearchQuery = advisorModelSearch.trim().toLowerCase()
-  const advisorModelPool = advisorProvider === 'openrouter'
-    && !showAllAdvisorModels
-    && !advisorSearchQuery
-    && recommendedAdvisorModels.length
-    ? recommendedAdvisorModels
-    : advisorModels
-  const filteredAdvisorModels = advisorModelPool
-    .filter((model) => {
-      return !advisorSearchQuery
-        || model.id.toLowerCase().includes(advisorSearchQuery)
-        || model.name.toLowerCase().includes(advisorSearchQuery)
-    })
-    .sort((left, right) => {
-      const leftExact = left.id.toLowerCase() === advisorSearchQuery ? 1 : 0
-      const rightExact = right.id.toLowerCase() === advisorSearchQuery ? 1 : 0
-      return rightExact - leftExact
-    })
-    .slice(0, 200)
-  const selectedAdvisorModel = advisorModel
-    ? advisorModels.find((model) => model.id === advisorModel) || {
-      id: advisorModel,
-      name: advisorModel,
-    }
-    : undefined
-  const visibleAdvisorModels = selectedAdvisorModel
-    && !filteredAdvisorModels.some((model) => model.id === selectedAdvisorModel.id)
-    ? [selectedAdvisorModel, ...filteredAdvisorModels]
-    : filteredAdvisorModels
-  const advisorModelOptions = [
-    { value: '', label: t('settings.advisor.selectModel') },
-    ...visibleAdvisorModels.map((model) => ({
-      value: model.id,
-      label: [
-        model.recommended ? t('settings.advisor.recommended') : '',
-        model.name === model.id ? model.id : `${model.name} · ${model.id}`,
-        model.contextLength
-          ? t('settings.advisor.modelContextLabel', {
-            context: formatContextLength(model.contextLength),
-          })
-          : '',
-      ].filter(Boolean).join(' · '),
-    })),
-  ]
-  const selectedAdvisorContextLength = selectedAdvisorModel?.contextLength
-  const selectedAdvisorContextLabel = selectedAdvisorContextLength
-    ? formatContextLength(selectedAdvisorContextLength)
-    : ''
-  const usesOllamaCloudModel = advisorProvider === 'ollama'
-    && advisorModel.toLowerCase().includes(':cloud')
 
   const mcpRelayReady = Boolean(mcpRelayHealth?.campaignReady)
   const mcpRelayServerHealthy = Boolean(mcpRelayHealth?.serverHealthy)
@@ -980,383 +713,33 @@ function SettingsPage({
             {/* Column 1: Core Systems */}
             <div className="space-y-8">
                 
-                {/* API Section */}
-                <section>
-                    <HUDSectionTitle number="01">{t('settings.sections.intelligence')}</HUDSectionTitle>
-                    <HUDPanel decoration="tech" title={t('settings.panels.advisorAccess')} quiet>
-                        <div className="space-y-4 pt-2">
-                             <AdvisorProviderChooser
-                               provider={advisorProvider}
-                               onChange={handleAdvisorProviderChange}
-                             />
-                             <ProviderSetupGuide provider={advisorProvider} />
-                             {(settings?.secretStorageReadFailed || settings?.secretStorageAvailable === false) && (
-                               <HUDMicro className="block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
-                                 {t(settings.secretStorageReadFailed
-                                   ? 'settings.advisor.lockedSecrets'
-                                   : 'settings.advisor.sessionOnlySecrets')}
-                               </HUDMicro>
-                             )}
-
-                             {advisorProvider !== 'gemini' && (
-                               <div className="space-y-4 border-t border-white/10 pt-4">
-                                 <div className="flex items-center justify-between gap-3">
-                                   <div>
-                                     <HUDLabel>{t(`settings.advisor.providers.${advisorProvider}`)}</HUDLabel>
-                                     <HUDMicro className="mt-1 block normal-case tracking-[0.02em] text-white/45">
-                                       {t(`settings.advisor.providerHelp.${advisorProvider}`)}
-                                     </HUDMicro>
-                                     {(advisorProvider === 'openrouter' || advisorProvider === 'custom') && (
-                                       <HUDMicro className="mt-2 block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
-                                         {t('settings.advisor.remoteContextNotice')}
-                                       </HUDMicro>
-                                     )}
-                                   </div>
-                                   {advisorConnection && (
-                                     <span className={`font-mono text-[10px] uppercase tracking-wider ${
-                                       advisorConnection.ok ? 'text-accent-green' : 'text-accent-red'
-                                     }`}>
-                                       {advisorConnection.ok ? t('settings.advisor.connected') : t('settings.advisor.failed')}
-                                     </span>
-                                   )}
-                                 </div>
-
-                                 {advisorProvider === 'openrouter' && (
-                                   <HUDInput
-                                     label={t('settings.advisor.apiKeyLabel')}
-                                     aria-label={t('settings.advisor.apiKeyLabel')}
-                                     type="password"
-                                     value={openRouterApiKey}
-                                     onChange={(e) => {
-                                       setOpenRouterApiKey(e.target.value)
-                                       invalidateAdvisorConnection()
-                                     }}
-                                     placeholder={settings?.openRouterApiKeySet ? t('settings.api.placeholderSet') : t('settings.api.placeholderEmpty')}
-                                   />
-                                 )}
-
-                                 {advisorProvider === 'custom' && (
-                                   <>
-                                     <HUDInput
-                                       label={t('settings.advisor.baseUrlLabel')}
-                                       aria-label={t('settings.advisor.baseUrlLabel')}
-                                       value={advisorBaseUrl}
-                                       onChange={(e) => {
-                                         setAdvisorBaseUrl(e.target.value)
-                                         invalidateAdvisorConnection()
-                                       }}
-                                       placeholder="https://provider.example/v1"
-                                     />
-                                     <HUDInput
-                                       label={t('settings.advisor.optionalApiKeyLabel')}
-                                       aria-label={t('settings.advisor.optionalApiKeyLabel')}
-                                       type="password"
-                                       value={customProviderApiKey}
-                                       onChange={(e) => {
-                                         setCustomProviderApiKey(e.target.value)
-                                         invalidateAdvisorConnection()
-                                       }}
-                                       placeholder={settings?.customProviderApiKeySet ? t('settings.api.placeholderSet') : t('settings.advisor.optional')}
-                                     />
-                                   </>
-                                 )}
-
-                                 <div className="flex flex-wrap items-center gap-3">
-                                   <HUDButton
-                                     type="button"
-                                     variant="secondary"
-                                     onClick={() => void handleCheckAdvisorProvider()}
-                                     disabled={advisorChecking || advisorTesting}
-                                     className="px-4 py-1.5 text-[10px]"
-                                   >
-                                     {advisorChecking ? t('settings.advisor.checking') : t('settings.advisor.checkConnection')}
-                                   </HUDButton>
-                                   {advisorConnection && (
-                                     <HUDMicro className={advisorConnection.ok ? 'text-accent-green' : 'text-accent-red'}>
-                                       {advisorConnection.message}
-                                     </HUDMicro>
-                                   )}
-                                 </div>
-
-                                 {advisorProvider === 'openrouter' && recommendedAdvisorModels.length > 0 && (
-                                   <div className="flex flex-wrap items-center gap-3">
-                                     <HUDButton
-                                       type="button"
-                                       variant="secondary"
-                                       onClick={() => {
-                                         setShowAllAdvisorModels(current => !current)
-                                         setAdvisorModelSearch('')
-                                       }}
-                                       className="px-4 py-1.5 text-[10px]"
-                                     >
-                                       {showAllAdvisorModels
-                                         ? t('settings.advisor.showRecommendedModels')
-                                         : t('settings.advisor.showAllModels')}
-                                     </HUDButton>
-                                     {!showAllAdvisorModels && (
-                                       <HUDMicro className="text-white/45">
-                                         {t('settings.advisor.recommendedSummary')}
-                                       </HUDMicro>
-                                     )}
-                                   </div>
-                                 )}
-
-                                 {showAllAdvisorModels && advisorModels.length > 8 && (
-                                   <HUDInput
-                                     label={t('settings.advisor.searchModels')}
-                                     aria-label={t('settings.advisor.searchModels')}
-                                     value={advisorModelSearch}
-                                     onChange={(e) => setAdvisorModelSearch(e.target.value)}
-                                     placeholder={t('settings.advisor.searchPlaceholder')}
-                                   />
-                                 )}
-
-                                 {advisorModels.length > 0 ? (
-                                     <HUDSelect
-                                       label={t('settings.advisor.modelLabel')}
-                                       value={advisorModel}
-                                       onChange={(e) => handleAdvisorModelChange(e.target.value)}
-                                       options={advisorModelOptions}
-                                     />
-                                 ) : (
-                                   <HUDInput
-                                     label={t('settings.advisor.modelLabel')}
-                                     aria-label={t('settings.advisor.modelLabel')}
-                                     value={advisorModel}
-                                     onChange={(e) => handleAdvisorModelChange(e.target.value)}
-                                     placeholder={t('settings.advisor.modelPlaceholder')}
-                                   />
-                                 )}
-
-                                 <div className="flex flex-wrap items-center gap-3">
-                                   <HUDButton
-                                     type="button"
-                                     variant="secondary"
-                                     onClick={() => void handleTestAdvisorModel()}
-                                     disabled={advisorChecking || advisorTesting || !advisorModel.trim()}
-                                     className="px-4 py-1.5 text-[10px]"
-                                   >
-                                     {advisorTesting ? t('settings.advisor.testingModel') : t('settings.advisor.testModel')}
-                                   </HUDButton>
-                                   {advisorModelTest && (
-                                     <HUDMicro className={
-                                       !advisorModelTest.ok
-                                         ? 'text-accent-red'
-                                         : advisorModelTest.chronicleReady === false
-                                           ? 'text-accent-yellow'
-                                           : 'text-accent-green'
-                                     }>
-                                       {advisorModelTest.message}
-                                     </HUDMicro>
-                                   )}
-                                 </div>
-                                 <HUDMicro className="block normal-case tracking-[0.02em] text-white/45">
-                                   {t('settings.advisor.modelTestPrivacy')}
-                                 </HUDMicro>
-
-                                 {usesOllamaCloudModel && (
-                                   <HUDMicro className="block border-l border-accent-yellow/50 pl-2 normal-case tracking-[0.02em] text-accent-yellow/75">
-                                     {t('settings.advisor.ollamaCloudNotice')}
-                                   </HUDMicro>
-                                 )}
-
-                                 <details className="group border-t border-white/10 pt-3">
-                                     <summary className="cursor-pointer list-none font-display text-[10px] uppercase tracking-[0.18em] text-text-secondary hover:text-accent-cyan">
-                                       <span className="group-open:hidden">{t('settings.advisor.showAdvanced')}</span>
-                                       <span className="hidden group-open:inline">{t('settings.advisor.hideAdvanced')}</span>
-                                     </summary>
-                                     <div className="mt-3 space-y-3">
-                                       {advisorModel.trim() && selectedAdvisorContextLength !== undefined && (
-                                         <HUDMicro
-                                           className={`block border-l pl-2 normal-case tracking-[0.02em] ${
-                                             selectedAdvisorContextLength < RECOMMENDED_ADVISOR_CONTEXT_LENGTH
-                                               ? 'border-accent-yellow/50 text-accent-yellow/75'
-                                               : 'border-accent-green/40 text-white/55'
-                                           }`}
-                                         >
-                                           {selectedAdvisorContextLength < RECOMMENDED_ADVISOR_CONTEXT_LENGTH
-                                             ? t('settings.advisor.modelContextTooSmall', {
-                                               context: selectedAdvisorContextLabel,
-                                             })
-                                             : t('settings.advisor.modelContextDetected', {
-                                               context: selectedAdvisorContextLabel,
-                                             })}
-                                         </HUDMicro>
-                                       )}
-                                       {advisorModel.trim() && selectedAdvisorContextLength === undefined && (
-                                         <HUDMicro className="block border-l border-white/20 pl-2 normal-case tracking-[0.02em] text-white/45">
-                                           {t('settings.advisor.modelContextUnknown')}
-                                         </HUDMicro>
-                                       )}
-                                       {advisorProvider !== 'custom' && (
-                                         <HUDInput
-                                           label={t('settings.advisor.baseUrlLabel')}
-                                           aria-label={t('settings.advisor.baseUrlLabel')}
-                                           value={advisorBaseUrl}
-                                           onChange={(e) => {
-                                             setAdvisorBaseUrl(e.target.value)
-                                             invalidateAdvisorConnection()
-                                           }}
-                                           placeholder={providerDefaultUrl}
-                                         />
-                                       )}
-                                     </div>
-                                   </details>
-                               </div>
-                             )}
-
-                             {advisorProvider === 'gemini' && (
-                               <div className="border-t border-white/10 pt-4">
-                                 <HUDInput
-                                    label={t('settings.api.label')}
-                                    type="password"
-                                    value={googleApiKey}
-                                    onChange={(e) => setGoogleApiKey(e.target.value)}
-                                    placeholder={settings?.googleApiKeySet ? t('settings.api.placeholderSet') : t('settings.api.placeholderEmpty')}
-                                 />
-                                 <div className="flex justify-between items-center">
-                                     <span className="font-mono text-xs text-white/30">
-                                         {t('settings.api.status')} {settings?.googleApiKeySet ? <span className="text-accent-green">{t('settings.api.active')}</span> : <span className="text-accent-yellow">{t('settings.api.missing')}</span>}
-                                     </span>
-                                     <a
-                                        href="https://aistudio.google.com/app/apikey"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="font-display text-[10px] text-accent-cyan hover:underline tracking-wider"
-                                     >
-                                         {t('settings.api.generateKey')}
-                                     </a>
-                                 </div>
-                               </div>
-                             )}
-                             {advisorProvider === 'gemini' && (
-                             <div className="border-t border-white/10 pt-4 space-y-3">
-                                 <div className="flex items-center justify-between gap-3">
-                                     <HUDLabel>{t('settings.geminiQuota.label')}</HUDLabel>
-                                     {modelRoutingModeSaving && (
-                                       <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
-                                     )}
-                                 </div>
-                                 <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
-                                   {t('settings.geminiQuota.description')}
-                                 </HUDMicro>
-
-                                 <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
-                                   {GEMINI_QUOTA_MODES.map((mode) => {
-                                     const isSelected = geminiQuotaMode === mode
-                                     return (
-                                       <button
-                                         key={mode}
-                                         type="button"
-                                         disabled={modelRoutingModeSaving}
-                                         aria-pressed={isSelected}
-                                         aria-label={t('settings.geminiQuota.aria', { mode: geminiQuotaLabel(mode) })}
-                                         onClick={() => void handleGeminiQuotaModeChange(mode)}
-                                         className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
-                                           isSelected
-                                             ? 'border border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
-                                             : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
-                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                       >
-                                         <div className="font-display text-[11px] uppercase tracking-[0.18em]">
-                                           {geminiQuotaLabel(mode)}
-                                         </div>
-                                         <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
-                                           {geminiQuotaTag(mode)}
-                                         </div>
-                                       </button>
-                                     )
-                                   })}
-                                 </div>
-
-                                 <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
-                                   {geminiQuotaHelper(geminiQuotaMode)}
-                                 </HUDMicro>
-
-                                 <details className="group border-t border-white/10 pt-3">
-                                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm border border-white/10 bg-black/20 px-3 py-2 font-display text-[10px] uppercase tracking-[0.18em] text-text-secondary transition-all duration-200 hover:border-accent-cyan/40 hover:bg-accent-cyan/5 hover:text-accent-cyan">
-                                     <span className="flex items-center gap-2">
-                                       <span className="transition-transform duration-200 group-open:rotate-90">&gt;</span>
-                                       <span className="group-open:hidden">{t('settings.geminiQuota.showAdvanced')}</span>
-                                       <span className="hidden group-open:inline">{t('settings.geminiQuota.hideAdvanced')}</span>
-                                     </span>
-                                     <span className="font-mono text-[9px] tracking-[0.12em] text-white/35">
-                                       {t('settings.geminiQuota.optional')}
-                                     </span>
-                                   </summary>
-                                   <div className="mt-3 space-y-4">
-                                     <div className="space-y-3">
-                                       <div className="flex items-center justify-between gap-3">
-                                         <HUDLabel>{t('settings.modelRouting.label')}</HUDLabel>
-                                         {modelRoutingModeSaving && (
-                                           <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
-                                         )}
-                                       </div>
-
-                                       <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
-                                         {(['quality_first', 'conserve'] as const).map((mode) => {
-                                           const isSelected = modelRoutingMode === mode
-                                           return (
-                                             <button
-                                               key={mode}
-                                               type="button"
-                                               disabled={modelRoutingModeSaving}
-                                               aria-pressed={isSelected}
-                                               aria-label={t('settings.modelRouting.toastSuccess', { mode: modelRoutingLabel(mode) })}
-                                               onClick={() => void handleModelRoutingModeChange(mode)}
-                                               className={`relative rounded-sm px-3 py-2 text-left transition-all duration-200 ${
-                                                 isSelected
-                                                   ? 'border border-accent-cyan/50 bg-accent-cyan/10 text-accent-cyan'
-                                                   : 'border border-transparent bg-transparent text-text-secondary hover:border-white/15 hover:bg-white/5 hover:text-text-primary'
-                                               } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                             >
-                                               <div className="font-display text-[11px] uppercase tracking-[0.18em]">
-                                                 {modelRoutingLabel(mode)}
-                                               </div>
-                                               <div className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/35">
-                                                 {mode === 'quality_first'
-                                                   ? t('settings.modelRouting.qualityFirstTag')
-                                                   : t('settings.modelRouting.conserveTag')}
-                                               </div>
-                                             </button>
-                                           )
-                                         })}
-                                       </div>
-
-                                       <HUDMicro className="block text-[10px] leading-relaxed text-white/45 normal-case tracking-[0.02em]">
-                                         {modelRoutingHelper(modelRoutingMode)}
-                                       </HUDMicro>
-                                     </div>
-
-                                   </div>
-                                 </details>
-                             </div>
-                             )}
-                             <ChronicleRefreshControl
-                               mode={chronicleRefreshMode}
-                               saving={chronicleRefreshModeSaving}
-                               onChange={(mode) => void handleChronicleRefreshModeChange(mode)}
-                             />
-                             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-                               <HUDMicro className={hasAdvisorChanges ? 'text-accent-yellow' : 'text-accent-green'}>
-                                 {hasAdvisorChanges
-                                   ? t('settings.advisor.unsaved')
-                                   : t('settings.advisor.savedState')}
-                               </HUDMicro>
-                               <HUDButton
-                                 type="button"
-                                 variant="primary"
-                                 onClick={() => void handleSaveAdvisor()}
-                                 disabled={saving || !hasAdvisorChanges}
-                                 className="min-w-40 px-4 py-1.5 text-[10px]"
-                               >
-                                 {saving ? t('common.applying') : t('settings.advisor.save')}
-                               </HUDButton>
-                             </div>
+                <section id="ai-setup">
+                  <HUDSectionTitle number="01">{t('settings.sections.intelligence')}</HUDSectionTitle>
+                  <HUDPanel decoration="tech" title={t('settings.panels.advisorAccess')} quiet>
+                    <div className="space-y-4 pt-2">
+                      {(settings?.secretStorageReadFailed || settings?.secretStorageAvailable === false) && (
+                        <HUDMicro className="block text-accent-yellow">{t(settings.secretStorageReadFailed ? 'settings.advisor.lockedSecrets' : 'settings.advisor.sessionOnlySecrets')}</HUDMicro>
+                      )}
+                      <AISetupForm
+                        initialSettings={settings}
+                        onSave={saveSettings}
+                        onProviderChange={setAdvisorProvider}
+                        onUseAIApp={() => revealSettingsSection('ai-app-connections')}
+                      />
+                      {advisorProvider === 'gemini' && <div className="space-y-3 border-t border-white/10 pt-4">
+                        <HUDLabel>{t('settings.geminiQuota.label')}</HUDLabel>
+                        <div className="grid grid-cols-2 gap-2">
+                          {GEMINI_QUOTA_MODES.map(mode => <button key={mode} type="button" disabled={modelRoutingModeSaving} aria-pressed={geminiQuotaMode === mode} aria-label={t('settings.geminiQuota.aria', { mode: geminiQuotaLabel(mode) })} onClick={() => void handleGeminiQuotaModeChange(mode)} className={`rounded border p-3 text-left ${geminiQuotaMode === mode ? 'border-accent-cyan text-accent-cyan' : 'border-white/20 text-text-secondary'}`}>
+                            <span className="block text-sm">{geminiQuotaLabel(mode)}</span>
+                            <span className="mt-1 block text-xs">{geminiQuotaTag(mode)}</span>
+                          </button>)}
                         </div>
-                    </HUDPanel>
+                        <p className="text-xs text-text-secondary">{geminiQuotaHelper(geminiQuotaMode)}</p>
+                      </div>}
+                      <ChronicleRefreshControl mode={chronicleRefreshMode} saving={chronicleRefreshModeSaving} onChange={mode => void handleChronicleRefreshModeChange(mode)} />
+                    </div>
+                  </HUDPanel>
                 </section>
-
             </div>
 
             {/* Column 2: Game and campaign essentials */}
@@ -1510,7 +893,7 @@ function SettingsPage({
             {/* Optional connections */}
             <div className="space-y-8">
                 {/* MCP Relay Section */}
-                <section>
+                <section id="ai-app-connections">
                     <HUDSectionTitle number="03">{t('settings.sections.mcpRelay')}</HUDSectionTitle>
                     <HUDPanel
                       decoration="tech"

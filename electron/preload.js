@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   showFolderDialog: () => ipcRenderer.invoke('select-folder'),
   advisorProviders: {
+    connectOpenRouter: () => ipcRenderer.invoke('advisor-provider:connect-openrouter'),
+    cancelOpenRouter: () => ipcRenderer.invoke('advisor-provider:cancel-openrouter'),
     listModels: (config) => ipcRenderer.invoke('advisor-provider:list-models', config),
     testModel: (config) => ipcRenderer.invoke('advisor-provider:test-model', config),
   },

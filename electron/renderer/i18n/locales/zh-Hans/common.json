@@ -19,7 +19,8 @@
     "reportIssue": "报告问题",
     "retry": "重试",
     "retrying": "正在重试...",
-    "unknownDate": "未知日期"
+    "unknownDate": "未知日期",
+    "cancel": "取消"
   },
   "status": {
     "ready": "系统在线",
@@ -71,18 +72,18 @@
     "errors": {
       "briefingNotReady": "顾问仍在分析你的存档。请在 {{seconds}} 秒后重试。",
       "unexpected": "发生意外错误",
-      "openProviderSettings": "打开提供商设置",
-      "providerNotConfigured": "{{provider}} 未完全配置为顾问聊天。选择型号并完成连接设置。",
-      "providerUnavailable": "{{provider}}。确保其服务器正在运行并且配置的地址正确。",
+      "openProviderSettings": "AI 设置",
+      "providerNotConfigured": "请在 AI 设置中连接 {{provider}} 以使用顾问。",
+      "providerUnavailable": "无法连接 {{provider}}。请检查网络连接或启动本地 AI 应用。",
       "providerAuthFailed": "{{provider}} 拒绝了配置的 API 密钥。检查密钥并再次尝试连接。",
-      "providerModelNotFound": "所选的 {{provider}} 模型不可用。刷新型号列表或选择其他型号。",
+      "providerModelNotFound": "此 {{provider}} 模型不可用。请检查应用更新，或在 AI 设置中选择其他模型。",
       "providerRateLimited": "{{provider}} 目前受到速率限制。稍等片刻，或选择其他型号或提供商。",
       "providerBillingFailed": "{{provider}} 没有用于此请求的可用帐单或积分。检查提供商帐户或选择其他提供商。",
       "providerTimeout": "{{provider}} 响应时间过长。本地模型可能仍在加载；再试一次或检查其服务器。",
       "providerContextLimit": "战役上下文窗口无法容纳此战役简报。将提供程序的上下文设置增加到至少 32K，或选择更大的上下文模型。",
       "providerInvalidResponse": "{{provider}} 返回此应用程序无法读取的响应。检查端点是否支持 OpenAI 兼容的聊天完成。",
       "providerEmptyResponse": "{{provider}} 返回空响应。再试一次或选择其他型号。",
-      "providerRequestFailed": "{{provider}} 无法完成请求。检查模型和端点，然后重试。"
+      "providerRequestFailed": "{{provider}} 无法回复。请在 AI 设置中检查连接后重试。"
     },
     "newChat": "新聊天",
     "welcome": {
@@ -275,7 +276,7 @@
     "providerSetup": {
       "title": "需要连接人工智能提供商",
       "description": "您仍然可以阅读现有章节。连接所选的提供商并选择一个模型来生成或重写 Chronicle 内容。",
-      "action": "打开提供商设置"
+      "action": "AI 设置"
     },
     "history": {
       "eyebrow": "存档 // 本地记录",
@@ -374,7 +375,7 @@
     "systemAlert": "系统警报",
     "saveSuccess": "配置已保存 // 设置已应用",
     "sections": {
-      "intelligence": "情报上行链路",
+      "intelligence": "AI 设置",
       "data": "游戏数据",
       "communications": "通信中继",
       "updates": "软件更新",
@@ -677,6 +678,49 @@
           "name": "CURSOR",
           "description": "在 Cursor 聊天和智能体中使用本地战役工具。"
         }
+      }
+    },
+    "aiSetup": {
+      "connectOpenRouter": "连接 OpenRouter",
+      "accountEntered": "账户已连接。选择模型，然后检查并保存。",
+      "manualKey": "改用 API 密钥",
+      "chooseModel": "已找到模型。选择一个，然后检查并保存。",
+      "noModels": "未找到聊天模型。请在 AI 应用中加载模型后重试。",
+      "searchPlaceholder": "按名称搜索，例如 Claude 或 DeepSeek",
+      "freeModel": "免费模型 · 受服务商限制",
+      "lowerCost": "低价模型 · 由服务商计费",
+      "paidModel": "付费模型 · 由服务商计费",
+      "advanced": "高级设置",
+      "modelId": "模型 ID",
+      "refreshModels": "刷新模型",
+      "prices": "每百万 token：输入 {{input}} / 输出 {{output}}。实际费用取决于用量。",
+      "smallModel": "此模型可能无法容纳你的战役信息。请选择上下文容量更大的模型，或增大其上下文设置。",
+      "localHelp": "查看本地设置说明",
+      "billing": "费用和免费额度由服务商管理。聊天订阅不一定包含 API 用量。",
+      "manageUsage": "管理用量和账单",
+      "browserWaiting": "请在浏览器中完成连接，然后返回此处。",
+      "checking": "正在检查…",
+      "findModels": "查找模型",
+      "checkSave": "检查并保存",
+      "verified": "AI 设置已保存，连接已验证。",
+      "advisorOnly": "已保存，可用于顾问。编年史可能需要其他模型。",
+      "saveFailed": "无法保存 AI 设置，请重试。",
+      "cancelled": "连接已取消，已保存的设置未更改。",
+      "browserTimeout": "登录超时，请重新连接 OpenRouter。",
+      "browserFailed": "无法完成登录。请重试或使用 API 密钥。",
+      "details": "技术详情",
+      "removeKey": "移除已保存的密钥",
+      "keyRemoved": "已移除保存的密钥。",
+      "copyDetails": "复制支持信息",
+      "useAIApp": "我已有 AI 应用",
+      "aiAppHelp": "连接 Claude 或 ChatGPT 等受支持的桌面应用。你将在该应用中聊天，无需在 Companion 中输入 API 密钥。",
+      "testNotice": "检查会发送一个简短测试请求，可能消耗服务额度，不会发送战役数据。",
+      "help": {
+        "gemini": "在 Companion 中使用 Google AI。在 Google AI Studio 中创建连接密钥，然后粘贴到下方。",
+        "openrouter": "使用一个 OpenRouter 账户选择多种模型。通过浏览器连接，或输入已有密钥。",
+        "ollama": "打开 Ollama 并下载聊天模型，Companion 随后即可在此电脑上找到它。",
+        "lm_studio": "打开 LM Studio，加载聊天模型，并在 Developer 选项卡中启动本地服务器。",
+        "custom": "使用兼容 OpenAI 的服务。请输入服务商提供的连接地址。"
       }
     }
   },

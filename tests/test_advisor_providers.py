@@ -601,3 +601,29 @@ def test_gemini_generator_accepts_chronicle_schema():
     assert models.request is not None
     assert models.request["model"] == "gemini-test-model"
     assert models.request["config"].response_schema is StructuredProbe
+
+
+@pytest.mark.parametrize(
+    ("error", "expected_code"),
+    [
+        (RuntimeError("404 NOT_FOUND: model is not found"), "PROVIDER_MODEL_NOT_FOUND"),
+        (RuntimeError("API key not valid"), "PROVIDER_AUTH_FAILED"),
+        (httpx.ConnectError("Connection refused"), "PROVIDER_UNAVAILABLE"),
+        (httpx.ReadTimeout("Timed out"), "PROVIDER_TIMEOUT"),
+    ],
+)
+def test_gemini_default_reports_actionable_errors(error, expected_code):
+    attempts = []
+
+    def fail(**kwargs):
+        attempts.append(kwargs["model"])
+        raise error
+
+    generator = GeminiAdvisorGenerator(
+        config=AdvisorProviderConfig(provider="gemini", model="unused", api_key="test-key"),
+        client=SimpleNamespace(models=SimpleNamespace(generate_content=fail)),
+    )
+    with pytest.raises(AdvisorProviderError) as result:
+        generator.generate(system_prompt="system", user_prompt="user")
+    assert result.value.code == expected_code
+    assert attempts == ["gemini-3.1-flash-lite"]

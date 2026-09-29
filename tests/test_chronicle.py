@@ -1482,7 +1482,7 @@ class TestCurrentEraFallbackModel:
         first_call = mock_client.models.generate_content.call_args_list[0]
         second_call = mock_client.models.generate_content.call_args_list[1]
         assert first_call.kwargs["model"] == "gemini-3-flash-preview"
-        assert second_call.kwargs["model"] == "gemini-3.1-flash-lite-preview"
+        assert second_call.kwargs["model"] == "gemini-3.1-flash-lite"
         assert generator._model_routing_response()["fallback"] is True  # type: ignore[attr-defined]
 
 

@@ -316,3 +316,42 @@ test('OpenRouter model test retries route-specific HTTP 404 without schema param
   assert.equal(requestBodies.length, 2)
   assert.equal('response_format' in requestBodies[1], false)
 })
+
+test('Gemini check uses the default model and verifies an actual structured answer', async () => {
+  const result = await testAdvisorModel({ provider: 'gemini', apiKey: 'secret', fetchImpl: async (url, options) => {
+    assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent')
+    assert.equal(options.headers['x-goog-api-key'], 'secret')
+    const body = JSON.parse(options.body)
+    assert.equal(body.generationConfig.maxOutputTokens, 512)
+    assert.equal(body.contents[0].parts[0].text.includes('campaign'), false)
+    return { ok: true, text: async () => JSON.stringify({ candidates: [{ content: { parts: [{ thought: true, text: 'Reasoning' }, { text: '{"status":"ok"}' }] } }] }) }
+  } })
+  assert.equal(result.ok, true)
+  assert.equal(result.chronicleReady, true)
+})
+
+test('Gemini connection errors distinguish missing models, authentication, and billing', async () => {
+  for (const [status, message, code] of [[404, 'Model retired', 'PROVIDER_MODEL_NOT_FOUND'], [400, 'API key not valid', 'PROVIDER_AUTH_FAILED'], [429, 'Quota exceeded', 'PROVIDER_RATE_LIMITED'], [402, 'Credits required', 'PROVIDER_BILLING_FAILED']]) {
+    const result = await testAdvisorModel({ provider: 'gemini', apiKey: 'secret', fetchImpl: async () => ({ ok: false, status, text: async () => JSON.stringify({ error: { message } }) }) })
+    assert.equal(result.ok, false)
+    assert.equal(result.errorCode, code)
+  }
+})
+
+test('empty model responses never pass the setup check', async () => {
+  for (const provider of ['gemini', 'ollama']) {
+    const result = await testAdvisorModel({ provider, apiKey: 'secret', model: 'model', fetchImpl: async () => ({ ok: true, text: async () => '{}' }) })
+    assert.equal(result.ok, false)
+    assert.equal(result.errorCode, 'PROVIDER_EMPTY_RESPONSE')
+  }
+})
+
+test('model discovery preserves prices without treating unknown pricing as free', async () => {
+  const result = await discoverAdvisorModels({ provider: 'openrouter', apiKey: 'secret', fetchImpl: async () => ({ ok: true, text: async () => JSON.stringify({ data: [
+    { id: 'paid', pricing: { prompt: '0.00000025', completion: '0.0000015' } },
+    { id: 'unknown' }, { id: 'free', pricing: { prompt: '0', completion: '0' } },
+  ] }) }) })
+  assert.deepEqual(result.models[0].pricing, { inputPerMillion: 0.25, outputPerMillion: 1.5 })
+  assert.equal(result.models[1].pricing, undefined)
+  assert.deepEqual(result.models[2].pricing, { inputPerMillion: 0, outputPerMillion: 0 })
+})

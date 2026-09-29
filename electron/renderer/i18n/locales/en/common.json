@@ -19,7 +19,8 @@
     "reportIssue": "Report Issue",
     "retry": "Retry",
     "retrying": "Retrying...",
-    "unknownDate": "Unknown date"
+    "unknownDate": "Unknown date",
+    "cancel": "Cancel"
   },
   "onboarding": {
     "step": "STEP {{current}} / {{total}}",
@@ -152,18 +153,18 @@
     "errors": {
       "briefingNotReady": "The advisor is still analyzing your save file. Please try again in {{seconds}} seconds.",
       "unexpected": "An unexpected error occurred",
-      "openProviderSettings": "OPEN PROVIDER SETTINGS",
-      "providerNotConfigured": "{{provider}} is not fully configured for Advisor chat. Choose a model and complete its connection settings.",
-      "providerUnavailable": "{{provider}} could not be reached. Make sure its server is running and the configured address is correct.",
+      "openProviderSettings": "AI SETUP",
+      "providerNotConfigured": "Connect {{provider}} in AI setup to use the Advisor.",
+      "providerUnavailable": "Could not reach {{provider}}. Check your internet connection or start your local AI app.",
       "providerAuthFailed": "{{provider}} rejected the configured API key. Check the key and try the connection again.",
-      "providerModelNotFound": "The selected {{provider}} model is unavailable. Refresh the model list or choose another model.",
+      "providerModelNotFound": "This {{provider}} model is unavailable. Check for app updates or choose another model in AI setup.",
       "providerRateLimited": "{{provider}} is currently rate limited. Wait briefly, or choose another model or provider.",
       "providerBillingFailed": "{{provider}} does not have usable billing or credits for this request. Check the provider account or choose another provider.",
       "providerTimeout": "{{provider}} took too long to respond. A local model may still be loading; try again or check its server.",
       "providerContextLimit": "The active context window cannot fit this campaign briefing. Increase the provider's context setting to at least 32K, or choose a larger-context model.",
       "providerInvalidResponse": "{{provider}} returned a response this app could not read. Check that the endpoint supports OpenAI-compatible chat completions.",
       "providerEmptyResponse": "{{provider}} returned an empty response. Try again or choose another model.",
-      "providerRequestFailed": "{{provider}} could not complete the request. Check the model and endpoint, then try again."
+      "providerRequestFailed": "{{provider}} could not reply. Open AI setup and check the connection, then try again."
     },
     "providerSetup": {
       "title": "ADVISOR CONNECTION REQUIRED",
@@ -280,7 +281,7 @@
     "providerSetup": {
       "title": "AI PROVIDER CONNECTION REQUIRED",
       "description": "You can still read existing chapters. Connect the selected provider and choose a model to generate or rewrite Chronicle content.",
-      "action": "OPEN PROVIDER SETTINGS"
+      "action": "AI SETUP"
     },
     "sidebar": {
       "empireArchives": "Empire Archives",
@@ -484,7 +485,7 @@
     "systemAlert": "SYSTEM ALERT",
     "saveSuccess": "CONFIGURATION SAVED // SETTINGS APPLIED",
     "sections": {
-      "intelligence": "AI & CHRONICLE",
+      "intelligence": "AI SETUP",
       "data": "GAME & CAMPAIGNS",
       "mcpRelay": "MCP RELAY",
       "communications": "COMMUNICATIONS RELAY",
@@ -788,6 +789,49 @@
       "auth": "Authorization failed.",
       "connection": "Connection error. Check network.",
       "generic": "System error. Retry."
+    },
+    "aiSetup": {
+      "connectOpenRouter": "Connect OpenRouter",
+      "accountEntered": "Account connected. Choose a model, then check and save.",
+      "manualKey": "Use an API key instead",
+      "chooseModel": "Models found. Choose one, then check and save.",
+      "noModels": "No chat models found. Load a model in your AI app, then try again.",
+      "searchPlaceholder": "Search by name, such as Claude or DeepSeek",
+      "freeModel": "Free model · provider limits apply",
+      "lowerCost": "Lower-cost model · billed by your provider",
+      "paidModel": "Paid model · billed by your provider",
+      "advanced": "Advanced settings",
+      "modelId": "Model ID",
+      "refreshModels": "Refresh models",
+      "prices": "Per million tokens: {{input}} input / {{output}} output. Actual cost depends on usage.",
+      "smallModel": "This model may be too small for your campaign. Use a model with more context or increase its context setting.",
+      "localHelp": "Show local setup instructions",
+      "billing": "Your provider manages charges and free limits. A chat subscription may not include API use.",
+      "manageUsage": "Manage usage and billing",
+      "browserWaiting": "Finish connecting in your browser, then return here.",
+      "checking": "Checking…",
+      "findModels": "Find models",
+      "checkSave": "Check and save",
+      "verified": "AI setup saved. Connection verified.",
+      "advisorOnly": "Saved for Advisor. Chronicle may need a different model.",
+      "saveFailed": "Could not save AI setup. Please try again.",
+      "cancelled": "Connection cancelled. Your saved setup is unchanged.",
+      "browserTimeout": "Sign-in timed out. Connect OpenRouter again.",
+      "browserFailed": "Could not complete sign-in. Try connecting again, or use an API key.",
+      "details": "Technical details",
+      "removeKey": "Remove saved key",
+      "keyRemoved": "Saved key removed.",
+      "copyDetails": "Copy support details",
+      "useAIApp": "I already use an AI app",
+      "aiAppHelp": "Connect a supported desktop app, such as Claude or ChatGPT. You chat there; no API key is needed in Companion.",
+      "testNotice": "Checks send a small test request, which may use your provider allowance. Campaign data is not sent.",
+      "help": {
+        "gemini": "Use Google AI in Companion. Create a connection key in Google AI Studio and paste it below.",
+        "openrouter": "Choose from many models using one OpenRouter account. Connect in your browser or enter an existing key.",
+        "ollama": "Open Ollama and download a chat model. Companion can then find it on this computer.",
+        "lm_studio": "Open LM Studio, load a chat model, and start its local server in the Developer tab.",
+        "custom": "Use an OpenAI-compatible service. Enter the connection address supplied by your provider."
+      }
     }
   },
   "update": {

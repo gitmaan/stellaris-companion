@@ -19,7 +19,8 @@
     "reportIssue": "Signaler un probleme",
     "retry": "Reessayer",
     "retrying": "Nouvelle tentative...",
-    "unknownDate": "Date inconnue"
+    "unknownDate": "Date inconnue",
+    "cancel": "Annuler"
   },
   "status": {
     "ready": "SYSTEMES EN LIGNE",
@@ -71,18 +72,18 @@
     "errors": {
       "briefingNotReady": "Le conseiller analyse encore votre sauvegarde. Reessayez dans {{seconds}} secondes.",
       "unexpected": "Une erreur inattendue est survenue",
-      "openProviderSettings": "Réglages du fournisseur",
-      "providerNotConfigured": "{{provider}} n'est pas entièrement configuré pour le chat avec le conseiller. Choisissez un modèle et complétez ses paramètres de connexion.",
-      "providerUnavailable": "{{provider}} n'a pas pu être joint. Assurez-vous que son serveur est en cours d'exécution et que l'adresse configurée est correcte.",
+      "openProviderSettings": "CONFIGURATION IA",
+      "providerNotConfigured": "Connectez {{provider}} dans la configuration IA pour utiliser le conseiller.",
+      "providerUnavailable": "Impossible de joindre {{provider}}. Vérifiez Internet ou démarrez votre application IA locale.",
       "providerAuthFailed": "{{provider}} a rejeté la clé API configurée. Vérifiez la clé et réessayez la connexion.",
-      "providerModelNotFound": "Le modèle {{provider}} sélectionné n'est pas disponible. Actualisez la liste des modèles ou choisissez un autre modèle.",
+      "providerModelNotFound": "Ce modèle {{provider}} est indisponible. Vérifiez les mises à jour ou choisissez un autre modèle dans la configuration IA.",
       "providerRateLimited": "{{provider}} limite actuellement le débit. Attendez un instant ou choisissez un autre modèle ou fournisseur.",
       "providerBillingFailed": "{{provider}} n'a pas de facturation ou de crédit utilisable pour cette demande. Vérifiez le compte du fournisseur ou choisissez un autre fournisseur.",
       "providerTimeout": "{{provider}} a mis trop de temps à répondre. Un modèle local est peut-être encore en cours de chargement ; réessayez ou vérifiez son serveur.",
       "providerContextLimit": "La fenêtre de contexte est trop petite pour ce briefing de campagne. Augmentez le contexte du fournisseur à au moins 32K ou choisissez un modèle avec un contexte plus large.",
       "providerInvalidResponse": "{{provider}} a renvoyé une réponse que cette application n'a pas pu lire. Vérifiez que le point de terminaison prend en charge les complétions de chat compatibles OpenAI.",
       "providerEmptyResponse": "{{provider}} a renvoyé une réponse vide. Réessayez ou choisissez un autre modèle.",
-      "providerRequestFailed": "{{provider}} n'a pas pu traiter la demande. Vérifiez le modèle et le point de terminaison, puis réessayez."
+      "providerRequestFailed": "{{provider}} n’a pas pu répondre. Vérifiez la connexion dans la configuration IA, puis réessayez."
     },
     "newChat": "Nouveau chat",
     "welcome": {
@@ -277,7 +278,7 @@
     "providerSetup": {
       "title": "CONNEXION DU FOURNISSEUR D'IA REQUISE",
       "description": "Vous pouvez toujours lire les chapitres existants. Connectez le fournisseur sélectionné et choisissez un modèle pour générer ou réécrire le contenu de Chronicle.",
-      "action": "Réglages du fournisseur"
+      "action": "CONFIGURATION IA"
     },
     "history": {
       "eyebrow": "Archiver //Dossiers locaux",
@@ -381,7 +382,7 @@
     "systemAlert": "ALERTE SYSTEME",
     "saveSuccess": "CONFIGURATION ENREGISTREE // PARAMETRES APPLIQUES",
     "sections": {
-      "intelligence": "LIAISON DE RENSEIGNEMENT",
+      "intelligence": "CONFIGURATION IA",
       "data": "DONNEES DU JEU",
       "communications": "RELAIS COMMUNICATIONS",
       "updates": "MISES A JOUR LOGICIELLES",
@@ -684,6 +685,49 @@
           "name": "CURSOR",
           "description": "Outils de campagne locaux dans les chats et agents Cursor."
         }
+      }
+    },
+    "aiSetup": {
+      "connectOpenRouter": "Connecter OpenRouter",
+      "accountEntered": "Compte connecté. Choisissez un modèle, puis vérifiez et enregistrez.",
+      "manualKey": "Utiliser une clé API",
+      "chooseModel": "Modèles trouvés. Choisissez-en un, puis vérifiez et enregistrez.",
+      "noModels": "Aucun modèle de discussion trouvé. Chargez un modèle dans votre application IA et réessayez.",
+      "searchPlaceholder": "Rechercher un nom, comme Claude ou DeepSeek",
+      "freeModel": "Modèle gratuit · limites du fournisseur applicables",
+      "lowerCost": "Modèle économique · facturé par le fournisseur",
+      "paidModel": "Modèle payant · facturé par le fournisseur",
+      "advanced": "Paramètres avancés",
+      "modelId": "Identifiant du modèle",
+      "refreshModels": "Actualiser les modèles",
+      "prices": "Par million de tokens : {{input}} en entrée / {{output}} en sortie. Le coût dépend de votre utilisation.",
+      "smallModel": "Ce modèle peut manquer de capacité pour votre campagne. Choisissez un contexte plus grand ou augmentez son réglage.",
+      "localHelp": "Voir les instructions de configuration locale",
+      "billing": "Votre fournisseur gère les frais et les limites gratuites. Un abonnement de chat ne couvre pas forcément l’API.",
+      "manageUsage": "Gérer l’utilisation et la facturation",
+      "browserWaiting": "Terminez la connexion dans votre navigateur, puis revenez ici.",
+      "checking": "Vérification…",
+      "findModels": "Trouver des modèles",
+      "checkSave": "Vérifier et enregistrer",
+      "verified": "Configuration IA enregistrée. Connexion vérifiée.",
+      "advisorOnly": "Enregistré pour le conseiller. La Chronique peut nécessiter un autre modèle.",
+      "saveFailed": "Impossible d’enregistrer la configuration IA. Réessayez.",
+      "cancelled": "Connexion annulée. La configuration enregistrée est inchangée.",
+      "browserTimeout": "Délai de connexion dépassé. Reconnectez OpenRouter.",
+      "browserFailed": "Impossible de terminer la connexion. Réessayez ou utilisez une clé API.",
+      "details": "Détails techniques",
+      "removeKey": "Supprimer la clé enregistrée",
+      "keyRemoved": "Clé enregistrée supprimée.",
+      "copyDetails": "Copier les informations d’assistance",
+      "useAIApp": "J’utilise déjà une application IA",
+      "aiAppHelp": "Connectez une application compatible, comme Claude ou ChatGPT. Vous discutez dans celle-ci ; aucune clé API n’est nécessaire dans Companion.",
+      "testNotice": "La vérification envoie une petite requête de test pouvant consommer votre quota. Aucune donnée de campagne n’est envoyée.",
+      "help": {
+        "gemini": "Utilisez l’IA Google dans Companion. Créez une clé de connexion dans Google AI Studio et collez-la ci-dessous.",
+        "openrouter": "Choisissez parmi de nombreux modèles avec un compte OpenRouter. Connectez-vous dans le navigateur ou saisissez une clé existante.",
+        "ollama": "Ouvrez Ollama et téléchargez un modèle de discussion. Companion pourra alors le trouver sur cet ordinateur.",
+        "lm_studio": "Ouvrez LM Studio, chargez un modèle de discussion et démarrez le serveur local dans l’onglet Developer.",
+        "custom": "Utilisez un service compatible OpenAI. Saisissez l’adresse de connexion fournie par votre fournisseur."
       }
     }
   },

@@ -144,6 +144,23 @@ function redactProviderMessage(rawMessage, apiKey) {
   return message.slice(0, 300)
 }
 
+function providerErrorCode(status, message = '') {
+  const normalized = String(message).toLowerCase().replace(/_/g, ' ')
+  if (/context|token limit|too many tokens/.test(normalized)) return 'PROVIDER_CONTEXT_LIMIT'
+  if (status === 402 || /billing|insufficient credits|no available credits/.test(normalized)) return 'PROVIDER_BILLING_FAILED'
+  if ([401, 403].includes(status) || /api key.*(invalid|not valid)|invalid api key/.test(normalized)) return 'PROVIDER_AUTH_FAILED'
+  if (status === 404 || /model.*not found/.test(normalized)) return 'PROVIDER_MODEL_NOT_FOUND'
+  if (status === 429) return 'PROVIDER_RATE_LIMITED'
+  if ([408, 504].includes(status)) return 'PROVIDER_TIMEOUT'
+  if (status >= 500) return 'PROVIDER_UNAVAILABLE'
+  return 'PROVIDER_REQUEST_FAILED'
+}
+
+function providerFailure(selected, response, payload, apiKey) {
+  const error = providerHttpError(selected, response, payload, apiKey)
+  return { ok: false, error, errorCode: providerErrorCode(response.status, error), status: response.status }
+}
+
 function providerHttpError(selected, response, payload, apiKey) {
   const providerMessage = payload?.error?.message || payload?.error || payload?.detail
   const suffix = providerMessage ? `: ${redactProviderMessage(providerMessage, apiKey)}` : ''
@@ -184,7 +201,7 @@ async function discoverAdvisorModels({
     return { ok: false, error: 'Enter the provider URL before checking the connection.' }
   }
   if (ADVISOR_PROVIDER_PRESETS[selected]?.requiresApiKey && !String(apiKey || '').trim()) {
-    return { ok: false, error: `${getAdvisorProviderLabel(selected)} requires an API key.` }
+    return { ok: false, error: `${getAdvisorProviderLabel(selected)} requires an API key.`, errorCode: 'PROVIDER_AUTH_FAILED' }
   }
 
   const controller = new AbortController()
@@ -204,10 +221,7 @@ async function discoverAdvisorModels({
     const payload = await readJsonResponse(response)
 
     if (!response.ok) {
-      return {
-        ok: false,
-        error: providerHttpError(selected, response, payload, apiKey),
-      }
+      return providerFailure(selected, response, payload, apiKey)
     }
 
     const entries = Array.isArray(payload?.data)
@@ -234,6 +248,11 @@ async function discoverAdvisorModels({
         name: String(entry?.name || entry?.display_name || id),
         contextLength: Number(entry?.context_length || entry?.context_window || 0) || undefined,
       }
+      const inputPrice = entry?.pricing?.prompt == null || entry.pricing.prompt === '' ? NaN : Number(entry.pricing.prompt)
+      const outputPrice = entry?.pricing?.completion == null || entry.pricing.completion === '' ? NaN : Number(entry.pricing.completion)
+      if (Number.isFinite(inputPrice) && inputPrice >= 0 && Number.isFinite(outputPrice) && outputPrice >= 0) {
+        modelEntry.pricing = { inputPerMillion: inputPrice * 1_000_000, outputPerMillion: outputPrice * 1_000_000 }
+      }
       if (Array.isArray(entry?.supported_parameters)) {
         modelEntry.supportedParameters = entry.supported_parameters.map(String)
       }
@@ -252,12 +271,46 @@ async function discoverAdvisorModels({
     }
   } catch (error) {
     if (error?.name === 'AbortError') {
-      return { ok: false, error: `${getAdvisorProviderLabel(selected)} did not respond in time.` }
+      return { ok: false, error: `${getAdvisorProviderLabel(selected)} did not respond in time.`, errorCode: 'PROVIDER_TIMEOUT' }
     }
     return {
       ok: false,
       error: `Could not connect to ${getAdvisorProviderLabel(selected)} at ${resolvedBaseUrl}.`,
+      errorCode: 'PROVIDER_UNAVAILABLE',
     }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function testGeminiConnection({ apiKey, timeoutMs, fetchImpl }) {
+  if (!String(apiKey || '').trim()) {
+    return { ok: false, errorCode: 'PROVIDER_AUTH_FAILED', error: 'Enter a Gemini API key.' }
+  }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  // Matches the default Advisor route in backend/core/model_routing.py.
+  const model = 'gemini-3.1-flash-lite'
+  try {
+    const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey.trim() },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: 'Return only a JSON object with status set to ok.' }] }],
+        generationConfig: { maxOutputTokens: 512, responseMimeType: 'application/json', thinkingConfig: { thinkingLevel: 'MINIMAL' } },
+      }),
+      signal: controller.signal,
+      redirect: 'error',
+    })
+    const payload = await readJsonResponse(response)
+    if (!response.ok) return providerFailure('gemini', response, payload, apiKey)
+    const answer = payload?.candidates?.[0]?.content?.parts?.filter(part => !part.thought).map(part => part.text || '').join('') || ''
+    if (!answer.trim()) return { ok: false, errorCode: 'PROVIDER_EMPTY_RESPONSE', error: 'Gemini returned no answer.' }
+    let chronicleReady = false
+    try { chronicleReady = JSON.parse(answer).status === 'ok' } catch { /* Plain text can still serve Advisor. */ }
+    return { ok: true, provider: 'gemini', model, advisorReady: true, chronicleReady, structuredOutput: chronicleReady }
+  } catch (error) {
+    return { ok: false, errorCode: error?.name === 'AbortError' ? 'PROVIDER_TIMEOUT' : 'PROVIDER_UNAVAILABLE', error: 'Could not complete the Gemini connection check.' }
   } finally {
     clearTimeout(timer)
   }
@@ -273,7 +326,7 @@ async function testAdvisorModel({
 }) {
   const selected = normalizeAdvisorProvider(provider)
   if (selected === 'gemini') {
-    return { ok: false, error: 'Gemini is verified when the app starts its AI connection.' }
+    return testGeminiConnection({ apiKey, timeoutMs, fetchImpl })
   }
   if (typeof fetchImpl !== 'function') {
     return { ok: false, error: 'Model testing is unavailable in this build.' }
@@ -289,7 +342,7 @@ async function testAdvisorModel({
     return { ok: false, error: 'Enter the provider URL before testing the model.' }
   }
   if (ADVISOR_PROVIDER_PRESETS[selected]?.requiresApiKey && !String(apiKey || '').trim()) {
-    return { ok: false, error: `${getAdvisorProviderLabel(selected)} requires an API key.` }
+    return { ok: false, error: `${getAdvisorProviderLabel(selected)} requires an API key.`, errorCode: 'PROVIDER_AUTH_FAILED' }
   }
 
   const selectedModel = String(model || '').trim()
@@ -361,7 +414,7 @@ async function testAdvisorModel({
       ;({ response, payload } = await send(baseBody))
     }
     if (!response.ok) {
-      return { ok: false, error: providerHttpError(selected, response, payload, apiKey) }
+      return providerFailure(selected, response, payload, apiKey)
     }
 
     const content = payload?.choices?.[0]?.message?.content
@@ -370,6 +423,7 @@ async function testAdvisorModel({
       : Array.isArray(content)
         ? content.map((part) => typeof part === 'string' ? part : part?.text || '').join('\n')
         : ''
+    if (!text.trim()) return { ok: false, errorCode: 'PROVIDER_EMPTY_RESPONSE', error: 'The model returned no answer.' }
     const start = text.indexOf('{')
     const end = text.lastIndexOf('}')
     if (start < 0 || end < start) {
@@ -424,11 +478,13 @@ async function testAdvisorModel({
       return {
         ok: false,
         error: `${getAdvisorProviderLabel(selected)} did not complete the model test in time.`,
+        errorCode: 'PROVIDER_TIMEOUT',
       }
     }
     return {
       ok: false,
       error: `Could not connect to ${getAdvisorProviderLabel(selected)} at ${resolvedBaseUrl}.`,
+      errorCode: 'PROVIDER_UNAVAILABLE',
     }
   } finally {
     clearTimeout(timer)

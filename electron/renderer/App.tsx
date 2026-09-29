@@ -46,6 +46,11 @@ const tabTransition = {
 function App() {
   const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('chat')
+  const [settingsTarget, setSettingsTarget] = useState({ id: 'ai-setup', request: 0 })
+  const openAISetup = (id = 'ai-setup') => {
+    setSettingsTarget(current => ({ id, request: current.request + 1 }))
+    setActiveTab('settings')
+  }
   const [campaignHistoryOpenRequest, setCampaignHistoryOpenRequest] = useState(0)
   const [uiTheme, setUiTheme] = useState<UiTheme>(DEFAULT_UI_THEME)
   const [chronicleRefreshMode, setChronicleRefreshMode] = useState<ChronicleRefreshMode>(
@@ -292,7 +297,7 @@ function App() {
                       <ChatPage
                         isActive={isActive}
                         modelRoutingMode={modelRoutingMode}
-                        onOpenSettings={() => setActiveTab('settings')}
+                        onOpenSettings={() => openAISetup()}
                         onReportLlmIssue={openLLMReportModal}
                       />
                     )}
@@ -301,12 +306,13 @@ function App() {
                         isActive={isActive}
                         refreshMode={chronicleRefreshMode}
                         modelRoutingMode={modelRoutingMode}
-                        onOpenSettings={() => setActiveTab('settings')}
+                        onOpenSettings={() => openAISetup()}
                         historyOpenRequest={campaignHistoryOpenRequest}
                       />
                     )}
                     {tab === 'settings' && (
                       <SettingsPage
+                        openTarget={settingsTarget}
                         key={onboardingDone ? 'post-onboarding' : 'pre-onboarding'}
                         onReportIssue={openReportModal}
                         onThemeChange={setUiTheme}
@@ -326,7 +332,14 @@ function App() {
       {/* Onboarding Modal */}
       <AnimatePresence>
         {onboardingDone === false && (
-          <OnboardingModal onComplete={() => setOnboardingDone(true)} language={language} onLanguageSelect={changeLanguage} />
+          <OnboardingModal
+            onComplete={openAIApps => {
+              setOnboardingDone(true)
+              if (openAIApps) openAISetup('ai-app-connections')
+            }}
+            language={language}
+            onLanguageSelect={changeLanguage}
+          />
         )}
       </AnimatePresence>
 
