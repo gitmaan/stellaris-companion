@@ -29,6 +29,11 @@ extraResources:
     to: rust-parser
     filter:
       - "**/*"
+  # Stable Claude Desktop extension opened from Settings.
+  - from: generated/mcpb
+    to: mcpb
+    filter:
+      - "stellaris-companion-mcp-relay.mcpb"
 
 mac:
   category: public.app-category.games

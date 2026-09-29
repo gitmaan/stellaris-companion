@@ -82,6 +82,24 @@ class GameDatabase:
         with self._lock:
             return self._conn.executemany(sql, rows)
 
+    @contextlib.contextmanager
+    def transaction(self, *, immediate: bool = False) -> Iterable[GameDatabase]:
+        """Hold the connection lock for one explicit atomic transaction.
+
+        ``BEGIN IMMEDIATE`` is useful for read-modify-write operations that must
+        compare a revision and persist a replacement without another writer
+        slipping in between those steps.
+        """
+        with self._lock:
+            self._conn.execute("BEGIN IMMEDIATE;" if immediate else "BEGIN;")
+            try:
+                yield self
+            except BaseException:
+                self._conn.rollback()
+                raise
+            else:
+                self._conn.commit()
+
     def commit(self) -> None:
         with self._lock:
             self._conn.commit()

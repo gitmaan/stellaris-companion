@@ -21,6 +21,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_submodules
+
 block_cipher = None
 
 # Get the project root directory (where this spec file lives)
@@ -96,6 +98,14 @@ a = Analysis(
         'pydantic_core',
         'anyio',
         'anyio._backends._asyncio',
+        # Official MCP Python SDK v2 and its generated protocol types.
+        # The SDK's optional CLI imports typer, which is not needed by the bundled
+        # stdio server. Excluding it keeps the runtime lean and avoids requiring
+        # the mcp[cli] extra during production builds.
+        *collect_submodules('mcp', filter=lambda name: not name.startswith('mcp.cli')),
+        *collect_submodules('mcp_types'),
+        'jsonschema',
+        'referencing',
         # Watchdog for save file monitoring
         'watchdog.observers',
         'watchdog.events',

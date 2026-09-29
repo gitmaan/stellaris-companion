@@ -99,8 +99,12 @@ def build_info_payload(root: Path = ROOT) -> dict[str, Any]:
         "source_fingerprint": source_fingerprint(root),
         "mcp": {
             "enabled": True,
-            "protocol_version": "2025-11-25",
+            "protocol_version": "2026-07-28",
+            "protocol_versions": ["2026-07-28", "2025-11-25"],
+            "sdk": "mcp-python-sdk-v2",
             "expected_tools": 10,
+            "expected_resources": 4,
+            "expected_prompts": 3,
         },
     }
 

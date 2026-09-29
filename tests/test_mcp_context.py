@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from pathlib import Path
 
+import pytest
+from mcp import Client
+
 from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
-from backend.mcp.context import StellarisMcpContext
-from backend.mcp.server import StellarisMcpServer
+from backend.mcp.context import McpContextError, StellarisMcpContext
+from backend.mcp.server import SERVER_INSTRUCTIONS, StellarisMcpServer, build_tool_definitions
 
 LEAK_PATTERN = re.compile(
     r"(tech_[a-z0-9_]+|chronicle\.[a-z0-9_.-]+|mcp_writeback|create_chapter|update_chapter|save_current_era)"
@@ -256,11 +260,26 @@ def test_chronicle_source_material_uses_chapter_event_range(tmp_path: Path) -> N
     assert payload["save_affordance"]["do_not_save_without_explicit_request"] is True
 
 
+def test_recent_events_filters_notable_types_before_display_names(tmp_path: Path) -> None:
+    db, _, _ = _make_test_db(tmp_path)
+    context = StellarisMcpContext(db=db)
+
+    payload = context.get_recent_events(notable_only=True)
+
+    assert [event["event_type"] for event in payload["events"]] == [
+        "Colony Count Change",
+        "War Started",
+    ]
+
+
 def test_chronicle_edit_tools_update_create_and_undo(tmp_path: Path) -> None:
     db, _, _ = _make_test_db(tmp_path)
     context = StellarisMcpContext(db=db)
 
+    guard = context.get_cached_chronicle()
     current_era = context.save_chronicle_current_era(
+        campaign_ref=guard["campaign_ref"],
+        expected_revision=guard["chronicle_revision"],
         narrative="The Kilik archives record a newly imported current era.",
         title="Imported Current Era",
     )
@@ -279,6 +298,8 @@ def test_chronicle_edit_tools_update_create_and_undo(tmp_path: Path) -> None:
     assert "newly imported current era" in cached["chronicle"]
 
     updated = context.update_chronicle_chapter(
+        campaign_ref=current_era["campaign_ref"],
+        expected_revision=current_era["chronicle_revision"],
         chapter_number=1,
         title="First Light Revised",
         narrative="The revised first chapter now speaks with cooler precision.",
@@ -290,6 +311,8 @@ def test_chronicle_edit_tools_update_create_and_undo(tmp_path: Path) -> None:
     assert "cooler precision" in cached["chapters"][0]["narrative"]
 
     created = context.create_chronicle_chapter(
+        campaign_ref=updated["campaign_ref"],
+        expected_revision=updated["chronicle_revision"],
         title="The Second Ledger",
         narrative="A second chapter was imported after careful review in chat.",
         summary="A second externally written chapter.",
@@ -300,7 +323,11 @@ def test_chronicle_edit_tools_update_create_and_undo(tmp_path: Path) -> None:
     assert cached["chapters"][1]["title"] == "The Second Ledger"
     assert "second chapter was imported" in cached["chronicle"]
 
-    undone = context.undo_chronicle_edit()
+    undone = context.undo_chronicle_edit(
+        campaign_ref=created["campaign_ref"],
+        expected_revision=created["chronicle_revision"],
+        edit_receipt=created["edit_receipt"],
+    )
     assert undone["undone"] is True
     assert undone["message"] == "Undid the most recent Chronicle edit for Chapter 2."
     _assert_no_internal_leaks(undone)
@@ -314,22 +341,7 @@ def test_mcp_server_lists_and_calls_tools(tmp_path: Path) -> None:
     context = StellarisMcpContext(db=db)
     server = StellarisMcpServer(context)
 
-    initialized = server.handle_message(
-        {
-            "jsonrpc": "2.0",
-            "id": 0,
-            "method": "initialize",
-            "params": {"protocolVersion": "2025-11-25"},
-        }
-    )
-    assert initialized is not None
-    assert initialized["result"]["serverInfo"]["title"] == "Stellaris Companion"
-    assert initialized["result"]["serverInfo"]["description"]
-    assert initialized["result"]["instructions"]
-
-    listed = server.handle_message({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
-    assert listed is not None
-    tools = listed["result"]["tools"]
+    tools = build_tool_definitions()
     tool_names = {tool["name"] for tool in tools}
     assert "get_strategy_context" in tool_names
     assert "get_cached_chronicle" in tool_names
@@ -355,40 +367,27 @@ def test_mcp_server_lists_and_calls_tools(tmp_path: Path) -> None:
     assert save_tool["annotations"]["readOnlyHint"] is False
     assert save_tool["annotations"]["destructiveHint"] is True
     assert "explicitly asks" in save_tool["description"]
+    assert save_tool["inputSchema"]["required"] == [
+        "campaign_ref",
+        "expected_revision",
+        "narrative",
+    ]
+    assert len(SERVER_INSTRUCTIONS) > 512
+    assert SERVER_INSTRUCTIONS[:512].count(".") >= 5
 
-    called = server.handle_message(
-        {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": "get_active_campaign",
-                "arguments": {},
-            },
-        }
-    )
-    assert called is not None
-    assert called["result"]["isError"] is False
-    structured = called["result"]["structuredContent"]
+    called = server.call_tool("get_active_campaign")
+    assert called["isError"] is False
+    structured = called["structuredContent"]
     assert structured["empire_name"] == "Kilik Cooperative"
 
-    text_payload = called["result"]["content"][0]["text"]
+    text_payload = called["content"][0]["text"]
     assert "Campaign Status loaded" in text_payload
     assert "Kilik Cooperative" in text_payload
 
-    strategy = server.handle_message(
-        {
-            "jsonrpc": "2.0",
-            "id": 3,
-            "method": "tools/call",
-            "params": {
-                "name": "get_strategy_context",
-                "arguments": {"question": "What should I focus on next?"},
-            },
-        }
+    strategy = server.call_tool(
+        "get_strategy_context", {"question": "What should I focus on next?"}
     )
-    assert strategy is not None
-    strategy_text = strategy["result"]["content"][0]["text"]
+    strategy_text = strategy["content"][0]["text"]
     assert "Advisor Briefing for Kilik Cooperative" in strategy_text
     assert "answer from it directly" in strategy_text
     assert "Energy -12/mo" in strategy_text
@@ -406,74 +405,155 @@ def test_mcp_server_chronicle_save_update_create_and_undo(tmp_path: Path) -> Non
     context = StellarisMcpContext(db=db)
     server = StellarisMcpServer(context)
 
-    saved = server.handle_message(
+    guard = context.get_cached_chronicle()
+    saved = server.call_tool(
+        "save_chronicle_current_era",
         {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {
-                "name": "save_chronicle_current_era",
-                "arguments": {"narrative": "The current era was saved from chat."},
-            },
-        }
+            "campaign_ref": guard["campaign_ref"],
+            "expected_revision": guard["chronicle_revision"],
+            "narrative": "The current era was saved from chat.",
+        },
     )
-    assert saved is not None
-    assert saved["result"]["isError"] is False
-    assert saved["result"]["structuredContent"]["saved"] is True
-    assert "Saved current-era Chronicle draft" in saved["result"]["content"][0]["text"]
-    _assert_no_internal_leaks(saved["result"])
+    assert saved["isError"] is False
+    assert saved["structuredContent"]["saved"] is True
+    assert "Saved current-era Chronicle draft" in saved["content"][0]["text"]
+    _assert_no_internal_leaks(saved)
 
-    updated = server.handle_message(
+    saved_payload = saved["structuredContent"]
+    updated = server.call_tool(
+        "update_chronicle_chapter",
         {
-            "jsonrpc": "2.0",
-            "id": 3,
-            "method": "tools/call",
-            "params": {
-                "name": "update_chronicle_chapter",
-                "arguments": {
-                    "chapter_number": 1,
-                    "title": "A Chapter Saved From Chat",
-                    "narrative": "The imported Chronicle now stands in the app archive.",
-                },
-            },
-        }
+            "campaign_ref": saved_payload["campaign_ref"],
+            "expected_revision": saved_payload["chronicle_revision"],
+            "chapter_number": 1,
+            "title": "A Chapter Saved From Chat",
+            "narrative": "The imported Chronicle now stands in the app archive.",
+        },
     )
-    assert updated is not None
-    assert updated["result"]["isError"] is False
-    assert updated["result"]["structuredContent"]["chapter"]["title"] == "A Chapter Saved From Chat"
-    _assert_no_internal_leaks(updated["result"])
+    assert updated["isError"] is False
+    assert updated["structuredContent"]["chapter"]["title"] == "A Chapter Saved From Chat"
+    _assert_no_internal_leaks(updated)
 
-    created = server.handle_message(
+    updated_payload = updated["structuredContent"]
+    created = server.call_tool(
+        "create_chronicle_chapter",
         {
-            "jsonrpc": "2.0",
-            "id": 4,
-            "method": "tools/call",
-            "params": {
-                "name": "create_chronicle_chapter",
-                "arguments": {
-                    "title": "A New Saved Chapter",
-                    "narrative": "A newly written chapter has been sent back to the archive.",
-                },
-            },
-        }
+            "campaign_ref": updated_payload["campaign_ref"],
+            "expected_revision": updated_payload["chronicle_revision"],
+            "title": "A New Saved Chapter",
+            "narrative": "A newly written chapter has been sent back to the archive.",
+        },
     )
-    assert created is not None
-    assert created["result"]["isError"] is False
-    assert created["result"]["structuredContent"]["chapter"]["number"] == 2
-    assert created["result"]["structuredContent"]["saved_item"]["chapter_number"] == 2
-    _assert_no_internal_leaks(created["result"])
+    assert created["isError"] is False
+    assert created["structuredContent"]["chapter"]["number"] == 2
+    assert created["structuredContent"]["saved_item"]["chapter_number"] == 2
+    _assert_no_internal_leaks(created)
 
-    undone = server.handle_message(
+    created_payload = created["structuredContent"]
+    undone = server.call_tool(
+        "undo_chronicle_edit",
         {
-            "jsonrpc": "2.0",
-            "id": 5,
-            "method": "tools/call",
-            "params": {"name": "undo_chronicle_edit", "arguments": {}},
-        }
+            "campaign_ref": created_payload["campaign_ref"],
+            "expected_revision": created_payload["chronicle_revision"],
+            "edit_receipt": created_payload["edit_receipt"],
+        },
     )
-    assert undone is not None
-    assert undone["result"]["isError"] is False
-    assert undone["result"]["structuredContent"]["message"] == (
+    assert undone["isError"] is False
+    assert undone["structuredContent"]["message"] == (
         "Undid the most recent Chronicle edit for Chapter 2."
     )
-    _assert_no_internal_leaks(undone["result"])
+    _assert_no_internal_leaks(undone)
+
+
+def test_chronicle_write_rejects_stale_revision_and_wrong_receipt(tmp_path: Path) -> None:
+    db, _, _ = _make_test_db(tmp_path)
+    context = StellarisMcpContext(db=db)
+    guard = context.get_cached_chronicle()
+
+    saved = context.save_chronicle_current_era(
+        campaign_ref=guard["campaign_ref"],
+        expected_revision=guard["chronicle_revision"],
+        narrative="A guarded Chronicle draft.",
+    )
+
+    with pytest.raises(McpContextError, match="Chronicle changed"):
+        context.save_chronicle_current_era(
+            campaign_ref=guard["campaign_ref"],
+            expected_revision=guard["chronicle_revision"],
+            narrative="A stale competing draft.",
+        )
+
+    with pytest.raises(McpContextError, match="active campaign changed"):
+        context.save_chronicle_current_era(
+            campaign_ref="campaign_wrong",
+            expected_revision=saved["chronicle_revision"],
+            narrative="A draft for the wrong campaign.",
+        )
+
+    with pytest.raises(McpContextError, match="receipt"):
+        context.undo_chronicle_edit(
+            campaign_ref=saved["campaign_ref"],
+            expected_revision=saved["chronicle_revision"],
+            edit_receipt="edit_not-the-right-receipt",
+        )
+
+
+def test_chronicle_revision_guard_holds_across_database_connections(tmp_path: Path) -> None:
+    db, _, _ = _make_test_db(tmp_path)
+    first = StellarisMcpContext(db=db)
+    second_db = GameDatabase(db_path=db.path)
+    second = StellarisMcpContext(db=second_db)
+    guard = second.get_cached_chronicle()
+
+    first.save_chronicle_current_era(
+        campaign_ref=guard["campaign_ref"],
+        expected_revision=guard["chronicle_revision"],
+        narrative="The winning concurrent Chronicle draft.",
+    )
+
+    with pytest.raises(McpContextError, match="Chronicle changed"):
+        second.save_chronicle_current_era(
+            campaign_ref=guard["campaign_ref"],
+            expected_revision=guard["chronicle_revision"],
+            narrative="The stale concurrent Chronicle draft.",
+        )
+
+    second_db.close()
+
+
+def test_official_sdk_exposes_tools_resources_and_prompts(tmp_path: Path) -> None:
+    db, _, _ = _make_test_db(tmp_path)
+    context = StellarisMcpContext(db=db)
+    server = StellarisMcpServer(context)
+
+    async def exercise_server() -> None:
+        async with Client(server.sdk_server) as client:
+            assert client.server_info is not None
+            assert client.server_info.title == "Stellaris Companion"
+            assert client.instructions == SERVER_INSTRUCTIONS
+
+            tools = await client.list_tools()
+            assert {tool.name for tool in tools.tools} == set(server.tools)
+
+            resources = await client.list_resources()
+            assert {str(resource.uri) for resource in resources.resources} == {
+                "stellaris://campaign/active",
+                "stellaris://campaign/briefing",
+                "stellaris://campaign/events/recent",
+                "stellaris://campaign/chronicle",
+            }
+            active = await client.read_resource("stellaris://campaign/active")
+            assert "Kilik Cooperative" in active.contents[0].text
+
+            prompts = await client.list_prompts()
+            assert {prompt.name for prompt in prompts.prompts} == {
+                "stellaris-advisor",
+                "chronicle-current-era",
+                "campaign-recap",
+            }
+            prompt = await client.get_prompt(
+                "stellaris-advisor", {"question": "What should I prioritize?"}
+            )
+            assert "get_strategy_context" in prompt.messages[0].content.text
+
+    asyncio.run(exercise_server())

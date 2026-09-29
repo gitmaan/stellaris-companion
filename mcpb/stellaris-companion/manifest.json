@@ -25,8 +25,7 @@
       ],
       "env": {
         "STELLARIS_COMPANION_APP_PATH": "${user_config.stellaris_companion_path}",
-        "STELLARIS_COMPANION_USER_DATA_DIR": "${user_config.user_data_dir}",
-        "STELLARIS_COMPANION_LANGUAGE": "${user_config.language}"
+        "STELLARIS_COMPANION_USER_DATA_DIR": "${user_config.user_data_dir}"
       }
     }
   },
@@ -104,13 +103,6 @@
       "type": "directory",
       "title": "Stellaris Companion data folder",
       "description": "Optional. Leave blank unless your Stellaris Companion database is stored somewhere custom.",
-      "required": false
-    },
-    "language": {
-      "type": "string",
-      "title": "Language",
-      "description": "Language code for cached Advisor and Chronicle content.",
-      "default": "en",
       "required": false
     }
   }

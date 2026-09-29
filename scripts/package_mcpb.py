@@ -15,6 +15,9 @@ SOURCE_DIR = ROOT / "mcpb" / "stellaris-companion"
 APP_PACKAGE_JSON = ROOT / "electron" / "package.json"
 ICON_SOURCE = ROOT / "electron" / "assets" / "icon.png"
 DEFAULT_OUTPUT_DIR = ROOT / "electron" / "dist" / "mcpb"
+BUNDLED_OUTPUT_PATH = (
+    ROOT / "electron" / "generated" / "mcpb" / "stellaris-companion-mcp-relay.mcpb"
+)
 
 
 def load_app_version() -> str:
@@ -78,7 +81,11 @@ def write_zip(staging_dir: Path, output_path: Path) -> None:
             if not file_path.is_file():
                 continue
             arcname = file_path.relative_to(staging_dir).as_posix()
-            zf.write(file_path, arcname)
+            info = zipfile.ZipInfo(arcname, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            zf.writestr(info, file_path.read_bytes())
 
     with zipfile.ZipFile(output_path, "r") as zf:
         names = set(zf.namelist())
@@ -98,6 +105,9 @@ def package_mcpb(output_dir: Path, version: str | None = None) -> Path:
         manifest = stamp_manifest(staging_dir, resolved_version)
         validate_staging(staging_dir, manifest)
         write_zip(staging_dir, output_path)
+
+    BUNDLED_OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(output_path, BUNDLED_OUTPUT_PATH)
 
     return output_path
 

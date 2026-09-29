@@ -92,6 +92,10 @@ jobs:
           cd electron
           npx electron-builder --win --x64 --publish never
 
+      - name: Re-package Claude Desktop MCPB release asset
+        working-directory: electron
+        run: npm run build:mcpb
+
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:

@@ -61,7 +61,11 @@ def configure_logging() -> None:
     if log_dir_raw:
         log_dir = Path(log_dir_raw)
         log_dir.mkdir(parents=True, exist_ok=True)
-        logfile = log_dir / "stellaris-companion-backend.log"
+        requested_log_name = os.environ.get(
+            "STELLARIS_LOG_FILE_NAME", "stellaris-companion-backend.log"
+        )
+        log_name = Path(requested_log_name).name or "stellaris-companion-backend.log"
+        logfile = log_dir / log_name
         handlers.append(
             RotatingFileHandler(
                 logfile,
@@ -149,8 +153,14 @@ Examples:
     parser.add_argument(
         "--language",
         type=str,
-        default="en",
-        help="Language scope to use with --mcp cached content (default: en).",
+        default=None,
+        help="Language scope to use with --mcp cached content. Overrides --settings-path.",
+    )
+    parser.add_argument(
+        "--settings-path",
+        type=str,
+        default=None,
+        help="Electron settings JSON used to resolve the current MCP language.",
     )
     return parser.parse_args()
 
@@ -428,6 +438,7 @@ def main() -> None:
         run_stdio_server(
             db_path=args.db_path,
             language=args.language,
+            settings_path=args.settings_path,
         )
         return
 

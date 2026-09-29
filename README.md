@@ -113,11 +113,11 @@ Setup:
 1. Open Stellaris Companion and load or select your Stellaris save folder.
 2. Let the app ingest at least one campaign snapshot.
 3. Go to **Config** -> **AI APP CONNECTIONS**.
-4. For Claude Desktop, use **ADD TO CLAUDE** and restart Claude Desktop.
-5. For other MCP clients, copy the Codex, Claude Code, or generic MCP setup from **SHOW MANUAL MCP SETUP**.
-6. Use **RUN CHECK** if you want to confirm the local MCP server responds before opening your AI client.
+4. Choose **Claude Desktop**, **ChatGPT + Codex**, or **Cursor**, then click **CONNECT**. Stellaris Companion preserves the rest of that client's MCP configuration and creates a backup before changing JSON config files.
+5. Restart the AI app if it is already open. The connection and campaign readiness checks run automatically when you return to Settings.
+6. For another MCP-compatible client, open **SHOW MANUAL MCP SETUP** and copy the generic configuration. The same section also provides sanitized diagnostics and a manual health check.
 
-The MCP Relay is local-only. It reads the app's local campaign cache and does not include provider API keys or the raw `.sav` file in MCP output.
+The MCP Relay reads the app's local campaign cache without exposing provider API keys or raw save files. It checks edits against the latest Chronicle to prevent overwrites and supports undoing the latest external edit. See [local MCP integration](docs/local-mcp.md) for details.
 
 ## Optional: Discord Overlay Setup
 

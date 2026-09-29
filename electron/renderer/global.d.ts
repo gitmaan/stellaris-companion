@@ -25,18 +25,45 @@ import type { ChronicleRefreshMode, ModelRoutingMode } from './hooks/useSettings
 
 export interface McpRelayHealthResult {
   ok: boolean
+  serverHealthy?: boolean
+  campaignReady?: boolean
   message: string
   durationMs?: number
   toolCount?: number
   toolNames?: string[]
   stderr?: string
+  protocolVersion?: string | null
+  serverVersion?: string | null
+  campaign?: {
+    save_loaded?: boolean
+    campaign_ref?: string
+    empire_name?: string
+    game_date?: string
+    snapshot_count?: number
+    freshness?: { state?: string; seconds?: number; message?: string }
+  }
+}
+
+export interface McpRelayClientStatus {
+  available?: boolean
+  executable?: string | null
+  configPath?: string
+  configExists?: boolean
+  configured: boolean
+  current?: boolean
+  serverName?: string | null
+  serverNames?: string[]
+  error?: string | null
 }
 
 export interface McpRelayStatus {
   serverName: string
   dbPath: string
+  settingsPath: string
   databaseExists: boolean
   logDir: string
+  logPath: string
+  mcpbPath?: string | null
   language: string
   command: string
   args: string[]
@@ -47,13 +74,7 @@ export interface McpRelayStatus {
     codex: string
     genericJson: string
   }
-  claudeDesktop: {
-    configPath: string
-    configExists: boolean
-    configured: boolean
-    current?: boolean
-    serverName?: string | null
-    error?: string | null
+  claudeDesktop: McpRelayClientStatus & {
     mcpb?: {
       settingsDir: string
       configPath: string | null
@@ -65,6 +86,13 @@ export interface McpRelayStatus {
       error?: string | null
     }
   }
+  codex: McpRelayClientStatus
+  cursor: McpRelayClientStatus
+  clients: {
+    claude: McpRelayClientStatus
+    codex: McpRelayClientStatus
+    cursor: McpRelayClientStatus
+  }
 }
 
 export interface McpRelayInstallResult {
@@ -72,6 +100,7 @@ export interface McpRelayInstallResult {
   configPath?: string
   serverName?: string
   error?: string
+  warning?: string
   status?: McpRelayStatus
 }
 
@@ -235,6 +264,10 @@ declare global {
         status: () => Promise<McpRelayStatus>
         healthCheck: () => Promise<McpRelayHealthResult>
         installClaudeDesktop: () => Promise<McpRelayInstallResult>
+        connectClient: (client: 'claude' | 'codex' | 'cursor') => Promise<McpRelayInstallResult>
+        disconnectClient: (client: 'claude' | 'codex' | 'cursor') => Promise<McpRelayInstallResult>
+        openClaudeExtension: () => Promise<{ success: boolean; error?: string }>
+        revealPath: (filePath: string) => Promise<{ success: boolean }>
         openClaudeConfigFolder: () => Promise<{ success: boolean }>
       }
       // Backend status events

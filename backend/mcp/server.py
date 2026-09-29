@@ -1,21 +1,36 @@
-"""Minimal stdio MCP server for local Stellaris Companion integrations."""
+"""Standards-compliant stdio MCP server for Stellaris Companion integrations."""
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import logging
+import re
 import sys
+import time
 from collections.abc import Callable
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+import mcp_types as types
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError
+from mcp.server.context import ServerRequestContext
+from mcp.server.lowlevel import NotificationOptions, Server
+from mcp.server.stdio import stdio_server
+
+from backend import __version__ as BACKEND_VERSION
 from backend.mcp.context import McpContextError, StellarisMcpContext, _display_identifier
 
 SERVER_NAME = "stellaris-companion"
 SERVER_TITLE = "Stellaris Companion"
-SERVER_VERSION = "0.1.0"
-PROTOCOL_VERSION = "2025-11-25"
+try:
+    SERVER_VERSION = re.sub(r"(?<=\d)b(?=\d+$)", "-beta.", version("stellaris-companion"))
+except PackageNotFoundError:  # pragma: no cover - editable/package builds provide metadata
+    SERVER_VERSION = BACKEND_VERSION
+PROTOCOL_VERSION = "2026-07-28"
 SERVER_DESCRIPTION = (
     "Local Stellaris campaign intelligence and Chronicle editing for external AI assistants."
 )
@@ -28,13 +43,17 @@ SERVER_ICON = {
     "mimeType": "image/svg+xml",
     "sizes": ["any"],
 }
-SERVER_INSTRUCTIONS = (
-    "Stellaris Companion provides local context about the user's current "
-    "Stellaris campaign. For strategy questions, call Advisor Briefing first; it "
-    "returns rich current campaign context, recent events, and advisor memory. Use "
-    "Empire Briefing only for follow-up detail or context-budget constraints. Use "
-    "Chronicle tools for narrative or campaign-history questions. For Chronicle "
-    "drafts and revisions, write in chat first and do not save automatically. After "
+_CORE_SERVER_INSTRUCTIONS = (
+    "Use Advisor Briefing first for strategy; it returns the active campaign, recent "
+    "events, and advisor memory without calling an in-app model. For Chronicle work, "
+    "read Chronicle Source Material or Chronicle Archive first, draft in chat, and "
+    "never save automatically. Call a write tool only after the user explicitly asks "
+    "to save/apply/create/undo. Pass campaign_ref and chronicle_revision from that "
+    "fresh read as the write guard. Writes update only the local Chronicle cache, not "
+    "a Stellaris save."
+)
+SERVER_INSTRUCTIONS = _CORE_SERVER_INSTRUCTIONS.ljust(512) + (
+    "Use Empire Briefing only for follow-up detail or tight context budgets. After "
     "presenting a Chronicle draft, briefly tell the user they can say "
     '"save this to Stellaris Companion" when ready. Only call Chronicle save, '
     "update, create, or undo tools after the user explicitly asks to save, apply, "
@@ -49,6 +68,7 @@ SERVER_INSTRUCTIONS = (
 logger = logging.getLogger(__name__)
 
 MAX_TOOL_TEXT_CHARS = 12_000
+MAX_TOOL_INPUT_CHARS = 100_000
 
 
 ToolHandler = Callable[[dict[str, Any]], dict[str, Any]]
@@ -79,8 +99,7 @@ def _campaign_ref_schema() -> dict[str, Any]:
         "type": "object",
         "properties": {
             "save_loaded": {"type": "boolean"},
-            "save_id": {"type": "string"},
-            "active_session_id": {"type": "string"},
+            "campaign_ref": {"type": "string"},
             "empire_name": {"type": ["string", "null"]},
             "game_date": {"type": ["string", "null"]},
             "first_game_date": {"type": ["string", "null"]},
@@ -90,6 +109,8 @@ def _campaign_ref_schema() -> dict[str, Any]:
             "is_active": {"type": "boolean"},
             "version": {"type": ["string", "null"]},
             "language": {"type": "string"},
+            "updated_at": {"type": ["string", "number", "null"]},
+            "freshness": {"type": "object", "additionalProperties": True},
             "message": {"type": "string"},
         },
         "additionalProperties": True,
@@ -201,9 +222,9 @@ def _chronicle_archive_output_schema() -> dict[str, Any]:
         "type": "object",
         "properties": {
             "campaign": _campaign_ref_schema(),
+            "campaign_ref": {"type": "string"},
+            "chronicle_revision": {"type": "string"},
             "cached": {"type": "boolean"},
-            "save_id": {"type": "string"},
-            "session_id": {"type": "string"},
             "language": {"type": "string"},
             "generated_at": {"type": ["string", "number", "null"]},
             "event_count": {"type": ["integer", "null"]},
@@ -225,6 +246,8 @@ def _chronicle_source_output_schema() -> dict[str, Any]:
         "type": "object",
         "properties": {
             "campaign": _campaign_ref_schema(),
+            "campaign_ref": {"type": "string"},
+            "chronicle_revision": {"type": "string"},
             "event_range": {"type": "object", "additionalProperties": True},
             "events": {"type": "array", "items": _event_schema()},
             "truncated": {"type": "boolean"},
@@ -243,6 +266,9 @@ def _chronicle_writeback_output_schema() -> dict[str, Any]:
         "type": "object",
         "properties": {
             "campaign": _campaign_ref_schema(),
+            "campaign_ref": {"type": "string"},
+            "chronicle_revision": {"type": "string"},
+            "edit_receipt": {"type": "string"},
             "saved": {"type": "boolean"},
             "message": {"type": "string"},
             "saved_item": {"type": "object", "additionalProperties": True},
@@ -263,6 +289,9 @@ def _chronicle_undo_output_schema() -> dict[str, Any]:
         "type": "object",
         "properties": {
             "campaign": _campaign_ref_schema(),
+            "campaign_ref": {"type": "string"},
+            "chronicle_revision": {"type": "string"},
+            "undone_edit_receipt": {"type": "string"},
             "undone": {"type": "boolean"},
             "message": {"type": "string"},
             "remaining_undo_count": {"type": "integer"},
@@ -276,15 +305,31 @@ def _chronicle_undo_output_schema() -> dict[str, Any]:
 def _sections_input_schema() -> dict[str, Any]:
     return {
         "type": "array",
+        "maxItems": 12,
         "items": {
             "type": "object",
             "properties": {
                 "type": {"type": "string", "enum": ["prose", "quote", "declaration"]},
-                "text": {"type": "string"},
-                "attribution": {"type": "string"},
+                "text": {"type": "string", "minLength": 1, "maxLength": 20000},
+                "attribution": {"type": "string", "maxLength": 200},
             },
             "required": ["type", "text"],
             "additionalProperties": False,
+        },
+    }
+
+
+def _write_guard_properties() -> dict[str, Any]:
+    return {
+        "campaign_ref": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque campaign_ref from a fresh Chronicle read.",
+        },
+        "expected_revision": {
+            "type": "string",
+            "minLength": 1,
+            "description": "chronicle_revision from the same fresh Chronicle read.",
         },
     }
 
@@ -296,7 +341,7 @@ def build_tool_definitions() -> list[dict[str, Any]]:
             "title": "Campaign Status",
             "description": (
                 "Use this for a quick read on which local Stellaris campaign is active: "
-                "empire name, game date, save/session IDs, snapshot count, and version. "
+                "empire name, game date, freshness, snapshot count, and version. "
                 "This is a lightweight status check, not the main strategy briefing."
             ),
             "icons": [SERVER_ICON],
@@ -323,6 +368,7 @@ def build_tool_definitions() -> list[dict[str, Any]]:
                 "properties": {
                     "question": {
                         "type": "string",
+                        "maxLength": 2000,
                         "description": "The user's strategy question.",
                         "default": "",
                     },
@@ -396,7 +442,8 @@ def build_tool_definitions() -> list[dict[str, Any]]:
                 "properties": {
                     "sections": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "maxItems": 20,
+                        "items": {"type": "string", "maxLength": 80},
                         "description": "Briefing sections to return, such as economy, military, diplomacy, territory, technology.",
                     },
                     "max_detail": {
@@ -432,8 +479,9 @@ def build_tool_definitions() -> list[dict[str, Any]]:
             "title": "Chronicle Source Material",
             "description": (
                 "Use this when the user asks an external model to write a new Chronicle "
-                "passage in chat. It returns event/source material and style context; "
-                "it cannot save the generated prose back into Stellaris Companion."
+                "passage in chat. It returns source material, style context, campaign_ref, "
+                "and chronicle_revision. Draft in chat; only a separate explicit save request "
+                "authorizes write-back."
             ),
             "icons": [SERVER_ICON],
             "inputSchema": {
@@ -475,6 +523,7 @@ def build_tool_definitions() -> list[dict[str, Any]]:
             "inputSchema": {
                 "type": "object",
                 "properties": {
+                    **_write_guard_properties(),
                     "narrative": {
                         "type": "string",
                         "minLength": 1,
@@ -483,11 +532,13 @@ def build_tool_definitions() -> list[dict[str, Any]]:
                     },
                     "title": {
                         "type": "string",
+                        "maxLength": 200,
                         "description": "Optional title for the current-era draft.",
                         "default": "External Chronicle Draft",
                     },
                     "start_date": {
                         "type": "string",
+                        "maxLength": 64,
                         "description": "Optional current-era start date. Defaults to the cached era start.",
                     },
                     "events_covered": {
@@ -496,7 +547,7 @@ def build_tool_definitions() -> list[dict[str, Any]]:
                         "description": "Optional number of source events covered by the draft.",
                     },
                 },
-                "required": ["narrative"],
+                "required": ["campaign_ref", "expected_revision", "narrative"],
                 "additionalProperties": False,
             },
             "outputSchema": _chronicle_writeback_output_schema(),
@@ -514,14 +565,20 @@ def build_tool_definitions() -> list[dict[str, Any]]:
             "inputSchema": {
                 "type": "object",
                 "properties": {
+                    **_write_guard_properties(),
                     "chapter_number": {"type": "integer", "minimum": 1},
                     "narrative": {"type": "string", "minLength": 1, "maxLength": 20000},
-                    "title": {"type": "string"},
+                    "title": {"type": "string", "maxLength": 200},
                     "summary": {"type": "string", "maxLength": 2000},
-                    "epigraph": {"type": "string"},
+                    "epigraph": {"type": "string", "maxLength": 1000},
                     "sections": _sections_input_schema(),
                 },
-                "required": ["chapter_number", "narrative"],
+                "required": [
+                    "campaign_ref",
+                    "expected_revision",
+                    "chapter_number",
+                    "narrative",
+                ],
                 "additionalProperties": False,
             },
             "outputSchema": _chronicle_writeback_output_schema(),
@@ -539,17 +596,18 @@ def build_tool_definitions() -> list[dict[str, Any]]:
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "title": {"type": "string", "minLength": 1},
+                    **_write_guard_properties(),
+                    "title": {"type": "string", "minLength": 1, "maxLength": 200},
                     "narrative": {"type": "string", "minLength": 1, "maxLength": 20000},
                     "summary": {"type": "string", "maxLength": 2000},
-                    "start_date": {"type": "string"},
-                    "end_date": {"type": "string"},
+                    "start_date": {"type": "string", "maxLength": 64},
+                    "end_date": {"type": "string", "maxLength": 64},
                     "start_snapshot_id": {"type": "integer", "minimum": 1},
                     "end_snapshot_id": {"type": "integer", "minimum": 1},
-                    "epigraph": {"type": "string"},
+                    "epigraph": {"type": "string", "maxLength": 1000},
                     "sections": _sections_input_schema(),
                 },
-                "required": ["title", "narrative"],
+                "required": ["campaign_ref", "expected_revision", "title", "narrative"],
                 "additionalProperties": False,
             },
             "outputSchema": _chronicle_writeback_output_schema(),
@@ -559,13 +617,17 @@ def build_tool_definitions() -> list[dict[str, Any]]:
             "name": "undo_chronicle_edit",
             "title": "Undo Chronicle Edit",
             "description": (
-                "Use only when the user asks to undo or revert the last Chronicle edit "
-                "saved through Stellaris Companion's external AI tools."
+                "Use only when the user asks to undo the exact latest Chronicle edit. "
+                "Pass the edit_receipt returned by that write and a fresh revision guard."
             ),
             "icons": [SERVER_ICON],
             "inputSchema": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    **_write_guard_properties(),
+                    "edit_receipt": {"type": "string", "minLength": 1},
+                },
+                "required": ["campaign_ref", "expected_revision", "edit_receipt"],
                 "additionalProperties": False,
             },
             "outputSchema": _chronicle_undo_output_schema(),
@@ -574,8 +636,77 @@ def build_tool_definitions() -> list[dict[str, Any]]:
     ]
 
 
+def build_resource_definitions() -> list[types.Resource]:
+    return [
+        types.Resource(
+            uri="stellaris://campaign/active",
+            name="active-campaign",
+            title="Active Campaign",
+            description="Current empire, date, freshness, and campaign readiness.",
+            mimeType="application/json",
+            icons=[types.Icon.model_validate(SERVER_ICON)],
+        ),
+        types.Resource(
+            uri="stellaris://campaign/briefing",
+            name="advisor-briefing",
+            title="Advisor Briefing",
+            description="Rich current campaign context and recent events.",
+            mimeType="application/json",
+            icons=[types.Icon.model_validate(SERVER_ICON)],
+        ),
+        types.Resource(
+            uri="stellaris://campaign/events/recent",
+            name="recent-events",
+            title="Recent Dispatches",
+            description="The latest local campaign events.",
+            mimeType="application/json",
+            icons=[types.Icon.model_validate(SERVER_ICON)],
+        ),
+        types.Resource(
+            uri="stellaris://campaign/chronicle",
+            name="chronicle-archive",
+            title="Chronicle Archive",
+            description="Cached Chronicle chapters and current-era draft.",
+            mimeType="application/json",
+            icons=[types.Icon.model_validate(SERVER_ICON)],
+        ),
+    ]
+
+
+def build_prompt_definitions() -> list[types.Prompt]:
+    icon = types.Icon.model_validate(SERVER_ICON)
+    return [
+        types.Prompt(
+            name="stellaris-advisor",
+            title="Ask the Stellaris Advisor",
+            description="Answer a strategy question using a fresh Advisor Briefing.",
+            arguments=[
+                types.PromptArgument(
+                    name="question",
+                    title="Strategy question",
+                    description="What the player wants help deciding.",
+                    required=True,
+                )
+            ],
+            icons=[icon],
+        ),
+        types.Prompt(
+            name="chronicle-current-era",
+            title="Draft the Current Era",
+            description="Write Chronicle prose from fresh source material without saving it.",
+            icons=[icon],
+        ),
+        types.Prompt(
+            name="campaign-recap",
+            title="Campaign Recap",
+            description="Summarize the campaign's current position and recent turning points.",
+            icons=[icon],
+        ),
+    ]
+
+
 class StellarisMcpServer:
-    """Small JSON-RPC MCP stdio server."""
+    """MCP SDK adapter around the local campaign context."""
 
     def __init__(self, context: StellarisMcpContext):
         self.context = context
@@ -589,69 +720,174 @@ class StellarisMcpServer:
             "save_chronicle_current_era": self._save_chronicle_current_era,
             "update_chronicle_chapter": self._update_chronicle_chapter,
             "create_chronicle_chapter": self._create_chronicle_chapter,
-            "undo_chronicle_edit": lambda args: self.context.undo_chronicle_edit(),
+            "undo_chronicle_edit": self._undo_chronicle_edit,
         }
-
-    def handle_message(self, message: dict[str, Any]) -> dict[str, Any] | None:
-        message_id = message.get("id")
-        method = message.get("method")
-        params = message.get("params") if isinstance(message.get("params"), dict) else {}
-
-        if message_id is None:
-            return None
-
-        try:
-            if method == "initialize":
-                return self._response(message_id, self._initialize_result(params))
-            if method == "ping":
-                return self._response(message_id, {})
-            if method == "tools/list":
-                return self._response(message_id, {"tools": build_tool_definitions()})
-            if method == "tools/call":
-                return self._response(message_id, self._call_tool(params))
-            if method == "resources/list":
-                return self._response(message_id, {"resources": []})
-            if method == "prompts/list":
-                return self._response(message_id, {"prompts": []})
-            return self._error(message_id, -32601, f"Method not found: {method}")
-        except McpContextError as exc:
-            return self._response(message_id, _tool_error(str(exc)))
-        except Exception as exc:
-            logger.exception("MCP request failed")
-            return self._error(message_id, -32603, str(exc) or "Internal error")
-
-    def _initialize_result(self, params: dict[str, Any]) -> dict[str, Any]:
-        requested_version = params.get("protocolVersion")
-        protocol_version = (
-            requested_version if isinstance(requested_version, str) else PROTOCOL_VERSION
+        self.tool_definitions = {
+            definition["name"]: definition for definition in build_tool_definitions()
+        }
+        self.resources = {str(resource.uri): resource for resource in build_resource_definitions()}
+        self.prompts = {prompt.name: prompt for prompt in build_prompt_definitions()}
+        self.sdk_server: Server[Any] = Server(
+            SERVER_NAME,
+            version=SERVER_VERSION,
+            title=SERVER_TITLE,
+            description=SERVER_DESCRIPTION,
+            instructions=SERVER_INSTRUCTIONS,
+            website_url=SERVER_WEBSITE_URL,
+            icons=[types.Icon.model_validate(SERVER_ICON)],
+            on_list_tools=self._list_tools,
+            on_call_tool=self._call_tool_request,
+            on_list_resources=self._list_resources,
+            on_read_resource=self._read_resource,
+            on_list_prompts=self._list_prompts,
+            on_get_prompt=self._get_prompt,
         )
-        return {
-            "protocolVersion": protocol_version,
-            "capabilities": {
-                "tools": {"listChanged": False},
-                "resources": {"subscribe": False, "listChanged": False},
-                "prompts": {"listChanged": False},
-            },
-            "serverInfo": {
-                "name": SERVER_NAME,
-                "title": SERVER_TITLE,
-                "version": SERVER_VERSION,
-                "description": SERVER_DESCRIPTION,
-                "icons": [SERVER_ICON],
-                "websiteUrl": SERVER_WEBSITE_URL,
-            },
-            "instructions": SERVER_INSTRUCTIONS,
-        }
 
-    def _call_tool(self, params: dict[str, Any]) -> dict[str, Any]:
-        name = params.get("name")
-        raw_args = params.get("arguments")
-        args = raw_args if isinstance(raw_args, dict) else {}
-        if not isinstance(name, str) or name not in self.tools:
+    async def _list_tools(
+        self,
+        ctx: ServerRequestContext[Any],
+        params: types.PaginatedRequestParams | None,
+    ) -> types.ListToolsResult:
+        return types.ListToolsResult(
+            tools=[types.Tool.model_validate(item) for item in build_tool_definitions()]
+        )
+
+    async def _call_tool_request(
+        self,
+        ctx: ServerRequestContext[Any],
+        params: types.CallToolRequestParams,
+    ) -> types.CallToolResult:
+        return types.CallToolResult.model_validate(
+            self.call_tool(str(params.name), params.arguments or {})
+        )
+
+    def call_tool(self, name: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Validate and invoke one tool, returning the wire-level tool result."""
+        arguments = args if isinstance(args, dict) else {}
+        definition = self.tool_definitions.get(name)
+        handler = self.tools.get(name)
+        if definition is None or handler is None:
             return _tool_error(f"Unknown tool: {name}")
 
-        result = self.tools[name](args)
-        return _tool_result(result)
+        started_at = time.perf_counter()
+        input_chars = len(json.dumps(arguments, ensure_ascii=False))
+        if input_chars > MAX_TOOL_INPUT_CHARS:
+            return _tool_error(
+                f"Input for {name} is too large ({input_chars} > {MAX_TOOL_INPUT_CHARS} chars)."
+            )
+        try:
+            Draft202012Validator(definition["inputSchema"]).validate(arguments)
+            payload = handler(arguments)
+            Draft202012Validator(definition["outputSchema"]).validate(payload)
+        except ValidationError as exc:
+            location = ".".join(str(part) for part in exc.absolute_path)
+            label = f" at {location}" if location else ""
+            result = _tool_error(f"Invalid input for {name}{label}: {exc.message}")
+        except McpContextError as exc:
+            result = _tool_error(str(exc))
+        except Exception:
+            logger.exception("MCP tool failed: %s", name)
+            result = _tool_error("The local MCP tool failed. Check MCP diagnostics for details.")
+        else:
+            result = _tool_result(payload)
+
+        logger.info(
+            "MCP tool name=%s ok=%s duration_ms=%d input_chars=%d",
+            name,
+            not bool(result.get("isError")),
+            int((time.perf_counter() - started_at) * 1000),
+            input_chars,
+        )
+        return result
+
+    async def _list_resources(
+        self,
+        ctx: ServerRequestContext[Any],
+        params: types.PaginatedRequestParams | None,
+    ) -> types.ListResourcesResult:
+        return types.ListResourcesResult(resources=list(self.resources.values()))
+
+    async def _read_resource(
+        self,
+        ctx: ServerRequestContext[Any],
+        params: types.ReadResourceRequestParams,
+    ) -> types.ReadResourceResult:
+        uri = str(params.uri)
+        readers: dict[str, Callable[[], dict[str, Any]]] = {
+            "stellaris://campaign/active": self.context.get_active_campaign,
+            "stellaris://campaign/briefing": lambda: self.context.get_strategy_context(
+                question="Give me a current strategic overview."
+            ),
+            "stellaris://campaign/events/recent": lambda: self.context.get_recent_events(limit=25),
+            "stellaris://campaign/chronicle": self.context.get_cached_chronicle,
+        }
+        reader = readers.get(uri)
+        if reader is None:
+            raise ValueError(f"Unknown Stellaris resource: {uri}")
+        try:
+            payload = reader()
+        except McpContextError as exc:
+            payload = {"available": False, "message": str(exc)}
+        return types.ReadResourceResult(
+            cacheScope="private",
+            ttlMs=0,
+            contents=[
+                types.TextResourceContents(
+                    uri=uri,
+                    mimeType="application/json",
+                    text=json.dumps(payload, ensure_ascii=False, indent=2),
+                )
+            ],
+        )
+
+    async def _list_prompts(
+        self,
+        ctx: ServerRequestContext[Any],
+        params: types.PaginatedRequestParams | None,
+    ) -> types.ListPromptsResult:
+        return types.ListPromptsResult(prompts=list(self.prompts.values()))
+
+    async def _get_prompt(
+        self,
+        ctx: ServerRequestContext[Any],
+        params: types.GetPromptRequestParams,
+    ) -> types.GetPromptResult:
+        arguments = params.arguments or {}
+        if params.name == "stellaris-advisor":
+            question = str(arguments.get("question") or "").strip()
+            if not question:
+                raise ValueError("The advisor prompt requires a question.")
+            text = (
+                f"Answer this Stellaris strategy question: {question}\n\n"
+                "Call get_strategy_context first. Ground every factual claim in that fresh "
+                "briefing, explain the most important trade-offs, and end with a short priority list."
+            )
+            description = "Fresh campaign strategy advice"
+        elif params.name == "chronicle-current-era":
+            text = (
+                "Call get_chronicle_source_material with scope=current_era, then draft an evocative "
+                "Chronicle passage in chat. Do not invent events and do not save it. After presenting "
+                "the draft, mention that I can ask to save it to Stellaris Companion."
+            )
+            description = "Draft current-era Chronicle prose"
+        elif params.name == "campaign-recap":
+            text = (
+                "Call get_strategy_context and get_cached_chronicle. Give me a concise campaign recap "
+                "covering the empire's present position, the latest turning points, and the next major "
+                "decision. Distinguish recorded history from recommendations."
+            )
+            description = "Recap the active campaign"
+        else:
+            raise ValueError(f"Unknown Stellaris prompt: {params.name}")
+        return types.GetPromptResult(
+            description=description,
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(type="text", text=text),
+                )
+            ],
+        )
 
     def _get_strategy_context(self, args: dict[str, Any]) -> dict[str, Any]:
         return self.context.get_strategy_context(
@@ -685,6 +921,8 @@ class StellarisMcpServer:
     def _save_chronicle_current_era(self, args: dict[str, Any]) -> dict[str, Any]:
         events_covered = args.get("events_covered")
         return self.context.save_chronicle_current_era(
+            campaign_ref=str(args.get("campaign_ref") or ""),
+            expected_revision=str(args.get("expected_revision") or ""),
             narrative=str(args.get("narrative") or ""),
             title=str(args.get("title") or "") or None,
             start_date=str(args.get("start_date") or "") or None,
@@ -695,6 +933,8 @@ class StellarisMcpServer:
 
     def _update_chronicle_chapter(self, args: dict[str, Any]) -> dict[str, Any]:
         return self.context.update_chronicle_chapter(
+            campaign_ref=str(args.get("campaign_ref") or ""),
+            expected_revision=str(args.get("expected_revision") or ""),
             chapter_number=_int_arg(args.get("chapter_number"), default=0),
             narrative=str(args.get("narrative") or ""),
             title=str(args.get("title") or "") or None,
@@ -705,6 +945,8 @@ class StellarisMcpServer:
 
     def _create_chronicle_chapter(self, args: dict[str, Any]) -> dict[str, Any]:
         return self.context.create_chronicle_chapter(
+            campaign_ref=str(args.get("campaign_ref") or ""),
+            expected_revision=str(args.get("expected_revision") or ""),
             title=str(args.get("title") or ""),
             narrative=str(args.get("narrative") or ""),
             summary=str(args.get("summary") or "") if "summary" in args else None,
@@ -716,53 +958,46 @@ class StellarisMcpServer:
             sections=_sections_arg(args.get("sections")),
         )
 
-    @staticmethod
-    def _response(message_id: Any, result: dict[str, Any]) -> dict[str, Any]:
-        return {"jsonrpc": "2.0", "id": message_id, "result": result}
-
-    @staticmethod
-    def _error(message_id: Any, code: int, message: str) -> dict[str, Any]:
-        return {
-            "jsonrpc": "2.0",
-            "id": message_id,
-            "error": {"code": code, "message": message},
-        }
+    def _undo_chronicle_edit(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.context.undo_chronicle_edit(
+            campaign_ref=str(args.get("campaign_ref") or ""),
+            expected_revision=str(args.get("expected_revision") or ""),
+            edit_receipt=str(args.get("edit_receipt") or ""),
+        )
 
 
 def serve_stdio(context: StellarisMcpContext) -> None:
     server = StellarisMcpServer(context)
     try:
-        for line in sys.stdin:
-            if not line.strip():
-                continue
-            try:
-                message = json.loads(line)
-            except json.JSONDecodeError as exc:
-                _write_message(
-                    {
-                        "jsonrpc": "2.0",
-                        "id": None,
-                        "error": {"code": -32700, "message": f"Parse error: {exc}"},
-                    }
-                )
-                continue
-            if not isinstance(message, dict):
-                continue
-            response = server.handle_message(message)
-            if response is not None:
-                _write_message(response)
+        asyncio.run(_serve_stdio_async(server))
     finally:
         context.close()
+
+
+async def _serve_stdio_async(server: StellarisMcpServer) -> None:
+    async with stdio_server() as (read_stream, write_stream):
+        await server.sdk_server.run(
+            read_stream,
+            write_stream,
+            server.sdk_server.create_initialization_options(
+                notification_options=NotificationOptions(
+                    prompts_changed=False,
+                    resources_changed=False,
+                    tools_changed=False,
+                )
+            ),
+        )
 
 
 def run_stdio_server(
     *,
     db_path: str | Path | None = None,
-    language: str = "en",
+    language: str | None = None,
+    settings_path: str | Path | None = None,
 ) -> None:
     context = StellarisMcpContext(
         db_path=db_path,
-        language=language,
+        language=_resolve_runtime_language(language=language, settings_path=settings_path),
     )
     serve_stdio(context)
 
@@ -776,8 +1011,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--language",
-        default="en",
-        help="Language scope for localized cached content, default: en.",
+        default=None,
+        help="Language scope for localized cached content. Overrides --settings-path.",
+    )
+    parser.add_argument(
+        "--settings-path",
+        default=None,
+        help="Optional Electron settings JSON used to resolve the current app language.",
     )
     parser.add_argument(
         "--log-level",
@@ -797,12 +1037,27 @@ def main(argv: list[str] | None = None) -> None:
     run_stdio_server(
         db_path=args.db_path,
         language=args.language,
+        settings_path=args.settings_path,
     )
 
 
-def _write_message(message: dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(message, separators=(",", ":"), ensure_ascii=False) + "\n")
-    sys.stdout.flush()
+def _resolve_runtime_language(
+    *,
+    language: str | None,
+    settings_path: str | Path | None,
+) -> str:
+    if language and str(language).strip():
+        return str(language).strip()
+    if settings_path:
+        try:
+            raw = json.loads(Path(settings_path).expanduser().read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                resolved = raw.get("resolvedLanguage") or raw.get("language")
+                if isinstance(resolved, str) and resolved.strip() and resolved != "system":
+                    return resolved.strip()
+        except (OSError, ValueError, TypeError):
+            logger.warning("Could not read MCP language setting from %s", settings_path)
+    return "en"
 
 
 def _tool_result(payload: dict[str, Any]) -> dict[str, Any]:

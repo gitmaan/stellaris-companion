@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import queue
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 from backend_build_info import verify as verify_backend_build_info
@@ -42,6 +45,13 @@ def _message(message_id: int, method: str, params: dict | None = None) -> str:
     return json.dumps(payload, separators=(",", ":"))
 
 
+def _notification(method: str, params: dict | None = None) -> str:
+    payload: dict[str, object] = {"jsonrpc": "2.0", "method": method}
+    if params is not None:
+        payload["params"] = params
+    return json.dumps(payload, separators=(",", ":"))
+
+
 def smoke_mcp_stdio(
     executable: Path,
     *,
@@ -55,22 +65,7 @@ def smoke_mcp_stdio(
 
     with tempfile.TemporaryDirectory(prefix="stellaris-mcp-smoke-") as tmp:
         db_path = Path(tmp) / "smoke.db"
-        input_text = "\n".join(
-            [
-                _message(
-                    1,
-                    "initialize",
-                    {
-                        "protocolVersion": "2025-11-25",
-                        "capabilities": {},
-                        "clientInfo": {"name": "stellaris-mcp-smoke", "version": "1.0.0"},
-                    },
-                ),
-                _message(2, "tools/list"),
-                "",
-            ]
-        )
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             [
                 str(executable),
                 "--mcp",
@@ -79,20 +74,100 @@ def smoke_mcp_stdio(
                 "--language",
                 "en",
             ],
-            input=input_text,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
+            bufsize=1,
         )
+        if proc.stdin is None or proc.stdout is None or proc.stderr is None:
+            raise SystemExit("MCP smoke process did not expose stdio pipes.")
+
+        stdout_lines: queue.Queue[str | None] = queue.Queue()
+        stderr_lines: list[str] = []
+
+        def read_stdout() -> None:
+            assert proc.stdout is not None
+            for line in proc.stdout:
+                stdout_lines.put(line)
+            stdout_lines.put(None)
+
+        def read_stderr() -> None:
+            assert proc.stderr is not None
+            stderr_lines.extend(proc.stderr.readlines())
+
+        threading.Thread(target=read_stdout, daemon=True).start()
+        threading.Thread(target=read_stderr, daemon=True).start()
+        deadline = time.monotonic() + timeout
+
+        def send(payload: str) -> None:
+            assert proc.stdin is not None
+            proc.stdin.write(payload + "\n")
+            proc.stdin.flush()
+
+        def receive(message_id: int) -> dict:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(str(executable), timeout)
+                try:
+                    line = stdout_lines.get(timeout=remaining)
+                except queue.Empty as exc:
+                    raise subprocess.TimeoutExpired(str(executable), timeout) from exc
+                if line is None:
+                    stderr = "".join(stderr_lines).strip()
+                    raise SystemExit(
+                        f"MCP server closed stdout before response {message_id}. stderr:\n{stderr}"
+                    )
+                try:
+                    response = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(response, dict) and response.get("id") == message_id:
+                    return response
+
+        try:
+            send(
+                _message(
+                    1,
+                    "initialize",
+                    {
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {"name": "stellaris-mcp-smoke", "version": "1.0.0"},
+                    },
+                )
+            )
+            responses = {1: receive(1)}
+            send(_notification("notifications/initialized", {}))
+            for message_id, method, params in [
+                (2, "tools/list", None),
+                (3, "resources/list", None),
+                (4, "prompts/list", None),
+                (5, "tools/call", {"name": "get_active_campaign", "arguments": {}}),
+            ]:
+                send(_message(message_id, method, params))
+                responses[message_id] = receive(message_id)
+        finally:
+            try:
+                proc.stdin.close()
+            except OSError:
+                pass
+            try:
+                proc.wait(timeout=max(0.1, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
 
     if proc.returncode != 0:
-        raise SystemExit(
-            f"MCP smoke process failed (exit {proc.returncode}). stderr:\n{proc.stderr.strip()}"
-        )
+        stderr = "".join(stderr_lines).strip()
+        raise SystemExit(f"MCP smoke process failed (exit {proc.returncode}). stderr:\n{stderr}")
 
-    responses = [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
-    by_id = {response.get("id"): response for response in responses if isinstance(response, dict)}
+    by_id = responses
     initialized = by_id.get(1, {}).get("result", {})
     if initialized.get("serverInfo", {}).get("title") != "Stellaris Companion":
         raise SystemExit(f"MCP initialize returned unexpected serverInfo: {initialized!r}")
@@ -103,7 +178,23 @@ def smoke_mcp_stdio(
     if missing:
         raise SystemExit(f"MCP tools/list missing expected tools: {', '.join(missing)}")
 
-    print(f"MCP stdio smoke passed: {len(tool_names)} tools")
+    resources = by_id.get(3, {}).get("result", {}).get("resources", [])
+    if len(resources) < 4:
+        raise SystemExit(f"MCP resources/list returned too few resources: {resources!r}")
+
+    prompts = by_id.get(4, {}).get("result", {}).get("prompts", [])
+    if len(prompts) < 3:
+        raise SystemExit(f"MCP prompts/list returned too few prompts: {prompts!r}")
+
+    campaign_result = by_id.get(5, {}).get("result", {})
+    campaign = campaign_result.get("structuredContent", {})
+    if campaign_result.get("isError") or campaign.get("save_loaded") is not False:
+        raise SystemExit(f"MCP Campaign Status was not callable: {campaign_result!r}")
+
+    print(
+        f"MCP stdio smoke passed: {len(tool_names)} tools, "
+        f"{len(resources)} resources, {len(prompts)} prompts"
+    )
 
 
 def main() -> None:

@@ -16,6 +16,14 @@ echo "Building Python backend..."
 
 if [ -n "${PYTHON_BIN:-}" ]; then
     :
+elif [ -x ".venv/bin/python" ]; then
+    PYTHON_BIN=.venv/bin/python
+elif [ -x "venv/bin/python" ]; then
+    PYTHON_BIN=venv/bin/python
+elif [ -f ".venv/Scripts/python.exe" ]; then
+    PYTHON_BIN=.venv/Scripts/python.exe
+elif [ -f "venv/Scripts/python.exe" ]; then
+    PYTHON_BIN=venv/Scripts/python.exe
 elif command -v python3 &> /dev/null; then
     PYTHON_BIN=python3
 elif command -v python &> /dev/null; then
@@ -34,7 +42,14 @@ fi
 # Check if PyInstaller is installed in the selected Python environment.
 if ! "$PYTHON_BIN" -m PyInstaller --version &> /dev/null; then
     echo "PyInstaller not found. Installing..."
-    "$PYTHON_BIN" -m pip install pyinstaller
+    if "$PYTHON_BIN" -m pip --version &> /dev/null; then
+        "$PYTHON_BIN" -m pip install 'pyinstaller>=6,<7'
+    elif command -v uv &> /dev/null; then
+        uv pip install --python "$PYTHON_BIN" 'pyinstaller>=6,<7'
+    else
+        echo "Error: PyInstaller is missing and this Python environment has no pip or uv installer"
+        exit 1
+    fi
 fi
 
 # Clean previous build artifacts
