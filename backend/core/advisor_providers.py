@@ -359,7 +359,7 @@ class GeminiAdvisorGenerator:
                 code="PROVIDER_CONTEXT_LIMIT",
                 status_code=400,
             )
-        raise AdvisorProviderError(message, code=_gemini_error_code(message))
+        raise AdvisorProviderError(message, code=_gemini_error_code(last_error or message))
 
 
 class OpenAICompatibleAdvisorGenerator:
@@ -606,7 +606,17 @@ def _is_context_limit_error(message: str) -> bool:
     return any(marker in normalized for marker in markers)
 
 
-def _gemini_error_code(message: str) -> str:
+def _gemini_error_code(error: Exception | str) -> str:
+    message = str(error)
+    status = getattr(error, "code", None) or getattr(error, "status_code", None)
+    if isinstance(error, (httpx.TimeoutException, TimeoutError)) or status in {408, 504}:
+        return "PROVIDER_TIMEOUT"
+    if isinstance(error, httpx.RequestError) or status in {500, 502, 503}:
+        return "PROVIDER_UNAVAILABLE"
+    if status == 404:
+        return "PROVIDER_MODEL_NOT_FOUND"
+    if status in {401, 403}:
+        return "PROVIDER_AUTH_FAILED"
     failure = classify_model_error(message)
     if failure is not None:
         if failure.reason == "billing":
@@ -623,6 +633,12 @@ def _gemini_error_code(message: str) -> str:
     )
     if any(marker in normalized for marker in auth_markers):
         return "PROVIDER_AUTH_FAILED"
+    if "not found" in normalized or "not supported for generatecontent" in normalized:
+        return "PROVIDER_MODEL_NOT_FOUND"
+    if "deadline exceeded" in normalized or "timed out" in normalized:
+        return "PROVIDER_TIMEOUT"
+    if "service unavailable" in normalized or "temporarily unavailable" in normalized:
+        return "PROVIDER_UNAVAILABLE"
     return "PROVIDER_REQUEST_FAILED"
 
 

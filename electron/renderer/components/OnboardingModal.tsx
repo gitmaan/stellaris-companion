@@ -3,23 +3,18 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { HUDButton } from './hud/HUDButton'
-import { HUDInput } from './hud/HUDInput'
-import { HUDSelect } from './hud/HUDForm'
 import { HUDLabel, HUDMicro } from './hud/HUDText'
 import { HUDPanel } from './hud/HUDPanel'
-import { AdvisorProviderChooser } from './settings/AdvisorProviderChooser'
-import { ProviderSetupGuide } from './settings/ProviderSetupGuide'
+import { AISetupForm } from './settings/AISetupForm'
 import {
-  DEFAULT_ADVISOR_PROVIDER,
-  normalizeAdvisorProvider,
-  type AdvisorProvider,
+  useSettings,
 } from '../hooks/useSettings'
 import appLogo from '../assets/app_logo.svg'
 import { LANGUAGE_OPTIONS } from '../i18n/languages'
 import type { LanguageSetting } from '../hooks/useSettings'
 
 interface OnboardingModalProps {
-  onComplete: () => void
+  onComplete: (openAIApps?: boolean) => void
   language: LanguageSetting
   onLanguageSelect: (language: LanguageSetting) => Promise<boolean>
 }
@@ -31,12 +26,6 @@ interface SaveDetectionResult {
   directory: string | null
   saveCount: number
   latest: { name: string; modified: string } | null
-}
-
-interface AdvisorProviderModel {
-  id: string
-  name: string
-  recommended?: boolean
 }
 
 const slideVariants = {
@@ -70,17 +59,8 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const actionRowBaselineTopRef = useRef<number | null>(null)
 
-  // Step 2 state
-  const [advisorProvider, setAdvisorProvider] = useState<AdvisorProvider>(DEFAULT_ADVISOR_PROVIDER)
-  const [googleApiKey, setGoogleApiKey] = useState('')
-  const [openRouterApiKey, setOpenRouterApiKey] = useState('')
-  const [customProviderApiKey, setCustomProviderApiKey] = useState('')
-  const [advisorBaseUrl, setAdvisorBaseUrl] = useState('')
-  const [advisorModel, setAdvisorModel] = useState('')
-  const [advisorModels, setAdvisorModels] = useState<AdvisorProviderModel[]>([])
-  const [advisorChecking, setAdvisorChecking] = useState(false)
-  const [advisorConnectionMessage, setAdvisorConnectionMessage] = useState<string | null>(null)
-  const [advisorConnectionOk, setAdvisorConnectionOk] = useState(false)
+  const { settings, loading: settingsLoading, saveSettings } = useSettings()
+  const [useAIApp, setUseAIApp] = useState(false)
 
   // Step 3 state
   const [saveResult, setSaveResult] = useState<SaveDetectionResult | null>(null)
@@ -218,81 +198,7 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
     step,
     scanning,
     saveResult?.found,
-    advisorProvider,
-    googleApiKey,
-    openRouterApiKey,
-    customProviderApiKey,
-    advisorBaseUrl,
-    advisorModel,
   ])
-
-  const invalidateAdvisorConnection = () => {
-    setAdvisorModels([])
-    setAdvisorModel('')
-    setAdvisorConnectionMessage(null)
-    setAdvisorConnectionOk(false)
-  }
-
-  const handleAdvisorProviderChange = (rawValue: string) => {
-    const nextProvider = normalizeAdvisorProvider(rawValue)
-    if (nextProvider === advisorProvider) return
-    setAdvisorProvider(nextProvider)
-    setAdvisorBaseUrl('')
-    invalidateAdvisorConnection()
-  }
-
-  const handleOpenRouterApiKeyChange = (value: string) => {
-    setOpenRouterApiKey(value)
-    invalidateAdvisorConnection()
-  }
-
-  const handleCustomProviderApiKeyChange = (value: string) => {
-    setCustomProviderApiKey(value)
-    invalidateAdvisorConnection()
-  }
-
-  const handleAdvisorBaseUrlChange = (value: string) => {
-    setAdvisorBaseUrl(value)
-    invalidateAdvisorConnection()
-  }
-
-  const handleFindAdvisorModels = async () => {
-    if (!window.electronAPI?.advisorProviders?.listModels || advisorProvider === 'gemini') return
-    const apiKey = advisorProvider === 'openrouter'
-      ? openRouterApiKey
-      : advisorProvider === 'custom'
-        ? customProviderApiKey
-        : ''
-    setAdvisorChecking(true)
-    setAdvisorConnectionMessage(null)
-    setAdvisorConnectionOk(false)
-    try {
-      const result = await window.electronAPI.advisorProviders.listModels({
-        provider: advisorProvider,
-        baseUrl: advisorBaseUrl,
-        apiKey,
-      })
-      if (!result.ok) {
-        setAdvisorModels([])
-        setAdvisorConnectionMessage(result.error || t('onboarding.ai.connectionError'))
-        return
-      }
-      const models = (result.models || []) as AdvisorProviderModel[]
-      setAdvisorModels(models)
-      const suggested = models.find(model => model.recommended) || (models.length === 1 ? models[0] : null)
-      if (suggested) setAdvisorModel(suggested.id)
-      setAdvisorConnectionOk(true)
-      setAdvisorConnectionMessage(
-        models.length
-          ? t('onboarding.ai.modelsFound', { count: models.length })
-          : t('onboarding.ai.noModels'),
-      )
-    } catch {
-      setAdvisorConnectionMessage(t('onboarding.ai.connectionError'))
-    } finally {
-      setAdvisorChecking(false)
-    }
-  }
 
   async function detectSaves(targetDirectory?: string) {
     clearAutoRescanTimer()
@@ -338,19 +244,6 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
     try {
       if (!window.electronAPI) throw new Error('Electron API unavailable')
       const settingsToSave: Record<string, string> = {}
-      const configuredProvider = advisorProvider === 'gemini'
-        ? googleApiKey.trim().length > 0
-        : advisorProvider === 'openrouter'
-          ? openRouterApiKey.trim().length > 0 || advisorModel.trim().length > 0
-          : advisorBaseUrl.trim().length > 0 || customProviderApiKey.trim().length > 0 || advisorModel.trim().length > 0
-      if (configuredProvider) {
-        settingsToSave.advisorProvider = advisorProvider
-        if (advisorModel.trim()) settingsToSave.advisorModel = advisorModel.trim()
-        if (advisorBaseUrl.trim()) settingsToSave.advisorBaseUrl = advisorBaseUrl.trim()
-        if (googleApiKey.trim()) settingsToSave.googleApiKey = googleApiKey.trim()
-        if (openRouterApiKey.trim()) settingsToSave.openRouterApiKey = openRouterApiKey.trim()
-        if (customProviderApiKey.trim()) settingsToSave.customProviderApiKey = customProviderApiKey.trim()
-      }
       if (useFoundSaves && saveResult?.found) {
         const saveDir = selectedPath || saveResult.directory
         if (saveDir) settingsToSave.saveDir = saveDir
@@ -361,7 +254,7 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
       }
       const completed = await window.electronAPI.onboarding.complete()
       if (completed?.success === false) throw new Error('Onboarding completion failed')
-      onComplete()
+      onComplete(useAIApp)
     } catch {
       setCompletionError(true)
     } finally {
@@ -430,27 +323,23 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
                 transition={slideTransition}
                 className="h-full p-1"
               >
-                <StepAiSetup
-                  provider={advisorProvider}
-                  googleApiKey={googleApiKey}
-                  openRouterApiKey={openRouterApiKey}
-                  customProviderApiKey={customProviderApiKey}
-                  baseUrl={advisorBaseUrl}
-                  model={advisorModel}
-                  models={advisorModels}
-                  checking={advisorChecking}
-                  connectionOk={advisorConnectionOk}
-                  connectionMessage={advisorConnectionMessage}
-                  onProviderChange={handleAdvisorProviderChange}
-                  onGoogleApiKeyChange={setGoogleApiKey}
-                  onOpenRouterApiKeyChange={handleOpenRouterApiKeyChange}
-                  onCustomProviderApiKeyChange={handleCustomProviderApiKeyChange}
-                  onBaseUrlChange={handleAdvisorBaseUrlChange}
-                  onModelChange={setAdvisorModel}
-                  onFindModels={() => void handleFindAdvisorModels()}
-                  onBack={() => goTo(1)}
-                  onNext={() => goTo(3)}
-                />
+                <StepFrame
+                  step={2}
+                  title={t('onboarding.ai.frameTitle')}
+                  actions={<>
+                    <HUDButton variant="secondary" onClick={() => goTo(1)}>{t('onboarding.actions.back')}</HUDButton>
+                    <HUDButton variant="secondary" onClick={() => goTo(3)}>{t('onboarding.actions.later')}</HUDButton>
+                  </>}
+                >
+                  {settingsLoading ? <p>{t('common.loading')}</p> : (
+                    <AISetupForm
+                      initialSettings={settings}
+                      onSave={saveSettings}
+                      onSaved={() => { setUseAIApp(false); goTo(3) }}
+                      onUseAIApp={() => { setUseAIApp(true); goTo(3) }}
+                    />
+                  )}
+                </StepFrame>
               </motion.div>
             )}
             {step === 3 && (
@@ -528,162 +417,6 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
 // =============================================================================
 // Step 2: AI setup
 // =============================================================================
-
-function StepAiSetup({
-  provider,
-  googleApiKey,
-  openRouterApiKey,
-  customProviderApiKey,
-  baseUrl,
-  model,
-  models,
-  checking,
-  connectionOk,
-  connectionMessage,
-  onProviderChange,
-  onGoogleApiKeyChange,
-  onOpenRouterApiKeyChange,
-  onCustomProviderApiKeyChange,
-  onBaseUrlChange,
-  onModelChange,
-  onFindModels,
-  onBack,
-  onNext,
-}: {
-  provider: AdvisorProvider
-  googleApiKey: string
-  openRouterApiKey: string
-  customProviderApiKey: string
-  baseUrl: string
-  model: string
-  models: AdvisorProviderModel[]
-  checking: boolean
-  connectionOk: boolean
-  connectionMessage: string | null
-  onProviderChange: (value: string) => void
-  onGoogleApiKeyChange: (value: string) => void
-  onOpenRouterApiKeyChange: (value: string) => void
-  onCustomProviderApiKeyChange: (value: string) => void
-  onBaseUrlChange: (value: string) => void
-  onModelChange: (value: string) => void
-  onFindModels: () => void
-  onBack: () => void
-  onNext: () => void
-}) {
-  const { t } = useTranslation()
-  const isGemini = provider === 'gemini'
-  const hasSetup = isGemini
-    ? googleApiKey.trim().length > 0
-    : connectionOk && model.trim().length > 0
-  const modelOptions = [
-    { value: '', label: t('onboarding.ai.chooseModel') },
-    ...models.slice(0, 100).map(option => ({ value: option.id, label: option.name || option.id })),
-  ]
-
-  return (
-    <StepFrame
-      step={2}
-      title={t('onboarding.ai.frameTitle')}
-      actions={(
-        <>
-          <HUDButton variant="secondary" onClick={onBack}>
-            {t('onboarding.actions.back')}
-          </HUDButton>
-          {!hasSetup && (
-            <HUDButton variant="secondary" onClick={onNext}>
-              {t('onboarding.actions.later')}
-            </HUDButton>
-          )}
-          <HUDButton data-onboarding-primary="true" onClick={onNext} disabled={!hasSetup}>
-            {t('onboarding.actions.continue')}
-          </HUDButton>
-        </>
-      )}
-    >
-      <div className="mx-auto w-full max-w-4xl space-y-4">
-        <AdvisorProviderChooser provider={provider} onChange={value => onProviderChange(value)} />
-        <ProviderSetupGuide provider={provider} />
-
-        {isGemini ? (
-          <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-            <HUDInput
-              label={t('onboarding.ai.geminiKey')}
-              type="password"
-              placeholder="AIza..."
-              value={googleApiKey}
-              onChange={(event) => onGoogleApiKeyChange(event.target.value)}
-              statusText={hasSetup ? t('onboarding.ai.ready') : t('onboarding.ai.notSet')}
-              statusClassName={hasSetup ? 'text-accent-green' : 'text-accent-yellow'}
-              autoFocus
-            />
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="pb-3 font-display text-[10px] tracking-wider text-accent-cyan hover:underline"
-            >
-              {t('onboarding.ai.getGeminiKey')} &gt;
-            </a>
-          </div>
-        ) : (
-          <div className="space-y-3 border-t border-white/10 pt-3">
-            {provider === 'openrouter' && (
-              <HUDInput
-                label={t('onboarding.ai.providerKey')}
-                type="password"
-                value={openRouterApiKey}
-                onChange={(event) => onOpenRouterApiKeyChange(event.target.value)}
-                placeholder={t('onboarding.ai.enterKey')}
-              />
-            )}
-            {provider === 'custom' && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <HUDInput
-                  label={t('onboarding.ai.serverAddress')}
-                  value={baseUrl}
-                  onChange={(event) => onBaseUrlChange(event.target.value)}
-                  placeholder={t('onboarding.ai.serverAddressPlaceholder')}
-                />
-                <HUDInput
-                  label={t('onboarding.ai.optionalKey')}
-                  type="password"
-                  value={customProviderApiKey}
-                  onChange={(event) => onCustomProviderApiKeyChange(event.target.value)}
-                  placeholder={t('onboarding.ai.optional')}
-                />
-              </div>
-            )}
-            <div className="flex flex-wrap items-center gap-3">
-              <HUDButton type="button" variant="secondary" onClick={onFindModels} disabled={checking}>
-                {checking ? t('onboarding.ai.looking') : t('onboarding.ai.findModels')}
-              </HUDButton>
-              {connectionMessage && (
-                <HUDMicro className={connectionOk ? 'text-accent-green' : 'text-accent-red'}>
-                  {connectionMessage}
-                </HUDMicro>
-              )}
-            </div>
-            {models.length > 0 ? (
-              <HUDSelect
-                label={t('onboarding.ai.model')}
-                value={model}
-                onChange={event => onModelChange(event.target.value)}
-                options={modelOptions}
-              />
-            ) : (
-              <HUDInput
-                label={t('onboarding.ai.model')}
-                value={model}
-                onChange={event => onModelChange(event.target.value)}
-                placeholder={t('onboarding.ai.findModelsFirst')}
-              />
-            )}
-          </div>
-        )}
-      </div>
-    </StepFrame>
-  )
-}
 
 // =============================================================================
 // Step 3: Save Directory

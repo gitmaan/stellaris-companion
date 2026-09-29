@@ -345,11 +345,11 @@ def test_ask_precomputed_injects_policy_block_but_uses_normal_advisor_path(compa
     )
 
     assert answer == "President, our naval ledgers remain estimates rather than certainties."
-    assert captured["model"] == "gemini-3.1-flash-lite-preview"
+    assert captured["model"] == "gemini-3.1-flash-lite"
     assert "NAVAL CAPACITY RESPONSE POLICY:" in captured["system_instruction"]
     assert "Response state: estimated." in captured["system_instruction"]
     assert "cannot confirm whether the empire is over naval cap" in captured["system_instruction"]
-    assert companion.get_call_stats()["model"] == "gemini-3.1-flash-lite-preview"
+    assert companion.get_call_stats()["model"] == "gemini-3.1-flash-lite"
     assert companion.get_call_stats()["tools_used"] == ["ask_precomputed_no_tools"]
 
 

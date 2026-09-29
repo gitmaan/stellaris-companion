@@ -19,7 +19,8 @@
     "reportIssue": "Problem melden",
     "retry": "Erneut versuchen",
     "retrying": "Wiederhole...",
-    "unknownDate": "Unbekanntes Datum"
+    "unknownDate": "Unbekanntes Datum",
+    "cancel": "Stornieren"
   },
   "status": {
     "ready": "SYSTEME ONLINE",
@@ -71,18 +72,18 @@
     "errors": {
       "briefingNotReady": "Der Berater analysiert deine Speicherdatei noch. Bitte versuche es in {{seconds}} Sekunden erneut.",
       "unexpected": "Ein unerwarteter Fehler ist aufgetreten",
-      "openProviderSettings": "ÖFFNEN SIE DIE ANBIETEREINSTELLUNGEN",
-      "providerNotConfigured": "{{provider}} ist nicht vollständig für den Berater-Chat konfiguriert. Wählen Sie ein Modell und vervollständigen Sie dessen Verbindungseinstellungen.",
-      "providerUnavailable": "{{provider}} konnte nicht erreicht werden. Stellen Sie sicher, dass der Server läuft und die konfigurierte Adresse korrekt ist.",
+      "openProviderSettings": "KI-EINRICHTUNG",
+      "providerNotConfigured": "{{provider}} in der KI-Einrichtung verbinden, um den Berater zu nutzen.",
+      "providerUnavailable": "{{provider}} ist nicht erreichbar. Internetverbindung prüfen oder die lokale KI-App starten.",
       "providerAuthFailed": "{{provider}} hat den konfigurierten Schlüssel API abgelehnt. Überprüfen Sie den Schlüssel und versuchen Sie erneut, die Verbindung herzustellen.",
-      "providerModelNotFound": "Das ausgewählte {{provider}}-Modell ist nicht verfügbar. Aktualisieren Sie die Modellliste oder wählen Sie ein anderes Modell.",
+      "providerModelNotFound": "Dieses {{provider}}-Modell ist nicht verfügbar. Nach App-Updates suchen oder in der KI-Einrichtung ein anderes Modell wählen.",
       "providerRateLimited": "{{provider}} ist derzeit ratenbegrenzt. Warten Sie kurz oder wählen Sie ein anderes Modell oder einen anderen Anbieter.",
       "providerBillingFailed": "{{provider}} verfügt für diese Anfrage nicht über nutzbare Rechnungen oder Gutschriften. Überprüfen Sie das Anbieterkonto oder wählen Sie einen anderen Anbieter.",
       "providerTimeout": "Die Antwort von {{provider}} hat zu lange gedauert. Möglicherweise wird noch ein lokales Modell geladen. Versuchen Sie es erneut oder überprüfen Sie den Server.",
       "providerContextLimit": "Das aktive Kontextfenster passt nicht zu diesem Kampagnenbriefing. Erhöhen Sie die Kontexteinstellung des Anbieters auf mindestens 32K oder wählen Sie ein Modell mit größerem Kontext.",
       "providerInvalidResponse": "{{provider}} hat eine Antwort zurückgegeben, die diese App nicht lesen konnte. Überprüfen Sie, ob der Endpunkt OpenAI-kompatible Chat-Abschlüsse unterstützt.",
       "providerEmptyResponse": "{{provider}} hat eine leere Antwort zurückgegeben. Versuchen Sie es erneut oder wählen Sie ein anderes Modell.",
-      "providerRequestFailed": "{{provider}} konnte die Anfrage nicht abschließen. Überprüfen Sie das Modell und den Endpunkt und versuchen Sie es dann erneut."
+      "providerRequestFailed": "{{provider}} konnte nicht antworten. In der KI-Einrichtung die Verbindung prüfen und erneut versuchen."
     },
     "newChat": "Neuer Chat",
     "welcome": {
@@ -275,7 +276,7 @@
     "providerSetup": {
       "title": "AI-PROVIDER-VERBINDUNG ERFORDERLICH",
       "description": "Sie können bestehende Kapitel weiterhin lesen. Verbinden Sie den ausgewählten Anbieter und wählen Sie ein Modell zum Generieren oder Umschreiben von Chronicle-Inhalten.",
-      "action": "ÖFFNEN SIE DIE ANBIETEREINSTELLUNGEN"
+      "action": "KI-EINRICHTUNG"
     },
     "history": {
       "eyebrow": "Archiv // Lokale Aufzeichnungen",
@@ -374,7 +375,7 @@
     "systemAlert": "SYSTEMALARM",
     "saveSuccess": "KONFIGURATION GESPEICHERT // EINSTELLUNGEN ANGEWENDET",
     "sections": {
-      "intelligence": "AUFKLAERUNGS-UPLINK",
+      "intelligence": "KI-EINRICHTUNG",
       "data": "SPIELDATEN",
       "communications": "KOMMUNIKATIONSRELAIS",
       "updates": "SOFTWARE-UPDATES",
@@ -677,6 +678,49 @@
           "name": "CURSOR",
           "description": "Lokale Kampagnenwerkzeuge in Cursor-Chats und Agenten."
         }
+      }
+    },
+    "aiSetup": {
+      "connectOpenRouter": "OpenRouter verbinden",
+      "accountEntered": "Konto verbunden. Modell wählen, prüfen und speichern.",
+      "manualKey": "Stattdessen einen API-Schlüssel verwenden",
+      "chooseModel": "Modelle gefunden. Eines wählen, prüfen und speichern.",
+      "noModels": "Keine Chatmodelle gefunden. Ein Modell in der KI-App laden und erneut versuchen.",
+      "searchPlaceholder": "Nach Namen suchen, z. B. Claude oder DeepSeek",
+      "freeModel": "Kostenloses Modell · Anbieterlimits gelten",
+      "lowerCost": "Preisgünstiges Modell · Abrechnung beim Anbieter",
+      "paidModel": "Kostenpflichtiges Modell · Abrechnung beim Anbieter",
+      "advanced": "Erweiterte Einstellungen",
+      "modelId": "Modell-ID",
+      "refreshModels": "Modelle aktualisieren",
+      "prices": "Pro Million Tokens: {{input}} Eingabe / {{output}} Ausgabe. Die Kosten hängen von der Nutzung ab.",
+      "smallModel": "Dieses Modell kann für die Kampagne zu klein sein. Ein Modell mit größerem Kontext wählen oder dessen Kontexteinstellung erhöhen.",
+      "localHelp": "Anleitung für lokale Einrichtung",
+      "billing": "Der Anbieter verwaltet Kosten und kostenlose Kontingente. Ein Chat-Abo umfasst nicht unbedingt API-Nutzung.",
+      "manageUsage": "Nutzung und Abrechnung verwalten",
+      "browserWaiting": "Verbindung im Browser abschließen und hierher zurückkehren.",
+      "checking": "Wird geprüft…",
+      "findModels": "Modelle suchen",
+      "checkSave": "Prüfen und speichern",
+      "verified": "KI-Einrichtung gespeichert. Verbindung geprüft.",
+      "advisorOnly": "Für den Berater gespeichert. Chronik benötigt möglicherweise ein anderes Modell.",
+      "saveFailed": "KI-Einrichtung konnte nicht gespeichert werden. Bitte erneut versuchen.",
+      "cancelled": "Verbindung abgebrochen. Die gespeicherte Einrichtung bleibt unverändert.",
+      "browserTimeout": "Anmeldung abgelaufen. OpenRouter erneut verbinden.",
+      "browserFailed": "Anmeldung fehlgeschlagen. Erneut verbinden oder einen API-Schlüssel verwenden.",
+      "details": "Technische Details",
+      "removeKey": "Gespeicherten Schlüssel entfernen",
+      "keyRemoved": "Gespeicherter Schlüssel entfernt.",
+      "copyDetails": "Supportdetails kopieren",
+      "useAIApp": "Ich nutze bereits eine KI-App",
+      "aiAppHelp": "Eine unterstützte Desktop-App wie Claude oder ChatGPT verbinden. Der Chat bleibt dort; Companion benötigt keinen API-Schlüssel.",
+      "testNotice": "Prüfungen senden eine kleine Testanfrage, die Kontingent verbrauchen kann. Kampagnendaten werden nicht gesendet.",
+      "help": {
+        "gemini": "Google-KI in Companion nutzen. In Google AI Studio einen Verbindungsschlüssel erstellen und unten einfügen.",
+        "openrouter": "Mit einem OpenRouter-Konto aus vielen Modellen wählen. Im Browser verbinden oder einen vorhandenen Schlüssel eingeben.",
+        "ollama": "Ollama öffnen und ein Chatmodell herunterladen. Companion kann es dann auf diesem Computer finden.",
+        "lm_studio": "LM Studio öffnen, ein Chatmodell laden und den lokalen Server im Tab „Developer“ starten.",
+        "custom": "Einen OpenAI-kompatiblen Dienst nutzen. Die vom Anbieter angegebene Verbindungsadresse eingeben."
       }
     }
   },

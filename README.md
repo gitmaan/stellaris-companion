@@ -50,22 +50,20 @@ npm -C electron/renderer install
 ./dev.sh
 ```
 
-### Add your API key
+### Connect your AI
 
-For development, use `.env`:
+Open **Config** → **AI SETUP**, or follow the first-run setup:
 
-```bash
-echo 'GOOGLE_API_KEY="your-key-here"' > .env
-```
+- **Gemini:** create a key in [Google AI Studio](https://aistudio.google.com/app/apikey), paste it, and choose **Check and save**. Model selection is automatic.
+- **OpenRouter:** choose **Online provider**, connect in your browser, select a model, and choose **Check and save**. Model costs are shown before you save; provider credits may be required.
+- **Ollama or LM Studio:** start the local app, load a model, and enable its server. Choose **On this device**, find models, select one, and choose **Check and save**.
+- **Custom:** enter a compatible API URL and optional key under **Online provider**. Advanced settings accept a model ID directly.
 
-For packaged builds, paste it in **Config** -> **INTELLIGENCE UPLINK**.
+The selected provider powers both Advisor and Chronicle. Setup checks use a small sample request without campaign data. For local models, use a context window of at least 32K tokens for full campaign briefings.
 
-For another AI provider, open **Config** -> **INTELLIGENCE UPLINK**, choose Ollama,
-LM Studio, OpenRouter, or Custom, check the connection, select a model, and run **TEST MODEL**.
-The selected model powers both Advisor and Chronicle. Ollama and LM Studio must already be
-running and exposing their API. Full campaign briefings typically need an active context window
-of at least 32K tokens. Public custom endpoints must use HTTPS; HTTP is accepted for localhost
-and private-network model servers.
+To use an existing AI app instead, choose **I already use an AI app** and follow the [connection guide](docs/local-mcp.md). This lets you discuss your campaign in that app; in-app Advisor and Chronicle still need a provider. Chat subscriptions and API billing are separate.
+
+For development, set `GOOGLE_API_KEY` in `.env` or use the same setup screen.
 
 ## What you can ask
 

@@ -19,7 +19,8 @@
     "reportIssue": "問題を報告",
     "retry": "再試行",
     "retrying": "再試行中...",
-    "unknownDate": "不明な日付"
+    "unknownDate": "不明な日付",
+    "cancel": "キャンセル"
   },
   "status": {
     "ready": "システムオンライン",
@@ -71,18 +72,18 @@
     "errors": {
       "briefingNotReady": "アドバイザーはまだセーブデータを分析しています。{{seconds}}秒後にもう一度お試しください。",
       "unexpected": "予期しないエラーが発生しました",
-      "openProviderSettings": "プロバイダー設定を開く",
-      "providerNotConfigured": "{{provider}} は、アドバイザー チャット用に完全には構成されていません。モデルを選択し、接続設定を完了します。",
-      "providerUnavailable": "{{provider}} に到達できませんでした。サーバーが実行中であり、構成されたアドレスが正しいことを確認してください。",
+      "openProviderSettings": "AI 設定",
+      "providerNotConfigured": "アドバイザーを使うには、AI 設定で {{provider}} に接続してください。",
+      "providerUnavailable": "{{provider}} に接続できません。インターネット接続を確認するか、ローカル AI アプリを起動してください。",
       "providerAuthFailed": "{{provider}} は、構成された API キーを拒否しました。キーを確認して、接続を再試行してください。",
-      "providerModelNotFound": "選択された {{provider}} モデルは使用できません。モデル リストを更新するか、別のモデルを選択します。",
+      "providerModelNotFound": "この {{provider}} モデルは利用できません。アプリを更新するか、AI 設定で別のモデルを選んでください。",
       "providerRateLimited": "{{provider}} は現在レート制限されています。しばらく待つか、別のモデルまたはプロバイダーを選択してください。",
       "providerBillingFailed": "{{provider}} には、このリクエストに使用できる請求またはクレジットがありません。プロバイダー アカウントを確認するか、別のプロバイダーを選択してください。",
       "providerTimeout": "{{provider}} の応答に時間がかかりすぎました。ローカル モデルがまだロード中の可能性があります。再試行するか、サーバーを確認してください。",
       "providerContextLimit": "アクティブなコンテキスト ウィンドウは、このキャンペーン ブリーフィングに適合しません。プロバイダーのコンテキスト設定を少なくとも 32K に増やすか、より大きなコンテキスト モデルを選択してください。",
       "providerInvalidResponse": "{{provider}} は、このアプリが読み取れない応答を返しました。エンドポイントが OpenAI 互換のチャット補完をサポートしていることを確認してください。",
       "providerEmptyResponse": "{{provider}} は空の応答を返しました。もう一度試すか、別のモデルを選択してください。",
-      "providerRequestFailed": "{{provider}} はリクエストを完了できませんでした。モデルとエンドポイントを確認して、再試行してください。"
+      "providerRequestFailed": "{{provider}} から回答を取得できませんでした。AI 設定で接続を確認し、再試行してください。"
     },
     "newChat": "新しいチャット",
     "welcome": {
@@ -275,7 +276,7 @@
     "providerSetup": {
       "title": "AI プロバイダーの接続が必要です",
       "description": "既存の章を引き続き読むことができます。選択したプロバイダーに接続し、Chronicle コンテンツを生成または書き換えるモデルを選択します。",
-      "action": "プロバイダー設定を開く"
+      "action": "AI 設定"
     },
     "history": {
       "eyebrow": "アーカイブ // ローカル履歴",
@@ -374,7 +375,7 @@
     "systemAlert": "システム警告",
     "saveSuccess": "設定を保存しました // 適用済み",
     "sections": {
-      "intelligence": "情報アップリンク",
+      "intelligence": "AI 設定",
       "data": "ゲームデータ",
       "communications": "通信リレー",
       "updates": "ソフトウェア更新",
@@ -677,6 +678,49 @@
           "name": "CURSOR",
           "description": "Cursor のチャットとエージェントでローカルキャンペーンを利用します。"
         }
+      }
+    },
+    "aiSetup": {
+      "connectOpenRouter": "OpenRouter に接続",
+      "accountEntered": "アカウントに接続しました。モデルを選び、確認して保存してください。",
+      "manualKey": "API キーを使う",
+      "chooseModel": "モデルが見つかりました。選択して接続を確認し、保存してください。",
+      "noModels": "チャット用モデルが見つかりません。AI アプリでモデルを読み込んでから再試行してください。",
+      "searchPlaceholder": "Claude や DeepSeek などの名前で検索",
+      "freeModel": "無料モデル · 提供元の利用制限があります",
+      "lowerCost": "低価格モデル · 提供元から請求されます",
+      "paidModel": "有料モデル · 提供元から請求されます",
+      "advanced": "詳細設定",
+      "modelId": "モデル ID",
+      "refreshModels": "モデル一覧を更新",
+      "prices": "100万トークンあたり：入力 {{input}} / 出力 {{output}}。実際の料金は使用量によって変わります。",
+      "smallModel": "このモデルではキャンペーンの情報を処理しきれない場合があります。コンテキストの大きいモデルを選ぶか、設定値を増やしてください。",
+      "localHelp": "ローカル設定の手順を見る",
+      "billing": "料金と無料利用枠は提供元が管理します。チャットの有料プランに API 利用が含まれない場合があります。",
+      "manageUsage": "使用量と料金を管理",
+      "browserWaiting": "ブラウザーで接続を完了し、ここに戻ってください。",
+      "checking": "確認中…",
+      "findModels": "モデルを探す",
+      "checkSave": "確認して保存",
+      "verified": "AI 設定を保存し、接続を確認しました。",
+      "advisorOnly": "アドバイザー用に保存しました。年代記には別のモデルが必要な場合があります。",
+      "saveFailed": "AI 設定を保存できませんでした。もう一度お試しください。",
+      "cancelled": "接続をキャンセルしました。保存済みの設定は変更されていません。",
+      "browserTimeout": "ログインがタイムアウトしました。OpenRouter に再接続してください。",
+      "browserFailed": "ログインを完了できませんでした。再試行するか、API キーを使ってください。",
+      "details": "技術的な詳細",
+      "removeKey": "保存済みのキーを削除",
+      "keyRemoved": "保存済みのキーを削除しました。",
+      "copyDetails": "サポート用の情報をコピー",
+      "useAIApp": "すでに AI アプリを使っている",
+      "aiAppHelp": "Claude や ChatGPT など、対応するデスクトップアプリに接続できます。会話はそちらで行うため、Companion に API キーを入力する必要はありません。",
+      "testNotice": "接続確認では、利用枠を消費する場合がある短いテストを送信します。キャンペーンの情報は送信しません。",
+      "help": {
+        "gemini": "Companion で Google の AI を使います。Google AI Studio で接続用のキーを作成し、下に貼り付けてください。",
+        "openrouter": "1つの OpenRouter アカウントでさまざまなモデルを選べます。ブラウザーで接続するか、既存のキーを入力してください。",
+        "ollama": "Ollama を開き、チャット用モデルをダウンロードしてください。Companion がこのコンピューター上のモデルを探します。",
+        "lm_studio": "LM Studio でチャット用モデルを読み込み、Developer タブでローカルサーバーを起動してください。",
+        "custom": "OpenAI 互換サービスを使います。提供元の接続先アドレスを入力してください。"
       }
     }
   },

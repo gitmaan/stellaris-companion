@@ -209,10 +209,13 @@ declare global {
       saveSettings: (settings: unknown) => Promise<{ success: boolean; language?: string; resolvedLanguage?: string }>
       showFolderDialog: () => Promise<string | null>
       advisorProviders: {
+        connectOpenRouter: () => Promise<{ ok: boolean; credentialId?: string; errorCode?: string }>
+        cancelOpenRouter: () => Promise<{ ok: boolean }>
         listModels: (config: {
           provider: string
           baseUrl?: string
           apiKey?: string
+          credentialId?: string
         }) => Promise<{
           ok: boolean
           models?: Array<{
@@ -222,15 +225,19 @@ declare global {
             supportedParameters?: string[]
             outputModalities?: string[]
             recommended?: boolean
+            pricing?: { inputPerMillion: number; outputPerMillion: number }
           }>
           baseUrl?: string
           provider?: string
           error?: string
+          errorCode?: string
+          status?: number
         }>
         testModel: (config: {
           provider: string
           baseUrl?: string
           apiKey?: string
+          credentialId?: string
           model: string
         }) => Promise<{
           ok: boolean
@@ -240,6 +247,8 @@ declare global {
           structuredOutput?: boolean
           advisorReady?: boolean
           chronicleReady?: boolean
+          errorCode?: string
+          status?: number
           error?: string
         }>
       }

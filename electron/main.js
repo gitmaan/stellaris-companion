@@ -36,6 +36,7 @@ const {
 } = require('./main/updates')
 const { registerBackendIpcHandlers } = require('./main/ipc/backend')
 const { registerSettingsIpcHandlers } = require('./main/ipc/settings')
+const { createOpenRouterOAuth } = require('./main/openRouterOAuth')
 const { registerExportIpcHandlers } = require('./main/ipc/export')
 const { nativeText } = require('./main/nativeI18n')
 const { DEFAULT_LANGUAGE, normalizeLanguage, resolveLanguage: resolveLanguageForLocale, changesBackendConfiguration, trayCacheKey } = require('./main/language')
@@ -1565,7 +1566,11 @@ ipcMain.handle('get-backend-log-tail', async (event, { maxBytes } = {}) => {
   }
 })
 
+const openRouterOAuth = createOpenRouterOAuth({ openExternal: url => shell.openExternal(url) })
+app.on('before-quit', () => openRouterOAuth.cancel())
+
 registerSettingsIpcHandlers({
+  openRouterOAuth,
   ipcMain,
   validateSender,
   dialog,

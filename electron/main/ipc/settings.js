@@ -9,6 +9,7 @@ function registerSettingsIpcHandlers({
   onSettingsSaved,
   discoverAdvisorModels,
   testAdvisorModel,
+  openRouterOAuth,
   translate,
 }) {
   ipcMain.handle('load-settings', async (event) => {
@@ -18,10 +19,17 @@ function registerSettingsIpcHandlers({
 
   ipcMain.handle('save-settings', async (event, settings) => {
     validateSender(event)
-    await saveSettings(settings)
+    const pendingCredential = settings?.openRouterCredentialId
+    const values = { ...settings }
+    delete values.openRouterCredentialId
+    if (pendingCredential) {
+      values.openRouterApiKey = openRouterOAuth.getKey(pendingCredential)
+    }
+    await saveSettings(values)
+    if (pendingCredential) openRouterOAuth.discard(pendingCredential)
 
     const fullSettings = await getSettingsWithSecrets()
-    await onSettingsSaved(fullSettings, settings || {})
+    await onSettingsSaved(fullSettings, values)
 
     const saved = getSettings()
     return { success: true, language: saved.language, resolvedLanguage: saved.resolvedLanguage }
@@ -41,40 +49,43 @@ function registerSettingsIpcHandlers({
     return result.filePaths[0]
   })
 
-  ipcMain.handle('advisor-provider:list-models', async (event, payload = {}) => {
-    validateSender(event)
-    const settings = await getSettingsWithSecrets()
-    const provider = payload.provider || settings.advisorProvider
-    const submittedKey = String(payload.apiKey || '')
-    let apiKey = submittedKey && !submittedKey.includes('...') ? submittedKey : ''
-    if (!apiKey && provider === 'openrouter') apiKey = settings.openRouterApiKey
-    if (!apiKey && provider === 'custom') apiKey = settings.customProviderApiKey
+  const resolveKey = (payload, settings, provider) => {
+    if (provider === 'openrouter' && payload.credentialId) {
+      return openRouterOAuth.getKey(payload.credentialId)
+    }
+    const submitted = payload.apiKey
+    if (typeof submitted === 'string' && !submitted.includes('...')) return submitted.trim()
+    if (provider === 'gemini') return settings.googleApiKey
+    if (provider === 'openrouter') return settings.openRouterApiKey
+    if (provider === 'custom') return settings.customProviderApiKey
+    return ''
+  }
 
-    return discoverAdvisorModels({
-      provider,
-      baseUrl: payload.baseUrl,
-      apiKey,
+  for (const [channel, operation] of [
+    ['advisor-provider:list-models', discoverAdvisorModels],
+    ['advisor-provider:test-model', testAdvisorModel],
+  ]) {
+    ipcMain.handle(channel, async (event, payload = {}) => {
+      validateSender(event)
+      const settings = await getSettingsWithSecrets()
+      const provider = payload.provider || settings.advisorProvider
+      try {
+        return await operation({ provider, baseUrl: payload.baseUrl, apiKey: resolveKey(payload, settings, provider), model: payload.model })
+      } catch {
+        return { ok: false, errorCode: 'PROVIDER_AUTH_FAILED', error: 'Connect your provider again.' }
+      }
     })
+  }
+
+  ipcMain.handle('advisor-provider:connect-openrouter', async event => {
+    validateSender(event)
+    return openRouterOAuth.connect()
   })
-
-  ipcMain.handle('advisor-provider:test-model', async (event, payload = {}) => {
+  ipcMain.handle('advisor-provider:cancel-openrouter', event => {
     validateSender(event)
-    const settings = await getSettingsWithSecrets()
-    const provider = payload.provider || settings.advisorProvider
-    const submittedKey = String(payload.apiKey || '')
-    let apiKey = submittedKey && !submittedKey.includes('...') ? submittedKey : ''
-    if (!apiKey && provider === 'openrouter') apiKey = settings.openRouterApiKey
-    if (!apiKey && provider === 'custom') apiKey = settings.customProviderApiKey
-
-    return testAdvisorModel({
-      provider,
-      baseUrl: payload.baseUrl,
-      apiKey,
-      model: payload.model,
-    })
+    openRouterOAuth.cancel()
+    return { ok: true }
   })
 }
 
-module.exports = {
-  registerSettingsIpcHandlers,
-}
+module.exports = { registerSettingsIpcHandlers }

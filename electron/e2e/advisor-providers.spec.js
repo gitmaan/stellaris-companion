@@ -147,55 +147,43 @@ test('configures a compatible Advisor provider and discovers its models', async 
       `http://127.0.0.1:${provider.port}/v1`,
     )
     await page.getByLabel('API KEY', { exact: true }).fill('tiny-key')
-    await page.getByLabel('MODEL').fill('local/manual-fallback')
-    await page.getByRole('button', { name: /Sooner/i }).click()
-    await expect(providerSelect).toHaveValue('custom')
-    await expect(page.getByPlaceholder('https://provider.example/v1')).toHaveValue(
-      `http://127.0.0.1:${provider.port}/v1`,
-    )
-    await expect(page.getByLabel('MODEL')).toHaveValue('local/manual-fallback')
-    await page.getByRole('button', { name: 'FIND AVAILABLE MODELS' }).click()
+    await page.getByRole('button', { name: 'Find models', exact: true }).click()
+    await expect(page.getByText('Models found. Choose one, then check and save.')).toBeVisible()
+    await expect(page.getByText('READY', { exact: true })).toHaveCount(0)
 
-    await expect(page.getByText('READY', { exact: true })).toBeVisible()
-    await expect(page.getByText(/2 models found/i)).toBeVisible()
-
-    const modelSelect = page.getByLabel('MODEL')
-    await expect(modelSelect).toHaveValue('local/manual-fallback')
-    await page.getByText('SHOW ADVANCED CONNECTION', { exact: true }).click()
-    await expect(page.getByText(/Context size was not reported/i)).toBeVisible()
+    const modelSelect = page.getByLabel('MODEL', { exact: true })
     await modelSelect.selectOption('local/strategist-small')
-    await expect(page.getByText(/8K context detected/i)).toBeVisible()
+    await expect(page.getByText(/may be too small for your campaign/i)).toBeVisible()
     await modelSelect.selectOption('local/strategist-large')
-    await expect(page.getByText(/Reported context.*64K/i)).toBeVisible()
-    await page.getByRole('button', { name: 'SAVE AI SETUP' }).click()
-    await expect(page.getByText('AI setup saved.')).toBeVisible()
-
-    await expect(providerSelect).toHaveValue('custom')
+    await page.getByRole('button', { name: /Sooner/i }).click()
     await expect(modelSelect).toHaveValue('local/strategist-large')
-    await page.getByRole('button', { name: 'CHECK SELECTED MODEL' }).click()
-    await expect(page.getByText(/STRUCTURED RESPONSES SUPPORTED/i)).toBeVisible()
-    await expect(page.getByText(/never send campaign data/i)).toBeVisible()
+    await page.getByRole('button', { name: 'Check and save', exact: true }).click()
+    await expect(page.getByText('AI setup saved. Connection verified.')).toBeVisible()
     expect(provider.getLastCompletionModel()).toBe('local/strategist-large')
+
+    // Failed checks must not replace a working provider.
+    await page.getByPlaceholder('https://provider.example/v1').fill(`http://127.0.0.1:${provider.port}/unavailable`)
+    await page.getByRole('button', { name: 'Check and save', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('model is unavailable')
+    const saved = await page.evaluate(() => window.electronAPI.getSettings())
+    expect(saved.advisorBaseUrl).toBe(`http://127.0.0.1:${provider.port}/v1`)
+    expect(saved.advisorModel).toBe('local/strategist-large')
 
     await app.close()
     app = await launchApp(backendPort, userDataDir)
     const reloadedPage = await app.firstWindow()
     await reloadedPage.waitForLoadState('domcontentloaded')
     await reloadedPage.getByRole('button', { name: /Config/i }).click()
-
     await expect(reloadedPage.getByLabel('PROVIDER')).toHaveValue('custom')
-    const sessionOnlyStorage = await reloadedPage
-      .getByText(/cannot securely save API keys right now/i)
-      .isVisible()
-    await expect(reloadedPage.getByLabel('API KEY', { exact: true })).toHaveValue(
-      sessionOnlyStorage ? '' : '****...****',
-    )
-    await reloadedPage.getByLabel('MODEL').fill('local/after-reload')
-    await reloadedPage.getByRole('button', { name: 'SAVE AI SETUP' }).click()
-    await expect(reloadedPage.getByText('AI setup saved.')).toBeVisible()
-    await reloadedPage.getByRole('button', { name: 'FIND AVAILABLE MODELS' }).click()
-    await expect(reloadedPage.getByText('READY', { exact: true })).toBeVisible()
+    const sessionOnlyStorage = await reloadedPage.getByText(/cannot securely save API keys right now/i).isVisible()
+    await expect(reloadedPage.getByLabel('API KEY', { exact: true })).toHaveValue(sessionOnlyStorage ? '' : '****...****')
+    await reloadedPage.getByText('Advanced settings', { exact: true }).click()
+    await reloadedPage.getByLabel('Model ID', { exact: true }).fill('local/after-reload')
+    await reloadedPage.getByRole('button', { name: 'Check and save', exact: true }).click()
+    await expect(reloadedPage.getByText('AI setup saved. Connection verified.')).toBeVisible()
+    expect(provider.getLastCompletionModel()).toBe('local/after-reload')
     expect(provider.getLastAuthorization()).toBe(sessionOnlyStorage ? '' : 'Bearer tiny-key')
+
   } finally {
     await app?.close()
     await provider.stop()
@@ -226,10 +214,10 @@ test('turns provider failures into actionable Chat recovery', async () => {
     await chatInput.fill('Could we win a war right now?')
     await page.getByRole('button', { name: 'SEND' }).click()
 
-    await expect(page.getByText(/Ollama could not be reached/i)).toBeVisible()
+    await expect(page.getByText(/Could not reach Ollama/i)).toBeVisible()
     await expect(page.getByText(/ECONNREFUSED/i)).toHaveCount(0)
 
-    await page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' }).click()
+    await page.getByRole('button', { name: 'AI SETUP', exact: true }).click()
     await expect(page.getByText('WHERE SHOULD AI RUN?')).toBeVisible()
   } finally {
     await app.close()
@@ -254,7 +242,7 @@ test('guides an unconfigured Advisor directly to provider settings', async () =>
     await expect(page.getByText('ADVISOR CONNECTION REQUIRED')).toBeVisible()
     await expect(page.getByText(/Ollama is selected but not ready/i)).toBeVisible()
 
-    await page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' }).click()
+    await page.getByRole('button', { name: 'AI SETUP', exact: true }).click()
     await expect(page.getByText('WHERE SHOULD AI RUN?')).toBeVisible()
   } finally {
     await app.close()
@@ -282,7 +270,7 @@ test('keeps existing Chronicle readable while guiding provider setup', async () 
       page.getByText('AI PROVIDER CONNECTION REQUIRED'),
     ).toBeVisible()
 
-    await page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' }).click()
+    await page.getByRole('button', { name: 'AI SETUP', exact: true }).click()
     await expect(page.getByText('WHERE SHOULD AI RUN?')).toBeVisible()
   } finally {
     await app.close()
@@ -313,13 +301,69 @@ test('keeps cached Chronicle readable when its provider goes offline', async () 
     })
     backend.advanceCampaign()
 
-    await expect(page.getByText(/LM Studio could not be reached/i)).toBeVisible()
+    await expect(page.getByText(/Could not reach LM Studio/i)).toBeVisible()
     await expect(page.getByText('Old teaser.')).toBeVisible()
     await expect(page.getByText(/ECONNREFUSED/i)).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'OPEN PROVIDER SETTINGS' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'AI SETUP', exact: true })).toBeVisible()
   } finally {
     await app.close()
     await backend.stop()
     await fs.rm(userDataDir, { recursive: true, force: true })
+  }
+})
+
+test('cancels browser sign-in and shows model costs before saving OpenRouter', async () => {
+  const backend = createMockChronicleBackend()
+  const backendPort = await backend.start()
+  const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-router-e2e-'))
+  const app = await launchApp(backendPort, profile)
+  try {
+    await app.evaluate(({ shell }) => {
+      // Browser approval is covered by the loopback authorization tests.
+      shell.openExternal = async () => {}
+      const realFetch = globalThis.fetch
+      globalThis.fetch = async (url, options) => {
+        if (!String(url).startsWith('https://openrouter.ai/api/v1/')) return realFetch(url, options)
+        const payload = String(url).includes('/models') ? { data: [
+          { id: 'google/gemini-3.1-flash-lite', name: 'Gemini Flash Lite', pricing: { prompt: '0.00000025', completion: '0.0000015' } },
+          { id: 'anthropic/claude-sonnet-5', name: 'Claude Sonnet', pricing: { prompt: '0.000002', completion: '0.00001' } },
+        ] } : { choices: [{ message: { content: '{"status":"ok"}' } }] }
+        return new Response(JSON.stringify(payload), { status: 200 })
+      }
+    })
+    const page = await app.firstWindow()
+    await page.getByRole('button', { name: /Config/i }).click()
+    await page.getByRole('button', { name: /Online provider/i }).click()
+    await page.getByRole('button', { name: 'Connect OpenRouter', exact: true }).click()
+    await expect(page.getByText('Finish connecting in your browser, then return here.')).toBeVisible()
+    await page.getByRole('button', { name: /^Cancel$/i }).click()
+    await expect(page.getByText('Connection cancelled. Your saved setup is unchanged.')).toBeVisible()
+    expect((await page.evaluate(() => window.electronAPI.getSettings())).advisorProvider).toBe('gemini')
+    await page.getByText('Use an API key instead', { exact: true }).click()
+    await page.getByLabel('OPENROUTER API KEY', { exact: true }).fill('fictional-router-key')
+    await expect(page.getByText('Account connected.', { exact: false })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Find models', exact: true }).click()
+    const model = page.getByLabel('MODEL', { exact: true })
+    await expect(model).toHaveValue('google/gemini-3.1-flash-lite')
+    await expect(page.getByText('Lower-cost model · billed by your provider')).toBeVisible()
+    await model.selectOption('anthropic/claude-sonnet-5')
+    await expect(page.getByText('Paid model · billed by your provider')).toBeVisible()
+    await page.getByRole('button', { name: 'Check and save', exact: true }).click()
+    await expect(page.getByText('AI setup saved. Connection verified.')).toBeVisible()
+    const settings = await page.evaluate(() => window.electronAPI.getSettings())
+    expect(settings.openRouterApiKeySet).toBe(true)
+    expect(settings.openRouterApiKey).not.toContain('fictional-router-key')
+    await page.getByRole('button', { name: 'Remove saved key', exact: true }).click()
+    await expect(page.getByText('Saved key removed.')).toBeVisible()
+    expect((await page.evaluate(() => window.electronAPI.getSettings())).openRouterApiKeySet).toBe(false)
+    await fs.mkdir(path.resolve(electronDir, '..', 'artifacts', 'ai-setup'), { recursive: true })
+    await page.screenshot({ path: path.resolve(electronDir, '..', 'artifacts', 'ai-setup', 'openrouter.png') })
+    await page.getByRole('button', { name: 'I already use an AI app', exact: true }).click()
+    await expect(page.locator('#ai-app-connections')).toBeInViewport()
+    await expect(page.locator('#ai-app-connections').getByText(/^Claude Desktop$/i)).toBeVisible()
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(profile, { recursive: true, force: true })
   }
 })

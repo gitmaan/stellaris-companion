@@ -14,7 +14,7 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 GEMINI_FLASH_MODEL = "gemini-3-flash-preview"
-GEMINI_FLASH_LITE_MODEL = "gemini-3.1-flash-lite-preview"
+GEMINI_FLASH_LITE_MODEL = "gemini-3.1-flash-lite"
 GOOGLE_GEMMA_MODEL = "gemma-4-26b-a4b-it"
 
 MODEL_ROUTING_QUALITY_FIRST = "quality_first"
