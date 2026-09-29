@@ -42,7 +42,13 @@ function createAnnouncementsService({ app, store, url = DEFAULT_ANNOUNCEMENTS_UR
   let pollTimer = null
 
   async function fetchAnnouncements(forceRefresh = false) {
-    if (IS_E2E) return []
+    if (IS_E2E) {
+      try {
+        return filterAnnouncements(JSON.parse(process.env.E2E_ANNOUNCEMENTS_FIXTURE || '{}'), app.getVersion())
+      } catch {
+        return []
+      }
+    }
     const appVersion = app.getVersion()
     const cached = store.get('announcementsCache')
 

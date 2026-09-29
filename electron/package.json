@@ -22,6 +22,9 @@
     "test:chronicle-publishing": "node --test test/chronicle-publishing.test.js",
     "test:advisor-providers": "node --test test/advisor-providers.test.js",
     "test:updates": "node --test test/updates.test.js",
+    "test:mcp-relay": "node --test test/mcp-relay.test.js",
+    "test:localization": "node scripts/localization.cjs && node --test test/settings-locales.test.js test/native-i18n.test.js test/language.test.js test/localization-runtime.test.js",
+    "localization:pseudo": "node scripts/localization.cjs --write-pseudo",
     "publish": "../scripts/publish-electron.sh",
     "start": "electron ."
   },

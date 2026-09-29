@@ -41,9 +41,9 @@
     "system": "Padrao do sistema",
     "en": "English",
     "de": "Deutsch",
-    "fr": "Francais",
-    "es": "Espanol",
-    "pt-BR": "Portugues (Brasil)",
+    "fr": "Français",
+    "es": "Español",
+    "pt-BR": "Português (Brasil)",
     "ja": "日本語",
     "zh-Hans": "简体中文",
     "en-XA": "Pseudo"
@@ -62,7 +62,10 @@
       "reportTitle": "Relatar esta resposta",
       "blockedLink": "Link nao HTTP(S) bloqueado",
       "details": "Detalhes da resposta",
-      "responseTime": "Tempo de resposta: {{seconds}}s"
+      "responseTime": "Tempo de resposta: {{seconds}}s",
+      "routingNotice": "Roteamento por {{model}}.",
+      "routingVia": "ROTEAMENTO POR {{model}}",
+      "modelReadout": "MODELO: {{model}}"
     },
     "errors": {
       "briefingNotReady": "O conselheiro ainda esta analisando seu arquivo de salvamento. Tente novamente em {{seconds}} segundos.",
@@ -189,7 +192,8 @@
       "lastPlayed": "Última jogada · {{date}}",
       "current": "Atual",
       "manageCampaigns": "Gerenciar campanhas",
-      "storyStyle": "Estilo da história"
+      "storyStyle": "Estilo da história",
+      "pending_many": "{{count}} capitulos pendentes"
     },
     "publish": {
       "eyebrow": "Compartilhar // Registro publico",
@@ -245,7 +249,8 @@
       "storyContinues": "A historia continua...",
       "present": "Presente",
       "eventsInEra_one": "{{count}} evento nesta era",
-      "eventsInEra_other": "{{count}} eventos nesta era"
+      "eventsInEra_other": "{{count}} eventos nesta era",
+      "eventsInEra_many": "{{count}} eventos nesta era"
     },
     "narrator": {
       "title": "Narrador",
@@ -341,7 +346,26 @@
       "deleted": "O histórico da campanha local foi excluído permanentemente.",
       "bulkMoved": "Campanhas {{count}} movidas para a Lixeira.",
       "undo": "Desfazer",
-      "unknownError": "O histórico da campanha não pôde ser atualizado."
+      "unknownError": "O histórico da campanha não pôde ser atualizado.",
+      "sessions_many": "{{count}} sessões",
+      "snapshots_many": "{{count}} registros",
+      "events_many": "{{count}} eventos",
+      "chapters_many": "{{count}} capítulos"
+    },
+    "exportHtml": {
+      "title": "Crônicas de {empire}",
+      "chapter": "Capítulo {number}",
+      "summary": "Resumo",
+      "currentEra": "Era atual",
+      "storyContinues": "A história continua…",
+      "present": "Presente",
+      "events_one": "{count} evento nesta era",
+      "events_other": "{count} eventos nesta era",
+      "footer": "Exportado do Stellaris Companion",
+      "filename": "Crônica",
+      "success": "Crônica exportada.",
+      "failure": "Não foi possível exportar a Crônica. Detalhes: {{detail}}",
+      "events_many": "{count} eventos nesta era"
     }
   },
   "settings": {
@@ -561,9 +585,9 @@
         }
       },
       "providers": {
-        "gemini": "GÊMEOS",
+        "gemini": "GEMINI",
         "ollama": "OLLAMA",
-        "lm_studio": "ESTÚDIO LM",
+        "lm_studio": "LM STUDIO",
         "openrouter": "OPENROUTER",
         "custom": "PONTO FINAL PERSONALIZADO"
       },
@@ -576,7 +600,7 @@
       }
     },
     "geminiQuota": {
-      "label": "USO DE GÊMEOS",
+      "label": "USO DO GEMINI",
       "description": "Escolha como equilibrar as respostas diárias do Conselheiro e a redação da Crônica.",
       "standard": "Livre-amigável",
       "higher": "Melhor qualidade",
@@ -623,7 +647,42 @@
       "copyError": "Falha ao copiar a configuração.",
       "installConfirm": "Conectar Claude Desktop a Stellaris Companion? Isso atualiza o arquivo de configuração local de Claude.",
       "installSuccess": "Claude Desktop conexão atualizada. Reinicie Claude Desktop para carregá-lo.",
-      "installError": "Falha ao atualizar a conexão Claude Desktop."
+      "installError": "Falha ao atualizar a conexão Claude Desktop.",
+      "serverUnavailableSummary": "O servidor MCP local nao esta respondendo. Execute a verificacao abaixo.",
+      "readyCampaignSummary": "Pronto para {{empire}} em {{date}}.",
+      "noCampaignSummary": "A conexao funciona, mas ainda nao ha campanha em cache. Carregue primeiro um save do Stellaris.",
+      "unknownEmpire": "o imperio ativo",
+      "campaignReadiness": "STATUS DA CAMPANHA",
+      "waitingForCampaign": "AGUARDANDO CAMPANHA",
+      "offline": "OFFLINE",
+      "connected": "CONECTADO",
+      "needsUpdate": "ATUALIZACAO NECESSARIA",
+      "notConnected": "NAO CONECTADO",
+      "unavailable": "NAO ENCONTRADO",
+      "connect": "CONECTAR",
+      "update": "ATUALIZAR",
+      "disconnect": "DESCONECTAR",
+      "working": "PROCESSANDO...",
+      "diagnostics": "DIAGNOSTICO MCP",
+      "copyDiagnostics": "COPIAR DIAGNOSTICO",
+      "installClaudeExtension": "ABRIR EXTENSAO DO CLAUDE",
+      "revealLog": "MOSTRAR LOG MCP",
+      "disconnectConfirm": "Desconectar {{target}} do Stellaris Companion? Outros servidores MCP serao mantidos.",
+      "disconnectSuccess": "{{target}} desconectado.",
+      "clients": {
+        "claude": {
+          "name": "CLAUDE DESKTOP",
+          "description": "Ferramentas locais de campanha no Claude com backup automatico da configuracao."
+        },
+        "codex": {
+          "name": "CHATGPT + CODEX",
+          "description": "Uma conexao compartilhada para ChatGPT Desktop, Codex CLI e a extensao da IDE."
+        },
+        "cursor": {
+          "name": "CURSOR",
+          "description": "Ferramentas locais de campanha nos chats e agentes do Cursor."
+        }
+      }
     }
   },
   "update": {
@@ -661,51 +720,81 @@
       "back": "VOLTAR",
       "continue": "CONTINUAR",
       "later": "CONFIGURADO MAIS TARDE",
-      "finish": "FINALIZAR"
+      "finish": "FINALIZAR",
+      "initialize": "Começar",
+      "skip": "Pular",
+      "next": "Próximo",
+      "browseElsewhere": "Escolher outra pasta",
+      "confirm": "Confirmar",
+      "setUpLater": "Configurar depois",
+      "scanAgain": "Procurar novamente",
+      "browseFolder": "Escolher pasta"
     },
     "welcome": {
       "frameTitle": "PRIMEIRO CONTATO",
       "logoAlt": "Stellaris Companion",
       "title": "Bem-vindo ao Stellaris Companion",
-      "body": "Escolha como o Advisor e o Chronicle funcionam e conecte seus salvamentos Stellaris."
+      "body": "Escolha um provedor de IA e conecte seus jogos salvos do Stellaris.",
+      "stepTitle": "Boas-vindas",
+      "description": "Configure seu conselheiro e encontre seus arquivos salvos de Stellaris em duas etapas."
     },
     "ai": {
       "frameTitle": "ESCOLHA SUA IA",
-      "geminiKey": "CHAVE DE GÊMEOS",
-      "getGeminiKey": "OBTENHA UMA CHAVE DE GÊMEOS",
-      "providerKey": "CHAVE DO PROVEDOR",
+      "geminiKey": "CHAVE DE API DO GEMINI",
+      "getGeminiKey": "OBTER UMA CHAVE DO GEMINI",
+      "providerKey": "CHAVE DE API DO PROVEDOR",
       "serverAddress": "ENDEREÇO DO SERVIDOR",
-      "optionalKey": "API CHAVE",
+      "optionalKey": "CHAVE DE API",
       "optional": "OPCIONAL",
-      "enterKey": "ENTER TECLA",
+      "enterKey": "DIGITE A CHAVE",
       "ready": "PRONTO",
       "notSet": "NÃO CONFIGURADO",
-      "findModels": "ENCONTRE OS MODELOS DISPONÍVEIS",
-      "looking": "OLHANDO...",
+      "findModels": "BUSCAR MODELOS DISPONÍVEIS",
+      "looking": "BUSCANDO...",
       "model": "MODELO",
       "chooseModel": "Escolha um modelo",
-      "findModelsFirst": "ENCONTRE OS MODELOS DISPONÍVEIS PRIMEIRO",
-      "modelsFound_one": "Pronto // Modelo {{count}} encontrado",
-      "modelsFound_other": "Pronto // Modelos {{count}} encontrados",
-      "noModels": "Conexão encontrada, mas nenhum modelo está disponível ainda.",
-      "connectionError": "Não foi possível acessar este provedor. Verifique se ele está funcionando e tente novamente."
+      "findModelsFirst": "BUSQUE OS MODELOS PRIMEIRO",
+      "modelsFound_one": "Pronto // {{count}} modelo encontrado",
+      "modelsFound_other": "Pronto // {{count}} modelos encontrados",
+      "noModels": "Conexão estabelecida, mas não há modelos disponíveis.",
+      "connectionError": "Não foi possível acessar este provedor. Verifique se ele está funcionando e tente novamente.",
+      "serverAddressPlaceholder": "https://provider.example/v1",
+      "modelsFound_many": "Pronto // {{count}} modelos encontrados"
     },
     "saves": {
-      "frameTitle": "CONECTE SEUS SALVOS",
-      "label": "SALVAR JOGOS",
-      "title": "Encontre suas campanhas Stellaris",
-      "browseElsewhere": "NAVEGUE EM OUTRO LUGAR",
-      "scanAgain": "VERIFIQUE NOVAMENTE",
-      "browseFolder": "NAVEGAR NA PASTA",
-      "scanning": "Procurando por arquivos salvos Stellaris...",
+      "frameTitle": "CONECTE SEUS JOGOS SALVOS",
+      "label": "JOGOS SALVOS",
+      "title": "Encontre seus jogos salvos do Stellaris",
+      "browseElsewhere": "ESCOLHER OUTRA PASTA",
+      "scanAgain": "BUSCAR NOVAMENTE",
+      "browseFolder": "ESCOLHER PASTA",
+      "scanning": "Buscando jogos salvos do Stellaris...",
       "found": "Suas campanhas estão prontas.",
       "count_one": "{{count}} arquivo salvo encontrado",
       "count_other": "{{count}} salvar arquivos encontrados",
-      "notFound": "Não foi possível encontrar seu Stellaris salvo automaticamente.",
+      "notFound": "Nenhum jogo salvo do Stellaris foi encontrado automaticamente.",
       "notFoundIn": "Nenhum arquivo .sav foi encontrado em {{path}}.",
       "notFoundDefault": "Verificamos os locais habituais de salvamento, mas ainda não encontramos nenhum arquivo .sav.",
-      "notFoundHelp": "Escolha Procurar pasta e selecione sua pasta de jogos salvos Stellaris ou configure-a mais tarde em Configurações."
-    }
+      "notFoundHelp": "Escolha a pasta de jogos salvos do Stellaris ou configure-a mais tarde em Configurações.",
+      "stepTitle": "Encontrar arquivos salvos",
+      "source": "Local dos arquivos salvos",
+      "help": "Escolha «Escolher pasta» e selecione «Stellaris/save games», ou configure depois nas Configurações.",
+      "count_many": "{{count}} arquivos salvos encontrados"
+    },
+    "language": "Idioma",
+    "languageError": "Não foi possível salvar o idioma. Tente novamente.",
+    "logoAlt": "Logotipo do Stellaris Companion",
+    "provider": {
+      "stepTitle": "Configurar IA",
+      "defaultProvider": "Provedor padrão",
+      "title": "Chave de API do Google Gemini (opcional)",
+      "description": "O Gemini é usado por padrão pelo conselheiro e pela Crônica. Você pode pular esta etapa e configurar Ollama, LM Studio ou OpenRouter nas Configurações.",
+      "keyLabel": "Chave de API",
+      "ready": "Pronta",
+      "missing": "Não informada",
+      "generateKey": "Obter chave de API"
+    },
+    "completionError": "Não foi possível concluir a configuração. Tente novamente."
   },
   "advisorPanel": {
     "title": "Estilo do consultor",
@@ -735,5 +824,151 @@
     "savedWhenReady": "Estilo salvo e será aplicado quando a análise estiver pronta.",
     "saveError": "O estilo do Advisor não pôde ser salvo.",
     "loadSaveHelp": "Carregue um salvamento para escolher um estilo de Conselheiro para esta campanha."
+  },
+  "native": {
+    "tray": {
+      "open": "Abrir Stellaris Companion",
+      "status": "Status: {status}",
+      "connected": "Conectado",
+      "disconnected": "Desconectado",
+      "notConfigured": "Não configurado",
+      "quit": "Sair"
+    },
+    "dialogs": {
+      "selectSaveFolder": "Escolher pasta de arquivos salvos do Stellaris",
+      "exportChronicle": "Exportar Crônica",
+      "htmlFile": "Documento HTML",
+      "historyBackup": "Backup do histórico do Stellaris Companion",
+      "backupHistory": "Fazer backup do histórico de campanhas",
+      "sqliteFile": "Banco de dados SQLite"
+    },
+    "crash": {
+      "title": "O Stellaris Companion falhou",
+      "message": "Ocorreu um erro inesperado no aplicativo."
+    }
+  },
+  "recovery": {
+    "title": "Ocorreu um erro",
+    "description": "O aplicativo encontrou um erro inesperado. Recarregue e tente novamente.",
+    "reload": "Recarregar",
+    "details": "Detalhes técnicos",
+    "somethingWentWrong": "Algo deu errado",
+    "report": "Relatar",
+    "responseOff": "A resposta parece incorreta?"
+  },
+  "advisorInfo": {
+    "title": "Conselheiro",
+    "noSave": "Nenhum arquivo salvo carregado",
+    "close": "Fechar painel do conselheiro",
+    "traitsTitle": "Características do império (detectadas)",
+    "ethics": "Ética: {{value}}",
+    "authority": "Autoridade: {{value}}",
+    "civics": "Princípios cívicos: {{value}}",
+    "noTraits": "Nenhuma característica disponível",
+    "origin": "Origem:",
+    "customizationTitle": "Personalizar a personalidade (opcional)",
+    "placeholder": "Descreva a personalidade do seu conselheiro…",
+    "tryPersonality": "Experimente uma personalidade",
+    "examples": {
+      "0": "Um oficial de inteligência cauteloso que não confia em ninguém",
+      "1": "Seco e cético em relação às minhas decisões",
+      "2": "Um gerente que fala usando jargões corporativos",
+      "3": "Entusiasmado com tudo, até com desastres"
+    },
+    "applying": "Aplicando…",
+    "apply": "Aplicar",
+    "applied": "Aplicado a esta campanha.",
+    "appliedLater": "Aplicado. Será salvo quando a análise terminar.",
+    "applyFailed": "Não foi possível aplicar a personalização.",
+    "applyFailedDetail": "Não foi possível aplicar a personalização. Detalhes: {{detail}}",
+    "loadSaveHelp": "Carregue um arquivo salvo para personalizar o conselheiro desta campanha."
+  },
+  "report": {
+    "title": "Relatar um problema ou enviar opinião",
+    "category": "Categoria",
+    "selectCategory": "Selecione uma categoria…",
+    "categories": {
+      "Bug": "Erro",
+      "Strange LLM Response": "Resposta estranha da IA",
+      "Missing Content": "Conteúdo ausente",
+      "Suggestion": "Sugestão",
+      "Other": "Outro"
+    },
+    "description": "Descrição",
+    "descriptionPlaceholder": "O que aconteceu? O que você esperava?",
+    "autoCaptured": "Dados coletados automaticamente",
+    "app": "Aplicativo",
+    "platform": "Plataforma",
+    "optional": "Informações opcionais (desativadas por padrão)",
+    "includeDiagnostics": "Incluir diagnósticos do jogo (metadados e cálculos limitados de guerra)",
+    "includeLogs": "Incluir registros recentes do backend",
+    "includeScreenshot": "Incluir captura de tela",
+    "includeError": "Incluir detalhes do erro (mensagem e pilha)",
+    "includeLlm": "Incluir a última solicitação e resposta",
+    "submitUnavailable": "O envio não está disponível nesta versão. Use «Copiar relatório».",
+    "submitUnavailableHint": "O envio não está disponível nesta versão",
+    "submittedIssue": "Enviado. Chamado: {{issueUrl}}",
+    "submitted": "Enviado. Obrigado!",
+    "submitFailedDetail": "Não foi possível enviar. {{detail}}",
+    "copied": "Relatório copiado. Cole-o no chamado ou comentário.",
+    "copyFailed": "Não foi possível copiar o relatório.",
+    "buildFailedDetail": "Não foi possível criar o relatório. {{detail}}",
+    "openedGithub": "GitHub aberto. Cole o relatório copiado no editor.",
+    "openFailedDetail": "Não foi possível abrir o GitHub. {{detail}}",
+    "working": "Processando…",
+    "submit": "Enviar",
+    "copy": "Copiar relatório",
+    "github": "Chamado no GitHub",
+    "close": "Fechar",
+    "markdown": {
+      "report": "Relatório",
+      "whatHappened": "O que aconteceu?",
+      "fillIn": "(preencha aqui)",
+      "environment": "Ambiente",
+      "gameContext": "Contexto da partida (opcional)",
+      "warDiagnostics": "Diagnósticos do cálculo de guerra",
+      "errorContext": "Contexto do erro (opcional)",
+      "stackTrace": "Rastreamento de pilha",
+      "llmContext": "Contexto de IA (opcional)",
+      "promptResponse": "Prompt e resposta",
+      "prompt": "Prompt",
+      "response": "Resposta",
+      "recentTurns": "Mensagens recentes",
+      "user": "Usuário",
+      "advisor": "Conselheiro",
+      "backendLogTail": "Logs recentes do serviço local (opcional)",
+      "last32KB": "Últimos ~32 KB",
+      "screenshot": "Captura de tela (opcional)",
+      "screenshotRequested": "Captura de tela solicitada.",
+      "screenshotHelp": "Use “Enviar” para fazer o upload da captura; o relatório copiado não contém dados da imagem.",
+      "stepsToReproduce": "Passos para reproduzir",
+      "issueBody": "Cole aqui o relatório da área de transferência.\n\n(Gerado pelo Stellaris Companion)",
+      "fields": {
+        "appVersion": "Versão do aplicativo: {{value}}",
+        "platform": "Plataforma: {{value}}",
+        "electronVersion": "Electron: {{value}}",
+        "stellarisVersion": "Versão do Stellaris: {{value}}",
+        "saveSize": "Tamanho do jogo salvo: {{value}} MB",
+        "galaxySize": "Tamanho da galáxia: {{value}}",
+        "gameYear": "Data/ano do jogo: {{value}}",
+        "ingestionStage": "Etapa de leitura: {{value}}",
+        "ingestionDetail": "Detalhes da leitura: {{value}}",
+        "precomputeReady": "Pré-processamento pronto: {{value}}",
+        "t2Ready": "Nível 2 pronto: {{value}}",
+        "empire": "Império: {{value}}",
+        "empireType": "Tipo de império: {{value}}",
+        "origin": "Origem: {{value}}",
+        "ethics": "Éticas: {{value}}",
+        "civics": "Princípios cívicos: {{value}}",
+        "dlcs_one": "{{count}} DLC ativado",
+        "dlcs_other": "{{count}} DLCs ativados",
+        "dlcs_many": "{{count}} DLCs ativados",
+        "ingestionLastError": "Último erro de leitura: {{value}}",
+        "source": "Origem do erro: {{value}}",
+        "message": "Mensagem: {{value}}",
+        "model": "Modelo: {{value}}",
+        "responseTime": "Tempo de resposta: {{value}} ms"
+      }
+    }
   }
 }

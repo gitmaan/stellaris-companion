@@ -37,6 +37,8 @@ const {
 const { registerBackendIpcHandlers } = require('./main/ipc/backend')
 const { registerSettingsIpcHandlers } = require('./main/ipc/settings')
 const { registerExportIpcHandlers } = require('./main/ipc/export')
+const { nativeText } = require('./main/nativeI18n')
+const { DEFAULT_LANGUAGE, normalizeLanguage, resolveLanguage: resolveLanguageForLocale, changesBackendConfiguration, trayCacheKey } = require('./main/language')
 const {
   createChroniclePublishingService,
   registerChroniclePublishingIpcHandlers,
@@ -58,6 +60,12 @@ const {
 
 const IS_DEV = process.env.NODE_ENV === 'development'
 const IS_E2E = process.env.E2E === '1'
+
+function tNative(key, values) {
+  let locale = 'en'
+  try { locale = getResolvedLanguageSetting() } catch { /* store may not exist during a crash */ }
+  return nativeText(locale, key, values)
+}
 
 function parsePositiveIntEnv(name, fallback) {
   const raw = process.env[name]
@@ -92,8 +100,8 @@ process.on('uncaughtException', async (err) => {
     try {
       await dialog.showMessageBox({
         type: 'error',
-        title: 'Stellaris Companion crashed',
-        message: 'An unexpected error occurred in the app.',
+        title: tNative('crash.title'),
+        message: tNative('crash.message'),
         detail: err?.stack || String(err),
       })
     } catch (e) {
@@ -226,9 +234,6 @@ const CHRONICLE_REFRESH_MODE_PRESETS = ['balanced', 'enhanced']
 const DEFAULT_CHRONICLE_REFRESH_MODE = 'balanced'
 const MODEL_ROUTING_MODE_PRESETS = ['quality_first', 'conserve']
 const DEFAULT_MODEL_ROUTING_MODE = 'conserve'
-const LANGUAGE_PRESETS = ['system', 'en', 'de', 'fr', 'es', 'pt-BR', 'ja', 'zh-Hans', 'en-XA']
-const DEFAULT_LANGUAGE = 'system'
-const DEFAULT_RESOLVED_LANGUAGE = 'en'
 
 // Discord configuration (DISC-007)
 // These are set via environment or will use defaults for development
@@ -790,42 +795,14 @@ function getModelRoutingModeSetting() {
   return normalizeModelRoutingMode(store.get('modelRoutingMode', DEFAULT_MODEL_ROUTING_MODE))
 }
 
-function normalizeLanguage(rawValue) {
-  if (typeof rawValue !== 'string') return DEFAULT_LANGUAGE
-  const normalized = rawValue.trim()
-  if (normalized === 'pt_BR') return 'pt-BR'
-  if (normalized === 'zh-CN' || normalized === 'zh_CN' || normalized === 'zh-Hans-CN') {
-    return 'zh-Hans'
-  }
-  return LANGUAGE_PRESETS.includes(normalized) ? normalized : DEFAULT_LANGUAGE
-}
-
 function resolveLanguage(language) {
-  const normalized = normalizeLanguage(language)
-  if (normalized !== 'system') return normalized
-
   let appLocale = ''
   try {
     appLocale = app.getLocale()
   } catch {
     appLocale = ''
   }
-
-  const locale = String(appLocale || '').trim()
-  if (!locale) return DEFAULT_RESOLVED_LANGUAGE
-  if (locale === 'pt-BR' || locale.toLowerCase().startsWith('pt')) return 'pt-BR'
-  if (
-    locale === 'zh-Hans' ||
-    locale.toLowerCase().startsWith('zh-cn') ||
-    locale.toLowerCase().startsWith('zh-sg') ||
-    locale.toLowerCase().startsWith('zh-hans')
-  ) {
-    return 'zh-Hans'
-  }
-
-  const base = locale.split(/[-_]/)[0].toLowerCase()
-  if (['en', 'de', 'fr', 'es', 'ja'].includes(base)) return base
-  return DEFAULT_RESOLVED_LANGUAGE
+  return resolveLanguageForLocale(language, appLocale)
 }
 
 function getLanguageSetting() {
@@ -1079,6 +1056,7 @@ function saveSettings(settings) {
 }
 
 function getSaveDirCandidates() {
+  if (IS_E2E && process.env.E2E_SAVE_DIR) return [path.resolve(process.env.E2E_SAVE_DIR)]
   const os = require('os')
 
   // Covers Steam, GOG, Paradox Launcher ("Stellaris Plaza"), Xbox Game Pass, and Flatpak Steam
@@ -1308,28 +1286,30 @@ function createTray() {
 function updateTrayMenu() {
   if (!tray) return
 
-  const currentStatus = lastBackendConnected ? 'Connected' : (backendConfigured ? 'Disconnected' : 'Not configured')
+  const currentStatus = lastBackendConnected ? 'connected' : (backendConfigured ? 'disconnected' : 'notConfigured')
+  const locale = getResolvedLanguageSetting()
 
   // Only rebuild menu if status changed to avoid Menu object accumulation
-  if (lastTrayStatus === currentStatus) {
+  const cacheKey = trayCacheKey(locale, currentStatus)
+  if (lastTrayStatus === cacheKey) {
     return
   }
-  lastTrayStatus = currentStatus
+  lastTrayStatus = cacheKey
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Open Stellaris Companion',
+      label: tNative('tray.open'),
       click: () => {
         revealMainWindow()
       },
     },
     {
-      label: `Status: ${currentStatus}`,
+      label: tNative('tray.status', { status: tNative(`tray.${currentStatus}`) }),
       enabled: false,
     },
     { type: 'separator' },
     {
-      label: 'Quit',
+      label: tNative('tray.quit'),
       click: () => {
         isQuitting = true
         app.quit()
@@ -1338,6 +1318,7 @@ function updateTrayMenu() {
   ])
 
   tray.setContextMenu(contextMenu)
+  if (IS_E2E) globalThis.__e2eTrayLabels = contextMenu.items.map(item => item.label)
 }
 
 function revealMainWindow() {
@@ -1587,27 +1568,17 @@ registerSettingsIpcHandlers({
   discoverAdvisorModels,
   testAdvisorModel,
   onSettingsSaved: async (fullSettings, changedSettings = {}) => {
-    backendConfigured = true
+    // Player-empire overrides are backend env values and require a restart too.
+    const backendRelevantSettingsChanged = changesBackendConfiguration(changedSettings)
 
-    const backendRelevantSettingsChanged =
-      changedSettings.googleApiKey !== undefined ||
-      changedSettings.openRouterApiKey !== undefined ||
-      changedSettings.customProviderApiKey !== undefined ||
-      changedSettings.advisorProvider !== undefined ||
-      changedSettings.advisorModel !== undefined ||
-      changedSettings.advisorBaseUrl !== undefined ||
-      changedSettings.saveDir !== undefined ||
-      changedSettings.savePath !== undefined ||
-      changedSettings.modelRoutingMode !== undefined ||
-      // Player-empire override is read from the backend env at launch, so a
-      // change must restart the backend for it to take effect.
-      changedSettings.playerName !== undefined ||
-      changedSettings.playerCountryId !== undefined
+    if (backendRelevantSettingsChanged) backendConfigured = true
+    if (changedSettings.language !== undefined) updateTrayMenu()
 
     if (backendRelevantSettingsChanged && !E2E_SKIP_BACKEND_AUTOSTART) {
       restartPythonBackend(fullSettings)
     }
   },
+  translate: tNative,
 })
 
 registerExportIpcHandlers({
@@ -1618,6 +1589,7 @@ registerExportIpcHandlers({
   app,
   shell,
   callBackendApiEnvelope,
+  translate: tNative,
 })
 
 const chroniclePublishingService = createChroniclePublishingService({
@@ -1804,6 +1776,8 @@ ipcMain.handle('onboarding:status', async (event) => {
 ipcMain.handle('onboarding:complete', async (event) => {
   validateSender(event)
   store.set('hasCompletedOnboarding', true)
+  backendConfigured = true
+  updateTrayMenu()
   return { success: true }
 })
 
@@ -1879,7 +1853,7 @@ app.whenReady().then(async () => {
   createWindow()
   phaseStart = logTiming('Create window', phaseStart)
 
-  if (!IS_E2E) {
+  if (!IS_E2E || process.env.E2E_ENABLE_TRAY === '1') {
     createTray()
     phaseStart = logTiming('Create tray', phaseStart)
   }
@@ -1890,7 +1864,8 @@ app.whenReady().then(async () => {
 
   // Load settings (backend health already checked above)
   const settings = await getSettingsWithSecrets()
-  backendConfigured = true
+  backendConfigured = E2E_BACKEND_CONFIGURED || store.get('hasCompletedOnboarding', false)
+  updateTrayMenu()
   phaseStart = logTiming('Load settings', phaseStart)
 
   if (backendAlreadyRunning) {

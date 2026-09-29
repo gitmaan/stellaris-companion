@@ -4,9 +4,9 @@ function buildChronicleText(narrative) {
   return `### THE CURRENT ERA\n**2200.01.01 - Present**\n\n${narrative}`
 }
 
-function buildChronicleResponse({ narrative, eventsCovered, cached }) {
+function buildChronicleResponse({ narrative, eventsCovered, cached, chapters = [] }) {
   return {
-    chapters: [],
+    chapters,
     current_era: {
       start_date: '2200.01.01',
       narrative,
@@ -181,6 +181,7 @@ function createMockChronicleBackend(options = {}) {
         narrative: initialNarrative,
         eventsCovered: initialEventsCovered,
         cached: false,
+        chapters: options.chapters,
       })
     }
 
@@ -189,6 +190,7 @@ function createMockChronicleBackend(options = {}) {
         narrative: initialNarrative,
         eventsCovered: initialEventsCovered,
         cached: true,
+        chapters: options.chapters,
       })
     }
 
@@ -200,6 +202,7 @@ function createMockChronicleBackend(options = {}) {
         narrative: initialNarrative,
         eventsCovered: initialEventsCovered,
         cached: true,
+        chapters: options.chapters,
       })
     }
 
@@ -277,6 +280,7 @@ function createMockChronicleBackend(options = {}) {
             narrative: campaign.narrative || initialNarrative,
             eventsCovered: campaign.eventCount ?? initialEventsCovered,
             cached: true,
+            chapters: options.chapters,
           })
           : buildEmptyChronicleResponse())
         return

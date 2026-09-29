@@ -103,10 +103,10 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
   }: ChatMessageProps,
   ref,
 ) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const markdownComponents = createMarkdownComponents(t('chat.message.blockedLink'))
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+    return date.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
   }
 
   const isUser = role === 'user'
@@ -115,12 +115,12 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
   const bodyTextSize = role === 'assistant' ? 'text-base' : 'text-sm'
   const finalModelDisplay = modelRouting?.final_model_display || modelDisplay
   const routingNotice = modelRouting?.fallback
-    ? modelRouting.notice || `Routing via ${finalModelDisplay || 'Gemini Flash-Lite'}.`
+    ? modelRouting.notice || t('chat.message.routingNotice', { model: finalModelDisplay || 'Gemini Flash-Lite' })
     : null
   const modelReadout = routingNotice
-    ? `ROUTING VIA ${finalModelDisplay || 'GEMINI FLASH-LITE'}`
+    ? t('chat.message.routingVia', { model: finalModelDisplay || 'GEMINI FLASH-LITE' })
     : finalModelDisplay
-      ? `MODEL: ${finalModelDisplay}`
+      ? t('chat.message.modelReadout', { model: finalModelDisplay })
       : null
 
   return (

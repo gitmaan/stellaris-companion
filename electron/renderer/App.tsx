@@ -10,15 +10,18 @@ import { useAnnouncements } from './hooks/useAnnouncements'
 import {
   DEFAULT_CHRONICLE_REFRESH_MODE,
   DEFAULT_MODEL_ROUTING_MODE,
+  DEFAULT_LANGUAGE,
   DEFAULT_RESOLVED_LANGUAGE,
   DEFAULT_UI_THEME,
   normalizeChronicleRefreshMode,
   normalizeModelRoutingMode,
   normalizeResolvedLanguage,
+  normalizeLanguage,
   normalizeUiTheme,
   type ChronicleRefreshMode,
   type ModelRoutingMode,
   type ResolvedLanguage,
+  type LanguageSetting,
   type UiTheme,
 } from './hooks/useSettings'
 import { isRtlLanguage } from './i18n/languages'
@@ -54,6 +57,8 @@ function App() {
   const [resolvedLanguage, setResolvedLanguage] = useState<ResolvedLanguage>(
     DEFAULT_RESOLVED_LANGUAGE,
   )
+  const [language, setLanguage] = useState<LanguageSetting>(DEFAULT_LANGUAGE)
+  const [languageReady, setLanguageReady] = useState(false)
   // Onboarding: null = checking, true = done, false = show modal
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null)
 
@@ -66,12 +71,16 @@ function App() {
   }, [])
 
   useEffect(() => {
-    window.electronAPI?.getSettings().then((settings) => {
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Settings load timed out')), 5000)
+    })
+    Promise.race([window.electronAPI?.getSettings() ?? Promise.reject(new Error('Electron API unavailable')), timeout]).then(async (settings) => {
       const loadedSettings = settings as {
         uiTheme?: unknown
         chronicleRefreshMode?: unknown
         modelRoutingMode?: unknown
         resolvedLanguage?: unknown
+        language?: unknown
       }
       const loadedTheme = normalizeUiTheme(loadedSettings?.uiTheme)
       const loadedChronicleRefreshMode = normalizeChronicleRefreshMode(
@@ -79,24 +88,43 @@ function App() {
       )
       const loadedModelRoutingMode = normalizeModelRoutingMode(loadedSettings?.modelRoutingMode)
       const loadedResolvedLanguage = normalizeResolvedLanguage(loadedSettings?.resolvedLanguage)
+      await i18n.changeLanguage(loadedResolvedLanguage)
+      document.documentElement.lang = loadedResolvedLanguage
       setUiTheme(loadedTheme)
       setChronicleRefreshMode(loadedChronicleRefreshMode)
       setModelRoutingMode(loadedModelRoutingMode)
       setResolvedLanguage(loadedResolvedLanguage)
+      setLanguage(normalizeLanguage(loadedSettings?.language))
     }).catch(() => {
-      // Keep default theme when settings can't be loaded.
+      // A failed settings read must not strand first-run users behind a blank window.
+    }).finally(() => {
+      setLanguageReady(true)
     })
-  }, [])
+  }, [i18n])
+
+  const changeLanguage = useCallback(async (nextLanguage: LanguageSetting): Promise<boolean> => {
+    if (!window.electronAPI) return false
+    try {
+      const result = await window.electronAPI.saveSettings({ language: nextLanguage })
+      if (result?.success === false) return false
+      const resolved = normalizeResolvedLanguage(result.resolvedLanguage)
+      await i18n.changeLanguage(resolved)
+      setLanguage(normalizeLanguage(result.language))
+      setResolvedLanguage(resolved)
+      return true
+    } catch {
+      return false
+    }
+  }, [i18n])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', uiTheme)
   }, [uiTheme])
 
   useEffect(() => {
-    void i18n.changeLanguage(resolvedLanguage)
     document.documentElement.lang = resolvedLanguage
     document.documentElement.dir = isRtlLanguage(resolvedLanguage) ? 'rtl' : 'ltr'
-  }, [i18n, resolvedLanguage])
+  }, [resolvedLanguage])
 
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: 'chat', label: t('app.tabs.chat'), icon: '◈' },
@@ -165,6 +193,8 @@ function App() {
     setActiveTab('chronicle')
     setCampaignHistoryOpenRequest(request => request + 1)
   }, [])
+
+  if (!languageReady || onboardingDone === null) return null
 
   return (
     <ErrorBoundary onError={(err) => promptErrorReport(err, 'ui')}>
@@ -280,7 +310,7 @@ function App() {
                         onThemeChange={setUiTheme}
                         onChronicleRefreshModeChange={setChronicleRefreshMode}
                         onModelRoutingModeChange={setModelRoutingMode}
-                        onLanguageChange={setResolvedLanguage}
+                        onLanguageSelect={changeLanguage}
                         onOpenCampaignHistory={handleOpenCampaignHistory}
                       />
                     )}
@@ -294,7 +324,7 @@ function App() {
       {/* Onboarding Modal */}
       <AnimatePresence>
         {onboardingDone === false && (
-          <OnboardingModal onComplete={() => setOnboardingDone(true)} />
+          <OnboardingModal onComplete={() => setOnboardingDone(true)} language={language} onLanguageSelect={changeLanguage} />
         )}
       </AnimatePresence>
 

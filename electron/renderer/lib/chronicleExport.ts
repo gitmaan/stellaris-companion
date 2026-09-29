@@ -2,6 +2,24 @@ import type { ChronicleChapter, CurrentEra, NarrativeSection } from '../hooks/us
 
 type ChronicleExportTheme = 'stellaris-cyan' | 'tactica-green' | 'command-amber'
 
+export interface ChronicleExportLabels {
+  title: string
+  chapter: string
+  summary: string
+  currentEra: string
+  storyContinues: string
+  present: string
+  events: string
+  footer: string
+}
+
+export interface ChronicleExportOptions {
+  locale: string
+  labels: ChronicleExportLabels
+  theme?: string
+  legacyChronicle?: string
+}
+
 interface ChronicleExportPalette {
   bgPrimary: string
   bgSecondary: string
@@ -112,22 +130,23 @@ export function generateChronicleHtml(
   empireName: string,
   chapters: ChronicleChapter[],
   currentEra: CurrentEra | null,
-  rawTheme?: string,
-  legacyChronicle?: string,
+  options: ChronicleExportOptions,
 ): string {
-  const css = applyExportTheme(CSS, resolveExportTheme(rawTheme))
-  const chaptersHtml = chapters.map(renderChapter).join('\n')
-  const currentEraHtml = currentEra ? renderCurrentEra(currentEra) : ''
-  const legacyHtml = chapters.length === 0 && !currentEra && legacyChronicle?.trim()
-    ? `<section class="chapter-panel narrative">${renderNarrativeText(legacyChronicle)}</section>`
+  const css = applyExportTheme(CSS, resolveExportTheme(options.theme))
+  const chaptersHtml = chapters.map(chapter => renderChapter(chapter, options)).join('\n')
+  const currentEraHtml = currentEra ? renderCurrentEra(currentEra, options) : ''
+  const legacyHtml = chapters.length === 0 && !currentEra && options.legacyChronicle?.trim()
+    ? `<section class="chapter-panel narrative">${renderNarrativeText(options.legacyChronicle)}</section>`
     : ''
+  const title = options.labels.title.replace('{empire}', empireName)
+  const locale = /^(en|de|fr|es|pt-BR|ja|zh-Hans|en-XA)$/.test(options.locale) ? options.locale : 'en'
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${locale}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chronicles of ${escapeHtml(empireName)}</title>
+<title>${escapeHtml(title)}</title>
 <style>
 ${css}
 </style>
@@ -136,7 +155,7 @@ ${css}
 <article class="chronicle">
   <header class="chronicle-header">
     <div class="header-diamond">&#x25C8;</div>
-    <h1>The Chronicles of ${escapeHtml(empireName)}</h1>
+    <h1>${escapeHtml(title)}</h1>
     <div class="energy-line"></div>
   </header>
 
@@ -146,7 +165,7 @@ ${legacyHtml}
 
   <footer class="chronicle-footer">
     <div class="energy-line"></div>
-    <p>Exported from Stellaris Companion</p>
+    <p>${escapeHtml(options.labels.footer)}</p>
   </footer>
 </article>
 </body>
@@ -167,7 +186,14 @@ body {
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
 }
+html:lang(ja) body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', sans-serif; line-break: strict; }
+html:lang(zh-Hans) body { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif; line-break: strict; }
+html:lang(ja) .chapter-label, html:lang(ja) .current-era-label, html:lang(ja) .chronicle-footer,
+html:lang(zh-Hans) .chapter-label, html:lang(zh-Hans) .current-era-label, html:lang(zh-Hans) .chronicle-footer { letter-spacing: normal; }
+html:lang(ja) .chronicle-header h1, html:lang(zh-Hans) .chronicle-header h1 { font-family: inherit; letter-spacing: normal; text-transform: none; }
+html:lang(ja) .drop-cap::first-letter, html:lang(zh-Hans) .drop-cap::first-letter { float: none; font-size: inherit; line-height: inherit; padding: 0; color: inherit; }
 
 .chronicle {
   max-width: 800px;
@@ -424,7 +450,7 @@ body {
 // Chapter rendering
 // ---------------------------------------------------------------------------
 
-function renderChapter(chapter: ChronicleChapter): string {
+function renderChapter(chapter: ChronicleChapter, options: ChronicleExportOptions): string {
   const title = cleanTitle(chapter.title)
   const narrative = chapter.sections?.length
     ? renderSections(chapter.sections, chapter.epigraph)
@@ -432,14 +458,14 @@ function renderChapter(chapter: ChronicleChapter): string {
 
   const summary = chapter.summary
     ? `<div class="chapter-summary">
-    <h4><span>&#x25C7;</span> Summary</h4>
+    <h4><span>&#x25C7;</span> ${escapeHtml(options.labels.summary)}</h4>
     <p>${escapeHtml(chapter.summary)}</p>
   </div>`
     : ''
 
   return `  <section class="chapter-panel">
     <div class="chapter-header-block">
-      <div class="chapter-label"><span>&#x25C7;</span> Chapter ${escapeHtml(toRoman(chapter.number))}</div>
+      <div class="chapter-label"><span>&#x25C7;</span> ${escapeHtml(options.labels.chapter.replace('{number}', options.locale === 'en' ? toRoman(chapter.number) : new Intl.NumberFormat(options.locale).format(chapter.number)))}</div>
       <div class="chapter-title">${escapeHtml(title)}</div>
       <div class="chapter-dates">${escapeHtml(chapter.start_date)} &ndash; ${escapeHtml(chapter.end_date)}</div>
     </div>
@@ -450,23 +476,23 @@ ${summary}
   </section>`
 }
 
-function renderCurrentEra(era: CurrentEra): string {
+function renderCurrentEra(era: CurrentEra, options: ChronicleExportOptions): string {
   const narrative = era.sections?.length
     ? renderSections(era.sections)
     : era.narrative ? renderNarrativeText(era.narrative) : ''
 
   return `  <section class="chapter-panel">
     <div class="chapter-header-block">
-      <div class="current-era-label"><span>&#x231B;</span> The Current Era</div>
-      <div class="chapter-title">The Story Continues...</div>
-      <div class="chapter-dates">${escapeHtml(era.start_date)} &ndash; Present</div>
+      <div class="current-era-label"><span>&#x231B;</span> ${escapeHtml(options.labels.currentEra)}</div>
+      <div class="chapter-title">${escapeHtml(options.labels.storyContinues)}</div>
+      <div class="chapter-dates">${escapeHtml(era.start_date)} &ndash; ${escapeHtml(options.labels.present)}</div>
     </div>
     <div class="narrative">
 ${narrative}
     </div>
     <div class="current-era-footer">
       <span>&#x25C7;</span>
-      <span>${era.events_covered} events in this era</span>
+      <span>${escapeHtml(options.labels.events.replace('{count}', new Intl.NumberFormat(options.locale).format(era.events_covered)))}</span>
     </div>
   </section>`
 }

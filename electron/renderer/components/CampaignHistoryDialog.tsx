@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { type Playthrough, useBackend } from '../hooks/useBackend'
 import type { ChroniclePublicationSummary } from '../global'
 import { useToast } from './Toast'
+import { isCompositionKey } from '../lib/compositionKey'
 
 type HistoryAction = 'label' | 'trash' | 'restore' | 'reset' | 'undo-reset' | 'delete'
 
@@ -61,7 +62,7 @@ function CampaignHistoryDialog({
   useEffect(() => {
     if (!isOpen) return
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !workingId) onClose()
+      if (event.key === 'Escape' && !isCompositionKey(event) && !workingId) onClose()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
@@ -411,8 +412,9 @@ function CampaignHistoryDialog({
                                   maxLength={80}
                                   onChange={event => setLabel(event.target.value)}
                                   onKeyDown={event => {
-                                    if (event.key === 'Enter') void handleSaveLabel(playthrough)
-                                    if (event.key === 'Escape') setEditingId(null)
+                                    if (isCompositionKey(event)) return
+                                    if (event.key === 'Enter') { event.preventDefault(); void handleSaveLabel(playthrough) }
+                                    if (event.key === 'Escape') { event.stopPropagation(); setEditingId(null) }
                                   }}
                                   placeholder={playthrough.empire_name || t('chronicle.history.labelPlaceholder')}
                                   className="min-w-0 flex-1 rounded border border-accent-cyan/40 bg-bg-primary px-3 py-2 text-sm text-text-primary outline-none"

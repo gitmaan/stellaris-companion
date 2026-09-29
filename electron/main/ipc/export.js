@@ -9,6 +9,7 @@ function registerExportIpcHandlers({
   app,
   shell,
   callBackendApiEnvelope,
+  translate,
 }) {
   ipcMain.handle('export-chronicle', async (event, { html, defaultFilename }) => {
     validateSender(event)
@@ -18,7 +19,8 @@ function registerExportIpcHandlers({
 
     const result = await dialog.showSaveDialog(getMainWindow(), {
       defaultPath,
-      filters: [{ name: 'HTML', extensions: ['html'] }],
+      title: translate('dialogs.exportChronicle'),
+      filters: [{ name: translate('dialogs.htmlFile'), extensions: ['html'] }],
     })
 
     if (result.canceled || !result.filePath) {
@@ -44,11 +46,12 @@ function registerExportIpcHandlers({
     validateSender(event)
     const defaultPath = path.join(
       app.getPath('documents'),
-      `Stellaris Companion History Backup ${new Date().toISOString().slice(0, 10)}.db`,
+      `${translate('dialogs.historyBackup')} ${new Date().toISOString().slice(0, 10)}.db`,
     )
     const result = await dialog.showSaveDialog(getMainWindow(), {
       defaultPath,
-      filters: [{ name: 'SQLite database', extensions: ['db'] }],
+      title: translate('dialogs.backupHistory'),
+      filters: [{ name: translate('dialogs.sqliteFile'), extensions: ['db'] }],
     })
     if (result.canceled || !result.filePath) return null
     return await callBackendApiEnvelope('/api/history/backup', {

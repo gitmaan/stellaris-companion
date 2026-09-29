@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import type { Announcement } from '../hooks/useBackend'
+import { isCompositionKey } from '../lib/compositionKey'
 
 const SEVERITY_PRIORITY: Record<Announcement['severity'], number> = {
   known_issue: 5,
@@ -63,10 +64,10 @@ function sortAnnouncements(items: Announcement[]): Announcement[] {
   })
 }
 
-function formatPublishedDate(dateValue: string): string {
+function formatPublishedDate(dateValue: string, locale: string, fallback: string): string {
   const ts = new Date(dateValue).getTime()
-  if (!Number.isFinite(ts)) return 'Unknown date'
-  return new Date(ts).toLocaleDateString(undefined, {
+  if (!Number.isFinite(ts)) return fallback
+  return new Date(ts).toLocaleDateString(locale, {
     month: 'short',
     day: 'numeric',
   })
@@ -81,7 +82,7 @@ function AnnouncementCard({
   announcement,
   onDismiss,
 }: AnnouncementCardProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const config = SEVERITY_CONFIG[announcement.severity] || SEVERITY_CONFIG.info
 
   return (
@@ -99,7 +100,7 @@ function AnnouncementCard({
               {t(`announcements.severity.${announcement.severity}`)}
             </span>
             <span className="font-mono text-[10px] tracking-[0.12em] text-text-muted uppercase">
-              {formatPublishedDate(announcement.publishedAt)}
+              {formatPublishedDate(announcement.publishedAt, i18n.language, t('common.unknownDate'))}
             </span>
           </div>
 
@@ -157,13 +158,12 @@ export function AnnouncementPanel({
   const reduceMotion = useReducedMotion()
 
   const activeItems = useMemo(() => sortAnnouncements(announcements), [announcements])
-  if (activeItems.length === 0) return null
 
   useEffect(() => {
     if (!isOpen) return
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape' && !isCompositionKey(event)) onClose()
     }
 
     window.addEventListener('keydown', onKeyDown)
@@ -171,6 +171,8 @@ export function AnnouncementPanel({
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [isOpen, onClose])
+
+  if (activeItems.length === 0) return null
 
   const panelTransition = reduceMotion
     ? { duration: 0 }
