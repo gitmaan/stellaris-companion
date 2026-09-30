@@ -52,7 +52,7 @@ npm -C electron/renderer install
 
 ### Connect your AI
 
-Open **Config** → **AI SETUP**, or follow the first-run setup:
+Open **Config** and choose **Chat in Companion**, or follow the first-run setup:
 
 - **Gemini:** create a key in [Google AI Studio](https://aistudio.google.com/app/apikey), paste it, and choose **Check and save**. Model selection is automatic.
 - **OpenRouter:** choose **Online provider**, connect in your browser, select a model, and choose **Check and save**. Model costs are shown before you save; provider credits may be required.
@@ -61,7 +61,7 @@ Open **Config** → **AI SETUP**, or follow the first-run setup:
 
 The selected provider powers both Advisor and Chronicle. Setup checks use a small sample request without campaign data. For local models, use a context window of at least 32K tokens for full campaign briefings.
 
-To use an existing AI app instead, choose **I already use an AI app** and follow the [connection guide](docs/local-mcp.md). This lets you discuss your campaign in that app; in-app Advisor and Chronicle still need a provider. Chat subscriptions and API billing are separate.
+To use an existing AI app, choose **Connect your AI app** to open **MCP Relay** and follow the [connection guide](docs/local-mcp.md). No API key is needed in Companion for this route. The built-in Advisor and automatic Chronicle generation require a provider; your connected app can help draft and save Chronicle entries.
 
 For development, set `GOOGLE_API_KEY` in `.env` or use the same setup screen.
 
@@ -108,12 +108,11 @@ What the MCP Relay provides:
 
 Setup:
 
-1. Open Stellaris Companion and load or select your Stellaris save folder.
-2. Let the app ingest at least one campaign snapshot.
-3. Go to **Config** -> **AI APP CONNECTIONS**.
-4. Choose **Claude Desktop**, **ChatGPT + Codex**, or **Cursor**, then click **CONNECT**. Stellaris Companion preserves the rest of that client's MCP configuration and creates a backup before changing JSON config files.
-5. Restart the AI app if it is already open. The connection and campaign readiness checks run automatically when you return to Settings.
-6. For another MCP-compatible client, open **SHOW MANUAL MCP SETUP** and copy the generic configuration. The same section also provides sanitized diagnostics and a manual health check.
+1. In onboarding or **Config**, choose **Connect your AI app**. Select your save folder and check that your campaign is ready.
+2. Choose **Claude Desktop**, **ChatGPT desktop**, or **Cursor**, then select **Add to…**. Existing app connections are preserved.
+3. Open or restart your AI app, start a new chat, and paste a question using **Copy question**.
+
+Keep Companion open while you play. Your AI app's plan and usage limits apply. ChatGPT desktop and Codex on the same computer share the connection; ChatGPT web uses a different setup. Manual configuration and troubleshooting are under **Advanced MCP setup**.
 
 The MCP Relay reads the app's local campaign cache without exposing provider API keys or raw save files. It checks edits against the latest Chronicle to prevent overwrites and supports undoing the latest external edit. See [local MCP integration](docs/local-mcp.md) for details.
 

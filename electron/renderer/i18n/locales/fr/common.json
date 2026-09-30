@@ -618,53 +618,11 @@
       "aria": "Définir le mode de quota Gemini sur {{mode}}"
     },
     "mcpRelay": {
-      "loading": "Scanning...",
-      "ready": "PRÊT",
-      "noDatabase": "PAS DE CACHE DE CAMPAGNE",
       "loadingSummary": "Vérification de la connexion de l'application IA locale.",
-      "readySummary": "Connexion locale prête.",
-      "noDatabaseSummary": "Aucune archive de campagne trouvée pour le moment. Ouvrez ou sélectionnez un dossier de sauvegarde avant de connecter des applications d'IA.",
-      "installed": "CONNECTÉ",
-      "installedNeedsRefresh": "mise à jour disponible",
-      "notInstalled": "Soumettre et entrer la boîte connectée",
-      "claudeDesktop": "CLAUDE DESKTOP",
-      "otherApps": "AUTRES APPLICATIONS D'IA",
-      "otherAppsHelp": "Utilisez la configuration MCP manuelle pour Cursor, LM Studio et des clients similaires.",
-      "localEndpoint": "Archives locales",
-      "runCheck": "Exécuter la vérification",
-      "checking": "VÉRIFICATION",
-      "connectClaude": "AJOUTER À CLAUDE",
-      "updateClaude": "MISE À JOUR CLAUDE",
-      "claudeConnected": "AJOUTÉ À CLAUDE",
-      "installing": "INSTALLATION",
-      "copyClaude": "COPIE CLAUDE JSON",
-      "copyClaudeCode": "COPIER LE CODE CLAUDE",
       "copyCodexSetup": "COPIER LA CONFIGURATION DU CODEX",
       "copyMcpJson": "COPIER MCP JSON",
-      "revealConfig": "RÉVÉLER LA CONFIGURATION",
-      "showAdvancedSetup": "AFFICHER LA CONFIGURATION MANUELLE DU MCP",
-      "hideAdvancedSetup": "MASQUER LA CONFIGURATION MANUELLE DU MCP",
-      "optional": "FACULTATIF",
-      "healthSuccess": "Le relais MCP a répondu correctement.",
-      "healthError": "La vérification du relais MCP a échoué.",
-      "copySuccess": "Configuration de {{target}} copiée.",
-      "copyError": "Échec de la copie de la configuration.",
-      "installConfirm": "Connecter {{target}} a Stellaris Companion ? Seule la configuration MCP locale de cette app sera modifiee.",
-      "installSuccess": "Connexion {{target}} mise a jour. Redemarrez l'app IA si elle est deja ouverte.",
       "installError": "Impossible de mettre a jour la connexion de l'app IA.",
-      "serverUnavailableSummary": "Le serveur MCP local ne repond pas. Lancez la verification ci-dessous.",
-      "readyCampaignSummary": "Pret pour {{empire}} au {{date}}.",
-      "noCampaignSummary": "La connexion fonctionne, mais aucune campagne n'est encore en cache. Chargez d'abord une sauvegarde Stellaris.",
       "unknownEmpire": "l'empire actif",
-      "campaignReadiness": "ETAT DE LA CAMPAGNE",
-      "waitingForCampaign": "EN ATTENTE DE CAMPAGNE",
-      "offline": "HORS LIGNE",
-      "connected": "CONNECTE",
-      "needsUpdate": "MISE A JOUR REQUISE",
-      "notConnected": "NON CONNECTE",
-      "unavailable": "INTROUVABLE",
-      "connect": "CONNECTER",
-      "update": "METTRE A JOUR",
       "disconnect": "DECONNECTER",
       "working": "TRAITEMENT...",
       "diagnostics": "DIAGNOSTIC MCP",
@@ -672,20 +630,65 @@
       "installClaudeExtension": "OUVRIR L'EXTENSION CLAUDE",
       "revealLog": "AFFICHER LE JOURNAL MCP",
       "disconnectConfirm": "Deconnecter {{target}} de Stellaris Companion ? Les autres serveurs MCP seront conserves.",
-      "disconnectSuccess": "{{target}} deconnecte.",
       "clients": {
         "claude": {
-          "name": "CLAUDE DESKTOP",
-          "description": "Outils de campagne locaux dans Claude avec sauvegarde automatique de la configuration."
+          "name": "Claude Desktop",
+          "description": "Discutez de votre campagne dans Claude sur cet ordinateur."
         },
         "codex": {
-          "name": "CHATGPT + CODEX",
-          "description": "Une connexion partagee pour ChatGPT Desktop, Codex CLI et l'extension IDE."
+          "name": "ChatGPT desktop",
+          "description": "Pour ChatGPT et Codex sur cet ordinateur. ChatGPT sur le Web utilise une configuration différente."
         },
         "cursor": {
-          "name": "CURSOR",
-          "description": "Outils de campagne locaux dans les chats et agents Cursor."
+          "name": "Cursor",
+          "description": "Discutez de votre campagne dans les conversations et agents Cursor."
         }
+      },
+      "intro": "Connectez votre application d’IA à votre campagne Stellaris.",
+      "benefits": "Obtenez des conseils stratégiques, comprenez votre économie et rédigez la Chronique de votre empire.",
+      "plan": "Vous discuterez dans l’application connectée. Aucune clé API requise dans Companion. L’abonnement et les limites habituelles de votre application d’IA s’appliquent.",
+      "chooseApp": "Choisir votre application",
+      "chooseCampaign": "Choisir votre campagne",
+      "chooseSave": "Choisir le dossier de sauvegardes",
+      "changeCampaign": "Changer de dossier de sauvegardes",
+      "campaignReady": "Campagne prête · {{empire}} · {{date}}",
+      "noCampaign": "Chargez une sauvegarde Stellaris dans Companion pour rendre votre campagne disponible.",
+      "checkFailed": "Impossible de vérifier votre campagne. Réessayez ou choisissez une sauvegarde pour commencer.",
+      "checkAgain": "Vérifier à nouveau",
+      "addTo": "Ajouter à {{target}}",
+      "setupHelp": "Ajoute la connexion à votre campagne dans {{target}} sur cet ordinateur. Les autres connexions sont conservées.",
+      "setupAdded": "Configuration ajoutée. Redémarrez votre application d’IA pour l’utiliser.",
+      "appMissing": "Ouvrez ou installez {{target}} sur cet ordinateur, puis vérifiez à nouveau. La configuration manuelle est disponible ci-dessous.",
+      "setupFailed": "La configuration nécessite votre attention. Ouvrez {{target}} et réessayez. Les détails techniques se trouvent dans Configuration MCP avancée.",
+      "updateSetup": "Mettre à jour la configuration",
+      "startChatting": "Commencer à discuter",
+      "restart": "Ouvrez {{target}} ou redémarrez l’application si elle est déjà ouverte. Créez une conversation et collez une question. Autorisez l’accès à Stellaris Companion si demandé.",
+      "firstQuestion": "Essayer une question",
+      "copyQuestion": "Copier la question",
+      "chronicleSave": "Vérifiez le brouillon, puis demandez à votre application d’IA de l’enregistrer dans votre Chronique lorsque vous êtes prêt.",
+      "keepOpen": "Gardez Companion ouvert pendant que vous jouez pour que votre application d’IA accède à vos dernières sauvegardes.",
+      "copied": "Copié dans le presse-papiers.",
+      "copyError": "Copie impossible. Réessayez.",
+      "advanced": "Configuration MCP avancée",
+      "otherApps": "Les autres applications de bureau compatibles avec MCP local peuvent utiliser le même JSON MCP dans leurs paramètres de connexion.",
+      "questions": {
+        "priorities": {
+          "label": "Priorités de l’empire",
+          "prompt": "Utilise Stellaris Companion pour résumer mon empire et proposer mes trois prochaines priorités."
+        },
+        "economy": {
+          "label": "Économie",
+          "prompt": "Utilise Stellaris Companion pour expliquer mon économie et proposer les améliorations les plus utiles."
+        },
+        "chronicle": {
+          "label": "Chronique",
+          "prompt": "Utilise Stellaris Companion pour rédiger un brouillon de Chronique sur les événements récents de ma campagne. Montre-moi le brouillon avant de l’enregistrer."
+        }
+      },
+      "manual": {
+        "claude": "Pour la configuration manuelle, ajoutez le JSON MCP copié au fichier claude_desktop_config.json de Claude Desktop, puis redémarrez Claude. Vous pouvez aussi ouvrir l’extension Claude fournie.",
+        "codex": "Pour configurer Codex manuellement, exécutez la commande copiée dans un terminal, puis redémarrez votre application de bureau. Elle utilise la même connexion que ChatGPT sur cet ordinateur.",
+        "cursor": "Pour la configuration manuelle, ajoutez le JSON MCP copié au fichier ~/.cursor/mcp.json dans votre dossier personnel, puis redémarrez Cursor."
       }
     },
     "aiSetup": {
@@ -720,8 +723,6 @@
       "removeKey": "Supprimer la clé enregistrée",
       "keyRemoved": "Clé enregistrée supprimée.",
       "copyDetails": "Copier les informations d’assistance",
-      "useAIApp": "J’utilise déjà une application IA",
-      "aiAppHelp": "Connectez une application compatible, comme Claude ou ChatGPT. Vous discutez dans celle-ci ; aucune clé API n’est nécessaire dans Companion.",
       "testNotice": "La vérification envoie une petite requête de test pouvant consommer votre quota. Aucune donnée de campagne n’est envoyée.",
       "help": {
         "gemini": "Utilisez l’IA Google dans Companion. Créez une clé de connexion dans Google AI Studio et collez-la ci-dessous.",
@@ -729,6 +730,17 @@
         "ollama": "Ouvrez Ollama et téléchargez un modèle de discussion. Companion pourra alors le trouver sur cet ordinateur.",
         "lm_studio": "Ouvrez LM Studio, chargez un modèle de discussion et démarrez le serveur local dans l’onglet Developer.",
         "custom": "Utilisez un service compatible OpenAI. Saisissez l’adresse de connexion fournie par votre fournisseur."
+      },
+      "chooseRoute": "Où souhaitez-vous discuter ?",
+      "routes": {
+        "companion": {
+          "title": "Discuter dans Companion",
+          "description": "Configurez le conseiller intégré. Nous vous aidons à choisir un fournisseur d’IA."
+        },
+        "relay": {
+          "title": "Connecter votre application d’IA",
+          "description": "Utilisez MCP Relay pour discuter de votre campagne dans Claude Desktop, ChatGPT pour ordinateur ou une autre application compatible. Aucune clé API requise dans Companion."
+        }
       }
     }
   },

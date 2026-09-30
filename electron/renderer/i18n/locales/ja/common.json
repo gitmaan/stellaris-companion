@@ -611,53 +611,11 @@
       "aria": "Gemini クォータ モードを {{mode}} に設定します"
     },
     "mcpRelay": {
-      "loading": "スキャン中...",
-      "ready": "準備完了",
-      "noDatabase": "キャンペーンキャッシュなし",
       "loadingSummary": "ローカル AI アプリの接続を確認しています。",
-      "readySummary": "ローカル接続の準備ができました。",
-      "noDatabaseSummary": "キャンペーン アーカイブがまだ見つかりません。 AI アプリを接続する前に、保存フォルダーを開くか選択してください。",
-      "installed": "接続されました",
-      "installedNeedsRefresh": "アップデートが利用可能です",
-      "notInstalled": "が接続されていません",
-      "claudeDesktop": "クロード デスクトップ",
-      "otherApps": "その他の AI アプリ",
-      "otherAppsHelp": "Cursor、LM Studio、および同様のクライアントには手動 MCP セットアップを使用します。",
-      "localEndpoint": "ローカルアーカイブ",
-      "runCheck": "実行チェック",
-      "checking": "チェック中...",
-      "connectClaude": "クロードに追加",
-      "updateClaude": "クロードを更新",
-      "claudeConnected": "クロードに追加",
-      "installing": "インストール中...",
-      "copyClaude": "クロードをコピー JSON",
-      "copyClaudeCode": "クロード コードをコピー",
       "copyCodexSetup": "CODEX セットアップをコピー",
       "copyMcpJson": "MCP をコピー JSON",
-      "revealConfig": "設定を明らかにする",
-      "showAdvancedSetup": "手動 MCP セットアップを表示",
-      "hideAdvancedSetup": "手動 MCP セットアップを非表示にする",
-      "optional": "オプション",
-      "healthSuccess": "MCP Relay は正常に応答しました。",
-      "healthError": "MCP Relay ヘルスチェックが失敗しました。",
-      "copySuccess": "{{target}} セットアップがコピーされました。",
-      "copyError": "セットアップのコピーに失敗しました。",
-      "installConfirm": "{{target}} を Stellaris Companion に接続しますか？そのアプリのローカル MCP 設定のみ更新します。",
-      "installSuccess": "{{target}} の接続を更新しました。開いている場合は AI アプリを再起動してください。",
       "installError": "AI アプリ接続を更新できませんでした。",
-      "serverUnavailableSummary": "ローカル MCP サーバーが応答していません。下のチェックを実行してください。",
-      "readyCampaignSummary": "{{empire}}（{{date}}）の準備ができました。",
-      "noCampaignSummary": "接続は動作していますが、キャンペーンがまだありません。まず Stellaris のセーブを読み込んでください。",
       "unknownEmpire": "現在の帝国",
-      "campaignReadiness": "キャンペーン準備状況",
-      "waitingForCampaign": "キャンペーン待機中",
-      "offline": "オフライン",
-      "connected": "接続済み",
-      "needsUpdate": "更新が必要",
-      "notConnected": "未接続",
-      "unavailable": "見つかりません",
-      "connect": "接続",
-      "update": "更新",
       "disconnect": "切断",
       "working": "処理中...",
       "diagnostics": "MCP 診断",
@@ -665,20 +623,65 @@
       "installClaudeExtension": "CLAUDE 拡張を開く",
       "revealLog": "MCP ログを表示",
       "disconnectConfirm": "{{target}} を切断しますか？他の MCP サーバーは保持されます。",
-      "disconnectSuccess": "{{target}} を切断しました。",
       "clients": {
         "claude": {
-          "name": "CLAUDE DESKTOP",
-          "description": "設定の自動バックアップ付きで、Claude からローカルキャンペーンを利用します。"
+          "name": "Claude Desktop",
+          "description": "このコンピューターのClaudeでキャンペーンについて相談できます。"
         },
         "codex": {
-          "name": "CHATGPT + CODEX",
-          "description": "ChatGPT デスクトップ、Codex CLI、IDE 拡張で共有する接続です。"
+          "name": "ChatGPT desktop",
+          "description": "このコンピューターのChatGPTデスクトップとCodexに対応します。Web版ChatGPTは設定方法が異なります。"
         },
         "cursor": {
-          "name": "CURSOR",
-          "description": "Cursor のチャットとエージェントでローカルキャンペーンを利用します。"
+          "name": "Cursor",
+          "description": "Cursorのチャットやエージェントでキャンペーンについて相談できます。"
         }
+      },
+      "intro": "AIアプリをStellarisのキャンペーンに接続します。",
+      "benefits": "戦略の相談、経済の分析、帝国の年代記の執筆に活用できます。",
+      "plan": "接続したアプリでチャットします。CompanionにAPIキーは不要です。AIアプリの通常のプランと利用制限が適用されます。",
+      "chooseApp": "アプリを選択",
+      "chooseCampaign": "キャンペーンを選択",
+      "chooseSave": "セーブフォルダーを選択",
+      "changeCampaign": "セーブフォルダーを変更",
+      "campaignReady": "キャンペーン準備完了 · {{empire}} · {{date}}",
+      "noCampaign": "CompanionでStellarisのセーブを読み込むと、キャンペーンが利用できるようになります。",
+      "checkFailed": "キャンペーンを確認できませんでした。再試行するか、セーブを選択して開始してください。",
+      "checkAgain": "再確認",
+      "addTo": "{{target}}に追加",
+      "setupHelp": "このコンピューターの{{target}}にキャンペーン接続を追加します。他の接続は保持されます。",
+      "setupAdded": "設定を追加しました。AIアプリを再起動してご利用ください。",
+      "appMissing": "このコンピューターで{{target}}を開くかインストールして、再確認してください。下に手動設定があります。",
+      "setupFailed": "設定の確認が必要です。{{target}}を開いて再試行してください。技術的な詳細は「MCPの詳細設定」にあります。",
+      "updateSetup": "設定を更新",
+      "startChatting": "チャットを開始",
+      "restart": "{{target}}を開いてください。すでに開いている場合は再起動し、新しいチャットに質問を貼り付けます。求められた場合はStellaris Companionへのアクセスを許可してください。",
+      "firstQuestion": "質問を試す",
+      "copyQuestion": "質問をコピー",
+      "chronicleSave": "下書きを確認し、準備ができたらAIアプリに年代記への保存を依頼してください。",
+      "keepOpen": "プレイ中はCompanionを開いたままにすると、AIアプリが最新のセーブにアクセスできます。",
+      "copied": "クリップボードにコピーしました。",
+      "copyError": "コピーできませんでした。再試行してください。",
+      "advanced": "MCPの詳細設定",
+      "otherApps": "ローカルMCPに対応した他のデスクトップアプリでも、接続設定で同じMCP JSONを使用できます。",
+      "questions": {
+        "priorities": {
+          "label": "帝国の優先事項",
+          "prompt": "Stellaris Companionを使って私の帝国を要約し、次に取り組むべき3つの優先事項を提案してください。"
+        },
+        "economy": {
+          "label": "経済",
+          "prompt": "Stellaris Companionを使って私の経済を説明し、最も効果的な改善策を提案してください。"
+        },
+        "chronicle": {
+          "label": "年代記",
+          "prompt": "Stellaris Companionを使って、キャンペーンの最近の出来事について年代記の下書きを作成してください。保存する前に下書きを見せてください。"
+        }
+      },
+      "manual": {
+        "claude": "手動設定では、コピーしたMCP JSONをClaude Desktopのclaude_desktop_config.jsonに追加してClaudeを再起動します。同梱のClaude拡張機能を開くこともできます。",
+        "codex": "Codexを手動で設定するには、コピーしたコマンドをターミナルで実行し、デスクトップアプリを再起動します。このコンピューターのChatGPTデスクトップと同じ接続を使用します。",
+        "cursor": "手動設定では、コピーしたMCP JSONをホームフォルダーの ~/.cursor/mcp.json に追加し、Cursorを再起動してください。"
       }
     },
     "aiSetup": {
@@ -713,8 +716,6 @@
       "removeKey": "保存済みのキーを削除",
       "keyRemoved": "保存済みのキーを削除しました。",
       "copyDetails": "サポート用の情報をコピー",
-      "useAIApp": "すでに AI アプリを使っている",
-      "aiAppHelp": "Claude や ChatGPT など、対応するデスクトップアプリに接続できます。会話はそちらで行うため、Companion に API キーを入力する必要はありません。",
       "testNotice": "接続確認では、利用枠を消費する場合がある短いテストを送信します。キャンペーンの情報は送信しません。",
       "help": {
         "gemini": "Companion で Google の AI を使います。Google AI Studio で接続用のキーを作成し、下に貼り付けてください。",
@@ -722,6 +723,17 @@
         "ollama": "Ollama を開き、チャット用モデルをダウンロードしてください。Companion がこのコンピューター上のモデルを探します。",
         "lm_studio": "LM Studio でチャット用モデルを読み込み、Developer タブでローカルサーバーを起動してください。",
         "custom": "OpenAI 互換サービスを使います。提供元の接続先アドレスを入力してください。"
+      },
+      "chooseRoute": "どこでチャットしますか？",
+      "routes": {
+        "companion": {
+          "title": "Companionでチャット",
+          "description": "内蔵アドバイザーを設定します。AIプロバイダーの選択をお手伝いします。"
+        },
+        "relay": {
+          "title": "お使いのAIアプリを接続",
+          "description": "MCP RelayでClaude Desktop、ChatGPTデスクトップなどの対応アプリにキャンペーンを接続します。CompanionにAPIキーは不要です。"
+        }
       }
     }
   },

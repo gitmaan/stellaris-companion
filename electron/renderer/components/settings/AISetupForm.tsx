@@ -35,7 +35,6 @@ interface Props {
   onSave: (values: Partial<AISetupValues>) => Promise<boolean>
   onSaved?: () => void
   onProviderChange?: (provider: AdvisorProvider) => void
-  onUseAIApp?: () => void
 }
 
 function initialValues(settings?: Partial<Settings> | null): AISetupValues {
@@ -72,7 +71,6 @@ export function AISetupForm({
   onSave,
   onSaved,
   onProviderChange,
-  onUseAIApp,
 }: Props) {
   const { t, i18n } = useTranslation()
   const [values, setValues] = useState(() => initialValues(initialSettings))
@@ -328,21 +326,6 @@ export function AISetupForm({
           provider={provider}
           onChange={(advisorProvider) => change({ advisorProvider })}
         />
-        {onUseAIApp && (
-          <div className="border-t border-white/10 pt-3">
-            <button
-              type="button"
-              disabled={Boolean(busy)}
-              className="text-sm text-accent-cyan underline"
-              onClick={onUseAIApp}
-            >
-              {t('settings.aiSetup.useAIApp')}
-            </button>
-            <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-              {t('settings.aiSetup.aiAppHelp')}
-            </p>
-          </div>
-        )}
         <p className="text-sm leading-relaxed text-text-secondary">
           {t(`settings.aiSetup.help.${provider}`)}
         </p>

@@ -611,53 +611,11 @@
       "aria": "将 Gemini 配额模式设置为 {{mode}}"
     },
     "mcpRelay": {
-      "loading": "扫描...",
-      "ready": "准备就绪",
-      "noDatabase": "无战役缓存",
       "loadingSummary": "检查本地 AI 应用程序连接。",
-      "readySummary": "本地连接准备就绪。",
-      "noDatabaseSummary": "尚未找到战役档案。连接 AI 应用程序之前打开或选择保存文件夹。",
-      "installed": "已连接",
-      "installedNeedsRefresh": "有更新",
-      "notInstalled": "未连接",
-      "claudeDesktop": "克劳德桌面",
-      "otherApps": "其他人工智能应用程序",
-      "otherAppsHelp": "对 Cursor、LM Studio 和类似客户端使用手动 MCP 设置。",
-      "localEndpoint": "本地档案",
-      "runCheck": "运行检查",
-      "checking": "检查...",
-      "connectClaude": "添加到克劳德",
-      "updateClaude": "更新克劳德",
-      "claudeConnected": "添加到克劳德",
-      "installing": "安装...",
-      "copyClaude": "复制克劳德 JSON",
-      "copyClaudeCode": "复制克劳德代码",
       "copyCodexSetup": "复制法典设置",
       "copyMcpJson": "复制 MCP JSON",
-      "revealConfig": "显示配置",
-      "showAdvancedSetup": "显示手动 MCP 设置",
-      "hideAdvancedSetup": "隐藏手动 MCP 设置",
-      "optional": "可选",
-      "healthSuccess": "MCP Relay 响应成功。",
-      "healthError": "MCP Relay 运行状况检查失败。",
-      "copySuccess": "{{target}} 设置已复制。",
-      "copyError": "无法复制设置。",
-      "installConfirm": "将 {{target}} 连接到 Stellaris Companion？只会更新该应用的本地 MCP 配置。",
-      "installSuccess": "已更新 {{target}} 连接。如果 AI 应用已打开，请重新启动。",
       "installError": "无法更新 AI 应用连接。",
-      "serverUnavailableSummary": "本地 MCP 服务器没有响应。请运行下方检查以查看详情。",
-      "readyCampaignSummary": "已准备好 {{empire}}（{{date}}）。",
-      "noCampaignSummary": "连接正常，但尚未缓存战役。请先在应用中加载 Stellaris 存档。",
       "unknownEmpire": "当前帝国",
-      "campaignReadiness": "战役就绪状态",
-      "waitingForCampaign": "等待战役",
-      "offline": "离线",
-      "connected": "已连接",
-      "needsUpdate": "需要更新",
-      "notConnected": "未连接",
-      "unavailable": "未找到",
-      "connect": "连接",
-      "update": "更新",
       "disconnect": "断开",
       "working": "处理中...",
       "diagnostics": "MCP 诊断",
@@ -665,20 +623,65 @@
       "installClaudeExtension": "打开 CLAUDE 扩展",
       "revealLog": "显示 MCP 日志",
       "disconnectConfirm": "断开 {{target}} 与 Stellaris Companion 的连接？其他 MCP 服务器会保留。",
-      "disconnectSuccess": "已断开 {{target}}。",
       "clients": {
         "claude": {
-          "name": "CLAUDE DESKTOP",
-          "description": "在 Claude 中使用本地战役工具，并自动备份配置。"
+          "name": "Claude Desktop",
+          "description": "在此电脑的 Claude 中讨论你的战役。"
         },
         "codex": {
-          "name": "CHATGPT + CODEX",
-          "description": "ChatGPT 桌面版、Codex CLI 和 IDE 扩展共享一个连接。"
+          "name": "ChatGPT desktop",
+          "description": "适用于此电脑上的 ChatGPT 桌面版和 Codex。ChatGPT 网页版使用不同的设置方式。"
         },
         "cursor": {
-          "name": "CURSOR",
-          "description": "在 Cursor 聊天和智能体中使用本地战役工具。"
+          "name": "Cursor",
+          "description": "在 Cursor 聊天和代理中讨论你的战役。"
         }
+      },
+      "intro": "将你的 AI 应用连接到 Stellaris 战役。",
+      "benefits": "获取战略建议、了解经济状况，并撰写帝国编年史。",
+      "plan": "你将在所连接的应用中聊天。Companion 无需 API 密钥。适用该 AI 应用原有的套餐和使用限额。",
+      "chooseApp": "选择应用",
+      "chooseCampaign": "选择战役",
+      "chooseSave": "选择存档文件夹",
+      "changeCampaign": "更改存档文件夹",
+      "campaignReady": "战役已就绪 · {{empire}} · {{date}}",
+      "noCampaign": "在 Companion 中加载 Stellaris 存档，让你的战役可供访问。",
+      "checkFailed": "无法检查战役。请重试，或选择存档以开始。",
+      "checkAgain": "重新检查",
+      "addTo": "添加到 {{target}}",
+      "setupHelp": "将战役连接添加到此电脑上的 {{target}}。其他连接会保留。",
+      "setupAdded": "已添加配置。请重启 AI 应用以使用。",
+      "appMissing": "请在此电脑上打开或安装 {{target}}，然后重新检查。也可使用下方的手动设置。",
+      "setupFailed": "设置需要处理。请打开 {{target}} 并重试。技术详情位于“高级 MCP 设置”中。",
+      "updateSetup": "更新配置",
+      "startChatting": "开始聊天",
+      "restart": "打开 {{target}}；如果已打开，请先重启。新建聊天并粘贴问题。如有提示，请允许访问 Stellaris Companion。",
+      "firstQuestion": "试问一个问题",
+      "copyQuestion": "复制问题",
+      "chronicleSave": "查看草稿，准备好后再让 AI 应用将其保存到编年史。",
+      "keepOpen": "游玩时保持 Companion 开启，以便 AI 应用访问最新存档。",
+      "copied": "已复制到剪贴板。",
+      "copyError": "无法复制。请重试。",
+      "advanced": "高级 MCP 设置",
+      "otherApps": "其他支持本地 MCP 的桌面应用可在连接设置中使用相同的 MCP JSON。",
+      "questions": {
+        "priorities": {
+          "label": "帝国优先事项",
+          "prompt": "请使用 Stellaris Companion 概述我的帝国，并建议接下来的三项优先事项。"
+        },
+        "economy": {
+          "label": "经济",
+          "prompt": "请使用 Stellaris Companion 解释我的经济状况，并提出最有用的改进建议。"
+        },
+        "chronicle": {
+          "label": "编年史",
+          "prompt": "请使用 Stellaris Companion，根据战役最近的事件起草一篇编年史。保存前先让我查看草稿。"
+        }
+      },
+      "manual": {
+        "claude": "手动设置时，将复制的 MCP JSON 合并到 Claude Desktop 的 claude_desktop_config.json 文件中，然后重启 Claude。也可以打开附带的 Claude 扩展。",
+        "codex": "手动设置 Codex 时，在终端运行复制的命令，然后重启桌面应用。它与此电脑上的 ChatGPT 桌面版共用连接。",
+        "cursor": "手动设置时，将复制的 MCP JSON 合并到主目录下的 ~/.cursor/mcp.json 文件中，然后重启 Cursor。"
       }
     },
     "aiSetup": {
@@ -713,8 +716,6 @@
       "removeKey": "移除已保存的密钥",
       "keyRemoved": "已移除保存的密钥。",
       "copyDetails": "复制支持信息",
-      "useAIApp": "我已有 AI 应用",
-      "aiAppHelp": "连接 Claude 或 ChatGPT 等受支持的桌面应用。你将在该应用中聊天，无需在 Companion 中输入 API 密钥。",
       "testNotice": "检查会发送一个简短测试请求，可能消耗服务额度，不会发送战役数据。",
       "help": {
         "gemini": "在 Companion 中使用 Google AI。在 Google AI Studio 中创建连接密钥，然后粘贴到下方。",
@@ -722,6 +723,17 @@
         "ollama": "打开 Ollama 并下载聊天模型，Companion 随后即可在此电脑上找到它。",
         "lm_studio": "打开 LM Studio，加载聊天模型，并在 Developer 选项卡中启动本地服务器。",
         "custom": "使用兼容 OpenAI 的服务。请输入服务商提供的连接地址。"
+      },
+      "chooseRoute": "你想在哪里聊天？",
+      "routes": {
+        "companion": {
+          "title": "在 Companion 中聊天",
+          "description": "设置内置顾问。我们会帮助你选择 AI 提供商。"
+        },
+        "relay": {
+          "title": "连接你的 AI 应用",
+          "description": "通过 MCP Relay 在 Claude Desktop、ChatGPT 桌面版或其他支持的应用中讨论战役。Companion 无需 API 密钥。"
+        }
       }
     }
   },

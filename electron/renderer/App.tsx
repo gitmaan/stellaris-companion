@@ -312,6 +312,7 @@ function App() {
                     )}
                     {tab === 'settings' && (
                       <SettingsPage
+                        isActive={isActive}
                         openTarget={settingsTarget}
                         key={onboardingDone ? 'post-onboarding' : 'pre-onboarding'}
                         onReportIssue={openReportModal}
