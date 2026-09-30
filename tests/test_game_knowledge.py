@@ -180,3 +180,18 @@ def test_topic_focused_prompt_does_not_misreport_available_older_coverage():
     assert "Verified mechanics are available through 4.3.5" in prompt
     assert "no topic-specific mechanics section was needed" in prompt
     assert "No verified mechanics pack covers" not in prompt
+
+
+def test_topic_focused_cygnus_prompt_preserves_partial_coverage_and_filters_sections():
+    prompt = build_game_knowledge_prompt(
+        "Cygnus v4.5.1",
+        purpose="advisor",
+        topics="population and factions",
+    )
+
+    assert "Only the listed mechanics changes are verified through 4.5.1" in prompt
+    assert "rather than splitting into separate groups" in prompt
+    assert "Do not carry forward older-version rules" in prompt
+    assert "A normal Anchorage adds 5 Naval Capacity" not in prompt
+    assert "Building a Branch Office costs 75 Influence" not in prompt
+    assert "Treat these as the current baseline" not in prompt

@@ -51,6 +51,7 @@ test('publishes, updates, and removes a Chronicle without sending save data', as
     await expect(page.getByText(/random management key/)).not.toBeVisible()
     await page.getByText('How updates and removal work', { exact: true }).click()
     await expect(page.getByText(/random management key/)).toBeVisible()
+    expect(backend.getPublicationRequests().filter(request => request.method === 'POST')).toHaveLength(0)
 
     const storyTitle = page.getByLabel('Story title')
     await storyTitle.fill('The UNE Chronicle')
@@ -92,6 +93,53 @@ test('publishes, updates, and removes a Chronicle without sending save data', as
 
     const deleteRequest = await backend.waitForPublicationRequest((request) => request.method === 'DELETE')
     expect(deleteRequest.body.expected_revision).toBe(2)
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(userDataDir, { recursive: true, force: true })
+  }
+})
+
+test('updating an existing unlisted Chronicle preserves its visibility', async () => {
+  const backend = createMockChronicleBackend()
+  const backendPort = await backend.start()
+  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-companion-unlisted-e2e-'))
+  const app = await launchApp(backendPort, userDataDir)
+
+  try {
+    const page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    await page.getByRole('button', { name: /Chronicle/i }).click()
+    await expect(page.getByText('Old teaser.')).toBeVisible()
+
+    // Seed a publication from the previous UI through the real IPC against the local mock.
+    const seeded = await page.evaluate(() => window.electronAPI.chroniclePublishing.publish({
+      saveId: 'save-1',
+      title: 'Existing unlisted story',
+      empireName: 'United Nations of Earth',
+      language: 'en',
+      visibility: 'unlisted',
+      document: {
+        chapters: [],
+        current_era: {
+          start_date: '2200.01.01',
+          events_covered: 2,
+          narrative: 'Old teaser.',
+          sections: [{ type: 'prose', text: 'Old teaser.' }],
+        },
+      },
+    }))
+    expect(seeded.ok, JSON.stringify(seeded)).toBe(true)
+
+    await page.getByRole('button', { name: 'Share Chronicle' }).click()
+    await expect(page.getByText('This story is private-by-link and excluded from search discovery.')).toBeVisible()
+    await page.getByLabel('Story title').fill('Updated unlisted story')
+    await page.getByRole('button', { name: 'Update story' }).click()
+
+    const request = await backend.waitForPublicationRequest(request => request.method === 'PUT')
+    expect(request.body.visibility).toBe('unlisted')
+    expect(request.body.title).toBe('Updated unlisted story')
+    await expect(page.getByText('This story is private-by-link and excluded from search discovery.')).toBeVisible()
   } finally {
     await app.close()
     await backend.stop()

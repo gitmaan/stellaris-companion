@@ -40,18 +40,22 @@ def test_server_instruction_prefix_is_self_contained() -> None:
     assert "campaign_ref" in prefix
 
 
-def test_every_locale_has_effortless_mcp_setup_copy() -> None:
+def test_every_locale_has_guided_mcp_setup_copy() -> None:
     required = {
-        "campaignReadiness",
-        "serverUnavailableSummary",
-        "readyCampaignSummary",
-        "noCampaignSummary",
-        "connect",
-        "update",
+        "chooseApp",
+        "chooseCampaign",
+        "campaignReady",
+        "noCampaign",
+        "checkFailed",
+        "addTo",
+        "setupAdded",
+        "updateSetup",
+        "startChatting",
         "disconnect",
         "copyDiagnostics",
-        "installConfirm",
         "disconnectConfirm",
+        "advanced",
+        "questions",
         "clients",
     }
     locale_root = ROOT / "electron" / "renderer" / "i18n" / "locales"
@@ -64,6 +68,7 @@ def test_every_locale_has_effortless_mcp_setup_copy() -> None:
         relay = settings["mcpRelay"]
         assert required <= set(relay), locale_file
         assert set(relay["clients"]) == {"claude", "codex", "cursor"}, locale_file
+        assert set(relay["questions"]) == {"priorities", "economy", "chronicle"}, locale_file
 
 
 def test_mcpb_wrapper_does_not_forward_the_entire_parent_environment() -> None:
