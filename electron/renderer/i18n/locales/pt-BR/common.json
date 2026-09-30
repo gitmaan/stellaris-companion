@@ -81,7 +81,7 @@
       "providerBillingFailed": "{{provider}} não possui faturamento ou créditos utilizáveis ​​para esta solicitação. Verifique a conta do provedor ou escolha outro provedor.",
       "providerTimeout": "{{provider}} demorou muito para responder. Um modelo local ainda pode estar sendo carregado; tente novamente ou verifique seu servidor.",
       "providerContextLimit": "A janela de contexto ativa não cabe neste briefing de campanha. Aumente a configuração de contexto do provedor para pelo menos 32K ou escolha um modelo de contexto maior.",
-      "providerInvalidResponse": "{{provider}} retornou uma resposta que este aplicativo não conseguiu ler. Verifique se o endpoint oferece suporte a conclusões de bate-papo compatíveis com OpenAI.",
+      "providerInvalidResponse": "{{provider}} retornou uma resposta incompleta ou ilegível. Tente novamente.",
       "providerEmptyResponse": "{{provider}} retornou uma resposta vazia. Tente novamente ou escolha outro modelo.",
       "providerRequestFailed": "{{provider}} não conseguiu responder. Verifique a conexão em Configuração de IA e tente novamente."
     },
@@ -166,7 +166,8 @@
       "retrieving": "Recuperando cronica...",
       "emptyTitle": "Ainda sem cronica",
       "emptyBody": "Jogue e acumule historia. Cronicas sao geradas automaticamente conforme seu imperio avanca pelas eras.",
-      "noSession": "Nenhuma sessao encontrada para este save"
+      "noSession": "Nenhuma sessao encontrada para este save",
+      "autoRefreshPaused": "As atualizações automáticas estão pausadas para poupar sua cota. Sua Crônica salva não foi alterada. Tente novamente quando quiser."
     },
     "sidebar": {
       "empireArchives": "Arquivos do imperio",

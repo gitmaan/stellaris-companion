@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import logging
 import os
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 from urllib.parse import urlparse
 
@@ -24,6 +25,13 @@ from backend.core.model_routing import (
     route_event_payload,
     route_models_for,
 )
+from backend.core.structured_output import validate_structured_response
+
+logger = logging.getLogger(__name__)
+
+# One allowance covers native Gemini recovery AND quota fallback. SDK retries are off.
+GEMINI_MAX_ATTEMPTS = 2
+GEMINI_CHRONICLE_OUTPUT_TOKENS = 8192
 
 ADVISOR_PROVIDER_GEMINI = "gemini"
 ADVISOR_PROVIDER_OLLAMA = "ollama"
@@ -195,15 +203,24 @@ class AdvisorGenerationResult:
     provider: str
     routing: dict[str, Any] | None = None
     schema_fallback_used: bool = False
+    diagnostics: list[dict[str, Any]] = field(default_factory=list)
 
 
 class AdvisorProviderError(RuntimeError):
     """A provider failure safe to expose through the local API."""
 
-    def __init__(self, message: str, *, code: str, status_code: int = 502):
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str,
+        status_code: int = 502,
+        diagnostics: list[dict[str, Any]] | None = None,
+    ):
         super().__init__(message)
         self.code = code
         self.status_code = status_code
+        self.diagnostics = diagnostics or []
 
 
 class AdvisorGenerator(Protocol):
@@ -258,40 +275,38 @@ class GeminiAdvisorGenerator:
         allow_schema_fallback: bool = True,
     ) -> AdvisorGenerationResult:
         del schema_name, allow_schema_fallback
+        if purpose == "chronicle":
+            max_output_tokens = max(max_output_tokens, GEMINI_CHRONICLE_OUTPUT_TOKENS)
+        retry_ceiling = 16384 if purpose == "chronicle" else 8192
         config_kwargs: dict[str, Any] = {
             "system_instruction": system_prompt,
             "temperature": temperature,
-            "max_output_tokens": max_output_tokens,
+            "http_options": types.HttpOptions(retry_options=types.HttpRetryOptions(attempts=1)),
         }
         if response_schema is not None:
             config_kwargs.update(
-                {
-                    "response_mime_type": "application/json",
-                    "response_schema": response_schema,
-                }
+                response_mime_type="application/json", response_schema=response_schema
             )
-        cfg = types.GenerateContentConfig(
-            **config_kwargs,
-        )
-        if thinking_level != "dynamic":
-            cfg.thinking_config = types.ThinkingConfig(thinking_level=thinking_level)
-
-        explicit_model = str(model or "").strip() or None
         candidate_models = route_models_for(
             mode=model_routing_mode,
             purpose=purpose,
-            explicit_model=explicit_model,
-        )
-        if not candidate_models:
-            candidate_models = [self.config.model]
-
+            explicit_model=str(model or "").strip() or None,
+        ) or [self.config.model]
         requested_model = candidate_models[0]
         route_event = None
-        last_error: Exception | None = None
+        diagnostics: list[dict[str, Any]] = []
+        candidate_index = 0
+        prompt = user_prompt
+        last_error = AdvisorProviderError(
+            "Gemini could not complete the response", code="PROVIDER_INVALID_RESPONSE"
+        )
 
-        for index, candidate_model in enumerate(candidate_models):
+        while len(diagnostics) < GEMINI_MAX_ATTEMPTS:
+            candidate_model = candidate_models[candidate_index]
             fallback_model = (
-                candidate_models[index + 1] if index + 1 < len(candidate_models) else None
+                candidate_models[candidate_index + 1]
+                if candidate_index + 1 < len(candidate_models)
+                else None
             )
             if fallback_model and is_model_temporarily_unavailable(candidate_model):
                 route_event = get_model_unavailable_event(
@@ -299,37 +314,40 @@ class GeminiAdvisorGenerator:
                     skipped_model=candidate_model,
                     final_model=fallback_model,
                 )
+                candidate_index += 1
                 continue
 
+            cfg = types.GenerateContentConfig(**config_kwargs, max_output_tokens=max_output_tokens)
+            level = thinking_level
+            # Lite already defaults to minimal thinking. Unknown/custom models keep their defaults.
+            if (
+                level == "dynamic"
+                and purpose == "chronicle"
+                and candidate_model.startswith("gemini-3")
+                and "flash-lite" not in candidate_model
+            ):
+                level = "low"
+            if level != "dynamic":
+                cfg.thinking_config = types.ThinkingConfig(thinking_level=level)
+            call = {
+                "requested_model": candidate_model,
+                "output_limit": max_output_tokens,
+                "thinking_level": level,
+                "attempt": len(diagnostics) + 1,
+            }
+            diagnostics.append(call)
             try:
                 response = self.client.models.generate_content(
-                    model=candidate_model,
-                    contents=user_prompt,
-                    config=cfg,
+                    model=candidate_model, contents=prompt, config=cfg
                 )
-                response_text = response.text or ""
-                if not response_text:
-                    raise AdvisorProviderError(
-                        "Gemini returned an empty response",
-                        code="PROVIDER_EMPTY_RESPONSE",
-                    )
-                if route_event and route_event.final_model != candidate_model:
-                    route_event.final_model = candidate_model
-                return AdvisorGenerationResult(
-                    text=response_text,
-                    model=candidate_model,
-                    requested_model=requested_model,
-                    provider=self.config.provider,
-                    routing=route_event_payload(route_event),
-                )
-            except AdvisorProviderError:
-                raise
             except Exception as exc:
-                last_error = exc
+                code = _gemini_error_code(exc)
+                call["error_code"] = code
+                logger.info("Gemini generation: %s", json.dumps(call))
                 failure = classify_model_error(exc)
                 if failure and failure.reason != "billing" and fallback_model:
                     mark_model_failure(candidate_model, failure)
-                    route_event = route_event or get_model_unavailable_event(
+                    route_event = get_model_unavailable_event(
                         requested_model=requested_model,
                         skipped_model=candidate_model,
                         final_model=fallback_model,
@@ -337,29 +355,96 @@ class GeminiAdvisorGenerator:
                     if route_event:
                         route_event.reason = failure.reason
                         route_event.error = _redact_sensitive_text(
-                            failure.message,
-                            self.config.api_key,
+                            failure.message, self.config.api_key
                         )
                         route_event.notice = fallback_notice(
-                            candidate_model,
-                            fallback_model,
-                            reason=failure.reason,
+                            candidate_model, fallback_model, reason=failure.reason
                         )
+                    candidate_index += 1
+                else:
+                    code = "PROVIDER_CONTEXT_LIMIT" if _is_context_limit_error(str(exc)) else code
+                last_error = AdvisorProviderError(
+                    _redact_sensitive_text(exc, self.config.api_key),
+                    code=code,
+                    status_code=400 if code == "PROVIDER_CONTEXT_LIMIT" else 502,
+                )
+                if failure and failure.reason != "billing" and fallback_model:
                     continue
                 break
 
-        message = _redact_sensitive_text(
-            last_error or "No Gemini model was available",
-            self.config.api_key,
-        )
-        if _is_context_limit_error(message):
-            raise AdvisorProviderError(
-                "The selected Gemini model cannot fit the current campaign briefing "
-                "in its context window",
-                code="PROVIDER_CONTEXT_LIMIT",
-                status_code=400,
+            candidates = getattr(response, "candidates", None)
+            finish = getattr(candidates[0], "finish_reason", None) if candidates else None
+            finish = getattr(finish, "value", finish)
+            call["finish_reason"] = finish if isinstance(finish, str) else None
+            block_reason = getattr(getattr(response, "prompt_feedback", None), "block_reason", None)
+            block_reason = getattr(block_reason, "value", block_reason)
+            call["block_reason"] = block_reason if isinstance(block_reason, str) else None
+            returned_model = getattr(response, "model_version", None)
+            call["returned_model"] = returned_model if isinstance(returned_model, str) else None
+            usage = getattr(response, "usage_metadata", None)
+            for field_name in (
+                "prompt_token_count",
+                "thoughts_token_count",
+                "candidates_token_count",
+            ):
+                value = getattr(usage, field_name, None)
+                call[field_name] = value if isinstance(value, int) else None
+            logger.info("Gemini generation: %s", json.dumps(call))
+
+            # Never return a partial answer, even if its JSON happens to parse.
+            if call["finish_reason"] == "MAX_TOKENS":
+                last_error = AdvisorProviderError(
+                    "Gemini reached the response length limit. Please request a shorter response.",
+                    code="PROVIDER_INVALID_RESPONSE",
+                )
+                if max_output_tokens >= retry_ceiling:
+                    break
+                max_output_tokens = min(max_output_tokens * 2, retry_ceiling)
+                prompt = (
+                    user_prompt
+                    + "\n\nReturn a concise, complete response within the requested format."
+                )
+                continue
+            if call["finish_reason"] not in (None, "STOP") or call["block_reason"] not in (
+                None,
+                "BLOCK_REASON_UNSPECIFIED",
+            ):
+                last_error = AdvisorProviderError(
+                    "Gemini stopped without completing the response", code="PROVIDER_REQUEST_FAILED"
+                )
+                break
+
+            response_text = response.text or ""
+            if not response_text.strip():
+                last_error = AdvisorProviderError(
+                    "Gemini returned an empty response", code="PROVIDER_EMPTY_RESPONSE"
+                )
+            else:
+                try:
+                    if response_schema is not None:
+                        validate_structured_response(response_text, response_schema)
+                except (ValueError, TypeError):
+                    last_error = AdvisorProviderError(
+                        "Gemini could not produce valid structured output",
+                        code="PROVIDER_INVALID_RESPONSE",
+                    )
+                else:
+                    return AdvisorGenerationResult(
+                        text=response_text,
+                        model=candidate_model,
+                        requested_model=requested_model,
+                        provider=self.config.provider,
+                        routing=route_event_payload(route_event),
+                        diagnostics=diagnostics,
+                    )
+            # Invalid/empty output gets one repair attempt at the SAME token allowance.
+            prompt = (
+                user_prompt
+                + "\n\nReturn a non-empty, complete response in the requested format. Return only JSON when a schema is provided."
             )
-        raise AdvisorProviderError(message, code=_gemini_error_code(last_error or message))
+
+        last_error.diagnostics = diagnostics
+        raise last_error
 
 
 class OpenAICompatibleAdvisorGenerator:

@@ -162,7 +162,7 @@
       "providerBillingFailed": "{{provider}} does not have usable billing or credits for this request. Check the provider account or choose another provider.",
       "providerTimeout": "{{provider}} took too long to respond. A local model may still be loading; try again or check its server.",
       "providerContextLimit": "The active context window cannot fit this campaign briefing. Increase the provider's context setting to at least 32K, or choose a larger-context model.",
-      "providerInvalidResponse": "{{provider}} returned a response this app could not read. Check that the endpoint supports OpenAI-compatible chat completions.",
+      "providerInvalidResponse": "{{provider}} returned an incomplete or unreadable response. Please try again.",
       "providerEmptyResponse": "{{provider}} returned an empty response. Try again or choose another model.",
       "providerRequestFailed": "{{provider}} could not reply. Open AI setup and check the connection, then try again."
     },
@@ -276,7 +276,8 @@
       "retrieving": "Retrieving Chronicle...",
       "emptyTitle": "No Chronicle Yet",
       "emptyBody": "Play your game and accumulate history. Chronicles are generated automatically as your empire progresses through the ages.",
-      "noSession": "No session found for this save"
+      "noSession": "No session found for this save",
+      "autoRefreshPaused": "Automatic updates are paused to save your quota. Your saved Chronicle is unchanged. Retry when you are ready."
     },
     "providerSetup": {
       "title": "AI PROVIDER CONNECTION REQUIRED",

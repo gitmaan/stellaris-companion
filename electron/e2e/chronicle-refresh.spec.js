@@ -59,6 +59,45 @@ async function launchApp(backendPort, userDataDir) {
   })
 }
 
+test('provider failure preserves the story and pauses automatic requests until Retry', async () => {
+  const backend = createMockChronicleBackend()
+  const backendPort = await backend.start()
+  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-companion-e2e-'))
+  const app = await launchApp(backendPort, userDataDir)
+  try {
+    const page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+    await installVisibilityShim(page)
+    await page.getByRole('button', { name: /Chronicle/i }).click()
+    await expect(page.getByText('Old teaser.')).toBeVisible()
+    await backend.waitForChronicleRequest(() => true)
+
+    backend.setChronicleError({ code: 'PROVIDER_INVALID_RESPONSE' })
+    backend.advanceCampaign()
+    await expect(page.getByRole('status').filter({ hasText: 'Automatic updates are paused' })).toBeVisible()
+    await expect(page.getByText('Old teaser.')).toBeVisible()
+    const countAfterFailure = backend.getChronicleRequests().length
+
+    // Let the normal ingestion, visibility and focus triggers fire again.
+    backend.advanceCampaign()
+    await setVisibilityState(page, 'hidden')
+    await setVisibilityState(page, 'visible')
+    await page.waitForTimeout(5000)
+    expect(backend.getChronicleRequests()).toHaveLength(countAfterFailure)
+    await expect(page.getByText('Old teaser.')).toBeVisible()
+
+    backend.setChronicleError(null)
+    await page.getByRole('button', { name: 'Retry', exact: true }).click()
+    await expect(page.getByText('Updated after visible refresh.')).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: 'Automatic updates are paused' })).toHaveCount(0)
+    expect(backend.getChronicleRequests()).toHaveLength(countAfterFailure + 1)
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(userDataDir, { recursive: true, force: true })
+  }
+})
+
 test('chronicle auto-refreshes with a visible full refresh after live progress advances', async () => {
   const backend = createMockChronicleBackend()
   const backendPort = await backend.start()

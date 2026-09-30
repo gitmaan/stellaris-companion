@@ -1077,7 +1077,8 @@ class Companion:
             wall_time_ms = elapsed * 1000
 
             self._last_call_stats = {
-                "total_calls": 1,
+                "total_calls": len(generation.diagnostics) or 1,
+                "diagnostics": generation.diagnostics,
                 "tools_used": ["ask_precomputed_no_tools"],
                 "wall_time_ms": wall_time_ms,
                 "response_length": len(response_text),
@@ -1113,7 +1114,8 @@ class Companion:
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
             self._last_call_stats = {
-                "total_calls": 0,
+                "total_calls": len(getattr(e, "diagnostics", [])),
+                "diagnostics": getattr(e, "diagnostics", []),
                 "tools_used": [],
                 "wall_time_ms": wall_time_ms,
                 "response_length": 0,
