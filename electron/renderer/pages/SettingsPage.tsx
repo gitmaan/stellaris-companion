@@ -31,7 +31,8 @@ import { HUDSelect } from '../components/hud/HUDForm'
 import { useToast } from '../components/Toast'
 import { AISetupForm } from '../components/settings/AISetupForm'
 import { ChronicleRefreshControl } from '../components/settings/ChronicleRefreshControl'
-import type { McpRelayClientStatus, McpRelayHealthResult, McpRelayStatus } from '../global'
+import { AISetupChoice, type AISetupRoute } from '../components/settings/AISetupChoice'
+import { MCPRelayPanel } from '../components/settings/MCPRelayPanel'
 import type { HistoryStorageResponse } from '../hooks/useBackend'
 
 /**
@@ -54,6 +55,7 @@ function revealSettingsSection(id: string) {
 }
 
 interface SettingsPageProps {
+  isActive?: boolean
   openTarget?: { id: string; request: number }
   onReportIssue?: () => void
   onThemeChange?: (theme: UiTheme) => void
@@ -103,6 +105,7 @@ function routingModeToQuotaMode(mode: ModelRoutingMode): GeminiQuotaMode {
 }
 
 function SettingsPage({
+  isActive = true,
   openTarget,
   onReportIssue,
   onThemeChange,
@@ -115,8 +118,11 @@ function SettingsPage({
   const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
   const { showToast } = useToast()
 
+  const [aiRoute, setAIRoute] = useState<AISetupRoute>('companion')
+
   useEffect(() => {
     if (loading || !openTarget?.request) return
+    setAIRoute(openTarget.id === 'ai-app-connections' ? 'relay' : 'companion')
     const frame = requestAnimationFrame(() => revealSettingsSection(openTarget.id))
     return () => cancelAnimationFrame(frame)
   }, [loading, openTarget])
@@ -151,11 +157,6 @@ function SettingsPage({
   const [languageSaving, setLanguageSaving] = useState(false)
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(DEFAULT_UPDATE_CHANNEL)
   const [updateChannelSaving, setUpdateChannelSaving] = useState(false)
-  const [mcpRelayStatus, setMcpRelayStatus] = useState<McpRelayStatus | null>(null)
-  const [mcpRelayHealth, setMcpRelayHealth] = useState<McpRelayHealthResult | null>(null)
-  const [mcpRelayLoading, setMcpRelayLoading] = useState(false)
-  const [mcpRelayChecking, setMcpRelayChecking] = useState(false)
-  const [mcpRelayClientBusy, setMcpRelayClientBusy] = useState<string | null>(null)
   const [historyStorage, setHistoryStorage] = useState<HistoryStorageResponse | null>(null)
   const [historyBackupRunning, setHistoryBackupRunning] = useState(false)
   const settingsHydratedRef = useRef(false)
@@ -192,32 +193,6 @@ function SettingsPage({
     onChronicleRefreshModeChange?.(normalizedChronicleRefreshMode)
     onModelRoutingModeChange?.(normalizedModelRoutingMode)
   }, [onChronicleRefreshModeChange, onModelRoutingModeChange, onThemeChange, settings])
-
-  useEffect(() => {
-    let cancelled = false
-    const loadMcpRelayStatus = async () => {
-      if (!window.electronAPI?.mcpRelay?.status) return
-      setMcpRelayLoading(true)
-      try {
-        const [status, health] = await Promise.all([
-          window.electronAPI.mcpRelay.status(),
-          window.electronAPI.mcpRelay.healthCheck(),
-        ])
-        if (!cancelled) {
-          setMcpRelayStatus(status)
-          setMcpRelayHealth(health)
-        }
-      } catch {
-        if (!cancelled) setMcpRelayStatus(null)
-      } finally {
-        if (!cancelled) setMcpRelayLoading(false)
-      }
-    }
-    void loadMcpRelayStatus()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const handleBrowse = async () => {
     const selectedPath = await showFolderDialog()
@@ -276,34 +251,6 @@ function SettingsPage({
   const handleConnectDiscord = async () => { await connectDiscord() }
   const handleDisconnectDiscord = async () => { await disconnectDiscord() }
 
-  const refreshMcpRelayStatus = async () => {
-    if (!window.electronAPI?.mcpRelay?.status) return null
-    const status = await window.electronAPI.mcpRelay.status()
-    setMcpRelayStatus(status)
-    return status
-  }
-
-  const handleMcpRelayHealthCheck = async () => {
-    if (!window.electronAPI?.mcpRelay?.healthCheck) return
-    setMcpRelayChecking(true)
-    try {
-      const result = await window.electronAPI.mcpRelay.healthCheck()
-      setMcpRelayHealth(result)
-      showToast({
-        type: result.ok ? 'success' : 'error',
-        message: result.ok ? t('settings.mcpRelay.healthSuccess') : result.message,
-        duration: result.ok ? 2200 : 5000,
-      })
-      await refreshMcpRelayStatus()
-    } catch (e) {
-      const message = e instanceof Error ? e.message : t('settings.mcpRelay.healthError')
-      setMcpRelayHealth({ ok: false, message })
-      showToast({ type: 'error', message, duration: 5000 })
-    } finally {
-      setMcpRelayChecking(false)
-    }
-  }
-
   const handleUpdateChannelChange = async (rawValue: string) => {
     const nextChannel = normalizeUpdateChannel(rawValue)
     if (nextChannel === updateChannel) return
@@ -331,104 +278,6 @@ function SettingsPage({
       }),
       duration: 1800,
     })
-  }
-
-  const handleCopyMcpRelayText = async (text: string | undefined, label: string) => {
-    if (!text || !window.electronAPI?.copyToClipboard) return
-    const result = await window.electronAPI.copyToClipboard(text)
-    showToast({
-      type: result?.success ? 'success' : 'error',
-      message: result?.success
-        ? t('settings.mcpRelay.copySuccess', { target: label })
-        : t('settings.mcpRelay.copyError'),
-      duration: result?.success ? 1800 : 4000,
-    })
-  }
-
-  const handleMcpClientConnection = async (
-    client: 'claude' | 'codex' | 'cursor',
-    disconnect = false,
-  ) => {
-    const api = window.electronAPI?.mcpRelay
-    if (!api?.connectClient || !api?.disconnectClient) return
-    const label = t(`settings.mcpRelay.clients.${client}.name`)
-    const confirmed = window.confirm(
-      disconnect
-        ? t('settings.mcpRelay.disconnectConfirm', { target: label })
-        : t('settings.mcpRelay.installConfirm', { target: label }),
-    )
-    if (!confirmed) return
-    setMcpRelayClientBusy(client)
-    try {
-      const result = disconnect
-        ? await api.disconnectClient(client)
-        : await api.connectClient(client)
-      if (result.status) setMcpRelayStatus(result.status)
-      if (!result.success) {
-        showToast({
-          type: 'error',
-          message: result.error || t('settings.mcpRelay.installError'),
-          duration: 6000,
-        })
-        return
-      }
-      showToast({
-        type: result.warning ? 'warning' : 'success',
-        message: result.warning || (
-          disconnect
-            ? t('settings.mcpRelay.disconnectSuccess', { target: label })
-            : t('settings.mcpRelay.installSuccess', { target: label })
-        ),
-        duration: result.warning ? 6000 : 2500,
-      })
-      await refreshMcpRelayStatus()
-    } catch (e) {
-      showToast({
-        type: 'error',
-        message: e instanceof Error ? e.message : t('settings.mcpRelay.installError'),
-        duration: 6000,
-      })
-    } finally {
-      setMcpRelayClientBusy(null)
-    }
-  }
-
-  const handleCopyMcpDiagnostics = async () => {
-    const diagnostics = {
-      generatedAt: new Date().toISOString(),
-      server: mcpRelayHealth
-        ? {
-          healthy: mcpRelayHealth.serverHealthy,
-          protocolVersion: mcpRelayHealth.protocolVersion,
-          serverVersion: mcpRelayHealth.serverVersion,
-          toolCount: mcpRelayHealth.toolCount,
-          durationMs: mcpRelayHealth.durationMs,
-        }
-        : null,
-      campaign: mcpRelayHealth
-        ? {
-          ready: mcpRelayHealth.campaignReady,
-          gameDate: mcpRelayHealth.campaign?.game_date || null,
-          snapshotCount: mcpRelayHealth.campaign?.snapshot_count || 0,
-          freshness: mcpRelayHealth.campaign?.freshness?.state || null,
-        }
-        : null,
-      clients: mcpRelayStatus
-        ? Object.fromEntries(
-          Object.entries(mcpRelayStatus.clients).map(([id, status]) => [
-            id,
-            {
-              available: status.available !== false,
-              configured: status.configured,
-              current: status.current === true,
-              hasError: Boolean(status.error),
-            },
-          ]),
-        )
-        : null,
-      language: mcpRelayStatus?.language || null,
-    }
-    await handleCopyMcpRelayText(JSON.stringify(diagnostics, null, 2), 'MCP diagnostics')
   }
 
   const [retrying, setRetrying] = useState(false)
@@ -614,27 +463,6 @@ function SettingsPage({
     t(`settings.updateChannel.${channel}`)
   const hasPlayerNameChange = Boolean(settings && playerName !== (settings.playerName || ''))
 
-  const mcpRelayReady = Boolean(mcpRelayHealth?.campaignReady)
-  const mcpRelayServerHealthy = Boolean(mcpRelayHealth?.serverHealthy)
-  const mcpRelaySummary = mcpRelayLoading
-    ? t('settings.mcpRelay.loadingSummary')
-    : !mcpRelayServerHealthy
-      ? t('settings.mcpRelay.serverUnavailableSummary')
-      : mcpRelayReady
-        ? t('settings.mcpRelay.readyCampaignSummary', {
-          empire: mcpRelayHealth?.campaign?.empire_name || t('settings.mcpRelay.unknownEmpire'),
-          date: mcpRelayHealth?.campaign?.game_date || '—',
-        })
-        : t('settings.mcpRelay.noCampaignSummary')
-  const mcpClients: Array<{
-    id: 'claude' | 'codex' | 'cursor'
-    status: McpRelayClientStatus | undefined
-  }> = [
-    { id: 'claude', status: mcpRelayStatus?.clients?.claude },
-    { id: 'codex', status: mcpRelayStatus?.clients?.codex },
-    { id: 'cursor', status: mcpRelayStatus?.clients?.cursor },
-  ]
-
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -711,12 +539,17 @@ function SettingsPage({
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             
             {/* Column 1: Core Systems */}
-            <div className="space-y-8">
+            <div className={`space-y-8 ${aiRoute === 'relay' ? 'md:col-span-2' : ''}`}>
                 
                 <section id="ai-setup">
                   <HUDSectionTitle number="01">{t('settings.sections.intelligence')}</HUDSectionTitle>
-                  <HUDPanel decoration="tech" title={t('settings.panels.advisorAccess')} quiet>
+                  <HUDPanel decoration="tech" title={t('settings.aiSetup.chooseRoute')} quiet>
                     <div className="space-y-4 pt-2">
+                      <AISetupChoice value={aiRoute} onChange={route => {
+                        setAIRoute(route)
+                        requestAnimationFrame(() => revealSettingsSection(route === 'relay' ? 'ai-app-connections' : 'ai-setup'))
+                      }} />
+                      {aiRoute === 'relay' ? <MCPRelayPanel active={isActive} onChooseCampaign={handleBrowse} /> : <>
                       {(settings?.secretStorageReadFailed || settings?.secretStorageAvailable === false) && (
                         <HUDMicro className="block text-accent-yellow">{t(settings.secretStorageReadFailed ? 'settings.advisor.lockedSecrets' : 'settings.advisor.sessionOnlySecrets')}</HUDMicro>
                       )}
@@ -724,7 +557,6 @@ function SettingsPage({
                         initialSettings={settings}
                         onSave={saveSettings}
                         onProviderChange={setAdvisorProvider}
-                        onUseAIApp={() => revealSettingsSection('ai-app-connections')}
                       />
                       {advisorProvider === 'gemini' && <div className="space-y-3 border-t border-white/10 pt-4">
                         <HUDLabel>{t('settings.geminiQuota.label')}</HUDLabel>
@@ -737,6 +569,7 @@ function SettingsPage({
                         <p className="text-xs text-text-secondary">{geminiQuotaHelper(geminiQuotaMode)}</p>
                       </div>}
                       <ChronicleRefreshControl mode={chronicleRefreshMode} saving={chronicleRefreshModeSaving} onChange={mode => void handleChronicleRefreshModeChange(mode)} />
+                      </>}
                     </div>
                   </HUDPanel>
                 </section>
@@ -892,187 +725,6 @@ function SettingsPage({
           <div className="grid grid-cols-1 gap-8 border-t border-white/10 p-4 md:grid-cols-2 md:p-6">
             {/* Optional connections */}
             <div className="space-y-8">
-                {/* MCP Relay Section */}
-                <section id="ai-app-connections">
-                    <HUDSectionTitle number="03">{t('settings.sections.mcpRelay')}</HUDSectionTitle>
-                    <HUDPanel
-                      decoration="tech"
-                      variant={mcpRelayServerHealthy ? 'primary' : 'secondary'}
-                      title={t('settings.panels.mcpRelay')}
-                      quiet
-                    >
-                        <div className="space-y-4 pt-2">
-                            <div className={`border p-3 rounded-sm space-y-2 ${mcpRelayServerHealthy ? 'border-accent-cyan/30 bg-accent-cyan/5' : 'border-white/10 bg-white/5'}`}>
-                              <div className="flex items-center justify-between gap-3">
-                                <HUDLabel>{t('settings.mcpRelay.campaignReadiness')}</HUDLabel>
-                                <div className={`font-display text-[11px] tracking-wider ${mcpRelayReady ? 'text-accent-green' : mcpRelayServerHealthy ? 'text-accent-yellow' : 'text-accent-red'}`}>
-                                  {mcpRelayReady
-                                    ? t('settings.mcpRelay.ready')
-                                    : mcpRelayServerHealthy
-                                      ? t('settings.mcpRelay.waitingForCampaign')
-                                      : t('settings.mcpRelay.offline')}
-                                </div>
-                              </div>
-                              <p className="font-mono text-[10px] leading-relaxed text-white/55">
-                                {mcpRelaySummary}
-                              </p>
-                              {mcpRelayHealth?.campaign?.freshness?.message && (
-                                <p className="font-mono text-[9px] leading-relaxed text-white/35">
-                                  {mcpRelayHealth.campaign.freshness.message}
-                                </p>
-                              )}
-                            </div>
-
-                            <div className="space-y-2">
-                              {mcpClients.map(({ id, status }) => {
-                                const isBusy = mcpRelayClientBusy === id
-                                const unavailable = id === 'codex' && status?.available === false
-                                const statusLabel = unavailable
-                                  ? t('settings.mcpRelay.unavailable')
-                                  : status?.current
-                                    ? t('settings.mcpRelay.connected')
-                                    : status?.configured
-                                      ? t('settings.mcpRelay.needsUpdate')
-                                      : t('settings.mcpRelay.notConnected')
-                                const statusClass = status?.current
-                                  ? 'text-accent-green'
-                                  : status?.configured
-                                    ? 'text-accent-yellow'
-                                    : 'text-text-secondary'
-                                return (
-                                  <div key={id} className="border border-white/10 bg-black/20 p-3 rounded-sm space-y-2">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div>
-                                        <HUDLabel>{t(`settings.mcpRelay.clients.${id}.name`)}</HUDLabel>
-                                        <p className="mt-1 font-mono text-[9px] leading-relaxed text-white/40">
-                                          {t(`settings.mcpRelay.clients.${id}.description`)}
-                                        </p>
-                                      </div>
-                                      <span className={`shrink-0 font-display text-[10px] tracking-wider ${statusClass}`}>
-                                        {statusLabel}
-                                      </span>
-                                    </div>
-                                    {status?.error && (
-                                      <p className="font-mono text-[9px] leading-relaxed text-accent-red">
-                                        {status.error}
-                                      </p>
-                                    )}
-                                    <div className="flex gap-2">
-                                      <HUDButton
-                                        variant={status?.current ? 'secondary' : 'primary'}
-                                        onClick={() => void handleMcpClientConnection(id)}
-                                        disabled={Boolean(mcpRelayClientBusy) || !mcpRelayStatus || status?.current || unavailable}
-                                        className="flex-1 px-3 text-[9px]"
-                                      >
-                                        {isBusy
-                                          ? t('settings.mcpRelay.working')
-                                          : status?.configured
-                                            ? t('settings.mcpRelay.update')
-                                            : t('settings.mcpRelay.connect')}
-                                      </HUDButton>
-                                      {status?.configured && (
-                                        <HUDButton
-                                          variant="ghost"
-                                          onClick={() => void handleMcpClientConnection(id, true)}
-                                          disabled={Boolean(mcpRelayClientBusy)}
-                                          className="px-3 text-[9px]"
-                                        >
-                                          {t('settings.mcpRelay.disconnect')}
-                                        </HUDButton>
-                                      )}
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-
-                            <details className="group">
-                              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm border border-white/10 bg-black/20 px-3 py-2 font-display text-[10px] uppercase tracking-[0.18em] text-text-secondary transition-all duration-200 hover:border-accent-cyan/40 hover:bg-accent-cyan/5 hover:text-accent-cyan">
-                                <span className="flex items-center gap-2">
-                                  <span className="transition-transform duration-200 group-open:rotate-90">&gt;</span>
-                                  <span className="group-open:hidden">{t('settings.mcpRelay.showAdvancedSetup')}</span>
-                                  <span className="hidden group-open:inline">{t('settings.mcpRelay.hideAdvancedSetup')}</span>
-                                </span>
-                                <span className="font-mono text-[9px] tracking-[0.12em] text-white/35">
-                                  {t('settings.mcpRelay.optional')}
-                                </span>
-                              </summary>
-                              <div className="mt-3 space-y-3">
-                                <div className="border border-white/10 bg-black/20 p-3 rounded-sm space-y-2">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <HUDLabel>{t('settings.mcpRelay.diagnostics')}</HUDLabel>
-                                    <HUDMicro>
-                                      {mcpRelayHealth?.protocolVersion || mcpRelayStatus?.language?.toUpperCase() || '—'}
-                                    </HUDMicro>
-                                  </div>
-                                  <p className="font-mono text-[10px] leading-relaxed text-white/45 break-all">
-                                    {mcpRelayStatus?.dbPath || t('settings.mcpRelay.loading')}
-                                  </p>
-                                  {mcpRelayHealth && (
-                                    <p className={`font-mono text-[10px] leading-relaxed ${mcpRelayHealth.ok ? 'text-accent-green' : 'text-accent-red'}`}>
-                                      {mcpRelayHealth.message}
-                                    </p>
-                                  )}
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2">
-                                  <HUDButton
-                                    variant="secondary"
-                                    onClick={() => void handleMcpRelayHealthCheck()}
-                                    disabled={mcpRelayChecking}
-                                    className="px-3 text-[9px]"
-                                  >
-                                    {mcpRelayChecking ? t('settings.mcpRelay.checking') : t('settings.mcpRelay.runCheck')}
-                                  </HUDButton>
-                                  <HUDButton
-                                    variant="secondary"
-                                    onClick={() => void handleCopyMcpDiagnostics()}
-                                    disabled={!mcpRelayStatus && !mcpRelayHealth}
-                                    className="px-3 text-[9px]"
-                                  >
-                                    {t('settings.mcpRelay.copyDiagnostics')}
-                                  </HUDButton>
-                                  <HUDButton
-                                    variant="secondary"
-                                    onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.codex, 'Codex')}
-                                    disabled={!mcpRelayStatus}
-                                    className="px-3 text-[9px]"
-                                  >
-                                    {t('settings.mcpRelay.copyCodexSetup')}
-                                  </HUDButton>
-                                  <HUDButton
-                                    variant="secondary"
-                                    onClick={() => void handleCopyMcpRelayText(mcpRelayStatus?.snippets?.genericJson, 'MCP JSON')}
-                                    disabled={!mcpRelayStatus}
-                                    className="px-3 text-[9px]"
-                                  >
-                                    {t('settings.mcpRelay.copyMcpJson')}
-                                  </HUDButton>
-                                  {mcpRelayStatus?.mcpbPath && (
-                                    <HUDButton
-                                      variant="secondary"
-                                      onClick={() => void window.electronAPI?.mcpRelay?.openClaudeExtension?.()}
-                                      className="px-3 text-[9px]"
-                                    >
-                                      {t('settings.mcpRelay.installClaudeExtension')}
-                                    </HUDButton>
-                                  )}
-                                  <HUDButton
-                                    variant="ghost"
-                                    onClick={() => mcpRelayStatus?.logPath && void window.electronAPI?.mcpRelay?.revealPath?.(mcpRelayStatus.logPath)}
-                                    disabled={!mcpRelayStatus?.logPath}
-                                    className="col-span-2 px-3 text-[9px]"
-                                  >
-                                    {t('settings.mcpRelay.revealLog')}
-                                  </HUDButton>
-                                </div>
-                              </div>
-                            </details>
-
-                        </div>
-                    </HUDPanel>
-                </section>
-                
                 {/* Discord Section */}
                 <section>
                     <HUDSectionTitle number="04">{t('settings.sections.communications')}</HUDSectionTitle>

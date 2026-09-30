@@ -18,13 +18,16 @@ patches/
   4.1.md   Stellaris 4.1 "Lyra"
   4.2.md   Stellaris 4.2 "Corvus"
   4.3.md   Stellaris 4.3 "Cetus"
+  4.4.md   Stellaris 4.4 "Pegasus"
+  4.5.md   Stellaris 4.5 "Cygnus" release-note coverage
+  4.5.1.md Cygnus hotfix coverage
   snapshots/
-    4.3.md   compiled current-state snapshot through 4.3.5
+    4.4.6.md compiled current-state Pegasus snapshot
 ```
 
-When the advisor builds its system prompt, `load_patch_notes()` in `stellaris_companion/personality.py` reads the player's game version from their save file and loads cumulative mechanics for that version. By default it prefers the latest compiled snapshot at or below the target version, then appends any later delta files. A player on v4.2 gets 4.0 + 4.1 + 4.2 concatenated. A player on v4.3 gets the compiled `snapshots/4.3.md` current-state artifact instead of raw 4.0 + 4.1 + 4.2 + 4.3 concatenation. The content is injected into the `[GAME MECHANICS]` block of the system prompt with an instruction to treat it as ground truth and never reference patches or changes.
+When Advisor or Chronicle builds a prompt, the shared resolver reads the game version from the save. For a version with a compiled snapshot, it loads that snapshot and applicable hotfix overlays. For 4.5, the Pop Group redesign makes the 4.4.6 snapshot unsafe to carry forward, so the resolver loads only the 4.5 release-note coverage and the 4.5.1 overlay when applicable. It labels this coverage partial until a full current-state snapshot has been checked against shipped 4.5 data. Unknown newer release lines receive no older mechanics pack.
 
-Lines starting with `#` (markdown headers) or `<!--` (HTML comments) are stripped during loading. Headers exist only for human readability of the files — the model sees flat content.
+HTML comments are stripped during loading. Markdown headers remain in the model context to group related mechanics.
 
 ## Content Format
 
@@ -60,10 +63,10 @@ Below the tables, standard bullets cover other 4.0 mechanics (growth, colonies, 
 
 All patch files follow the same conventions:
 
-- **Present-tense facts only.** Never use change language ("no longer", "used to", "was changed", "patch"). The model should present mechanics as how the game works, not as things that changed.
+- **Present-tense facts only.** Avoid change-history language ("used to", "was changed", "patch"). The model should present mechanics as how the game works.
 - **Parenthetical strategic implications** at the end of bullets where useful, e.g. "(Early colonies require military protection.)"
 - **Concrete numbers inline.** Don't say "a lot of pops" — say "80,000-120,000 pops."
-- **Section headers by gameplay domain** (`### Population & Growth`, `### Trade & Logistics`, etc.) for human readability. These are stripped before injection.
+- **Section headers by gameplay domain** (`### Population & Growth`, `### Trade & Logistics`, etc.) so the model can keep related rules together.
 
 ## Content Selection
 

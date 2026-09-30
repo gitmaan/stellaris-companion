@@ -1065,6 +1065,25 @@ class PlayerMixin:
         values = session.get_duplicate_values("country", str(player_id), "technology")
         return [value for value in values if isinstance(value, str)]
 
+    def get_active_policies(self) -> dict[str, str]:
+        """Return selected player policies, preserving unfamiliar game-version IDs."""
+        country = self._get_player_country_entry(self.get_player_empire_id())
+        if not isinstance(country, dict):
+            return {}
+        active_policies = country.get("active_policies")
+        if not isinstance(active_policies, list):
+            return {}
+
+        result: dict[str, str] = {}
+        for entry in active_policies:
+            if not isinstance(entry, dict):
+                continue
+            policy = entry.get("policy")
+            selected = entry.get("selected")
+            if isinstance(policy, str) and policy and isinstance(selected, str) and selected:
+                result[policy] = selected
+        return result
+
     @staticmethod
     def _get_active_diplomatic_stance(player_country: dict) -> str | None:
         """Extract the currently selected diplomatic stance."""

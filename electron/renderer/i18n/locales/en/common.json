@@ -304,7 +304,7 @@
       "manageCampaigns": "Manage campaigns",
       "narrator": "Narrator",
       "storyStyle": "Story style",
-      "publish": "Publish",
+      "publish": "Share Chronicle",
       "export": "Export",
       "events": "Events",
       "latest": "Latest",
@@ -384,8 +384,8 @@
     },
     "publish": {
       "eyebrow": "Share // Public Record",
-      "title": "Publish Chronicle",
-      "subtitle": "Create one lightweight story link without creating an account. Nothing is sent until you publish.",
+      "title": "Share Chronicle",
+      "subtitle": "Create a public story link and submit it to the Chronicle archive for review. No account is needed, and nothing is sent until you confirm.",
       "close": "Close publishing dialog",
       "checking": "Checking publication status...",
       "defaultTitle": "The Chronicle of {{empireName}}",
@@ -395,23 +395,25 @@
       "unlistedHelp": "Recommended. The story stays out of the public archive and search engines.",
       "discoverable": "Request public discovery",
       "discoverableHelp": "The story can join the Chronicle archive and search engines after review.",
-      "privacyTitle": "Exactly what leaves this device",
+      "privacyTitle": "What will be shared",
       "privacyStoryOnly": "The title, empire name, language, and Chronicle chapter text shown here.",
       "privacyNoSave": "Never your save file, save path, API key, prompts, or AI provider details.",
       "privacyKey": "A random management key is encrypted on this device so you can update or remove the story.",
-      "publish": "Publish story",
+      "privacyLearnMore": "How updates and removal work",
+      "publish": "Publish publicly",
       "publishing": "Publishing...",
       "update": "Update story",
       "updating": "Updating...",
-      "published": "Story published",
+      "published": "Chronicle published",
       "revision": "Revision {{revision}}",
-      "pendingReview": "Your link works now. Public discovery is pending review, so the story remains noindex.",
+      "pendingReview": "Your public link works now. Archive and search discovery are pending review, so the story remains noindex.",
       "approved": "This story is approved for the public Chronicle archive and search discovery.",
       "unlistedStatus": "This story is private-by-link and excluded from search discovery.",
       "copyLink": "Copy link",
       "copied": "Link copied",
       "openStory": "Open story",
       "syncWarning": "Showing the saved publication details while offline: {{message}}",
+      "manageStory": "Manage publication",
       "remove": "Remove published story",
       "confirmRemove": "Confirm permanent removal",
       "removing": "Removing...",
@@ -683,53 +685,11 @@
       "errorPrefix": "ERR:"
     },
     "mcpRelay": {
-      "loading": "SCANNING...",
-      "ready": "READY",
-      "noDatabase": "NO CAMPAIGN CACHE",
       "loadingSummary": "Checking the local AI app connection.",
-      "readySummary": "Local connection ready.",
-      "noDatabaseSummary": "No campaign archive found yet. Open or select a save folder before connecting AI apps.",
-      "installed": "CONNECTED",
-      "installedNeedsRefresh": "UPDATE AVAILABLE",
-      "notInstalled": "NOT CONNECTED",
-      "claudeDesktop": "CLAUDE DESKTOP",
-      "otherApps": "OTHER AI APPS",
-      "otherAppsHelp": "Use manual MCP setup for Cursor, LM Studio, and similar clients.",
-      "localEndpoint": "LOCAL ARCHIVE",
-      "runCheck": "RUN CHECK",
-      "checking": "CHECKING...",
-      "connectClaude": "ADD TO CLAUDE",
-      "updateClaude": "UPDATE CLAUDE",
-      "claudeConnected": "ADDED TO CLAUDE",
-      "installing": "INSTALLING...",
-      "copyClaude": "COPY CLAUDE JSON",
-      "copyClaudeCode": "COPY CLAUDE CODE",
       "copyCodexSetup": "COPY CODEX SETUP",
       "copyMcpJson": "COPY MCP JSON",
-      "revealConfig": "REVEAL CONFIG",
-      "showAdvancedSetup": "SHOW MANUAL MCP SETUP",
-      "hideAdvancedSetup": "HIDE MANUAL MCP SETUP",
-      "optional": "OPTIONAL",
-      "healthSuccess": "MCP Relay responded successfully.",
-      "healthError": "MCP Relay health check failed.",
-      "copySuccess": "{{target}} setup copied.",
-      "copyError": "Failed to copy setup.",
-      "installConfirm": "Connect {{target}} to Stellaris Companion? This updates only that app's local MCP configuration.",
-      "installSuccess": "{{target}} connection updated. Restart the AI app if it is already open.",
       "installError": "Failed to update the AI app connection.",
-      "serverUnavailableSummary": "The local MCP server is not responding. Run the check below for details.",
-      "readyCampaignSummary": "Ready for {{empire}} on {{date}}.",
-      "noCampaignSummary": "The connection works, but no campaign is cached yet. Load a Stellaris save in the app first.",
       "unknownEmpire": "the active empire",
-      "campaignReadiness": "CAMPAIGN READINESS",
-      "waitingForCampaign": "WAITING FOR CAMPAIGN",
-      "offline": "OFFLINE",
-      "connected": "CONNECTED",
-      "needsUpdate": "UPDATE NEEDED",
-      "notConnected": "NOT CONNECTED",
-      "unavailable": "NOT FOUND",
-      "connect": "CONNECT",
-      "update": "UPDATE",
       "disconnect": "DISCONNECT",
       "working": "WORKING...",
       "diagnostics": "MCP DIAGNOSTICS",
@@ -737,20 +697,65 @@
       "installClaudeExtension": "OPEN CLAUDE EXTENSION",
       "revealLog": "REVEAL MCP LOG",
       "disconnectConfirm": "Disconnect {{target}} from Stellaris Companion? Other MCP servers will be kept.",
-      "disconnectSuccess": "{{target}} disconnected.",
       "clients": {
         "claude": {
-          "name": "CLAUDE DESKTOP",
-          "description": "Local campaign tools in Claude, with automatic config backup."
+          "name": "Claude Desktop",
+          "description": "Discuss your campaign in Claude on this computer."
         },
         "codex": {
-          "name": "CHATGPT + CODEX",
-          "description": "One shared connection for ChatGPT desktop, Codex CLI, and the IDE extension."
+          "name": "ChatGPT desktop",
+          "description": "For ChatGPT desktop and Codex on this computer. ChatGPT web uses a different setup."
         },
         "cursor": {
-          "name": "CURSOR",
-          "description": "Local campaign tools available in Cursor chats and agents."
+          "name": "Cursor",
+          "description": "Discuss your campaign in Cursor chats and agents."
         }
+      },
+      "intro": "Connect your AI app to your Stellaris campaign.",
+      "benefits": "Get strategic advice, understand your economy, and write your empire’s Chronicle.",
+      "plan": "You’ll chat in the app you connect. No API key needed in Companion. Your AI app’s usual plan and usage limits apply.",
+      "chooseApp": "Choose your app",
+      "chooseCampaign": "Choose your campaign",
+      "chooseSave": "Choose save folder",
+      "changeCampaign": "Change save folder",
+      "campaignReady": "Campaign ready · {{empire}} · {{date}}",
+      "noCampaign": "Load a Stellaris save in Companion to make your campaign available.",
+      "checkFailed": "We couldn’t check your campaign. Try again, or choose a save to get started.",
+      "checkAgain": "Check again",
+      "addTo": "Add to {{target}}",
+      "setupHelp": "This adds your campaign connection to {{target}} on this computer. Other connections are kept.",
+      "setupAdded": "Setup added. Restart your AI app to use it.",
+      "appMissing": "Open or install {{target}} on this computer, then check again. Manual setup is available below.",
+      "setupFailed": "Setup needs attention. Open {{target}} and try again. Technical details are under Advanced MCP setup.",
+      "updateSetup": "Update setup",
+      "startChatting": "Start chatting",
+      "restart": "Open {{target}}, or restart it if it’s already open. Start a new chat and paste a question. Allow access to Stellaris Companion if prompted.",
+      "firstQuestion": "Try a question",
+      "copyQuestion": "Copy question",
+      "chronicleSave": "Review the draft, then ask your AI app to save it to your Chronicle when you’re ready.",
+      "keepOpen": "Keep Companion open while you play so your AI app can access your latest saves.",
+      "copied": "Copied to clipboard.",
+      "copyError": "Couldn’t copy. Try again.",
+      "advanced": "Advanced MCP setup",
+      "otherApps": "Other desktop apps that support local MCP can use the same MCP JSON in their connection settings.",
+      "questions": {
+        "priorities": {
+          "label": "Empire priorities",
+          "prompt": "Use Stellaris Companion to summarize my empire and suggest my next three priorities."
+        },
+        "economy": {
+          "label": "Economy",
+          "prompt": "Use Stellaris Companion to explain my economy and suggest the most useful improvements."
+        },
+        "chronicle": {
+          "label": "Chronicle",
+          "prompt": "Use Stellaris Companion to draft a Chronicle entry about my campaign’s recent events. Show me the draft before saving."
+        }
+      },
+      "manual": {
+        "claude": "For manual setup, merge the copied MCP JSON into Claude Desktop’s claude_desktop_config.json, then restart Claude. You can also open the bundled Claude extension.",
+        "codex": "For manual Codex setup, run the copied command in a terminal, then restart your desktop app. This uses the same connection as ChatGPT desktop on this computer.",
+        "cursor": "For manual setup, merge the copied MCP JSON into ~/.cursor/mcp.json in your home folder, then restart Cursor."
       }
     },
     "feedback": {
@@ -823,8 +828,6 @@
       "removeKey": "Remove saved key",
       "keyRemoved": "Saved key removed.",
       "copyDetails": "Copy support details",
-      "useAIApp": "I already use an AI app",
-      "aiAppHelp": "Connect a supported desktop app, such as Claude or ChatGPT. You chat there; no API key is needed in Companion.",
       "testNotice": "Checks send a small test request, which may use your provider allowance. Campaign data is not sent.",
       "help": {
         "gemini": "Use Google AI in Companion. Create a connection key in Google AI Studio and paste it below.",
@@ -832,6 +835,17 @@
         "ollama": "Open Ollama and download a chat model. Companion can then find it on this computer.",
         "lm_studio": "Open LM Studio, load a chat model, and start its local server in the Developer tab.",
         "custom": "Use an OpenAI-compatible service. Enter the connection address supplied by your provider."
+      },
+      "chooseRoute": "Where would you like to chat?",
+      "routes": {
+        "companion": {
+          "title": "Chat in Companion",
+          "description": "Set up the built-in advisor. We’ll help you choose an AI provider."
+        },
+        "relay": {
+          "title": "Connect your AI app",
+          "description": "Use MCP Relay to discuss your campaign in Claude Desktop, ChatGPT desktop, or another supported app. No API key needed in Companion."
+        }
       }
     }
   },

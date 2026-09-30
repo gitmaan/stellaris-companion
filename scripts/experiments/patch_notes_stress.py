@@ -4,13 +4,15 @@ Stress test for patch notes content — verifies the advisor correctly
 understands post-4.0 game mechanics (pop scaling, workforce, trade, etc.)
 and compares two formatting approaches for token efficiency.
 
-Uses live Gemini 3 Flash API calls in standalone mode (no Rust parser needed).
+Uses live Gemini API calls in standalone mode (no Rust parser needed).
 
 Usage:
     python3 scripts/experiments/patch_notes_stress.py --hypothesis real
     python3 scripts/experiments/patch_notes_stress.py --hypothesis raw
     python3 scripts/experiments/patch_notes_stress.py --version "Cetus v4.3.0" --hypothesis real
+    python3 scripts/experiments/patch_notes_stress.py --model gemma-4-26b-a4b-it
     python3 scripts/experiments/patch_notes_stress.py --test-name naval_cap_corvette_43
+    python3 scripts/experiments/patch_notes_stress.py -t market_currency -t branch_office_trade_43
     python3 scripts/experiments/patch_notes_stress.py --list-tests
 """
 
@@ -232,6 +234,7 @@ HYPOTHESIS_B_42 = """\
 # =============================================================================
 
 DEFAULT_VERSION = "Cetus v4.3.0"
+DEFAULT_MODEL = "gemini-3-flash-preview"
 
 
 def _get_hypothesis_a():
@@ -485,11 +488,17 @@ ALL_CASES = [
 
 
 def run_test(
-    client: genai.Client, test: TestCase, system_prompt: str, verbose: bool = False
+    client: genai.Client,
+    test: TestCase,
+    system_prompt: str,
+    *,
+    model: str = DEFAULT_MODEL,
+    verbose: bool = False,
 ) -> dict:
     """Run a single test case and return raw response for manual review."""
     print(f"\n{'=' * 60}")
     print(f"  TEST: {test.name}")
+    print(f"  Model: {model}")
     print(f"  Q: {test.question}")
     if test.notes:
         print(f"  Expect: {test.notes}")
@@ -498,7 +507,7 @@ def run_test(
     start = time.time()
     try:
         response = client.models.generate_content(
-            model="gemini-3-flash-preview",
+            model=model,
             contents=test.question,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -509,8 +518,10 @@ def run_test(
         response_text = response.text or ""
         elapsed = time.time() - start
     except Exception as e:
-        print(f"\n  ERROR: {e}")
-        return {"name": test.name, "error": str(e), "response": "", "elapsed": 0}
+        elapsed = time.time() - start
+        error = str(e)
+        print(f"\n  ERROR ({elapsed:.1f}s): {error}")
+        return {"name": test.name, "error": error, "response": "", "elapsed": elapsed}
 
     print(f"\n  Response ({elapsed:.1f}s):")
     print("  " + "-" * 56)
@@ -525,8 +536,10 @@ def run_suite(
     client: genai.Client,
     hypothesis_key: str,
     version: str,
-    test_name: str | None = None,
+    model: str = DEFAULT_MODEL,
+    test_names: list[str] | None = None,
     save_path: str | None = None,
+    delay_s: float = 0.0,
 ) -> dict:
     """Run the test suite for a hypothesis and collect responses for manual review."""
     label, content_fn = HYPOTHESES[hypothesis_key][0], HYPOTHESES[hypothesis_key][1]
@@ -538,25 +551,37 @@ def run_suite(
     print("PATCH NOTES STRESS TEST")
     print(f"  Hypothesis: {label}")
     print(f"  Version: {version}")
+    print(f"  Model: {model}")
+    if delay_s:
+        print(f"  Delay between tests: {delay_s:.1f}s")
     print(f"  System prompt: {len(system_prompt)} chars (~{token_est} tokens)")
     print(f"  Patch content: {len(patch_content)} chars (~{len(patch_content) // 4} tokens)")
     print(f"{'=' * 60}")
 
     # Select tests
-    if test_name:
-        cases = [t for t in ALL_CASES if t.name == test_name]
-        if not cases:
-            print(f"ERROR: test '{test_name}' not found. Available: {[t.name for t in ALL_CASES]}")
+    if test_names:
+        requested = [
+            name.strip() for item in test_names for name in item.split(",") if name.strip()
+        ]
+        available = {test.name for test in ALL_CASES}
+        missing = [name for name in requested if name not in available]
+        if missing:
+            print(f"ERROR: test(s) not found: {missing}. Available: {[t.name for t in ALL_CASES]}")
             sys.exit(1)
+        requested_set = set(requested)
+        cases = [test for test in ALL_CASES if test.name in requested_set]
     else:
         cases = ALL_CASES
 
     print(f"\nRunning {len(cases)} tests...\n")
 
     all_results = []
-    for test in cases:
-        result = run_test(client, test, system_prompt)
+    for index, test in enumerate(cases):
+        result = run_test(client, test, system_prompt, model=model)
         all_results.append(result)
+        if delay_s > 0 and index < len(cases) - 1:
+            print(f"\n  Waiting {delay_s:.1f}s before next request...")
+            time.sleep(delay_s)
 
     # Summary stats
     total_errors = sum(1 for r in all_results if r.get("error"))
@@ -578,11 +603,17 @@ def run_suite(
             "hypothesis": hypothesis_key,
             "label": label,
             "version": version,
+            "model": model,
             "token_est": token_est,
             "prompt_chars": len(system_prompt),
             "patch_chars": len(patch_content),
             "results": [
-                {"name": r["name"], "response": r["response"], "elapsed": r["elapsed"]}
+                {
+                    "name": r["name"],
+                    "response": r["response"],
+                    "elapsed": r["elapsed"],
+                    "error": r.get("error"),
+                }
                 for r in all_results
             ],
         }
@@ -592,6 +623,7 @@ def run_suite(
 
     return {
         "hypothesis": hypothesis_key,
+        "model": model,
         "total": len(all_results),
         "errors": total_errors,
         "avg_elapsed": avg_elapsed,
@@ -617,9 +649,26 @@ def main():
         choices=list(HYPOTHESES.keys()),
         help="Hypothesis to test (default: a)",
     )
-    parser.add_argument("--test-name", "-t", type=str, help="Run specific test by name")
+    parser.add_argument(
+        "--test-name",
+        "-t",
+        action="append",
+        help="Run specific test by name; repeat or comma-separate for multiple tests.",
+    )
     parser.add_argument("--save", "-s", type=str, help="Save results to JSON file")
     parser.add_argument("--list-tests", action="store_true", help="List all test names and exit")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL,
+        help=f"Gemini API model to test (default: {DEFAULT_MODEL})",
+    )
+    parser.add_argument(
+        "--delay-s",
+        type=float,
+        default=0.0,
+        help="Seconds to wait between model calls; useful for free-tier RPM pacing.",
+    )
     parser.add_argument(
         "--version",
         type=str,
@@ -643,8 +692,10 @@ def main():
         client,
         args.hypothesis,
         version=args.version,
-        test_name=args.test_name,
+        model=args.model,
+        test_names=args.test_name,
         save_path=args.save,
+        delay_s=args.delay_s,
     )
 
 

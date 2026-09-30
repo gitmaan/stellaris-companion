@@ -6,6 +6,8 @@ import { HUDButton } from './hud/HUDButton'
 import { HUDLabel, HUDMicro } from './hud/HUDText'
 import { HUDPanel } from './hud/HUDPanel'
 import { AISetupForm } from './settings/AISetupForm'
+import { AISetupChoice, type AISetupRoute } from './settings/AISetupChoice'
+import { MCPRelayPanel } from './settings/MCPRelayPanel'
 import {
   useSettings,
 } from '../hooks/useSettings'
@@ -60,7 +62,7 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
   const actionRowBaselineTopRef = useRef<number | null>(null)
 
   const { settings, loading: settingsLoading, saveSettings } = useSettings()
-  const [useAIApp, setUseAIApp] = useState(false)
+  const [aiRoute, setAIRoute] = useState<AISetupRoute | null>(null)
 
   // Step 3 state
   const [saveResult, setSaveResult] = useState<SaveDetectionResult | null>(null)
@@ -254,7 +256,7 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
       }
       const completed = await window.electronAPI.onboarding.complete()
       if (completed?.success === false) throw new Error('Onboarding completion failed')
-      onComplete(useAIApp)
+      onComplete(aiRoute === 'relay')
     } catch {
       setCompletionError(true)
     } finally {
@@ -287,7 +289,7 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ duration: 0.25 }}
-        className="relative mx-4 h-[min(36rem,calc(100vh-3rem))] w-[min(54rem,calc(100%-2rem))] outline-none"
+        className="relative mx-4 h-[min(42rem,calc(100vh-3rem))] w-[min(54rem,calc(100%-2rem))] outline-none"
       >
         <div className="relative h-full overflow-hidden">
           <div className="absolute right-6 top-5 z-10 flex flex-col items-end gap-1">
@@ -327,18 +329,21 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
                   step={2}
                   title={t('onboarding.ai.frameTitle')}
                   actions={<>
-                    <HUDButton variant="secondary" onClick={() => goTo(1)}>{t('onboarding.actions.back')}</HUDButton>
-                    <HUDButton variant="secondary" onClick={() => goTo(3)}>{t('onboarding.actions.later')}</HUDButton>
+                    <HUDButton variant="secondary" onClick={() => aiRoute ? setAIRoute(null) : goTo(1)}>{t('onboarding.actions.back')}</HUDButton>
+                    <HUDButton variant={aiRoute === 'relay' ? 'primary' : 'secondary'} onClick={() => goTo(3)}>{t(aiRoute === 'relay' ? 'onboarding.actions.continue' : 'onboarding.actions.later')}</HUDButton>
                   </>}
                 >
-                  {settingsLoading ? <p>{t('common.loading')}</p> : (
-                    <AISetupForm
-                      initialSettings={settings}
-                      onSave={saveSettings}
-                      onSaved={() => { setUseAIApp(false); goTo(3) }}
-                      onUseAIApp={() => { setUseAIApp(true); goTo(3) }}
-                    />
-                  )}
+                  <div className={aiRoute ? "space-y-5" : "flex h-full flex-col justify-center"}>
+                    {!aiRoute && <AISetupChoice value={aiRoute} onChange={setAIRoute} />}
+                    {aiRoute === 'relay' && <MCPRelayPanel onChooseCampaign={() => goTo(3)} />}
+                    {aiRoute === 'companion' && (settingsLoading ? <p>{t('common.loading')}</p> : (
+                      <AISetupForm
+                        initialSettings={settings}
+                        onSave={saveSettings}
+                        onSaved={() => goTo(3)}
+                      />
+                    ))}
+                  </div>
                 </StepFrame>
               </motion.div>
             )}

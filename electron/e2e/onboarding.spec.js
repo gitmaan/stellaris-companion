@@ -43,6 +43,8 @@ test('guides first-time players through a visual AI choice without forcing setup
     await dialog.getByRole('button', { name: 'GET STARTED' }).click()
 
     await expect(dialog.getByRole('heading', { name: 'CHOOSE YOUR AI' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: /Connect your AI app/ })).toBeVisible()
+    await dialog.getByRole('button', { name: /Chat in Companion/ }).click()
     await expect(dialog.getByRole('button', { name: /Gemini.*easiest setup/i })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -105,7 +107,10 @@ test('opens existing AI app connections after onboarding without a provider key'
     const page = await app.firstWindow()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('button', { name: 'GET STARTED' }).click()
-    await dialog.getByRole('button', { name: 'I already use an AI app', exact: true }).click()
+    await dialog.getByRole('button', { name: /Connect your AI app/ }).click()
+    await expect(dialog.getByRole('heading', { name: 'MCP RELAY' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Claude Desktop', exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: 'CONTINUE', exact: true }).click()
     await expect(dialog.getByRole('heading', { name: 'CONNECT YOUR SAVES' })).toBeVisible()
     await dialog.getByRole('button', { name: /^(SET UP LATER|FINISH)$/ }).click()
     await expect(dialog).not.toBeVisible()

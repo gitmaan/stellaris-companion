@@ -358,7 +358,7 @@ test('cancels browser sign-in and shows model costs before saving OpenRouter', a
     expect((await page.evaluate(() => window.electronAPI.getSettings())).openRouterApiKeySet).toBe(false)
     await fs.mkdir(path.resolve(electronDir, '..', 'artifacts', 'ai-setup'), { recursive: true })
     await page.screenshot({ path: path.resolve(electronDir, '..', 'artifacts', 'ai-setup', 'openrouter.png') })
-    await page.getByRole('button', { name: 'I already use an AI app', exact: true }).click()
+    await page.getByRole('button', { name: /Connect your AI app/ }).click()
     await expect(page.locator('#ai-app-connections')).toBeInViewport()
     await expect(page.locator('#ai-app-connections').getByText(/^Claude Desktop$/i)).toBeVisible()
   } finally {

@@ -92,6 +92,25 @@ class DummyPlayerExtractor(PlayerMixin):
         return set(self._timed_modifiers)
 
 
+def test_get_active_policies_keeps_unfamiliar_policy_ids():
+    extractor = DummyPlayerExtractor(
+        {
+            "active_policies": [
+                {"policy": "diplomatic_stance", "selected": "diplo_stance_expansionist"},
+                {"policy": "fleet_doctrine", "selected": "doctrine_example"},
+                {"policy": "weapon_preference", "selected": "kinetic_example"},
+                {"policy": "invalid"},
+            ]
+        }
+    )
+
+    assert extractor.get_active_policies() == {
+        "diplomatic_stance": "diplo_stance_expansionist",
+        "fleet_doctrine": "doctrine_example",
+        "weapon_preference": "kinetic_example",
+    }
+
+
 def test_get_naval_capacity_high_confidence_on_clean_base_plus_difficulty():
     extractor = DummyPlayerExtractor(
         {

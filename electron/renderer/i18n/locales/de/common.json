@@ -182,7 +182,7 @@
       "finalizedTooltip": "Finalisiertes Kapitel",
       "currentEra": "Aktuelle Aera",
       "narrator": "Erzaehler",
-      "publish": "Veroeffentlichen",
+      "publish": "Chronik teilen",
       "export": "Exportieren",
       "events": "Ereignisse",
       "latest": "Neueste",
@@ -199,8 +199,8 @@
     },
     "publish": {
       "eyebrow": "Teilen // Oeffentliche Akte",
-      "title": "Chronik veroeffentlichen",
-      "subtitle": "Erstelle einen einfachen Link zu deiner Geschichte, ohne ein Konto anzulegen. Vor dem Veroeffentlichen wird nichts gesendet.",
+      "title": "Chronik teilen",
+      "subtitle": "Erstelle einen oeffentlichen Link und reiche ihn ohne Konto zur Pruefung beim Chronikarchiv ein. Bis zur Bestaetigung wird nichts gesendet.",
       "close": "Veroeffentlichungsdialog schliessen",
       "checking": "Veroeffentlichungsstatus wird geprueft...",
       "defaultTitle": "Die Chronik von {{empireName}}",
@@ -210,15 +210,16 @@
       "unlistedHelp": "Empfohlen. Die Geschichte bleibt ausserhalb des oeffentlichen Archivs und der Suchmaschinen.",
       "discoverable": "Oeffentliche Auffindbarkeit beantragen",
       "discoverableHelp": "Nach einer Pruefung kann die Geschichte im Chronikarchiv und in Suchmaschinen erscheinen.",
-      "privacyTitle": "Genau diese Daten verlassen das Geraet",
+      "privacyTitle": "Das wird geteilt",
       "privacyStoryOnly": "Titel, Reichsname, Sprache und der hier sichtbare Chroniktext.",
       "privacyNoSave": "Niemals Speicherdatei, Speicherpfad, API-Schluessel, Prompts oder Angaben zum KI-Anbieter.",
       "privacyKey": "Ein zufaelliger Verwaltungsschluessel wird auf diesem Geraet verschluesselt, damit du die Geschichte aendern oder entfernen kannst.",
-      "publish": "Geschichte veroeffentlichen",
+      "privacyLearnMore": "So funktionieren Aenderungen und Entfernen",
+      "publish": "Oeffentlich veroeffentlichen",
       "publishing": "Wird veroeffentlicht...",
       "update": "Geschichte aktualisieren",
       "updating": "Wird aktualisiert...",
-      "published": "Geschichte veroeffentlicht",
+      "published": "Chronik veroeffentlicht",
       "revision": "Revision {{revision}}",
       "pendingReview": "Der Link funktioniert bereits. Die oeffentliche Freigabe wird geprueft; bis dahin bleibt die Geschichte von Suchmaschinen ausgeschlossen.",
       "approved": "Diese Geschichte ist fuer das oeffentliche Chronikarchiv und die Suche freigegeben.",
@@ -227,6 +228,7 @@
       "copied": "Link kopiert",
       "openStory": "Geschichte oeffnen",
       "syncWarning": "Gespeicherte Veroeffentlichungsdaten werden offline angezeigt: {{message}}",
+      "manageStory": "Veroeffentlichung verwalten",
       "remove": "Veroeffentlichte Geschichte entfernen",
       "confirmRemove": "Dauerhaftes Entfernen bestaetigen",
       "removing": "Wird entfernt...",
@@ -611,53 +613,11 @@
       "aria": "Setzen Sie den Gemini-Kontingentmodus auf {{mode}}"
     },
     "mcpRelay": {
-      "loading": "SCANNEN...",
-      "ready": "BEREIT",
-      "noDatabase": "KEIN KAMPAGNEN-CACHE",
       "loadingSummary": "Überprüfen der lokalen AI-App-Verbindung.",
-      "readySummary": "Lokale Verbindung bereit.",
-      "noDatabaseSummary": "Noch kein Kampagnenarchiv gefunden. Öffnen Sie einen Speicherordner oder wählen Sie ihn aus, bevor Sie AI-Apps verbinden.",
-      "installed": "VERBUNDEN",
-      "installedNeedsRefresh": "UPDATE VERFÜGBAR",
-      "notInstalled": "NICHT VERBUNDEN",
-      "claudeDesktop": "CLAUDE DESKTOP",
-      "otherApps": "ANDERE KI-APPS",
-      "otherAppsHelp": "Verwenden Sie die manuelle MCP-Einrichtung für Cursor, LM Studio und ähnliche Clients.",
-      "localEndpoint": "LOKALES ARCHIV",
-      "runCheck": "DURCHFÜHREN SIE DIE PRÜFUNG",
-      "checking": "ÜBERPRÜFUNG...",
-      "connectClaude": "Zu CLAUDE hinzufügen",
-      "updateClaude": "UPDATE CLAUDE",
-      "claudeConnected": "HINZUGEFÜGT ZU CLAUDE",
-      "installing": "INSTALLIEREN...",
-      "copyClaude": "KOPIE CLAUDE JSON",
-      "copyClaudeCode": "CLAUDE-CODE KOPIEREN",
       "copyCodexSetup": "CODEX-SETUP KOPIEREN",
       "copyMcpJson": "KOPIEREN MCP JSON",
-      "revealConfig": "KONFIGURATION ANZEIGEN",
-      "showAdvancedSetup": "MANUELLES MCP-SETUP ANZEIGEN",
-      "hideAdvancedSetup": "MANUELLES MCP-SETUP AUSblenden",
-      "optional": "OPTIONAL",
-      "healthSuccess": "MCP Relay hat erfolgreich geantwortet.",
-      "healthError": "Die Integritätsprüfung von MCP Relay ist fehlgeschlagen.",
-      "copySuccess": "{{target}}-Setup kopiert.",
-      "copyError": "Setup konnte nicht kopiert werden.",
-      "installConfirm": "{{target}} mit Stellaris Companion verbinden? Nur die lokale MCP-Konfiguration dieser App wird aktualisiert.",
-      "installSuccess": "Verbindung fuer {{target}} aktualisiert. Starte die KI-App neu, falls sie geoeffnet ist.",
       "installError": "KI-App-Verbindung konnte nicht aktualisiert werden.",
-      "serverUnavailableSummary": "Der lokale MCP-Server antwortet nicht. Fuehre unten die Pruefung aus.",
-      "readyCampaignSummary": "Bereit fuer {{empire}} am {{date}}.",
-      "noCampaignSummary": "Die Verbindung funktioniert, aber noch keine Kampagne ist zwischengespeichert. Lade zuerst einen Stellaris-Spielstand.",
       "unknownEmpire": "das aktive Reich",
-      "campaignReadiness": "KAMPAGNENBEREITSCHAFT",
-      "waitingForCampaign": "WARTE AUF KAMPAGNE",
-      "offline": "OFFLINE",
-      "connected": "VERBUNDEN",
-      "needsUpdate": "UPDATE NOETIG",
-      "notConnected": "NICHT VERBUNDEN",
-      "unavailable": "NICHT GEFUNDEN",
-      "connect": "VERBINDEN",
-      "update": "AKTUALISIEREN",
       "disconnect": "TRENNEN",
       "working": "ARBEITET...",
       "diagnostics": "MCP-DIAGNOSE",
@@ -665,20 +625,65 @@
       "installClaudeExtension": "CLAUDE-ERWEITERUNG OEFFNEN",
       "revealLog": "MCP-LOG ANZEIGEN",
       "disconnectConfirm": "{{target}} von Stellaris Companion trennen? Andere MCP-Server bleiben erhalten.",
-      "disconnectSuccess": "{{target}} wurde getrennt.",
       "clients": {
         "claude": {
-          "name": "CLAUDE DESKTOP",
-          "description": "Lokale Kampagnenwerkzeuge in Claude, mit automatischer Konfigurationssicherung."
+          "name": "Claude Desktop",
+          "description": "Besprich deine Kampagne in Claude auf diesem Computer."
         },
         "codex": {
-          "name": "CHATGPT + CODEX",
-          "description": "Eine gemeinsame Verbindung fuer ChatGPT Desktop, Codex CLI und die IDE-Erweiterung."
+          "name": "ChatGPT desktop",
+          "description": "Für ChatGPT Desktop und Codex auf diesem Computer. ChatGPT im Browser wird anders eingerichtet."
         },
         "cursor": {
-          "name": "CURSOR",
-          "description": "Lokale Kampagnenwerkzeuge in Cursor-Chats und Agenten."
+          "name": "Cursor",
+          "description": "Besprich deine Kampagne in Cursor-Chats und mit Agenten."
         }
+      },
+      "intro": "Verbinde deine KI-App mit deiner Stellaris-Kampagne.",
+      "benefits": "Erhalte Strategietipps, verstehe deine Wirtschaft und schreibe die Chronik deines Reiches.",
+      "plan": "Du chattest in der verbundenen App. In Companion ist kein API-Schlüssel nötig. Es gelten der Tarif und die Nutzungslimits deiner KI-App.",
+      "chooseApp": "App auswählen",
+      "chooseCampaign": "Kampagne auswählen",
+      "chooseSave": "Spielstandordner auswählen",
+      "changeCampaign": "Spielstandordner ändern",
+      "campaignReady": "Kampagne bereit · {{empire}} · {{date}}",
+      "noCampaign": "Lade einen Stellaris-Spielstand in Companion, um deine Kampagne bereitzustellen.",
+      "checkFailed": "Deine Kampagne konnte nicht geprüft werden. Versuche es erneut oder wähle einen Spielstand.",
+      "checkAgain": "Erneut prüfen",
+      "addTo": "Zu {{target}} hinzufügen",
+      "setupHelp": "Fügt die Kampagnenverbindung zu {{target}} auf diesem Computer hinzu. Andere Verbindungen bleiben erhalten.",
+      "setupAdded": "Einrichtung hinzugefügt. Starte deine KI-App neu, um sie zu nutzen.",
+      "appMissing": "Öffne oder installiere {{target}} auf diesem Computer und prüfe erneut. Die manuelle Einrichtung findest du unten.",
+      "setupFailed": "Die Einrichtung benötigt Aufmerksamkeit. Öffne {{target}} und versuche es erneut. Technische Details findest du unter Erweiterte MCP-Einrichtung.",
+      "updateSetup": "Einrichtung aktualisieren",
+      "startChatting": "Chat starten",
+      "restart": "Öffne {{target}} oder starte die App neu, falls sie bereits läuft. Beginne einen neuen Chat und füge eine Frage ein. Erlaube auf Nachfrage den Zugriff auf Stellaris Companion.",
+      "firstQuestion": "Frage ausprobieren",
+      "copyQuestion": "Frage kopieren",
+      "chronicleSave": "Prüfe den Entwurf und bitte deine KI-App anschließend, ihn in deiner Chronik zu speichern.",
+      "keepOpen": "Lass Companion beim Spielen geöffnet, damit deine KI-App auf die neuesten Spielstände zugreifen kann.",
+      "copied": "In die Zwischenablage kopiert.",
+      "copyError": "Kopieren fehlgeschlagen. Versuche es erneut.",
+      "advanced": "Erweiterte MCP-Einrichtung",
+      "otherApps": "Andere Desktop-Apps mit lokalem MCP können dieselbe MCP-JSON in ihren Verbindungseinstellungen verwenden.",
+      "questions": {
+        "priorities": {
+          "label": "Prioritäten",
+          "prompt": "Nutze Stellaris Companion, um mein Reich zusammenzufassen und meine nächsten drei Prioritäten vorzuschlagen."
+        },
+        "economy": {
+          "label": "Wirtschaft",
+          "prompt": "Nutze Stellaris Companion, um meine Wirtschaft zu erklären und die sinnvollsten Verbesserungen vorzuschlagen."
+        },
+        "chronicle": {
+          "label": "Chronik",
+          "prompt": "Nutze Stellaris Companion, um einen Chronikeintrag über die jüngsten Ereignisse meiner Kampagne zu entwerfen. Zeige mir den Entwurf vor dem Speichern."
+        }
+      },
+      "manual": {
+        "claude": "Füge für die manuelle Einrichtung die kopierte MCP-JSON in Claude Desktops claude_desktop_config.json ein und starte Claude neu. Alternativ kannst du die mitgelieferte Claude-Erweiterung öffnen.",
+        "codex": "Führe für die manuelle Codex-Einrichtung den kopierten Befehl in einem Terminal aus und starte deine Desktop-App neu. Sie nutzt dieselbe Verbindung wie ChatGPT Desktop auf diesem Computer.",
+        "cursor": "Füge für die manuelle Einrichtung die kopierte MCP-JSON in ~/.cursor/mcp.json in deinem Benutzerordner ein und starte Cursor neu."
       }
     },
     "aiSetup": {
@@ -713,8 +718,6 @@
       "removeKey": "Gespeicherten Schlüssel entfernen",
       "keyRemoved": "Gespeicherter Schlüssel entfernt.",
       "copyDetails": "Supportdetails kopieren",
-      "useAIApp": "Ich nutze bereits eine KI-App",
-      "aiAppHelp": "Eine unterstützte Desktop-App wie Claude oder ChatGPT verbinden. Der Chat bleibt dort; Companion benötigt keinen API-Schlüssel.",
       "testNotice": "Prüfungen senden eine kleine Testanfrage, die Kontingent verbrauchen kann. Kampagnendaten werden nicht gesendet.",
       "help": {
         "gemini": "Google-KI in Companion nutzen. In Google AI Studio einen Verbindungsschlüssel erstellen und unten einfügen.",
@@ -722,6 +725,17 @@
         "ollama": "Ollama öffnen und ein Chatmodell herunterladen. Companion kann es dann auf diesem Computer finden.",
         "lm_studio": "LM Studio öffnen, ein Chatmodell laden und den lokalen Server im Tab „Developer“ starten.",
         "custom": "Einen OpenAI-kompatiblen Dienst nutzen. Die vom Anbieter angegebene Verbindungsadresse eingeben."
+      },
+      "chooseRoute": "Wo möchtest du chatten?",
+      "routes": {
+        "companion": {
+          "title": "In Companion chatten",
+          "description": "Richte den integrierten Berater ein. Wir helfen dir bei der Wahl eines KI-Anbieters."
+        },
+        "relay": {
+          "title": "Deine KI-App verbinden",
+          "description": "Besprich deine Kampagne über MCP Relay in Claude Desktop, ChatGPT Desktop oder einer anderen unterstützten App. Kein API-Schlüssel in Companion nötig."
+        }
       }
     }
   },

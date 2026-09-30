@@ -1,5 +1,11 @@
 # Development workflow
 
+## Branches and releases
+
+`main` is the shared integration baseline. Fetch `origin` and start each focused change from `origin/main` on a short-lived `codex/` branch or worktree. Before resuming older work, compare it with current `main` and port only the changes that are still missing. Preserve local edits before switching branches.
+
+Open pull requests against `main` and validate the combined result before merging. Separate worktrees can use separate feature branches; they should share this baseline rather than accumulating independent release branches. A merge does not publish the app: version changes and release tags wait until the release is requested. Track pending validation in [Next release](next-release.md).
+
 ## Prerequisites
 
 - Node.js 22.12+ + npm

@@ -30,7 +30,9 @@ function ChroniclePublishDialog({
     [empireName, t],
   )
   const [title, setTitle] = useState(defaultTitle)
-  const [visibility, setVisibility] = useState<ChroniclePublicationVisibility>('unlisted')
+  // New publications are public by default. The service and stored receipts still
+  // support unlisted stories so existing links remain manageable.
+  const [visibility, setVisibility] = useState<ChroniclePublicationVisibility>('discoverable')
   const [receipt, setReceipt] = useState<ChroniclePublicationReceipt | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -58,7 +60,7 @@ function ChroniclePublishDialog({
         setVisibility(nextReceipt.visibility)
       } else {
         setTitle(defaultTitle)
-        setVisibility('unlisted')
+        setVisibility('discoverable')
       }
     } finally {
       setLoadingStatus(false)
@@ -149,7 +151,7 @@ function ChroniclePublishDialog({
       }
       setReceipt(null)
       setTitle(defaultTitle)
-      setVisibility('unlisted')
+      setVisibility('discoverable')
       setConfirmRemove(false)
     } finally {
       setRemoving(false)
@@ -218,11 +220,10 @@ function ChroniclePublishDialog({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-accent-teal shadow-[0_0_8px_rgba(45,212,191,0.8)]" />
                         <strong className="text-sm text-accent-teal">{t('chronicle.publish.published')}</strong>
-                        <span className="text-xs text-text-muted">{t('chronicle.publish.revision', { revision: receipt.revision })}</span>
                       </div>
                       {moderationMessage && <p className="mt-2 text-xs text-text-secondary">{moderationMessage}</p>}
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <button type="button" onClick={handleCopy} className="px-3 py-2 rounded border border-accent-teal/35 text-xs text-accent-teal hover:bg-accent-teal/10 transition-colors">
+                        <button type="button" onClick={handleCopy} className="px-3 py-2 rounded border border-accent-teal/45 bg-accent-teal/10 text-xs font-semibold text-accent-teal hover:bg-accent-teal/20 transition-colors">
                           {copied ? t('chronicle.publish.copied') : t('chronicle.publish.copyLink')}
                         </button>
                         <button type="button" onClick={handleOpen} className="px-3 py-2 rounded border border-border text-xs text-text-secondary hover:text-text-primary hover:border-accent-cyan/40 transition-colors">
@@ -249,32 +250,22 @@ function ChroniclePublishDialog({
                       maxLength={120}
                       className="w-full rounded-md border border-border bg-bg-tertiary px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent-cyan/60"
                     />
-                    <p className="mt-1 text-right text-[10px] text-text-muted">{title.length}/120</p>
+                    {title.length >= 100 && (
+                      <p className="mt-1 text-right text-[10px] text-text-muted">{title.length}/120</p>
+                    )}
                   </div>
-
-                  <fieldset>
-                    <legend className="text-xs uppercase tracking-wider text-text-secondary mb-2">{t('chronicle.publish.visibility')}</legend>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className={`cursor-pointer rounded-md border p-4 transition-colors ${visibility === 'unlisted' ? 'border-accent-cyan/55 bg-accent-cyan/5' : 'border-border bg-bg-tertiary/40 hover:border-border-light'}`}>
-                        <input className="sr-only" type="radio" name="chronicle-visibility" value="unlisted" checked={visibility === 'unlisted'} onChange={() => setVisibility('unlisted')} />
-                        <span className="block text-sm font-semibold text-text-primary">{t('chronicle.publish.unlisted')}</span>
-                        <span className="mt-1 block text-xs leading-relaxed text-text-secondary">{t('chronicle.publish.unlistedHelp')}</span>
-                      </label>
-                      <label className={`cursor-pointer rounded-md border p-4 transition-colors ${visibility === 'discoverable' ? 'border-accent-teal/55 bg-accent-teal/5' : 'border-border bg-bg-tertiary/40 hover:border-border-light'}`}>
-                        <input className="sr-only" type="radio" name="chronicle-visibility" value="discoverable" checked={visibility === 'discoverable'} onChange={() => setVisibility('discoverable')} />
-                        <span className="block text-sm font-semibold text-text-primary">{t('chronicle.publish.discoverable')}</span>
-                        <span className="mt-1 block text-xs leading-relaxed text-text-secondary">{t('chronicle.publish.discoverableHelp')}</span>
-                      </label>
-                    </div>
-                  </fieldset>
 
                   <div className="rounded-md border border-border bg-bg-primary/50 p-4">
                     <h3 className="text-xs uppercase tracking-wider text-text-primary">{t('chronicle.publish.privacyTitle')}</h3>
-                    <ul className="mt-3 space-y-2 text-xs leading-relaxed text-text-secondary">
-                      <li className="flex gap-2"><span className="text-accent-teal">✓</span>{t('chronicle.publish.privacyStoryOnly')}</li>
-                      <li className="flex gap-2"><span className="text-accent-teal">✓</span>{t('chronicle.publish.privacyNoSave')}</li>
-                      <li className="flex gap-2"><span className="text-accent-teal">✓</span>{t('chronicle.publish.privacyKey')}</li>
-                    </ul>
+                    <p className="mt-2 text-xs leading-relaxed text-text-secondary">
+                      {t('chronicle.publish.privacyStoryOnly')} {t('chronicle.publish.privacyNoSave')}
+                    </p>
+                    <details className="mt-3 text-xs text-text-secondary">
+                      <summary className="cursor-pointer select-none text-accent-cyan/80 hover:text-accent-cyan transition-colors">
+                        {t('chronicle.publish.privacyLearnMore')}
+                      </summary>
+                      <p className="mt-2 leading-relaxed">{t('chronicle.publish.privacyKey')}</p>
+                    </details>
                   </div>
 
                   {error && (
@@ -283,14 +274,17 @@ function ChroniclePublishDialog({
                     </div>
                   )}
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
-                    <div>
-                      {receipt && (
+                  {receipt && (
+                    <details className="rounded-md border border-border/80 bg-bg-primary/30 px-4 py-3">
+                      <summary className="cursor-pointer select-none text-xs text-text-secondary hover:text-text-primary transition-colors">
+                        {t('chronicle.publish.manageStory')}
+                      </summary>
+                      <div className="mt-3 border-t border-border/70 pt-3">
                         <button
                           type="button"
                           onClick={handleRemove}
                           disabled={removing || submitting}
-                          className={`px-3 py-2 text-xs rounded border transition-colors disabled:opacity-50 ${confirmRemove ? 'border-accent-red bg-accent-red/15 text-accent-red' : 'border-border text-text-muted hover:text-accent-red hover:border-accent-red/40'}`}
+                          className={`px-3 py-2 text-xs rounded border transition-colors disabled:opacity-50 ${confirmRemove ? 'border-accent-red bg-accent-red/15 text-accent-red' : 'border-accent-red/25 text-accent-red/70 hover:text-accent-red hover:border-accent-red/50'}`}
                         >
                           {removing
                             ? t('chronicle.publish.removing')
@@ -298,23 +292,21 @@ function ChroniclePublishDialog({
                               ? t('chronicle.publish.confirmRemove')
                               : t('chronicle.publish.remove')}
                         </button>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={onClose} disabled={submitting || removing} className="px-4 py-2.5 rounded border border-border text-xs text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50">
-                        {t('chronicle.publish.cancel')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handlePublish}
-                        disabled={submitting || removing || !title.trim() || !chronicle}
-                        className="px-5 py-2.5 rounded border border-accent-cyan/50 bg-accent-cyan/10 text-xs font-semibold uppercase tracking-wider text-accent-cyan hover:bg-accent-cyan/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {submitting
-                          ? t(receipt ? 'chronicle.publish.updating' : 'chronicle.publish.publishing')
-                          : t(receipt ? 'chronicle.publish.update' : 'chronicle.publish.publish')}
-                      </button>
-                    </div>
+                      </div>
+                    </details>
+                  )}
+
+                  <div className="flex justify-end border-t border-border pt-5">
+                    <button
+                      type="button"
+                      onClick={handlePublish}
+                      disabled={submitting || removing || !title.trim() || !chronicle}
+                      className="px-5 py-2.5 rounded border border-accent-cyan/50 bg-accent-cyan/10 text-xs font-semibold uppercase tracking-wider text-accent-cyan hover:bg-accent-cyan/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {submitting
+                        ? t(receipt ? 'chronicle.publish.updating' : 'chronicle.publish.publishing')
+                        : t(receipt ? 'chronicle.publish.update' : 'chronicle.publish.publish')}
+                    </button>
                   </div>
                 </>
               )}

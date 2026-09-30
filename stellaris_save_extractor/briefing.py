@@ -138,6 +138,7 @@ class BriefingMixin:
         meta = self.get_metadata()
         player = self.get_player_status()
         identity = self.get_empire_identity()
+        identity["active_policies"] = self.get_active_policies()
         resources = self.get_resources()
 
         # Pre-warm the player country content cache for methods that still use regex
