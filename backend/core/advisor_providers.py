@@ -301,22 +301,32 @@ class GeminiAdvisorGenerator:
             "Gemini could not complete the response", code="PROVIDER_INVALID_RESPONSE"
         )
 
-        while len(diagnostics) < GEMINI_MAX_ATTEMPTS:
+        while len(diagnostics) < GEMINI_MAX_ATTEMPTS and candidate_index < len(candidate_models):
             candidate_model = candidate_models[candidate_index]
             fallback_model = (
                 candidate_models[candidate_index + 1]
                 if candidate_index + 1 < len(candidate_models)
                 else None
             )
-            if fallback_model and is_model_temporarily_unavailable(candidate_model):
+            if is_model_temporarily_unavailable(candidate_model):
                 route_event = get_model_unavailable_event(
                     requested_model=requested_model,
                     skipped_model=candidate_model,
-                    final_model=fallback_model,
+                    final_model=fallback_model or candidate_model,
+                )
+                last_error = AdvisorProviderError(
+                    "The selected Gemini models are cooling down after reaching their quota. "
+                    "Please try again later.",
+                    code="PROVIDER_RATE_LIMITED",
                 )
                 candidate_index += 1
                 continue
 
+            if route_event:
+                route_event.final_model = candidate_model
+                route_event.notice = fallback_notice(
+                    route_event.attempted_model, candidate_model, reason=route_event.reason
+                )
             cfg = types.GenerateContentConfig(**config_kwargs, max_output_tokens=max_output_tokens)
             level = thinking_level
             # Lite already defaults to minimal thinking. Unknown/custom models keep their defaults.
@@ -345,20 +355,24 @@ class GeminiAdvisorGenerator:
                 call["error_code"] = code
                 logger.info("Gemini generation: %s", json.dumps(call))
                 failure = classify_model_error(exc)
-                if failure and failure.reason != "billing" and fallback_model:
+                can_fallback = (
+                    code == "PROVIDER_RATE_LIMITED"
+                    and failure is not None
+                    and failure.reason in {"quota", "rate_limit", "daily_quota"}
+                )
+                if can_fallback and failure is not None:
+                    # Remember every exhausted model, including the last attempt,
+                    # so a later generation can reach the reserve without spending
+                    # another request on a known quota failure.
                     mark_model_failure(candidate_model, failure)
                     route_event = get_model_unavailable_event(
                         requested_model=requested_model,
                         skipped_model=candidate_model,
-                        final_model=fallback_model,
+                        final_model=fallback_model or candidate_model,
                     )
                     if route_event:
-                        route_event.reason = failure.reason
                         route_event.error = _redact_sensitive_text(
                             failure.message, self.config.api_key
-                        )
-                        route_event.notice = fallback_notice(
-                            candidate_model, fallback_model, reason=failure.reason
                         )
                     candidate_index += 1
                 else:
@@ -368,7 +382,7 @@ class GeminiAdvisorGenerator:
                     code=code,
                     status_code=400 if code == "PROVIDER_CONTEXT_LIMIT" else 502,
                 )
-                if failure and failure.reason != "billing" and fallback_model:
+                if can_fallback:
                     continue
                 break
 

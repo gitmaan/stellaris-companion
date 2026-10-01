@@ -13,8 +13,10 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
-GEMINI_FLASH_MODEL = "gemini-3-flash-preview"
-GEMINI_FLASH_LITE_MODEL = "gemini-3.1-flash-lite"
+GEMINI_FLASH_MODEL = "gemini-3.8-flash"
+GEMINI_FLASH_LITE_MODEL = "gemini-3.5-flash-lite"
+# Reserve only; Google currently lists May 7, 2027 as its earliest shutdown.
+GEMINI_FLASH_LITE_RESERVE_MODEL = "gemini-3.1-flash-lite"
 GOOGLE_GEMMA_MODEL = "gemma-4-26b-a4b-it"
 
 MODEL_ROUTING_QUALITY_FIRST = "quality_first"
@@ -25,10 +27,11 @@ ModelPurpose = Literal["advisor", "chronicle"]
 ModelRoutingMode = Literal["quality_first", "conserve"]
 
 _MODEL_DISPLAY_NAMES = {
-    GEMINI_FLASH_MODEL: "Gemini Flash",
+    GEMINI_FLASH_MODEL: "Gemini 3.8 Flash",
+    GEMINI_FLASH_LITE_MODEL: "Gemini 3.5 Flash-Lite",
+    GEMINI_FLASH_LITE_RESERVE_MODEL: "Gemini 3.1 Flash-Lite",
+    "gemini-3-flash-preview": "Gemini Flash",
     "gemini-3-flash": "Gemini Flash",
-    GEMINI_FLASH_LITE_MODEL: "Gemini Flash-Lite",
-    "gemini-3.1-flash-lite": "Gemini Flash-Lite",
     GOOGLE_GEMMA_MODEL: "Google Gemma",
     "gemma-4-26b": "Google Gemma",
 }
@@ -65,7 +68,6 @@ class ModelRouteEvent:
 class _ModelState:
     unavailable_until: float = 0.0
     reason: str | None = None
-    notice: str | None = None
 
 
 _MODEL_STATE: dict[str, _ModelState] = {}
@@ -105,9 +107,10 @@ def route_models_for(
         return [explicit_model]
 
     routing_mode = normalize_model_routing_mode(mode)
+    lite_models = [GEMINI_FLASH_LITE_MODEL, GEMINI_FLASH_LITE_RESERVE_MODEL]
     if routing_mode == MODEL_ROUTING_CONSERVE and purpose == "advisor":
-        return [GEMINI_FLASH_LITE_MODEL]
-    return [GEMINI_FLASH_MODEL, GEMINI_FLASH_LITE_MODEL]
+        return lite_models
+    return [GEMINI_FLASH_MODEL, *lite_models]
 
 
 def is_model_temporarily_unavailable(model_id: str, *, now: float | None = None) -> bool:
@@ -136,7 +139,7 @@ def get_model_unavailable_event(
         final_model=final_model,
         fallback=True,
         reason=state.reason,
-        notice=state.notice,
+        notice=fallback_notice(skipped_model, final_model, reason=state.reason),
     )
 
 
@@ -152,7 +155,6 @@ def mark_model_failure(model_id: str, failure: ModelFailure) -> None:
     _MODEL_STATE[model_id] = _ModelState(
         unavailable_until=unavailable_until,
         reason=failure.reason,
-        notice=fallback_notice(model_id, GEMINI_FLASH_LITE_MODEL, reason=failure.reason),
     )
 
 
@@ -165,7 +167,11 @@ def classify_model_error(error: BaseException | str) -> ModelFailure | None:
     text = str(error)
     lowered = text.lower()
 
-    if "no available credits" in lowered or "billing" in lowered and "quota" not in lowered:
+    if (
+        "no available credits" in lowered
+        or "insufficient credits" in lowered
+        or ("billing" in lowered and "quota" not in lowered)
+    ):
         return ModelFailure(
             reason="billing",
             message=text,
@@ -173,6 +179,14 @@ def classify_model_error(error: BaseException | str) -> ModelFailure | None:
             quota_id=_match(text, r"quotaId': '([^']+)'"),
             quota_value=_match(text, r"quotaValue': '([^']+)'"),
         )
+
+    # Switching models cannot recover a shared account/spending limit. Generic
+    # quota messages often link to billing docs, which is not a billing failure.
+    compact = re.sub(r"[^a-z0-9]", "", lowered)
+    if any(
+        marker in compact for marker in ("spendlimit", "spendinglimit", "spendbased", "accountwide")
+    ):
+        return ModelFailure(reason="account_limit", message=text)
 
     is_quota = (
         "429" in text
@@ -189,9 +203,10 @@ def classify_model_error(error: BaseException | str) -> ModelFailure | None:
 
     reason = "quota"
     quota_text = f"{quota_id or ''} {lowered}"
-    if "perday" in quota_text or "requestsperday" in quota_text:
+    compact_quota = re.sub(r"[^a-z0-9]", "", quota_text.lower())
+    if "perday" in compact_quota or "daily" in compact_quota:
         reason = "daily_quota"
-    elif "perminute" in quota_text or "requestsperminute" in quota_text:
+    elif "perminute" in compact_quota:
         reason = "rate_limit"
 
     return ModelFailure(

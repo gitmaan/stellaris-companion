@@ -107,13 +107,34 @@ retry loop. SDK transport retries are disabled for these calls.
 
 These are ceilings, not target response lengths. Each answer or Chronicle piece
 gets at most two API requests total, including JSON repair and the existing quota
-fallback to Flash-Lite. A Chronicle refresh may generate several pieces. Only a
+fallback. A Chronicle refresh may generate several pieces. Only a
 confirmed `MAX_TOKENS` finish increases the ceiling; empty or invalid JSON gets
 one repair at the same ceiling. Other provider failures stop immediately unless
 the existing quota fallback is available within the two-request allowance.
 
 Gemini 3 Chronicle generation uses low thinking; Flash-Lite retains its default.
-Advisor thinking and model selection remain unchanged. After a provider failure,
+Advisor thinking retains its default. Automatic routing uses these priority lists:
+
+| Use | Model order |
+| --- | --- |
+| Advisor in Conserve mode (default) | `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` |
+| Advisor in Quality mode / Chronicle in either mode | `gemini-3.8-flash` → `gemini-3.5-flash-lite` → `gemini-3.1-flash-lite` |
+
+The three-model list does not increase the two-request allowance. Known quota
+failures are skipped without a request, including an exhausted reserve. Every
+model quota failure is remembered for the running backend: daily quotas until
+midnight Pacific, other rate limits for the provider's retry delay (at least five
+seconds, or 60 seconds when unspecified). Models re-enter the list when their
+cooldown expires. Explicit model overrides stay on that model. Authentication,
+billing and recognized account-wide spending limits never trigger model fallback.
+The fallback notice identifies the actual model used, including its version.
+
+The setup connection probe uses `gemini-3.5-flash-lite`, matching the default
+Advisor model. OpenRouter recommendations are managed separately. Review Google's
+[model lifecycle](https://ai.google.dev/gemini-api/docs/deprecations) before each
+release; the reserve currently has an earliest shutdown date of May 7, 2027.
+
+After a provider failure,
 the Chronicle page pauses automatic generation for that campaign until an
 explicit Retry or app reload, and keeps the saved story available.
 

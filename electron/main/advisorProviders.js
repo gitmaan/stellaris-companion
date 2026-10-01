@@ -290,7 +290,7 @@ async function testGeminiConnection({ apiKey, timeoutMs, fetchImpl }) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   // Matches the default Advisor route in backend/core/model_routing.py.
-  const model = 'gemini-3.1-flash-lite'
+  const model = 'gemini-3.5-flash-lite'
   try {
     const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
