@@ -3,7 +3,7 @@ import type { AdvisorProvider } from '../../hooks/useSettings'
 import { HUDSelect } from '../hud/HUDForm'
 import { HUDLabel, HUDMicro } from '../hud/HUDText'
 
-type ProviderGroup = 'gemini' | 'local' | 'other'
+type ProviderGroup = 'chatgpt' | 'gemini' | 'local' | 'other'
 
 interface AdvisorProviderChooserProps {
   provider: AdvisorProvider
@@ -14,6 +14,7 @@ const LOCAL_PROVIDERS: AdvisorProvider[] = ['ollama', 'lm_studio']
 const OTHER_PROVIDERS: AdvisorProvider[] = ['openrouter', 'custom']
 
 function providerGroup(provider: AdvisorProvider): ProviderGroup {
+  if (provider === 'chatgpt') return 'chatgpt'
   if (provider === 'gemini') return 'gemini'
   if (LOCAL_PROVIDERS.includes(provider)) return 'local'
   return OTHER_PROVIDERS.includes(provider) ? 'other' : 'gemini'
@@ -22,8 +23,9 @@ function providerGroup(provider: AdvisorProvider): ProviderGroup {
 export function AdvisorProviderChooser({ provider, onChange }: AdvisorProviderChooserProps) {
   const { t } = useTranslation()
   const selectedGroup = providerGroup(provider)
-  const groups: ProviderGroup[] = ['gemini', 'local', 'other']
+  const groups: ProviderGroup[] = ['chatgpt', 'gemini', 'local', 'other']
   const groupIcons: Record<ProviderGroup, string> = {
+    chatgpt: '◉',
     gemini: '✦',
     local: '▣',
     other: '◎',
@@ -31,6 +33,7 @@ export function AdvisorProviderChooser({ provider, onChange }: AdvisorProviderCh
 
   const chooseGroup = (group: ProviderGroup) => {
     if (group === selectedGroup) return
+    if (group === 'chatgpt') onChange('chatgpt')
     if (group === 'gemini') onChange('gemini')
     if (group === 'local') onChange('ollama')
     if (group === 'other') onChange('openrouter')
@@ -49,7 +52,7 @@ export function AdvisorProviderChooser({ provider, onChange }: AdvisorProviderCh
   return (
     <div className="space-y-3">
       <HUDLabel>{t('settings.advisor.providerChoiceLabel')}</HUDLabel>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2">
         {groups.map(group => {
           const selected = selectedGroup === group
           return (
@@ -69,7 +72,7 @@ export function AdvisorProviderChooser({ provider, onChange }: AdvisorProviderCh
                   <span aria-hidden="true" className={selected ? 'text-accent-cyan' : 'text-white/35'}>
                     {groupIcons[group]}
                   </span>
-                  {t(`settings.advisor.providerGroups.${group}`)}
+                  {group === 'chatgpt' ? 'ChatGPT' : t(`settings.advisor.providerGroups.${group}`)}
                 </span>
                 {selected && (
                   <span
@@ -82,14 +85,14 @@ export function AdvisorProviderChooser({ provider, onChange }: AdvisorProviderCh
                 )}
               </div>
               <HUDMicro className="mt-1 block text-[9px] text-white/40">
-                {t(`settings.advisor.providerGroups.${group}Tag`)}
+                {t(group === 'chatgpt' ? 'chatgpt.usingPlan' : `settings.advisor.providerGroups.${group}Tag`)}
               </HUDMicro>
             </button>
           )
         })}
       </div>
 
-      {selectedGroup !== 'gemini' && (
+      {(selectedGroup === 'local' || selectedGroup === 'other') && (
         <HUDSelect
           label={t(`settings.advisor.${selectedGroup}ProviderLabel`)}
           value={provider}

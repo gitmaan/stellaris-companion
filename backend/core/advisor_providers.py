@@ -38,6 +38,7 @@ ADVISOR_PROVIDER_OLLAMA = "ollama"
 ADVISOR_PROVIDER_LM_STUDIO = "lm_studio"
 ADVISOR_PROVIDER_OPENROUTER = "openrouter"
 ADVISOR_PROVIDER_CUSTOM = "custom"
+ADVISOR_PROVIDER_CHATGPT = "chatgpt"
 
 ADVISOR_PROVIDERS = {
     ADVISOR_PROVIDER_GEMINI,
@@ -45,6 +46,7 @@ ADVISOR_PROVIDERS = {
     ADVISOR_PROVIDER_LM_STUDIO,
     ADVISOR_PROVIDER_OPENROUTER,
     ADVISOR_PROVIDER_CUSTOM,
+    ADVISOR_PROVIDER_CHATGPT,
 }
 
 PROVIDER_BASE_URLS = {
@@ -160,6 +162,22 @@ class AdvisorProviderConfig:
 
         if selected_provider == ADVISOR_PROVIDER_GEMINI:
             configured_key = str(google_api_key or os.environ.get("GOOGLE_API_KEY") or "")
+        elif selected_provider == ADVISOR_PROVIDER_CHATGPT:
+            # A per-process local bridge capability, never a ChatGPT OAuth token.
+            configured_url = os.environ.get("STELLARIS_CHATGPT_BRIDGE_URL", "")
+            configured_key = os.environ.get("STELLARIS_CHATGPT_BRIDGE_TOKEN", "")
+            parsed = urlparse(configured_url)
+            if (
+                parsed.scheme != "http"
+                or parsed.hostname != "127.0.0.1"
+                or not parsed.port
+                or parsed.username
+                or parsed.password
+                or parsed.path
+                or parsed.query
+                or parsed.fragment
+            ):
+                configured_url = ""
         else:
             configured_key = str(
                 advisor_api_key or os.environ.get("STELLARIS_ADVISOR_API_KEY") or ""
@@ -176,6 +194,8 @@ class AdvisorProviderConfig:
     def is_configured(self) -> bool:
         if self.provider == ADVISOR_PROVIDER_GEMINI:
             return bool(self.api_key)
+        if self.provider == ADVISOR_PROVIDER_CHATGPT:
+            return bool(self.base_url and self.api_key and self.model)
         if not self.base_url or not self.model:
             return False
         if self.provider == ADVISOR_PROVIDER_OPENROUTER:
@@ -190,6 +210,7 @@ class AdvisorProviderConfig:
             ADVISOR_PROVIDER_LM_STUDIO: "LM Studio",
             ADVISOR_PROVIDER_OPENROUTER: "OpenRouter",
             ADVISOR_PROVIDER_CUSTOM: "Custom provider",
+            ADVISOR_PROVIDER_CHATGPT: "ChatGPT",
         }[self.provider]
 
 
@@ -645,6 +666,109 @@ class OpenAICompatibleAdvisorGenerator:
         )
 
 
+class ChatGPTAdvisorGenerator:
+    """Use the desktop OAuth owner for Responses inference and completed output."""
+
+    def __init__(self, *, config: AdvisorProviderConfig, client: httpx.Client | None = None):
+        self.config = config
+        self._client = client
+
+    def generate(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        model: str | None = None,
+        model_routing_mode: str | None = None,
+        thinking_level: str = "dynamic",
+        temperature: float = 1.0,
+        max_output_tokens: int = 4096,
+        purpose: str = "advisor",
+        response_schema: type[BaseModel] | None = None,
+        schema_name: str | None = None,
+        allow_schema_fallback: bool = True,
+    ) -> AdvisorGenerationResult:
+        del model_routing_mode, thinking_level, temperature, max_output_tokens
+        if not self.config.is_configured:
+            raise AdvisorProviderError(
+                "Connect ChatGPT in Settings to continue.",
+                code="ADVISOR_PROVIDER_NOT_CONFIGURED",
+                status_code=400,
+            )
+        requested_model = model or self.config.model
+        body: dict[str, Any] = {
+            "instructions": system_prompt,
+            "input": user_prompt,
+            "purpose": purpose,
+        }
+        # The desktop owns the saved selection. Leaving it out for normal
+        # requests lets model switches take effect without a backend restart.
+        if model:
+            body["model"] = model
+        if response_schema:
+            body["input"] = _with_json_schema_instruction(
+                user_prompt, response_schema=response_schema
+            )
+            body["schema"] = _portable_json_schema(response_schema)
+            body["schemaName"] = _structured_schema_name(response_schema, schema_name)
+            body["allowSchemaFallback"] = allow_schema_fallback
+        client = self._client or httpx.Client(
+            timeout=self.config.timeout_seconds + 10, follow_redirects=False, trust_env=False
+        )
+        try:
+            response = client.post(
+                f"{self.config.base_url}/generate",
+                json=body,
+                headers={"Authorization": f"Bearer {self.config.api_key}"},
+            )
+            payload = response.json()
+        except (httpx.RequestError, ValueError) as exc:
+            raise AdvisorProviderError(
+                "ChatGPT is temporarily unavailable. Please try again.",
+                code="CHATGPT_UNAVAILABLE",
+                status_code=503,
+            ) from exc
+        finally:
+            if self._client is None:
+                client.close()
+        if not response.is_success:
+            allowed_codes = {
+                "CHATGPT_LIMIT",
+                "CHATGPT_RECONNECT",
+                "CHATGPT_PERMISSION",
+                "CHATGPT_INELIGIBLE",
+                "CHATGPT_UNAVAILABLE",
+                "CHATGPT_CANCELLED",
+                "CHATGPT_INVALID_RESPONSE",
+                "CHATGPT_MODEL",
+                "PROVIDER_CONTEXT_LIMIT",
+            }
+            code = payload.get("code") if isinstance(payload, dict) else None
+            if code not in allowed_codes:
+                code = "CHATGPT_UNAVAILABLE"
+            raise AdvisorProviderError(
+                "ChatGPT could not complete this request. Please try again or check your connection in Settings.",
+                code=code,
+                status_code=response.status_code,
+            )
+        if (
+            not isinstance(payload, dict)
+            or not isinstance(payload.get("text"), str)
+            or not payload["text"].strip()
+        ):
+            raise AdvisorProviderError(
+                "ChatGPT did not finish the response. Please try again.",
+                code="CHATGPT_INVALID_RESPONSE",
+            )
+        return AdvisorGenerationResult(
+            text=payload["text"],
+            model=payload.get("model") or requested_model,
+            requested_model=payload.get("model") or requested_model,
+            provider=ADVISOR_PROVIDER_CHATGPT,
+            schema_fallback_used=payload.get("schemaFallbackUsed") is True,
+        )
+
+
 def create_advisor_generator(
     *,
     config: AdvisorProviderConfig,
@@ -657,6 +781,8 @@ def create_advisor_generator(
         if gemini_client is None:
             return None
         return GeminiAdvisorGenerator(config=config, client=gemini_client)
+    if config.provider == ADVISOR_PROVIDER_CHATGPT:
+        return ChatGPTAdvisorGenerator(config=config)
     return OpenAICompatibleAdvisorGenerator(config=config)
 
 

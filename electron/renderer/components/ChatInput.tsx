@@ -6,7 +6,7 @@ import PersonIcon from './PersonIcon'
 import { isCompositionKey } from '../lib/compositionKey'
 
 interface ChatInputProps {
-  onSend: (message: string) => void
+  onSend: (message: string) => void | Promise<boolean | void>
   onOpenAdvisorPanel?: () => void
   disabled?: boolean
   loading?: boolean
@@ -56,23 +56,29 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
     resizeTextarea()
   }, [message, maxTextareaHeight, resizeTextarea])
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
+  const send = useCallback(async () => {
     if (message.trim() && !isDisabled) {
-      onSend(message.trim())
+      const sent = message.trim()
       setMessage('')
+      try {
+        if (await onSend(sent) === false) {
+          setMessage(current => current || sent)
+          textareaRef.current?.focus()
+        }
+      } catch { setMessage(current => current || sent) }
     }
   }, [message, isDisabled, onSend])
+
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault(); void send()
+  }, [send])
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !isCompositionKey(e)) {
       e.preventDefault()
-      if (message.trim() && !isDisabled) {
-        onSend(message.trim())
-        setMessage('')
-      }
+      void send()
     }
-  }, [message, isDisabled, onSend])
+  }, [send])
 
   const canSend = !isDisabled && message.trim()
 

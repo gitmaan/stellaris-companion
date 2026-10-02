@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import ChronicleChapterList from '../components/ChronicleChapterList'
+import ChatGPTUsage from '../components/ChatGPTUsage'
+import { manageChatGPTUsage } from '../hooks/useChatGPT'
 import ChronicleContent from '../components/ChronicleContent'
 import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
 import ChroniclePublishDialog from '../components/ChroniclePublishDialog'
@@ -62,6 +64,7 @@ function isDocumentVisible(): boolean {
 }
 
 function getProviderName(provider: string | null): string {
+  if (provider === 'chatgpt') return 'ChatGPT'
   switch (provider) {
     case 'ollama':
       return 'Ollama'
@@ -87,6 +90,7 @@ function getChronicleProviderErrorMessage({
   provider: string | null
   t: TFunction
 }): string {
+  if (code?.startsWith('CHATGPT_')) return String(t(`chatgpt.errors.${code}`, { defaultValue: t('chatgpt.errors.CHATGPT_UNAVAILABLE') }))
   const providerErrorKeys: Record<string, string> = {
     PROVIDER_UNAVAILABLE: 'providerUnavailable',
     PROVIDER_AUTH_FAILED: 'providerAuthFailed',
@@ -105,7 +109,7 @@ function getChronicleProviderErrorMessage({
 }
 
 function isProviderError(code?: string | null): boolean {
-  return Boolean(code?.startsWith('PROVIDER_'))
+  return Boolean(code?.startsWith('PROVIDER_') || ['CHATGPT_RECONNECT', 'CHATGPT_PERMISSION', 'CHATGPT_MODEL', 'CHATGPT_INELIGIBLE'].includes(code || ''))
 }
 
 /**
@@ -170,6 +174,7 @@ function ChroniclePage({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errorNeedsSettings, setErrorNeedsSettings] = useState(false)
+  const [usageLimited, setUsageLimited] = useState(false)
   const [chronicleProvider, setChronicleProvider] = useState<string | null>(null)
   const [chronicleConfigured, setChronicleConfigured] = useState<boolean | null>(null)
 
@@ -366,6 +371,7 @@ function ChroniclePage({
             t,
           }))
           setErrorNeedsSettings(isProviderError(chronicleResult.errorCode))
+          setUsageLimited(chronicleResult.errorCode === 'CHATGPT_LIMIT')
         }
       } else if (chronicleResult.data) {
         setChronicle(chronicleResult.data)
@@ -811,6 +817,7 @@ function ChroniclePage({
         t,
       }))
       setErrorNeedsSettings(isProviderError(result.errorCode))
+      setUsageLimited(result.errorCode === 'CHATGPT_LIMIT')
       setRegeneratingChapter(null)
       return
     }
@@ -970,6 +977,7 @@ function ChroniclePage({
               </div>
             )}
 
+            {chronicleProvider === 'chatgpt' && <ChatGPTUsage disabled={loading || regeneratingChapter !== null} />}
             {error && (
               <div className="stellaris-panel bg-accent-red/10 border-accent-red/30 rounded-lg p-4 mb-4 flex flex-wrap justify-between items-center gap-3">
                 <p className="text-accent-red text-sm m-0 flex items-center gap-2">
@@ -977,6 +985,7 @@ function ChroniclePage({
                   {error}
                 </p>
                 <div className="flex items-center gap-2">
+                  {usageLimited && <HUDButton type="button" onClick={() => void manageChatGPTUsage()}>{t('chatgpt.manageUsage')}</HUDButton>}
                   {errorNeedsSettings && onOpenSettings && (
                     <HUDButton
                       type="button"

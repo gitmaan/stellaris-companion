@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import ChatMessage from '../components/ChatMessage'
 import ChatInput from '../components/ChatInput'
+import ChatGPTUsage from '../components/ChatGPTUsage'
+import { manageChatGPTUsage } from '../hooks/useChatGPT'
 import VirtualChatList from '../components/VirtualChatList'
 import AdvisorInfoPanel from '../components/AdvisorInfoPanel'
 import { useBackend, ChatResponse, EmpireType } from '../hooks/useBackend'
@@ -94,7 +96,7 @@ interface Message {
   modelDisplay?: string
   modelRouting?: ChatResponse['model_routing']
   isError?: boolean
-  action?: 'settings'
+  action?: 'settings' | 'usage'
 }
 
 const MAX_CHAT_MESSAGES = 300
@@ -122,6 +124,8 @@ function buildRecentTurnsForReport(messages: Message[], assistantIndex: number):
 
 function getAdvisorProviderName(provider: string | null): string {
   switch (provider) {
+    case 'chatgpt':
+      return 'ChatGPT'
     case 'ollama':
       return 'Ollama'
     case 'lm_studio':
@@ -145,7 +149,11 @@ function getProviderErrorMessage({
   fallback: string
   provider: string | null
   t: TFunction
-}): { content: string; action?: 'settings' } {
+}): { content: string; action?: 'settings' | 'usage' } {
+  if (code?.startsWith('CHATGPT_')) return {
+    content: String(t(`chatgpt.errors.${code}`, { defaultValue: t('chatgpt.errors.CHATGPT_UNAVAILABLE') })),
+    action: code === 'CHATGPT_LIMIT' ? 'usage' : ['CHATGPT_RECONNECT', 'CHATGPT_PERMISSION', 'CHATGPT_MODEL', 'CHATGPT_INELIGIBLE'].includes(code) ? 'settings' : undefined,
+  }
   const providerName = getAdvisorProviderName(provider)
   const providerErrorKeys: Record<string, string> = {
     ADVISOR_PROVIDER_NOT_CONFIGURED: 'providerNotConfigured',
@@ -350,7 +358,7 @@ function ChatPage({
             isError: true,
           }
           setMessages(prev => capMessages([...prev, retryMessage]))
-          return
+          return false
         }
 
         const providerError = getProviderErrorMessage({
@@ -371,6 +379,7 @@ function ChatPage({
           action: providerError.action,
         }
         setMessages(prev => capMessages([...prev, errorMessage]))
+        return false
       } else if (result.data) {
         setAdvisorConfigured(true)
         // Success - add assistant response
@@ -386,6 +395,7 @@ function ChatPage({
           modelRouting: chatResponse.model_routing,
         }
         setMessages(prev => capMessages([...prev, assistantMessage]))
+        return true
       }
     } catch (err) {
       // Only update state if component is still mounted
@@ -400,6 +410,7 @@ function ChatPage({
         isError: true,
       }
       setMessages(prev => capMessages([...prev, errorMessage]))
+      return false
     } finally {
       if (isMountedRef.current && generation === chatGenerationRef.current) {
         setIsLoading(false)
@@ -433,9 +444,9 @@ function ChatPage({
           actionLabel={
             message.action === 'settings'
               ? t('chat.errors.openProviderSettings')
-              : undefined
+              : message.action === 'usage' ? t('chatgpt.manageUsage') : undefined
           }
-          onAction={message.action === 'settings' ? onOpenSettings : undefined}
+          onAction={message.action === 'settings' ? onOpenSettings : message.action === 'usage' ? () => void manageChatGPTUsage() : undefined}
           onReport={
             onReportLlmIssue && message.role === 'assistant' && !message.isError
               ? () => {
@@ -696,6 +707,7 @@ function ChatPage({
         disabled={!precomputeReady || advisorConfigured === false}
         onOpenAdvisorPanel={() => setAdvisorPanelOpen(true)}
       />
+      {advisorProvider === 'chatgpt' && <ChatGPTUsage disabled={isLoading} />}
     </div>
   )
 }

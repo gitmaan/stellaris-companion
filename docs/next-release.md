@@ -4,6 +4,7 @@ The next release is in development on `main`. The published app remains at v1.0.
 
 ## Included since v1.0.0
 
+- ChatGPT account connection for Advisor and Chronicle, simpler onboarding, and a shared model picker with saved preferences.
 - Broader localization across onboarding, settings, campaign history, and desktop controls.
 - More reliable campaign selection, save ingestion, and stored provider credentials.
 - Simpler AI setup, stable Gemini model selection, and bounded recovery that preserves saved Chronicles when generation fails.
@@ -19,6 +20,7 @@ The next release is in development on `main`. The published app remains at v1.0.
 - [ ] Confirm MCP Relay setup and a campaign query in each advertised client on its supported platform.
 - [ ] Run the final CI suite and packaged-app smoke checks, including provider setup, Chronicle refresh/sharing, and update/restart behavior.
 - [ ] Recheck Gemini model availability and retirement dates, including the 3.1 Flash-Lite reserve (earliest shutdown May 7, 2027).
+- [ ] Verify ChatGPT sign-in, protected credential storage, and an Advisor and Chronicle request in packaged macOS, Windows, and Linux builds.
 - [ ] Choose the version, prepare 3–5 user-facing release bullets, and publish only when the release is requested.
 
 Keep this list current as more work merges. Do not describe Cygnus support as complete until the save validation above passes.
