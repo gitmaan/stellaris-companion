@@ -636,7 +636,11 @@ class TestGenerateChronicleChapterOnly:
         mock_db.get_all_events_by_save_id.return_value = [
             {"event_type": "war_started", "summary": "War begun", "game_date": "2205.01.01"}
         ]
-        mock_db.upsert_chronicle_by_save_id.return_value = None
+        mock_db.commit_chronicle.side_effect = lambda **kwargs: {
+            "chapters_json": json.dumps(kwargs["chapters_data"]),
+            "event_count": kwargs["event_count"],
+            "snapshot_count": kwargs["snapshot_count"],
+        }
 
         cached_chapters = {
             "format_version": 1,
@@ -727,8 +731,8 @@ class TestGenerateChronicleChapterOnly:
         assert result["current_era"]["narrative"] == "Existing current era narrative."
         assert result["chapters"][0]["title"] == "The First Turning"
 
-        upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
-        stored = json.loads(upsert_kwargs["chapters_json"])
+        upsert_kwargs = generator.db.commit_chronicle.call_args.kwargs
+        stored = upsert_kwargs["chapters_data"]
         assert "current_era_cache" in stored
 
     def test_chapter_only_defers_when_auto_sync_cooldown_active(self, generator):
@@ -773,8 +777,8 @@ class TestGenerateChronicleChapterOnly:
         generator._count_pending_chapters.assert_not_called()  # type: ignore[attr-defined]
         assert result["pending_chapters"] == 2
 
-        upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
-        stored = json.loads(upsert_kwargs["chapters_json"])
+        generator.db.commit_chronicle.assert_not_called()
+        stored = json.loads(generator.db.get_chronicle_by_save_id.return_value["chapters_json"])
         assert stored["auto_chapter_sync"]["next_allowed_at"] == next_allowed_at
 
     def test_chapter_only_sets_pending_cadence_when_backlog_exists(self, generator):
@@ -784,8 +788,8 @@ class TestGenerateChronicleChapterOnly:
 
         generator.generate_chronicle("session-1", chapter_only=True)
 
-        upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
-        stored = json.loads(upsert_kwargs["chapters_json"])
+        upsert_kwargs = generator.db.commit_chronicle.call_args.kwargs
+        stored = upsert_kwargs["chapters_data"]
         auto_sync = stored.get("auto_chapter_sync")
         assert isinstance(auto_sync, dict)
         assert auto_sync["pending_chapters"] == 3
@@ -802,8 +806,8 @@ class TestGenerateChronicleChapterOnly:
 
         generator.generate_chronicle("session-1", chapter_only=True)
 
-        upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
-        stored = json.loads(upsert_kwargs["chapters_json"])
+        upsert_kwargs = generator.db.commit_chronicle.call_args.kwargs
+        stored = upsert_kwargs["chapters_data"]
         auto_sync = stored.get("auto_chapter_sync")
         assert isinstance(auto_sync, dict)
         assert auto_sync["pending_chapters"] == 0
@@ -834,7 +838,11 @@ class TestGenerateChronicleCurrentEraPolicy:
         mock_db.get_all_events_by_save_id.return_value = [
             {"event_type": "war_started", "summary": "War begun", "game_date": "2205.01.01"}
         ]
-        mock_db.upsert_chronicle_by_save_id.return_value = None
+        mock_db.commit_chronicle.side_effect = lambda **kwargs: {
+            "chapters_json": json.dumps(kwargs["chapters_data"]),
+            "event_count": kwargs["event_count"],
+            "snapshot_count": kwargs["snapshot_count"],
+        }
         return ChronicleGenerator(db=mock_db, api_key="fake-key")
 
     def test_reuses_current_era_cache_with_new_snapshot_in_same_era(self, generator):
@@ -955,8 +963,8 @@ class TestGenerateChronicleCurrentEraPolicy:
         generator._generate_current_era.assert_not_called()  # type: ignore[attr-defined]
         assert result["current_era"] is None
 
-        upsert_kwargs = generator.db.upsert_chronicle_by_save_id.call_args.kwargs
-        stored = json.loads(upsert_kwargs["chapters_json"])
+        upsert_kwargs = generator.db.commit_chronicle.call_args.kwargs
+        stored = upsert_kwargs["chapters_data"]
         assert "current_era_cache" not in stored
 
     def test_reuses_cache_when_event_growth_below_threshold(self, generator):
@@ -1313,7 +1321,8 @@ class TestGenerateChronicleCurrentEraPolicy:
 
         def persist_cached(**kwargs):
             nonlocal cached_state
-            cached_state = json.loads(kwargs["chapters_json"])
+            cached_state = kwargs["chapters_data"]
+            return load_cached()
 
         def generate_current_era(**_kwargs):
             generated_counts.append(current_event_count)
@@ -1333,7 +1342,7 @@ class TestGenerateChronicleCurrentEraPolicy:
         generator.db.get_chronicle_by_save_id.side_effect = load_cached
         generator.db.get_events_in_snapshot_range.side_effect = lambda **_kwargs: build_events()
         generator.db.get_all_events_by_save_id.side_effect = lambda **_kwargs: build_events()
-        generator.db.upsert_chronicle_by_save_id.side_effect = persist_cached
+        generator.db.commit_chronicle.side_effect = persist_cached
         generator._should_finalize_chapter = MagicMock(return_value=(False, None))  # type: ignore[method-assign]
         generator._count_pending_chapters = MagicMock(return_value=0)  # type: ignore[method-assign]
         generator._generate_current_era = MagicMock(side_effect=generate_current_era)  # type: ignore[method-assign]
@@ -1401,12 +1410,13 @@ class TestGenerateChronicleCurrentEraPolicy:
 
         def persist_cached(**kwargs):
             nonlocal cached_state
-            cached_state = json.loads(kwargs["chapters_json"])
+            cached_state = kwargs["chapters_data"]
+            return load_cached()
 
         generator.db.get_chronicle_by_save_id.side_effect = load_cached
         generator.db.get_events_in_snapshot_range.side_effect = lambda **_kwargs: build_events()
         generator.db.get_all_events_by_save_id.side_effect = lambda **_kwargs: build_events()
-        generator.db.upsert_chronicle_by_save_id.side_effect = persist_cached
+        generator.db.commit_chronicle.side_effect = persist_cached
         generator._should_finalize_chapter = MagicMock(return_value=(False, None))  # type: ignore[method-assign]
         generator._count_pending_chapters = MagicMock(return_value=0)  # type: ignore[method-assign]
         generator._generate_current_era = MagicMock(  # type: ignore[method-assign]

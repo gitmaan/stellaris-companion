@@ -485,7 +485,7 @@ function renderCurrentEra(era: CurrentEra, options: ChronicleExportOptions): str
     <div class="chapter-header-block">
       <div class="current-era-label"><span>&#x231B;</span> ${escapeHtml(options.labels.currentEra)}</div>
       <div class="chapter-title">${escapeHtml(options.labels.storyContinues)}</div>
-      <div class="chapter-dates">${escapeHtml(era.start_date)} &ndash; ${escapeHtml(options.labels.present)}</div>
+      <div class="chapter-dates">${escapeHtml(era.start_date)} &ndash; ${escapeHtml(era.coverage_date || options.labels.present)}</div>
     </div>
     <div class="narrative">
 ${narrative}

@@ -421,7 +421,10 @@
       "enhancedHelp": "Mises a jour plus rapides de l'ere actuelle dans la Chronique. Utilise plus d'appels au modele.",
       "aria": "Definir le mode d'actualisation sur {{mode}}",
       "toastError": "Impossible de mettre a jour le mode d'actualisation de la Chronique. Reessayez.",
-      "toastSuccess": "Mode d'actualisation de la Chronique defini sur {{mode}}."
+      "toastSuccess": "Mode d'actualisation de la Chronique defini sur {{mode}}.",
+      "manual": "Manuel",
+      "manualTag": "Sur demande",
+      "manualHelp": "Les événements continuent d’être enregistrés. Actualisez l’histoire pour obtenir du nouveau texte."
     },
     "modelRouting": {
       "label": "ROUTAGE MODELE",
@@ -1126,5 +1129,28 @@
     "lowerUsage": "Consommation réduite",
     "moreModels": "Autres modèles",
     "modelUpdated": "Modèle mis à jour"
+  },
+  "continuity": {
+    "historyRetry": "Historique indisponible · Réessayer",
+    "restoring": "Restauration du chat…",
+    "chats": "Chats",
+    "basedOnSave": "D’après la sauvegarde du {{date}}",
+    "historyNotSaved": "Cette réponse n’a pas pu être enregistrée.",
+    "storyCoverage": "L’histoire couvre la période jusqu’au {{date}}",
+    "chapterTitle": "Titre du chapitre",
+    "chapterText": "Texte du chapitre",
+    "editProtection": "Vos modifications sont conservées lors des mises à jour automatiques.",
+    "saveChanges": "Enregistrer",
+    "chapterActions": "Actions du chapitre",
+    "editText": "Modifier le texte",
+    "undoChapter": "Annuler la dernière modification",
+    "editedByYou": "Modifié par vous · conservé lors des mises à jour",
+    "coverageUnknown": "Période inconnue",
+    "editConflict": "Ce chapitre a changé pendant votre modification. Votre brouillon est conservé ; annulez et rouvrez la dernière version.",
+    "editFailed": "Impossible d’enregistrer ce chapitre.",
+    "earlierMessages": "Messages précédents",
+    "latestMessages": "Revenir aux derniers",
+    "updateStory": "Actualiser l’histoire",
+    "earlierSave": "Une sauvegarde antérieure est chargée. Votre histoire enregistrée est conservée."
   }
 }

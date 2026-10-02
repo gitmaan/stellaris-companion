@@ -9,26 +9,48 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import os
 import sqlite3
 import threading
 import time
+import uuid
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Annotated, Any, NoReturn
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Path as ApiPath
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.core.advisor_providers import (
     AdvisorProviderConfig,
     AdvisorProviderError,
     normalize_advisor_provider,
 )
+from backend.core.chronicle_store import ChronicleConflict, cached_chronicle_response
 
 _chronicle_in_flight: set[str] = set()
 _chronicle_in_flight_lock = threading.Lock()
+_advisor_locks: dict[str, tuple[threading.Lock, int]] = {}
+_advisor_locks_guard = threading.Lock()
+
+
+@contextlib.contextmanager
+def _advisor_conversation_lock(key: str):
+    """Serialize a thread's completed exchanges, without retaining idle locks."""
+    with _advisor_locks_guard:
+        lock, users = _advisor_locks.get(key, (threading.Lock(), 0))
+        _advisor_locks[key] = (lock, users + 1)
+    try:
+        with lock:
+            yield
+    finally:
+        with _advisor_locks_guard:
+            _, users = _advisor_locks[key]
+            if users == 1:
+                del _advisor_locks[key]
+            else:
+                _advisor_locks[key] = (lock, users - 1)
 
 
 # Auth configuration
@@ -53,6 +75,13 @@ class ChatRequest(BaseModel):
     model: str | None = None
     model_routing_mode: str | None = None
     language: str | None = None
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=200)
+    save_id: str | None = Field(default=None, min_length=1, max_length=200)
+    request_id: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class AdvisorConversationRequest(BaseModel):
+    title: str = Field(default="", max_length=100)
 
 
 class RecapRequest(BaseModel):
@@ -80,10 +109,23 @@ class RegenerateChapterRequest(BaseModel):
 
     session_id: str
     chapter_number: int
+    expected_revision: str | None = None
     confirm: bool = False
     regeneration_instructions: str | None = None
     model_routing_mode: str | None = None
     language: str | None = None
+
+
+class ChronicleChapterEditRequest(BaseModel):
+    language: str | None = None
+    expected_revision: str = Field(min_length=1, max_length=80)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    narrative: str = Field(min_length=1, max_length=100_000)
+
+
+class ChronicleChapterUndoRequest(BaseModel):
+    language: str | None = None
+    expected_revision: str = Field(min_length=1, max_length=80)
 
 
 class AdvisorCustomRequest(BaseModel):
@@ -109,6 +151,7 @@ class ChronicleResetRequest(BaseModel):
 
     confirm: bool = False
     language: str | None = None
+    expected_revision: str | None = None
 
 
 class HistoryBackupRequest(BaseModel):
@@ -159,75 +202,14 @@ def _pick_latest_game_date(*values: Any) -> str | None:
 
 
 def _cached_chronicle_response(cached: dict[str, Any] | None) -> dict[str, Any]:
-    """Shape a stored Chronicle for the renderer without invoking a provider or writing data."""
-    if not cached:
-        return {
-            "chapters": [],
-            "current_era": None,
-            "pending_chapters": 0,
-            "message": None,
-            "chronicle": "",
-            "cached": False,
-            "event_count": 0,
-            "generated_at": "",
-            "model_routing": None,
-        }
-
-    chapters_data: dict[str, Any] = {}
-    cache_warning: str | None = None
-    raw_chapters = cached.get("chapters_json")
-    if isinstance(raw_chapters, str) and raw_chapters:
-        try:
-            parsed = json.loads(raw_chapters)
-            if isinstance(parsed, dict):
-                chapters_data = parsed
-            else:
-                cache_warning = "Stored chapter data is not an object; legacy prose was preserved."
-        except json.JSONDecodeError:
-            cache_warning = "Stored chapter data could not be parsed; legacy prose was preserved."
-
-    raw_list = chapters_data.get("chapters")
-    chapters: list[dict[str, Any]] = []
-    if isinstance(raw_list, list):
-        for index, raw in enumerate(raw_list, start=1):
-            if not isinstance(raw, dict):
-                continue
-            chapter = dict(raw)
-            chapter.setdefault("number", index)
-            chapter.setdefault("title", f"Chapter {index}")
-            chapter.setdefault("start_date", "")
-            chapter.setdefault("end_date", "")
-            chapter.setdefault("narrative", "")
-            chapter.setdefault("summary", "")
-            chapter.setdefault("is_finalized", True)
-            chapter.setdefault("context_stale", False)
-            chapter.setdefault("can_regenerate", bool(chapter.get("is_finalized", True)))
-            chapters.append(chapter)
-
-    era_cache = chapters_data.get("current_era_cache")
-    current_era = (
-        era_cache.get("current_era")
-        if isinstance(era_cache, dict) and isinstance(era_cache.get("current_era"), dict)
-        else None
-    )
-    response = {
-        "chapters": chapters,
-        "current_era": current_era,
-        "pending_chapters": 0,
-        "message": None,
-        "chronicle": cached.get("chronicle_text") or "",
-        "cached": True,
-        "event_count": int(cached.get("event_count") or 0),
-        "generated_at": str(cached.get("generated_at") or ""),
-        "model_routing": None,
-        "language": cached.get("language") or "en",
-    }
-    if cache_warning:
-        response["cache_warning"] = cache_warning
-    return response
+    return cached_chronicle_response(cached)
 
 
 def _raise_chronicle_value_error(error: ValueError) -> NoReturn:
+    if isinstance(error, ChronicleConflict):
+        raise HTTPException(
+            status_code=409, detail={"error": str(error), "code": "CHRONICLE_CONFLICT"}
+        ) from error
     if str(error) == "GOOGLE_API_KEY not configured":
         raise HTTPException(
             status_code=400,
@@ -341,7 +323,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Stellaris Companion API",
         description="Backend API for Stellaris Companion Electron app",
-        version="1.1.0-beta.1",
+        version="1.1.0",
         docs_url=None,  # Disable Swagger UI in production
         redoc_url=None,  # Disable ReDoc in production
     )
@@ -524,6 +506,7 @@ def create_app() -> FastAPI:
             extractor = getattr(companion, "extractor", None)
             player_id = extractor.get_player_empire_id() if extractor else None
             empire_name = (companion.metadata or {}).get("name")
+            campaign_id = (companion.metadata or {}).get("campaign_id")
             save_path = getattr(companion, "save_path", None)
 
         if not save_path:
@@ -649,6 +632,77 @@ def create_app() -> FastAPI:
         db.update_chronicle_custom_instructions(save_id, custom or None)
         return {"custom_instructions": custom or None, "persisted": True}
 
+    def _advisor_history_unavailable(error: Exception) -> NoReturn:
+        raise HTTPException(
+            status_code=503,
+            detail={"error": "Advisor history is unavailable", "code": "CHAT_HISTORY_UNAVAILABLE"},
+        ) from error
+
+    def _advisor_database(request: Request, save_id: str):
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        try:
+            session_id = db.get_active_or_latest_session_id(save_id=save_id)
+        except sqlite3.Error as exc:
+            _advisor_history_unavailable(exc)
+        if session_id is None:
+            raise HTTPException(status_code=404, detail={"error": "Playthrough not found"})
+        return db
+
+    @app.get("/api/playthroughs/{save_id}/conversations", dependencies=[Depends(verify_token)])
+    def list_advisor_conversations(request: Request, save_id: str) -> dict[str, Any]:
+        db = _advisor_database(request, save_id)
+        try:
+            return {"conversations": db.list_advisor_conversations(save_id)}
+        except sqlite3.Error as exc:
+            _advisor_history_unavailable(exc)
+
+    @app.post("/api/playthroughs/{save_id}/conversations", dependencies=[Depends(verify_token)])
+    def create_advisor_conversation(
+        request: Request,
+        save_id: str,
+        body: AdvisorConversationRequest | None = None,
+    ) -> dict[str, Any]:
+        db = _advisor_database(request, save_id)
+        try:
+            conversation = db.create_advisor_conversation(save_id, title=body.title if body else "")
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+        except sqlite3.Error as exc:
+            _advisor_history_unavailable(exc)
+        return {"conversation": conversation}
+
+    @app.get(
+        "/api/playthroughs/{save_id}/conversations/{conversation_id}",
+        dependencies=[Depends(verify_token)],
+    )
+    def get_advisor_conversation(
+        request: Request,
+        save_id: str,
+        conversation_id: str,
+        limit: Annotated[int, Query(ge=1, le=500)] = 300,
+        before_turn_id: Annotated[str | None, Query(max_length=200)] = None,
+    ) -> dict[str, Any]:
+        db = _advisor_database(request, save_id)
+        try:
+            conversation = db.get_advisor_conversation(save_id, conversation_id)
+            if conversation is None:
+                raise HTTPException(status_code=404, detail={"error": "Conversation not found"})
+            turns = db.get_advisor_turns(
+                save_id,
+                conversation_id,
+                limit=limit + 1,
+                before_turn_id=before_turn_id,
+            )
+        except (sqlite3.Error, ValueError) as exc:
+            _advisor_history_unavailable(exc)
+        return {
+            "conversation": conversation,
+            "turns": turns[-limit:],
+            "has_more": len(turns) > limit,
+        }
+
     @app.post("/api/chat", dependencies=[Depends(verify_token)])
     def chat(request: Request, body: ChatRequest) -> dict[str, Any]:
         """Chat endpoint for asking questions about the game state.
@@ -726,41 +780,172 @@ def create_app() -> FastAPI:
                 },
             )
 
-        # Call ask_precomputed to get the response
-        start_time = time.time()
         save_id, _ = _resolve_current_save_id(request)
-        scoped_session_key = _scope_chat_session_key(save_id=save_id, client_key=body.session_key)
-        requested_model = (body.model or "").strip()[:120] or None
-        try:
-            response_text, elapsed = companion.ask_precomputed(
-                question=body.message,
-                session_key=scoped_session_key,
-                save_id=save_id,
-                model_name=requested_model,
-                model_routing_mode=body.model_routing_mode,
-                language=body.language,
-            )
-        except AdvisorProviderError as exc:
+        if body.save_id and save_id != body.save_id:
             raise HTTPException(
-                status_code=exc.status_code,
-                detail={"error": str(exc), "code": exc.code},
-            ) from exc
-        response_time_ms = int((time.time() - start_time) * 1000)
-        call_stats = companion.get_call_stats()
-        response_model = call_stats.get("model") or companion.get_advisor_model()
+                status_code=409,
+                detail={
+                    "error": "The active campaign changed",
+                    "code": "CAMPAIGN_CHANGED",
+                },
+            )
+        conversation_id = (
+            body.conversation_id
+            or uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                _scope_chat_session_key(save_id=save_id, client_key=body.session_key),
+            ).hex
+        )
+        request_id = body.request_id or uuid.uuid4().hex
+        db = getattr(request.app.state, "db", None)
+        scoped_session_key = _scope_chat_session_key(save_id=save_id, client_key=conversation_id)
+        from backend.core.language import normalize_language
 
-        return {
-            "text": response_text,
-            "game_date": precompute_status.get("game_date"),
-            "response_time_ms": response_time_ms,
-            "model": response_model,
-            "model_display": call_stats.get("model_display"),
-            "requested_model": call_stats.get("requested_model"),
-            "requested_model_display": call_stats.get("requested_model_display"),
-            "model_routing": call_stats.get("routing"),
-            "provider": call_stats.get("provider")
-            or getattr(companion, "get_advisor_provider", lambda: "gemini")(),
-        }
+        output_language = normalize_language(body.language)
+        with (
+            _advisor_conversation_lock(f"request:{save_id}:{request_id}"),
+            _advisor_conversation_lock(scoped_session_key),
+        ):
+            history_available = False
+            if db is not None and save_id:
+                try:
+                    conversation = db.get_advisor_conversation(save_id, conversation_id)
+                    if body.conversation_id and conversation is None:
+                        raise HTTPException(
+                            status_code=404, detail={"error": "Conversation not found"}
+                        )
+                    if conversation is None:
+                        db.create_advisor_conversation(save_id, conversation_id=conversation_id)
+                    previous = db.get_advisor_turn_by_request(save_id, request_id)
+                    if previous:
+                        if (
+                            previous["conversation_id"] != conversation_id
+                            or previous["question"] != body.message.strip()
+                        ):
+                            raise HTTPException(
+                                status_code=409,
+                                detail={
+                                    "error": "Request ID already belongs to a different exchange",
+                                    "code": "CHAT_REQUEST_CONFLICT",
+                                },
+                            )
+                        return {
+                            **{
+                                key: previous.get(key)
+                                for key in (
+                                    "save_id",
+                                    "conversation_id",
+                                    "game_date",
+                                    "source_hash",
+                                    "snapshot_id",
+                                    "response_time_ms",
+                                    "model",
+                                    "model_display",
+                                    "requested_model",
+                                    "requested_model_display",
+                                    "model_routing",
+                                    "provider",
+                                )
+                            },
+                            "text": previous["answer"],
+                            "turn_id": previous["id"],
+                            "history_saved": True,
+                        }
+                    history_available = True
+                except HTTPException:
+                    raise
+                except (sqlite3.Error, ValueError):
+                    # An unavailable archive must not prevent a usable live reply.
+                    history_available = False
+
+            requested_model = (body.model or "").strip()[:120] or None
+            start_time = time.time()
+            source = None
+            try:
+                if hasattr(companion, "ask_precomputed_with_context"):
+                    source = companion.capture_advisor_source(save_id=save_id)
+                    restored = None
+                    if history_available:
+                        try:
+                            restored = db.get_advisor_turns(save_id, conversation_id, limit=6)
+                        except (sqlite3.Error, ValueError):
+                            history_available = False
+                    reply = companion.ask_precomputed_with_context(
+                        question=body.message,
+                        session_key=scoped_session_key,
+                        save_id=save_id,
+                        model_name=requested_model,
+                        model_routing_mode=body.model_routing_mode,
+                        language=output_language,
+                        source=source,
+                        restored_turns=restored,
+                        persist_memory=False,
+                    )
+                    response_text, elapsed, call_stats = reply.text, reply.elapsed, reply.stats
+                else:
+                    # Compatibility for older/custom companion implementations.
+                    response_text, elapsed = companion.ask_precomputed(
+                        question=body.message,
+                        session_key=scoped_session_key,
+                        save_id=save_id,
+                        model_name=requested_model,
+                        model_routing_mode=body.model_routing_mode,
+                        language=body.language,
+                    )
+                    call_stats = companion.get_call_stats()
+            except AdvisorProviderError as exc:
+                raise HTTPException(
+                    status_code=exc.status_code, detail={"error": str(exc), "code": exc.code}
+                ) from exc
+
+            result = {
+                "text": response_text,
+                "save_id": source.save_id if source else save_id,
+                "game_date": source.game_date if source else precompute_status.get("game_date"),
+                "source_hash": source.source_hash if source else None,
+                "snapshot_id": None,
+                "conversation_id": conversation_id,
+                "turn_id": None,
+                "history_saved": False,
+                "response_time_ms": int((time.time() - start_time) * 1000),
+                "model": call_stats.get("model") or companion.get_advisor_model(),
+                "model_display": call_stats.get("model_display"),
+                "requested_model": call_stats.get("requested_model"),
+                "requested_model_display": call_stats.get("requested_model_display"),
+                "model_routing": call_stats.get("routing"),
+                "provider": call_stats.get("provider")
+                or getattr(companion, "get_advisor_provider", lambda: "gemini")(),
+            }
+            if history_available and not call_stats.get("error"):
+                try:
+                    metadata = {
+                        key: result[key]
+                        for key in (
+                            "response_time_ms",
+                            "model",
+                            "model_display",
+                            "requested_model",
+                            "requested_model_display",
+                            "model_routing",
+                            "provider",
+                        )
+                    }
+                    turn = db.save_advisor_turn(
+                        save_id=result["save_id"],
+                        conversation_id=conversation_id,
+                        request_id=request_id,
+                        question=body.message.strip(),
+                        answer=response_text,
+                        language=output_language,
+                        game_date=result["game_date"],
+                        source_hash=result["source_hash"],
+                        response=metadata,
+                    )
+                    result["turn_id"], result["history_saved"] = turn["id"], True
+                except (sqlite3.Error, ValueError):
+                    # Keep the generated answer visible and honestly report that it is unsaved.
+                    pass
+            return result
 
     @app.get("/api/status", dependencies=[Depends(verify_token)])
     async def get_status(request: Request) -> dict[str, Any]:
@@ -909,6 +1094,60 @@ def create_app() -> FastAPI:
         cached = db.get_cached_chronicle_for_save(save_id, language=output_language)
         return _cached_chronicle_response(cached)
 
+    def mutate_chronicle_chapter(
+        request: Request,
+        save_id: str,
+        chapter_number: int,
+        body: ChronicleChapterEditRequest | ChronicleChapterUndoRequest,
+        *,
+        undo: bool,
+    ) -> dict[str, Any]:
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        from backend.core.language import normalize_language
+
+        language = normalize_language(body.language)
+        try:
+            saved = db.edit_chronicle_chapter(
+                save_id=save_id,
+                chapter_number=chapter_number,
+                language=language,
+                expected_revision=body.expected_revision,
+                undo=undo,
+                narrative=body.narrative if isinstance(body, ChronicleChapterEditRequest) else "",
+                title=body.title if isinstance(body, ChronicleChapterEditRequest) else None,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+        except ValueError as exc:
+            _raise_chronicle_value_error(exc)
+        return _cached_chronicle_response(saved)
+
+    @app.put(
+        "/api/playthroughs/{save_id}/chronicle/chapters/{chapter_number}",
+        dependencies=[Depends(verify_token)],
+    )
+    def edit_chronicle_chapter(
+        request: Request,
+        save_id: str,
+        chapter_number: Annotated[int, ApiPath(ge=1)],
+        body: ChronicleChapterEditRequest,
+    ) -> dict[str, Any]:
+        return mutate_chronicle_chapter(request, save_id, chapter_number, body, undo=False)
+
+    @app.post(
+        "/api/playthroughs/{save_id}/chronicle/chapters/{chapter_number}/undo",
+        dependencies=[Depends(verify_token)],
+    )
+    def undo_chronicle_chapter(
+        request: Request,
+        save_id: str,
+        chapter_number: Annotated[int, ApiPath(ge=1)],
+        body: ChronicleChapterUndoRequest,
+    ) -> dict[str, Any]:
+        return mutate_chronicle_chapter(request, save_id, chapter_number, body, undo=True)
+
     @app.post(
         "/api/playthroughs/{save_id}/label",
         dependencies=[Depends(verify_token)],
@@ -985,10 +1224,17 @@ def create_app() -> FastAPI:
                     detail={"error": "Chronicle generation is in progress; try again shortly"},
                 )
         try:
-            rows_reset = db.reset_chronicle(save_id, language=output_language)
+            rows_reset = db.reset_chronicle(
+                save_id, language=output_language, expected_revision=body.expected_revision
+            )
+        except ChronicleConflict as exc:
+            _raise_chronicle_value_error(exc)
         except ValueError as exc:
             raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
         return {
+            "chronicle_revision": cached_chronicle_response(
+                db.get_cached_chronicle_for_save(save_id, language=output_language)
+            )["chronicle_revision"],
             "save_id": save_id,
             "language": output_language,
             "reset": True,
@@ -1011,7 +1257,12 @@ def create_app() -> FastAPI:
         from backend.core.language import normalize_language
 
         output_language = normalize_language(body.language)
-        restored = db.undo_chronicle_reset(save_id, language=output_language)
+        try:
+            restored = db.undo_chronicle_reset(
+                save_id, language=output_language, expected_revision=body.expected_revision
+            )
+        except ChronicleConflict as exc:
+            _raise_chronicle_value_error(exc)
         if not restored:
             raise HTTPException(status_code=404, detail={"error": "No Chronicle reset to undo"})
         return {"save_id": save_id, "language": output_language, "restored": True}
@@ -1383,6 +1634,7 @@ def create_app() -> FastAPI:
                 session_id=body.session_id,
                 chapter_number=body.chapter_number,
                 confirm=body.confirm,
+                expected_revision=body.expected_revision,
                 regeneration_instructions=body.regeneration_instructions,
                 model_routing_mode=body.model_routing_mode,
                 language=body.language,

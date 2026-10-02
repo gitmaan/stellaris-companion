@@ -78,7 +78,7 @@ test('publishes, updates, and removes a Chronicle without sending save data', as
     expect(JSON.stringify(createRequest.body)).not.toContain('mock\\\\save.sav')
 
     await storyTitle.fill('The UNE Chronicle, Revised')
-    await page.getByRole('button', { name: 'Update story' }).click()
+    await page.getByRole('dialog', { name: 'Share Chronicle' }).getByRole('button', { name: 'Update story' }).click()
     await expect(page.getByText('Your public link works now. Archive and search discovery are pending review, so the story remains noindex.')).toBeVisible()
 
     const updateRequest = await backend.waitForPublicationRequest((request) => request.method === 'PUT')
@@ -134,7 +134,7 @@ test('updating an existing unlisted Chronicle preserves its visibility', async (
     await page.getByRole('button', { name: 'Share Chronicle' }).click()
     await expect(page.getByText('This story is private-by-link and excluded from search discovery.')).toBeVisible()
     await page.getByLabel('Story title').fill('Updated unlisted story')
-    await page.getByRole('button', { name: 'Update story' }).click()
+    await page.getByRole('dialog', { name: 'Share Chronicle' }).getByRole('button', { name: 'Update story' }).click()
 
     const request = await backend.waitForPublicationRequest(request => request.method === 'PUT')
     expect(request.body.visibility).toBe('unlisted')

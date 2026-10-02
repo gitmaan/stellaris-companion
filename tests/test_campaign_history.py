@@ -3,6 +3,7 @@ import sqlite3
 
 import pytest
 
+from backend.core.chronicle_store import load_chapters_data
 from backend.core.database import GameDatabase
 
 
@@ -146,12 +147,19 @@ def test_chronicle_reset_is_language_scoped_and_exactly_reversible(tmp_path):
     reset_en = db.get_cached_chronicle_for_save("alpha", language="en")
     untouched_de = db.get_cached_chronicle_for_save("alpha", language="de")
     assert reset_en is not None and reset_en["chronicle_text"] == ""
-    assert reset_en["chapters_json"] is None
+    assert json.loads(reset_en["chapters_json"])["reset_tombstone"] is True
     assert untouched_de is not None and untouched_de["chronicle_text"] == "Deutsche Chronik"
     assert db.get_playthrough("alpha", language="en")["can_undo_reset"] is True
 
     assert db.undo_chronicle_reset("alpha", language="en") is True
-    assert _cache_rows(db) == before
+    after = _cache_rows(db)
+    for restored, original in zip(after, before, strict=True):
+        assert {k: v for k, v in restored.items() if k != "chapters_json"} == {
+            k: v for k, v in original.items() if k != "chapters_json"
+        }
+        restored_data, original_data = load_chapters_data(restored), load_chapters_data(original)
+        restored_data.pop("revision_id", None)
+        assert restored_data == original_data
     assert db.undo_chronicle_reset("alpha", language="en") is False
     db.close()
 
@@ -213,6 +221,8 @@ def test_upgrade_from_v085_schema_creates_backup_and_preserves_cache_bytes(tmp_p
     before = _cache_rows(db)
     db.execute("DROP TABLE chronicle_revisions;")
     db.execute("DROP TABLE playthrough_metadata;")
+    db.execute("DROP TABLE advisor_turns;")
+    db.execute("DROP TABLE advisor_conversations;")
     # v0.8.5 shipped schema 9. Recreate that exact boundary before opening the
     # database with the campaign-history release.
     db.execute("UPDATE schema_version SET version = 9;")
@@ -222,7 +232,7 @@ def test_upgrade_from_v085_schema_creates_backup_and_preserves_cache_bytes(tmp_p
     upgraded = GameDatabase(path)
     backup_path = tmp_path / "history.db.pre-v10.backup"
 
-    assert upgraded.get_schema_version() == 10
+    assert upgraded.get_schema_version() == 11
     assert backup_path.exists()
     assert _cache_rows(upgraded) == before
     with sqlite3.connect(backup_path) as backup:

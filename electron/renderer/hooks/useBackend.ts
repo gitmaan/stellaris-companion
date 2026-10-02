@@ -59,9 +59,45 @@ export type BackendStatusEvent = HealthResponse & {
   error?: string
 }
 
+export interface ChatContinuity {
+  save_id?: string
+  conversation_id?: string
+  request_id: string
+}
+
+export interface AdvisorConversation {
+  id: string
+  save_id: string
+  title: string
+  created_at: number
+  updated_at: number
+  turn_count: number
+  last_game_date: string | null
+}
+
+export interface AdvisorTurn extends Omit<ChatResponse, 'text'> {
+  id: string
+  conversation_id: string
+  request_id: string
+  question: string
+  answer: string
+  language: string
+  created_at: number
+}
+
+export interface ConversationsResponse { conversations: AdvisorConversation[] }
+export interface ConversationResponse { conversation: AdvisorConversation; turns: AdvisorTurn[]; has_more: boolean }
+export interface CreatedConversationResponse { conversation: AdvisorConversation }
+
 export interface ChatResponse {
+  save_id?: string
+  conversation_id?: string
+  turn_id?: string | null
+  source_hash?: string | null
+  snapshot_id?: number | null
+  history_saved?: boolean
   text: string
-  game_date: string
+  game_date: string | null
   response_time_ms: number
   model?: string
   model_display?: string
@@ -189,6 +225,10 @@ export interface NarrativeSection {
 }
 
 export interface ChronicleChapter {
+  id?: string
+  can_undo?: boolean
+  manual_edit_locked?: boolean
+  coverage_date?: string | null
   number: number
   title: string
   start_date: string
@@ -205,6 +245,7 @@ export interface ChronicleChapter {
 }
 
 export interface CurrentEra {
+  coverage_date?: string | null
   start_date: string
   narrative: string
   events_covered: number
@@ -214,6 +255,8 @@ export interface CurrentEra {
 }
 
 export interface ChronicleResponse {
+  chronicle_revision?: string
+  coverage_date?: string | null
   // New structured format
   chapters: ChronicleChapter[]
   current_era: CurrentEra | null
@@ -504,9 +547,10 @@ export function useBackend() {
     sessionKey?: string,
     model?: string,
     modelRoutingMode?: ModelRoutingMode,
+    continuity?: ChatContinuity,
   ): Promise<UseBackendResult<ChatResponse>> => {
     return callApi<ChatResponse>('chat', () =>
-      window.electronAPI!.backend.chat(message, sessionKey, model, modelRoutingMode)
+      window.electronAPI!.backend.chat(message, sessionKey, model, modelRoutingMode, continuity)
     )
   }, [callApi])
 
@@ -535,6 +579,12 @@ export function useBackend() {
       window.electronAPI!.backend.playthroughs(includeTrashed)
     )
   }, [callApi])
+
+  const conversations = useCallback((saveId: string) => callApi<ConversationsResponse>('conversations', () => window.electronAPI!.backend.conversations(saveId)), [callApi])
+  const createConversation = useCallback((saveId: string) => callApi<CreatedConversationResponse>('createConversation', () => window.electronAPI!.backend.createConversation(saveId)), [callApi])
+  const conversation = useCallback((saveId: string, conversationId: string, beforeTurnId?: string) => callApi<ConversationResponse>('conversation', () => window.electronAPI!.backend.conversation(saveId, conversationId, beforeTurnId)), [callApi])
+  const editChapter = useCallback((saveId: string, chapterNumber: number, expectedRevision: string, title: string, narrative: string) => callApi<ChronicleResponse>('editChapter', () => window.electronAPI!.backend.editChapter(saveId, chapterNumber, expectedRevision, title, narrative)), [callApi])
+  const undoChapter = useCallback((saveId: string, chapterNumber: number, expectedRevision: string) => callApi<ChronicleResponse>('undoChapter', () => window.electronAPI!.backend.undoChapter(saveId, chapterNumber, expectedRevision)), [callApi])
 
   const cachedChronicle = useCallback(async (
     saveId: string,
@@ -571,9 +621,10 @@ export function useBackend() {
 
   const resetChronicle = useCallback(async (
     saveId: string,
+    expectedRevision?: string,
   ): Promise<UseBackendResult<PlaythroughMutationResponse>> => {
     return callApi<PlaythroughMutationResponse>('resetChronicle', () =>
-      window.electronAPI!.backend.resetChronicle(saveId)
+      window.electronAPI!.backend.resetChronicle(saveId, expectedRevision)
     )
   }, [callApi])
 
@@ -659,6 +710,7 @@ export function useBackend() {
     confirm?: boolean,
     regenerationInstructions?: string,
     modelRoutingMode?: ModelRoutingMode,
+    expectedRevision?: string,
   ): Promise<UseBackendResult<RegenerateChapterResponse>> => {
     return callApi<RegenerateChapterResponse>('regenerateChapter', () =>
       window.electronAPI!.backend.regenerateChapter(
@@ -667,6 +719,7 @@ export function useBackend() {
         confirm,
         regenerationInstructions,
         modelRoutingMode,
+        expectedRevision,
       )
     )
   }, [callApi])
@@ -712,6 +765,7 @@ export function useBackend() {
     sessions,
     playthroughs,
     cachedChronicle,
+    conversations, createConversation, conversation, editChapter, undoChapter,
     setPlaythroughLabel,
     trashPlaythrough,
     restorePlaythrough,
@@ -732,7 +786,7 @@ export function useBackend() {
     get loadingStates() {
       return loadingStatesRef.current
     },
-  }), [health, chat, status, sessions, playthroughs, cachedChronicle, setPlaythroughLabel, trashPlaythrough, restorePlaythrough, resetChronicle, undoChronicleReset, deletePlaythrough, historyStorage, sessionEvents, recap, chronicle, regenerateChapter, endSession, getChronicleCustom, setChronicleCustom, isLoading])
+  }), [health, chat, status, sessions, playthroughs, cachedChronicle, conversations, createConversation, conversation, editChapter, undoChapter, setPlaythroughLabel, trashPlaythrough, restorePlaythrough, resetChronicle, undoChronicleReset, deletePlaythrough, historyStorage, sessionEvents, recap, chronicle, regenerateChapter, endSession, getChronicleCustom, setChronicleCustom, isLoading])
 }
 
 export default useBackend

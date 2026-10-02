@@ -1,14 +1,20 @@
 const http = require('http')
+const { randomUUID } = require('crypto')
+const { resolveLanguage } = require('../../main/language')
 
 function buildChronicleText(narrative) {
   return `### THE CURRENT ERA\n**2200.01.01 - Present**\n\n${narrative}`
 }
 
-function buildChronicleResponse({ narrative, eventsCovered, cached, chapters = [] }) {
+function buildChronicleResponse({ narrative, eventsCovered, cached, chapters = [], revision = 'mock-1', coverageDate = '2205.01.01', language = 'en' }) {
   return {
     chapters,
+    language: resolveLanguage(language, language),
+    chronicle_revision: revision,
+    coverage_date: coverageDate,
     current_era: {
       start_date: '2200.01.01',
+      coverage_date: coverageDate,
       narrative,
       events_covered: eventsCovered,
       sections: [
@@ -28,9 +34,10 @@ function buildChronicleResponse({ narrative, eventsCovered, cached, chapters = [
   }
 }
 
-function buildEmptyChronicleResponse() {
+function buildEmptyChronicleResponse(language = 'en') {
   return {
     chapters: [],
+    language: resolveLanguage(language, language),
     current_era: null,
     pending_chapters: 0,
     message: null,
@@ -72,6 +79,10 @@ function createMockChronicleBackend(options = {}) {
   let publication = null
   let chronicleError = options.chronicleError ?? null
   let healthOverrides = {}
+  const conversations = new Map((options.conversations ?? []).map(item => [item.id, structuredClone(item)]))
+  let revision = 1
+  let chapters = structuredClone(options.chapters ?? [])
+  const chapterUndo = new Map()
   const chronicleRequests = []
   const chatRequests = []
   const publicationRequests = []
@@ -135,9 +146,9 @@ function createMockChronicleBackend(options = {}) {
     ],
   })
 
-  const playthroughsPayload = () => ({
+  const playthroughsPayload = (language = 'en') => ({
     current_save_id: campaigns.find(campaign => campaign.current)?.saveId || null,
-    language: 'en',
+    language: resolveLanguage(language, language),
     playthroughs: campaigns.map((campaign, index) => ({
       save_id: campaign.saveId,
       empire_name: campaign.empireName,
@@ -154,7 +165,7 @@ function createMockChronicleBackend(options = {}) {
       snapshot_count: campaign.snapshotCount ?? 0,
       event_count: campaign.eventCount ?? 0,
       has_chronicle: campaign.hasChronicle ?? false,
-      cached_languages: campaign.hasChronicle ? ['en'] : [],
+      cached_languages: campaign.hasChronicle ? [resolveLanguage(language, language)] : [],
       chapter_count: 0,
       total_chapter_count: 0,
       has_current_era: campaign.hasChronicle ?? false,
@@ -180,13 +191,16 @@ function createMockChronicleBackend(options = {}) {
   })
 
   const chroniclePayload = (body) => {
-    if (options.emptyChronicle) return buildEmptyChronicleResponse()
+    const language = resolveLanguage(body.language, body.language)
+    if (options.emptyChronicle) return buildEmptyChronicleResponse(language)
     if (phase === 'initial') {
       return buildChronicleResponse({
         narrative: initialNarrative,
         eventsCovered: initialEventsCovered,
         cached: false,
-        chapters: options.chapters,
+        chapters,
+        revision: `mock-${revision}`,
+        language,
       })
     }
 
@@ -195,10 +209,13 @@ function createMockChronicleBackend(options = {}) {
         narrative: initialNarrative,
         eventsCovered: initialEventsCovered,
         cached: true,
-        chapters: options.chapters,
+        chapters,
+        revision: `mock-${revision}`,
+        language,
       })
     }
 
+    if (body.refresh_mode === 'manual' && !body.force_refresh) return buildChronicleResponse({ narrative: initialNarrative, eventsCovered: initialEventsCovered, cached: true, chapters, revision: `mock-${revision}`, language })
     const refreshMode = body.refresh_mode === 'enhanced' ? 'enhanced' : 'balanced'
     const eventGrowth = Math.max(0, advancedEventsCovered - initialEventsCovered)
     const threshold = refreshMode === 'enhanced' ? enhancedThreshold : balancedThreshold
@@ -207,7 +224,9 @@ function createMockChronicleBackend(options = {}) {
         narrative: initialNarrative,
         eventsCovered: initialEventsCovered,
         cached: true,
-        chapters: options.chapters,
+        chapters,
+        revision: `mock-${revision}`,
+        language,
       })
     }
 
@@ -215,6 +234,10 @@ function createMockChronicleBackend(options = {}) {
       narrative: updatedNarrative,
       eventsCovered: advancedEventsCovered,
       cached: false,
+      chapters,
+      revision: `mock-${revision}`,
+      coverageDate: '2208.01.01',
+      language,
     })
   }
 
@@ -247,7 +270,7 @@ function createMockChronicleBackend(options = {}) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/playthroughs') {
-      sendJson(res, 200, playthroughsPayload())
+      sendJson(res, 200, playthroughsPayload(url.searchParams.get('language')))
       return
     }
 
@@ -269,6 +292,54 @@ function createMockChronicleBackend(options = {}) {
       return
     }
 
+    const conversationMatch = url.pathname.match(/^\/api\/playthroughs\/([^/]+)\/conversations(?:\/([^/]+))?$/)
+    if (conversationMatch) {
+      const saveId = decodeURIComponent(conversationMatch[1])
+      const id = conversationMatch[2] && decodeURIComponent(conversationMatch[2])
+      if (options.historyUnavailable) { sendJson(res, 503, { detail: { error: 'Chat history unavailable', code: 'CHAT_HISTORY_UNAVAILABLE' } }); return }
+      if (req.method === 'GET' && !id) {
+        sendJson(res, 200, { conversations: [...conversations.values()].filter(item => item.save_id === saveId).map(({ turns, ...item }) => item).sort((a, b) => b.updated_at - a.updated_at) })
+      } else if (req.method === 'POST' && !id) {
+        const conversation = { id: randomUUID(), save_id: saveId, title: '', created_at: Date.now() / 1000, updated_at: Date.now() / 1000, turn_count: 0, last_game_date: null }
+        conversations.set(conversation.id, { ...conversation, turns: [] })
+        sendJson(res, 200, { conversation })
+      } else if (req.method === 'GET' && id) {
+        const saved = conversations.get(id)
+        if (!saved || saved.save_id !== saveId) sendJson(res, 404, { detail: { error: 'Chat not found' } })
+        else {
+          const { turns, ...conversation } = saved
+          const before = url.searchParams.get('before_turn_id')
+          const end = before ? turns.findIndex(turn => turn.id === before) : turns.length
+          const start = Math.max(0, end - Number(url.searchParams.get('limit') || 150))
+          sendJson(res, 200, { conversation, turns: turns.slice(start, end), has_more: start > 0 })
+        }
+      }
+      return
+    }
+
+    const chapterMatch = url.pathname.match(/^\/api\/playthroughs\/([^/]+)\/chronicle\/chapters\/(\d+)(\/undo)?$/)
+    if (chapterMatch) {
+      const body = await readJsonBody(req)
+      const number = Number(chapterMatch[2])
+      await options.onChapterChange?.({ save_id: decodeURIComponent(chapterMatch[1]), number, undo: Boolean(chapterMatch[3]) })
+      if (body.expected_revision !== `mock-${revision}` || options.editConflict) {
+        sendJson(res, 409, { detail: { error: 'Chapter changed', code: 'CHRONICLE_CONFLICT' } }); return
+      }
+      const index = chapters.findIndex(chapter => chapter.number === number)
+      if (index < 0) { sendJson(res, 404, { detail: { error: 'Chapter not found' } }); return }
+      if (chapterMatch[3]) {
+        chapters[index] = chapterUndo.get(number)
+        chapterUndo.delete(number)
+      } else {
+        chapterUndo.set(number, structuredClone(chapters[index]))
+        chapters[index] = { ...chapters[index], title: body.title, narrative: body.narrative, sections: null, summary: '', manual_edit_locked: true }
+      }
+      chapters[index].can_undo = chapterUndo.has(number)
+      revision += 1
+      sendJson(res, 200, buildChronicleResponse({ narrative: initialNarrative, eventsCovered: initialEventsCovered, cached: true, chapters, revision: `mock-${revision}`, language: body.language }))
+      return
+    }
+
     const playthroughMatch = url.pathname.match(/^\/api\/playthroughs\/([^/]+)(?:\/([^/]+))?$/)
     if (playthroughMatch) {
       const saveId = decodeURIComponent(playthroughMatch[1])
@@ -285,9 +356,11 @@ function createMockChronicleBackend(options = {}) {
             narrative: campaign.narrative || initialNarrative,
             eventsCovered: campaign.eventCount ?? initialEventsCovered,
             cached: true,
-            chapters: options.chapters,
+            chapters,
+            revision: `mock-${revision}`,
+            language: url.searchParams.get('language'),
           })
-          : buildEmptyChronicleResponse())
+          : buildEmptyChronicleResponse(url.searchParams.get('language')))
         return
       }
 
@@ -347,15 +420,25 @@ function createMockChronicleBackend(options = {}) {
         })
         return
       }
-      sendJson(res, 200, {
+      if (body.conversation_id && !options.historyUnavailable && !conversations.has(body.conversation_id)) { sendJson(res, 404, { detail: { error: 'Conversation not found' } }); return }
+      const source = currentHealthPayload()
+      const saveId = body.save_id || source.save_id
+      const id = body.conversation_id || randomUUID()
+      const response = {
         text: options.onChat ? await options.onChat(body) : (options.chatResponse ?? 'Mock strategic response.'),
-        game_date: healthPayload().game_date,
+        game_date: source.game_date,
         response_time_ms: 12,
         model: options.chatModel ?? 'mock-advisor-model',
         model_display: options.chatModel ?? 'Mock Advisor Model',
         model_routing: null,
         provider: options.advisorProvider ?? 'gemini',
-      })
+        save_id: saveId, conversation_id: id, turn_id: randomUUID(), history_saved: !options.historyUnavailable, source_hash: 'mock-source',
+      }
+      const saved = conversations.get(id) || { id, save_id: saveId, title: body.message, created_at: Date.now() / 1000, turns: [] }
+      saved.turns.push({ ...response, id: response.turn_id, request_id: body.request_id, question: body.message, answer: response.text, created_at: Date.now() / 1000, language: resolveLanguage(body.language, body.language) })
+      Object.assign(saved, { updated_at: Date.now() / 1000, turn_count: saved.turns.length, last_game_date: response.game_date, title: saved.title || body.message })
+      if (!options.historyUnavailable) conversations.set(id, saved)
+      sendJson(res, 200, response)
       return
     }
 
@@ -500,6 +583,7 @@ function createMockChronicleBackend(options = {}) {
     advanceCampaign,
     setHealth: (payload) => { healthOverrides = payload },
     setChronicleError,
+    setHistoryUnavailable: value => { options.historyUnavailable = value },
     waitForChronicleRequest,
     waitForPublicationRequest,
     getChatRequests: () => [...chatRequests],

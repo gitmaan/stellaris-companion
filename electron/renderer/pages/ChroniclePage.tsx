@@ -112,6 +112,12 @@ function isProviderError(code?: string | null): boolean {
   return Boolean(code?.startsWith('PROVIDER_') || ['CHATGPT_RECONNECT', 'CHATGPT_PERMISSION', 'CHATGPT_MODEL', 'CHATGPT_INELIGIBLE'].includes(code || ''))
 }
 
+function gameDateOrder(value: string): number | null {
+  const parts = value.split('.').map(Number)
+  if (parts.length !== 3 || parts.some(part => !Number.isInteger(part)) || parts[0] < 0 || parts[1] < 1 || parts[1] > 12 || parts[2] < 1 || parts[2] > 31) return null
+  return parts[0] * 372 + (parts[1] - 1) * 31 + parts[2]
+}
+
 /**
  * ChroniclePage - The hero feature: your empire's living history book
  * Galactic Archives aesthetic - document your empire's journey through the stars
@@ -163,12 +169,16 @@ function ChroniclePage({
   // Available saves/games
   const [saves, setSaves] = useState<SaveInfo[]>([])
   const [selectedSaveId, setSelectedSaveId] = useState<string | null>(null)
+  const selectedSaveIdRef = useRef(selectedSaveId)
+  selectedSaveIdRef.current = selectedSaveId
   const selectedPlaythrough = useMemo(
     () => playthroughs.find(item => item.save_id === selectedSaveId) || null,
     [playthroughs, selectedSaveId],
   )
 
   // Chronicle data
+  const [mutationBusy, setMutationBusy] = useState(false)
+  const mutationBusyRef = useRef(false)
   const [chronicle, setChronicle] = useState<ChronicleResponse | null>(null)
   const [savesLoading, setSavesLoading] = useState(true)
   const [loading, setLoading] = useState(false)
@@ -177,6 +187,7 @@ function ChroniclePage({
   const [usageLimited, setUsageLimited] = useState(false)
   const [chronicleProvider, setChronicleProvider] = useState<string | null>(null)
   const [chronicleConfigured, setChronicleConfigured] = useState<boolean | null>(null)
+  const [liveSource, setLiveSource] = useState<{ saveId: string; date: string } | null>(null)
 
   // Selected chapter (null = show current era)
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null)
@@ -195,6 +206,9 @@ function ChroniclePage({
 
   // Regeneration state - tracks which chapter is being regenerated
   const [regeneratingChapter, setRegeneratingChapter] = useState<number | null>(null)
+  const regeneratingChapterRef = useRef<number | null>(null)
+  regeneratingChapterRef.current = regeneratingChapter
+  const confirmRevisionRef = useRef<string>()
   const [confirmRegen, setConfirmRegen] = useState<number | null>(null)
   const [justRegenerated, setJustRegenerated] = useState<number | null>(null)
 
@@ -215,6 +229,29 @@ function ChroniclePage({
   const hiddenChapterFinalizeInFlightRef = useRef(false)
   const lastHiddenChapterFinalizeAtRef = useRef(0)
   const visibleCatchupInFlightRef = useRef(false)
+
+  // A locale or automatically selected campaign can change without the picker.
+  // Invalidate responses from the previous reader scope just as picker changes do.
+  const readerScope = `${selectedSaveId || ''}:${normalizeResolvedLanguage(i18n.resolvedLanguage || i18n.language)}`
+  const readerScopeRef = useRef(readerScope)
+  useEffect(() => {
+    if (readerScopeRef.current === readerScope) return
+    readerScopeRef.current = readerScope
+    chronicleRequestTokenRef.current += 1
+    chronicleInFlightRef.current = false
+    queuedForceRefreshRef.current = false
+    didInitChapterSelectionRef.current = false
+    if (chronicleRetryTimerRef.current) {
+      clearTimeout(chronicleRetryTimerRef.current)
+      chronicleRetryTimerRef.current = null
+    }
+    setChronicle(null)
+    setLoading(false)
+    setSelectedChapter(null)
+    setConfirmRegen(null)
+    setRegeneratingChapter(null)
+    regeneratingChapterRef.current = null
+  }, [readerScope])
 
   // Load save-scoped campaign summaries. This is metadata-only and never generates
   // or rewrites Chronicle content.
@@ -279,7 +316,8 @@ function ChroniclePage({
     forceRefresh = false,
     chapterOnly = false,
   ) => {
-    if (!selectedSaveId) return
+    if (!selectedSaveId || mutationBusyRef.current || regeneratingChapterRef.current !== null) return
+    if (!forceRefresh && chapterOnly && refreshMode === 'manual') return
     const autoRefreshPaused = !forceRefresh && failedAutoRefreshSavesRef.current.has(selectedSaveId)
     if (autoRefreshPaused && chapterOnly) return
     if (forceRefresh) failedAutoRefreshSavesRef.current.delete(selectedSaveId)
@@ -340,7 +378,7 @@ function ChroniclePage({
         }
       }
 
-      if (autoRefreshPaused) return
+      if (autoRefreshPaused || (!forceRefresh && refreshMode === 'manual')) return
 
       const chronicleResult = await backend.chronicle(
         session.id,
@@ -526,6 +564,10 @@ function ChroniclePage({
     const cleanup = window.electronAPI.onBackendStatus((status) => {
       if (!isMountedRef.current) return
       if (!status?.connected) return
+      if (status.save_loaded && status.save_id && status.game_date) {
+        const saveId = status.save_id, date = status.game_date
+        setLiveSource(previous => previous?.saveId === saveId && previous.date === date ? previous : { saveId, date })
+      } else if (status.save_loaded === false) setLiveSource(null)
       if (typeof status.chronicle_configured === 'boolean') {
         setChronicleConfigured(status.chronicle_configured)
       }
@@ -601,6 +643,9 @@ function ChroniclePage({
 
   // Load chronicle when save changes (only after sessions are cached)
   useEffect(() => {
+    // A campaign switch can occur while Edit or Undo is saving. Resume the
+    // selected reader when it settles, using the usual visibility/refresh policy.
+    if (mutationBusy) return
     if (selectedSaveId && cachedSessions.length > 0) {
       if (!isActive) {
         pendingVisibleChronicleRefreshRef.current = true
@@ -621,6 +666,7 @@ function ChroniclePage({
     finalizePendingChaptersHidden,
     isActive,
     loadChronicle,
+    mutationBusy,
     selectedSaveId,
   ])
 
@@ -662,9 +708,101 @@ function ChroniclePage({
     processPendingVisibleChronicleRefresh()
   }, [processPendingVisibleChronicleRefresh])
 
+  const changeChapter = useCallback(async (chapterNumber: number, revision: string, edit?: { title: string; narrative: string }): Promise<boolean> => {
+    if (!selectedSaveId || mutationBusyRef.current) return false
+    const token = chronicleRequestTokenRef.current
+    mutationBusyRef.current = true
+    setMutationBusy(true)
+    try {
+      const result = edit
+        ? await backend.editChapter(selectedSaveId, chapterNumber, revision, edit.title, edit.narrative)
+        : await backend.undoChapter(selectedSaveId, chapterNumber, revision)
+      if (!isMountedRef.current || token !== chronicleRequestTokenRef.current) return false
+      if (!result.data) {
+        showToast({ type: 'error', message: result.errorCode === 'CHRONICLE_CONFLICT' ? t('continuity.editConflict') : result.error || t('continuity.editFailed') })
+        if (result.errorCode === 'CHRONICLE_CONFLICT') {
+          const cached = await backend.cachedChronicle(selectedSaveId)
+          if (isMountedRef.current && token === chronicleRequestTokenRef.current && cached.data) setChronicle(cached.data)
+        }
+        return false
+      }
+      setChronicle(result.data)
+      return true
+    } finally {
+      mutationBusyRef.current = false
+      if (isMountedRef.current) setMutationBusy(false)
+    }
+  }, [backend, selectedSaveId, showToast, t])
+
   // Scroll spy: track which chapter is in view
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrollingToRef = useRef(false)
+
+  const restoredReadingKeyRef = useRef<string | null>(null)
+  useEffect(() => { restoredReadingKeyRef.current = null }, [selectedSaveId, i18n.language])
+  useEffect(() => {
+    if (!isActive || !chronicle || !selectedSaveId) return
+    const container = scrollContainerRef.current
+    if (!container) return
+    const language = normalizeResolvedLanguage(i18n.resolvedLanguage || i18n.language)
+    if (chronicle.language && normalizeResolvedLanguage(chronicle.language) !== language) return
+    const key = `chronicle-reading:${selectedSaveId}:${language}`
+    let frame = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let disposed = false
+    const blocks = () => Array.from(container.querySelectorAll<HTMLElement>('[data-reading-id]'))
+    const storePosition = () => {
+      if (disposed || restoredReadingKeyRef.current !== key || container.clientHeight === 0) return
+      const top = container.getBoundingClientRect().top + 12
+      const all = blocks()
+      const block = all.find(item => item.getBoundingClientRect().bottom > top) || all[all.length - 1]
+      if (!block) return
+      const paragraphs = Array.from(block.querySelectorAll<HTMLElement>('.chronicle-narrative > p, .chronicle-narrative > blockquote, .chronicle-narrative > div'))
+      const paragraph = paragraphs.find(item => item.getBoundingClientRect().bottom > top)
+      const target = paragraph || block
+      const offset = Math.max(0, Math.min(1, (top - target.getBoundingClientRect().top) / Math.max(1, target.offsetHeight)))
+      try { localStorage.setItem(key, JSON.stringify({ id: block.dataset.readingId, anchor: block.id, version: block.dataset.readingVersion, paragraph: paragraph ? paragraphs.indexOf(paragraph) : -1, offset })) } catch { /* Reader preferences must never interrupt reading. */ }
+    }
+    if (restoredReadingKeyRef.current !== key) {
+      const restorePosition = () => {
+        if (disposed) return
+        frame = requestAnimationFrame(() => {
+          if (disposed) return
+          try {
+            const raw = localStorage.getItem(key)
+            const saved = raw ? JSON.parse(raw) : null
+            if (saved) {
+              const all = blocks()
+              const block = all.find(item => item.dataset.readingId === saved.id && item.id === saved.anchor)
+                || all.find(item => item.id === saved.anchor) || all[0]
+              if (block) {
+                const paragraphs = Array.from(block.querySelectorAll<HTMLElement>('.chronicle-narrative > p, .chronicle-narrative > blockquote, .chronicle-narrative > div'))
+                const unchanged = block.dataset.readingVersion === saved.version
+                const target = unchanged && Number.isInteger(saved.paragraph) && saved.paragraph >= 0 ? paragraphs[saved.paragraph] || block : block
+                const offset = unchanged && Number.isFinite(saved.offset) ? Math.max(0, Math.min(1, saved.offset)) * target.offsetHeight : 0
+                container.scrollTop += target.getBoundingClientRect().top - container.getBoundingClientRect().top + offset - 12
+                setSelectedChapter(block.id === 'current-era' ? null : Number(block.id.replace('chapter-', '')))
+              }
+            }
+          } catch { /* Ignore invalid or unavailable local preferences. */ }
+          restoredReadingKeyRef.current = key
+        })
+      }
+      // Font metrics affect paragraph positions during the first file load.
+      void document.fonts.ready.then(restorePosition, restorePosition)
+    }
+    const onScroll = () => { if (timer) clearTimeout(timer); timer = setTimeout(storePosition, 180) }
+    container.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('beforeunload', storePosition)
+    return () => {
+      storePosition()
+      disposed = true
+      cancelAnimationFrame(frame)
+      if (timer) clearTimeout(timer)
+      container.removeEventListener('scroll', onScroll)
+      window.removeEventListener('beforeunload', storePosition)
+    }
+  }, [chronicle, selectedSaveId, i18n.language, i18n.resolvedLanguage, isActive])
 
   useEffect(() => {
     if (!chronicle) return
@@ -739,6 +877,10 @@ function ChroniclePage({
       chronicleRetryTimerRef.current = null
     }
     setLoading(false)
+    setRegeneratingChapter(null)
+    regeneratingChapterRef.current = null
+    setConfirmRegen(null)
+    setJustRegenerated(null)
     setError(null)
     setErrorNeedsSettings(false)
     window.localStorage.setItem('chronicle.lastSelectedSaveId', saveId)
@@ -751,17 +893,30 @@ function ChroniclePage({
     saveId: string,
     action: 'label' | 'trash' | 'restore' | 'reset' | 'undo-reset' | 'delete',
   ) => {
-    const affectsSelectedChronicle = saveId === selectedSaveId
+    const affectsSelectedChronicle = saveId === selectedSaveIdRef.current
       && ['trash', 'reset', 'delete'].includes(action)
     if (affectsSelectedChronicle) {
+      chronicleRequestTokenRef.current += 1
+      chronicleInFlightRef.current = false
+      queuedForceRefreshRef.current = false
+      setLoading(false)
+      setRegeneratingChapter(null)
+      regeneratingChapterRef.current = null
+      setConfirmRegen(null)
+      if (chronicleRetryTimerRef.current) {
+        clearTimeout(chronicleRetryTimerRef.current)
+        chronicleRetryTimerRef.current = null
+      }
       setChronicle(null)
       setSelectedChapter(null)
       didInitChapterSelectionRef.current = false
     }
     await loadSaves({ silent: true })
-    if (saveId === selectedSaveId && action === 'undo-reset') {
+    if (!isMountedRef.current) return
+    if (saveId === selectedSaveIdRef.current && action === 'undo-reset') {
+      const token = chronicleRequestTokenRef.current
       const restored = await backend.cachedChronicle(saveId)
-      if (restored.data?.cached) setChronicle(restored.data)
+      if (isMountedRef.current && token === chronicleRequestTokenRef.current && saveId === selectedSaveIdRef.current && restored.data?.cached) setChronicle(restored.data)
     }
   }, [backend, loadSaves, selectedSaveId])
 
@@ -774,12 +929,15 @@ function ChroniclePage({
   const handleRegenerateChapter = useCallback(async (chapterNumber: number, regenerationInstructions?: string) => {
     if (confirmRegen !== chapterNumber) {
       // First click - show confirmation
+      confirmRevisionRef.current = chronicle?.chronicle_revision
       setConfirmRegen(chapterNumber)
       return
     }
 
+    const token = chronicleRequestTokenRef.current
     // Second click - do the regeneration
     setConfirmRegen(null)
+    regeneratingChapterRef.current = chapterNumber
     setRegeneratingChapter(chapterNumber)
     setJustRegenerated(null)
 
@@ -798,9 +956,10 @@ function ChroniclePage({
       true,
       regenerationInstructions,
       modelRoutingMode,
+      confirmRevisionRef.current,
     )
 
-    if (!isMountedRef.current) return
+    if (!isMountedRef.current || token !== chronicleRequestTokenRef.current) return
 
     if (result.error) {
       if (result.errorCode === 'CHRONICLE_PROVIDER_NOT_CONFIGURED') {
@@ -822,15 +981,9 @@ function ChroniclePage({
       return
     }
 
-    // Silently reload chronicle data without showing loading spinner
-    const chronicleResult = await backend.chronicle(
-      session.id,
-      false,
-      false,
-      refreshMode,
-      modelRoutingMode,
-    )
-    if (!isMountedRef.current) return
+    // Reading the updated archive never triggers another generation.
+    const chronicleResult = await backend.cachedChronicle(session.save_id)
+    if (!isMountedRef.current || token !== chronicleRequestTokenRef.current) return
 
     if (chronicleResult.data) {
       setChronicle(chronicleResult.data)
@@ -846,6 +999,7 @@ function ChroniclePage({
     backend,
     selectedSaveId,
     confirmRegen,
+    chronicle?.chronicle_revision,
     latestSessionBySaveId,
     modelRoutingMode,
     refreshMode,
@@ -857,6 +1011,12 @@ function ChroniclePage({
   const handleCancelRegen = useCallback(() => {
     setConfirmRegen(null)
   }, [])
+
+  const storyAfterLoadedSave = Boolean(
+    liveSource?.saveId === selectedSaveId && chronicle?.coverage_date
+    && gameDateOrder(chronicle.coverage_date) !== null && gameDateOrder(liveSource.date) !== null
+    && gameDateOrder(chronicle.coverage_date)! > gameDateOrder(liveSource.date)!,
+  )
 
   // Get empire name for header
   const empireName = saves.find(s => s.save_id === selectedSaveId)?.display_name || 'Unknown Empire'
@@ -946,6 +1106,7 @@ function ChroniclePage({
           </AnimatePresence>
           <div ref={scrollContainerRef} className="absolute inset-0 overflow-y-auto p-6">
           <div className="relative">
+            {storyAfterLoadedSave && <p role="status" className="mb-4 rounded border border-accent-yellow/20 bg-accent-yellow/5 px-4 py-3 text-xs text-text-secondary">{t('continuity.earlierSave')}</p>}
             {chronicleConfigured === false && (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border border-accent-yellow/40 bg-accent-yellow/5 px-4 py-3">
                 <div className="min-w-0">
@@ -1029,6 +1190,11 @@ function ChroniclePage({
               </div>
             ) : chronicle ? (
               <ChronicleContent
+                revision={chronicle.chronicle_revision}
+                coverageDate={chronicle.coverage_date}
+                mutationBusy={mutationBusy || loading}
+                onEdit={(number, revision, title, narrative) => changeChapter(number, revision, { title, narrative })}
+                onUndo={(number, revision) => void changeChapter(number, revision)}
                 empireName={empireName}
                 chapters={chronicle.chapters}
                 currentEra={chronicle.current_era}

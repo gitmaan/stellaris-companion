@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 export const UI_THEME_VALUES = ['stellaris-cyan', 'tactica-green', 'command-amber'] as const
 export type UiTheme = (typeof UI_THEME_VALUES)[number]
 export const DEFAULT_UI_THEME: UiTheme = 'stellaris-cyan'
-export const CHRONICLE_REFRESH_MODE_VALUES = ['balanced', 'enhanced'] as const
+export const CHRONICLE_REFRESH_MODE_VALUES = ['balanced', 'enhanced', 'manual'] as const
 export type ChronicleRefreshMode = (typeof CHRONICLE_REFRESH_MODE_VALUES)[number]
 export const DEFAULT_CHRONICLE_REFRESH_MODE: ChronicleRefreshMode = 'balanced'
 export const MODEL_ROUTING_MODE_VALUES = ['quality_first', 'conserve'] as const

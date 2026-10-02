@@ -414,7 +414,10 @@
       "enhancedHelp": "Schnellere Story-Updates der aktuellen Aera in der Chronik. Nutzt mehr Modellaufrufe.",
       "aria": "Aktualisierungsmodus auf {{mode}} setzen",
       "toastError": "Chronik-Aktualisierungsmodus konnte nicht geaendert werden. Bitte erneut versuchen.",
-      "toastSuccess": "Chronik-Aktualisierungsmodus auf {{mode}} gesetzt."
+      "toastSuccess": "Chronik-Aktualisierungsmodus auf {{mode}} gesetzt.",
+      "manual": "Manuell",
+      "manualTag": "Auf Anfrage",
+      "manualHelp": "Die Ereignisse werden weiter erfasst. Aktualisiere die Geschichte, wenn du neue Texte möchtest."
     },
     "modelRouting": {
       "label": "MODELL-ROUTING",
@@ -1115,5 +1118,28 @@
     "lowerUsage": "Weniger Verbrauch",
     "moreModels": "Weitere Modelle",
     "modelUpdated": "Modell aktualisiert"
+  },
+  "continuity": {
+    "historyRetry": "Chatverlauf nicht verfügbar · Erneut versuchen",
+    "restoring": "Chat wird wiederhergestellt…",
+    "chats": "Chats",
+    "basedOnSave": "Basierend auf Spielstand {{date}}",
+    "historyNotSaved": "Diese Antwort konnte nicht gespeichert werden.",
+    "storyCoverage": "Die Geschichte reicht bis {{date}}",
+    "chapterTitle": "Kapiteltitel",
+    "chapterText": "Kapiteltext",
+    "editProtection": "Deine Änderungen bleiben bei automatischen Aktualisierungen erhalten.",
+    "saveChanges": "Änderungen speichern",
+    "chapterActions": "Kapitelaktionen",
+    "editText": "Text bearbeiten",
+    "undoChapter": "Letzte Änderung rückgängig",
+    "editedByYou": "Von dir bearbeitet · bleibt bei Aktualisierungen erhalten",
+    "coverageUnknown": "Zeitraum unbekannt",
+    "editConflict": "Dieses Kapitel wurde während der Bearbeitung geändert. Dein Entwurf bleibt erhalten; brich ab und öffne die neueste Version.",
+    "editFailed": "Dieses Kapitel konnte nicht gespeichert werden.",
+    "earlierMessages": "Ältere Nachrichten",
+    "latestMessages": "Zur neuesten Nachricht",
+    "updateStory": "Geschichte aktualisieren",
+    "earlierSave": "Ein früherer Spielstand wurde geladen. Deine aufgezeichnete Geschichte bleibt erhalten."
   }
 }

@@ -421,7 +421,10 @@
       "enhancedHelp": "Actualizaciones mas rapidas de la era actual al ver Cronica. Usa mas llamadas al modelo.",
       "aria": "Establecer modo de actualizacion en {{mode}}",
       "toastError": "No se pudo actualizar el modo de Cronica. Intentalo de nuevo.",
-      "toastSuccess": "Modo de Cronica establecido en {{mode}}."
+      "toastSuccess": "Modo de Cronica establecido en {{mode}}.",
+      "manual": "Manual",
+      "manualTag": "A petición",
+      "manualHelp": "Los eventos siguen acumulándose. Actualiza la historia cuando quieras nuevo texto."
     },
     "modelRouting": {
       "label": "ENRUTAMIENTO DE MODELO",
@@ -1126,5 +1129,28 @@
     "lowerUsage": "Menor consumo",
     "moreModels": "Más modelos",
     "modelUpdated": "Modelo actualizado"
+  },
+  "continuity": {
+    "historyRetry": "Historial no disponible · Reintentar",
+    "restoring": "Restaurando chat…",
+    "chats": "Chats",
+    "basedOnSave": "Basado en la partida del {{date}}",
+    "historyNotSaved": "No se pudo guardar esta respuesta.",
+    "storyCoverage": "La historia abarca hasta {{date}}",
+    "chapterTitle": "Título del capítulo",
+    "chapterText": "Texto del capítulo",
+    "editProtection": "Tus cambios se conservan durante las actualizaciones automáticas.",
+    "saveChanges": "Guardar cambios",
+    "chapterActions": "Acciones del capítulo",
+    "editText": "Editar texto",
+    "undoChapter": "Deshacer último cambio",
+    "editedByYou": "Editado por ti · se conserva al actualizar",
+    "coverageUnknown": "Cobertura desconocida",
+    "editConflict": "El capítulo cambió mientras lo editabas. Tu borrador sigue aquí; cancela y vuelve a abrir la versión más reciente.",
+    "editFailed": "No se pudo guardar el capítulo.",
+    "earlierMessages": "Mensajes anteriores",
+    "latestMessages": "Volver a los últimos",
+    "updateStory": "Actualizar historia",
+    "earlierSave": "Se cargó una partida anterior. Tu historia registrada se conserva."
   }
 }

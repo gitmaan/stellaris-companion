@@ -12,6 +12,15 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.advisor_memory import sanitize_advisor_memory
+from backend.core.chronicle_store import (
+    ChronicleConflict,
+    cached_chronicle_response,
+    events_between_dates,
+    load_chapters_data,
+)
+from backend.core.chronicle_store import (
+    chronicle_revision as shared_chronicle_revision,
+)
 from backend.core.database import GameDatabase
 from backend.core.language import language_name, normalize_language
 
@@ -349,7 +358,7 @@ class StellarisMcpContext:
                 "save_affordance": self._chronicle_save_affordance(),
             }
 
-        chapters_data = _parse_json_object(cached.get("chapters_json"))
+        chapters_data = load_chapters_data(cached)
         current_era_cache = chapters_data.get("current_era_cache")
         current_era = (
             current_era_cache.get("current_era")
@@ -367,7 +376,8 @@ class StellarisMcpContext:
             "chronicle_revision": _chronicle_revision(chapters_data),
             "cached": True,
             "language": cached.get("language") or self.language,
-            "generated_at": cached.get("generated_at"),
+            "generated_at": cached_chronicle_response(cached)["generated_at"],
+            "coverage_date": chapters_data.get("coverage_date"),
             "event_count": cached.get("event_count"),
             "snapshot_count": cached.get("snapshot_count"),
             "chapters": [_chapter_payload(ch) for ch in chapters],
@@ -394,7 +404,7 @@ class StellarisMcpContext:
         cached = self.db.get_chronicle_by_save_id(save_id, language=self.language)
         if not cached:
             cached = self.db.get_cached_chronicle(str(session["id"]), language=self.language)
-        chapters_data = _parse_json_object(cached.get("chapters_json")) if cached else {}
+        chapters_data = load_chapters_data(cached)
         normalized_scope = str(scope or "current_era").strip().lower()
         if normalized_scope.startswith("chapter:") and chapter_number is None:
             with contextlib_suppress_value_error():
@@ -413,6 +423,13 @@ class StellarisMcpContext:
                 from_snapshot_id=chapter.get("start_snapshot_id"),
                 to_snapshot_id=chapter.get("end_snapshot_id"),
             )
+            source = chapter.get("source_bundle") or {}
+            if isinstance(source.get("events"), list):
+                events = source["events"]
+            else:
+                events = events_between_dates(
+                    events, chapter.get("start_date"), chapter.get("end_date")
+                )
             event_range = {
                 "scope": "chapter",
                 "chapter_number": chapter.get("number"),
@@ -446,7 +463,13 @@ class StellarisMcpContext:
         if truncated:
             events = events[-lim:]
 
-        briefing = self._load_briefing(str(session["id"]))
+        if event_range.get("scope") == "chapter":
+            source = chapter.get("source_bundle") or {}
+            briefing = source.get("briefing") or self.db.get_historical_chronicle_briefing(
+                save_id, chapter.get("end_snapshot_id")
+            )
+        else:
+            briefing = self._load_briefing(str(session["id"]))
         return {
             "campaign": self.get_active_campaign(),
             "campaign_ref": _campaign_ref(save_id),
@@ -524,6 +547,9 @@ class StellarisMcpContext:
                 "sections": [{"type": "prose", "text": cleaned_narrative, "attribution": ""}],
                 "events_covered": resolved_events_covered,
                 "source": "mcp_writeback",
+                "manual_edit_locked": True,
+                "coverage_date": None,
+                "generated_at": generated_at,
                 "external_edit": {
                     "operation": "save_current_era",
                     "source": "external_ai",
@@ -539,6 +565,7 @@ class StellarisMcpContext:
                 "generated_at": generated_at,
                 "language": self.language,
                 "source": "mcp_writeback",
+                "coverage_date": None,
                 "current_era": current_era,
             }
             self._record_external_edit(
@@ -551,7 +578,8 @@ class StellarisMcpContext:
                 base_revision=state["base_revision"],
             )
             chronicle_revision = self._finalize_external_edit(chapters_data)
-            self._persist_chronicle_state(
+            chronicle_revision = self._persist_chronicle_state(
+                expected_revision=state["base_revision"],
                 session=session,
                 save_id=save_id,
                 chapters_data=chapters_data,
@@ -622,8 +650,13 @@ class StellarisMcpContext:
             )
             if title is not None and str(title).strip():
                 chapter["title"] = str(title).strip()
-            if summary is not None:
-                chapter["summary"] = str(summary).strip()
+            chapter["summary"] = str(summary).strip() if summary is not None else ""
+            for later in chapters_data.get("chapters", []):
+                if later.get("number", 0) > chapter_number:
+                    later["context_stale"] = True
+            era = (chapters_data.get("current_era_cache") or {}).get("current_era")
+            if isinstance(era, dict):
+                era["context_stale"] = True
             if epigraph is not None:
                 chapter["epigraph"] = str(epigraph).strip()
             chapter["source"] = "mcp_writeback"
@@ -644,7 +677,8 @@ class StellarisMcpContext:
                 base_revision=state["base_revision"],
             )
             chronicle_revision = self._finalize_external_edit(chapters_data)
-            self._persist_chronicle_state(
+            chronicle_revision = self._persist_chronicle_state(
+                expected_revision=state["base_revision"],
                 session=session,
                 save_id=save_id,
                 chapters_data=chapters_data,
@@ -797,7 +831,8 @@ class StellarisMcpContext:
                 base_revision=state["base_revision"],
             )
             chronicle_revision = self._finalize_external_edit(chapters_data)
-            self._persist_chronicle_state(
+            chronicle_revision = self._persist_chronicle_state(
+                expected_revision=state["base_revision"],
                 session=session,
                 save_id=save_id,
                 chapters_data=chapters_data,
@@ -842,6 +877,11 @@ class StellarisMcpContext:
                 raise McpContextError("There is no external Chronicle edit to undo.")
 
             last_edit = history[-1]
+            if last_edit.get("resulting_revision") != state["base_revision"]:
+                raise McpContextError(
+                    "A newer Chronicle change was saved after this external edit. "
+                    "Undo cannot replace those newer changes."
+                )
             if last_edit.get("edit_receipt") != str(edit_receipt or "").strip():
                 raise McpContextError(
                     "That edit receipt is no longer the latest Chronicle change. "
@@ -857,7 +897,8 @@ class StellarisMcpContext:
             restored["external_edit_history"] = history[:-1]
             restored["external_edit_last_updated_at"] = datetime.now(timezone.utc).isoformat()
             chronicle_revision = _chronicle_revision(restored)
-            self._persist_chronicle_state(
+            chronicle_revision = self._persist_chronicle_state(
+                expected_revision=state["base_revision"],
                 session=session,
                 save_id=save_id,
                 chapters_data=restored,
@@ -889,7 +930,7 @@ class StellarisMcpContext:
         if require_cached and not cached:
             raise McpContextError("No cached Chronicle is available to edit.")
 
-        chapters_data = _parse_json_object(cached.get("chapters_json")) if cached else {}
+        chapters_data = load_chapters_data(cached)
         if not chapters_data:
             chapters_data = _json_clone(DEFAULT_CHAPTERS_DATA)
         self._ensure_chapters(chapters_data)
@@ -944,28 +985,35 @@ class StellarisMcpContext:
         save_id: str,
         chapters_data: dict[str, Any],
         snapshot_range: dict[str, Any],
-    ) -> None:
-        current_era_cache = chapters_data.get("current_era_cache")
-        current_era = (
-            current_era_cache.get("current_era")
-            if isinstance(current_era_cache, dict)
-            and isinstance(current_era_cache.get("current_era"), dict)
-            else None
+        expected_revision: str,
+    ) -> str:
+        # The caller holds a short transaction, with no provider work inside it.
+        era = (chapters_data.get("current_era_cache") or {}).get("current_era")
+        dates = [ch.get("coverage_date") for ch in chapters_data.get("chapters", [])]
+        if isinstance(era, dict):
+            dates.append(era.get("coverage_date"))
+        chapters_data["coverage_date"] = max(
+            (v for v in dates if isinstance(v, str) and v), default=None
         )
-        chronicle_text = _assemble_chronicle_text(chapters_data, current_era)
-        event_count = len(self.db.get_all_events_by_save_id(save_id=save_id))
-        snapshot_count = int(
-            snapshot_range.get("snapshot_count") or session.get("snapshot_count") or 0
-        )
-        self.db.upsert_chronicle_by_save_id(
-            save_id=save_id,
-            session_id=str(session["id"]),
-            chronicle_text=chronicle_text,
-            chapters_json=json.dumps(chapters_data, ensure_ascii=False),
-            event_count=event_count,
-            snapshot_count=snapshot_count,
-            language=self.language,
-        )
+        chapters_data["content_generated_at"] = datetime.now(timezone.utc).isoformat()
+        try:
+            saved = self.db.commit_chronicle(
+                save_id=save_id,
+                session_id=str(session["id"]),
+                language=self.language,
+                expected_revision=expected_revision,
+                chapters_data=chapters_data,
+                event_count=len(
+                    self.db.get_events_in_snapshot_range(
+                        save_id=save_id, to_snapshot_id=snapshot_range.get("last_snapshot_id")
+                    )
+                ),
+                snapshot_count=int(snapshot_range.get("snapshot_count") or 0),
+                external_write=True,
+            )
+        except ChronicleConflict as exc:
+            raise McpContextError(str(exc)) from exc
+        return shared_chronicle_revision(load_chapters_data(saved))
 
     def _validate_chronicle_text(self, value: str, *, field_name: str) -> None:
         if not value:
@@ -1471,14 +1519,8 @@ def _campaign_ref(save_id: str) -> str:
 
 
 def _chronicle_revision(chapters_data: dict[str, Any]) -> str:
-    visible = _visible_chapters_snapshot(chapters_data)
-    encoded = json.dumps(
-        visible,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode()
-    return f"chronicle_{hashlib.sha256(encoded).hexdigest()[:24]}"
+    normalized = load_chapters_data({"chapters_json": json.dumps(chapters_data)})
+    return shared_chronicle_revision(normalized)
 
 
 def _new_edit_receipt() -> str:
@@ -1509,6 +1551,7 @@ def _visible_chapters_snapshot(chapters_data: dict[str, Any]) -> dict[str, Any]:
     if isinstance(snapshot, dict):
         snapshot.pop("external_edit_history", None)
         snapshot.pop("external_edit_last_updated_at", None)
+        snapshot.pop("chapter_undo", None)
     return snapshot if isinstance(snapshot, dict) else {}
 
 

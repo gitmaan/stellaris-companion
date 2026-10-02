@@ -414,7 +414,10 @@
       "enhancedHelp": "年代記表示中の現在時代の更新を速くします。モデル呼び出しが増えます。",
       "aria": "更新モードを {{mode}} に設定",
       "toastError": "年代記の更新モードを変更できませんでした。もう一度お試しください。",
-      "toastSuccess": "年代記の更新モードを {{mode}} に設定しました。"
+      "toastSuccess": "年代記の更新モードを {{mode}} に設定しました。",
+      "manual": "手動",
+      "manualTag": "必要なときに",
+      "manualHelp": "出来事の記録は続きます。新しい物語が必要なときに更新してください。"
     },
     "modelRouting": {
       "label": "モデルルーティング",
@@ -1115,5 +1118,28 @@
     "lowerUsage": "使用量を抑える",
     "moreModels": "その他のモデル",
     "modelUpdated": "モデルを更新しました"
+  },
+  "continuity": {
+    "historyRetry": "会話履歴を取得できません · 再試行",
+    "restoring": "会話を復元中…",
+    "chats": "会話履歴",
+    "basedOnSave": "セーブ {{date}} に基づく回答",
+    "historyNotSaved": "この回答を保存できませんでした。",
+    "storyCoverage": "物語の収録範囲：{{date}} まで",
+    "chapterTitle": "章のタイトル",
+    "chapterText": "章の本文",
+    "editProtection": "自動更新時も編集内容は保持されます。",
+    "saveChanges": "変更を保存",
+    "chapterActions": "章の操作",
+    "editText": "本文を編集",
+    "undoChapter": "直前の変更を元に戻す",
+    "editedByYou": "手動編集済み · 更新時も保持",
+    "coverageUnknown": "収録範囲は不明",
+    "editConflict": "編集中にこの章が変更されました。下書きは保持されています。キャンセルして最新版を開き直してください。",
+    "editFailed": "この章を保存できませんでした。",
+    "earlierMessages": "以前のメッセージ",
+    "latestMessages": "最新の会話に戻る",
+    "updateStory": "物語を更新",
+    "earlierSave": "以前のセーブを読み込みました。記録済みの物語は保持されます。"
   }
 }

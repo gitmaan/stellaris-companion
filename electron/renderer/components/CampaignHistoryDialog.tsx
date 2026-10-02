@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useRef, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
@@ -169,8 +169,14 @@ function CampaignHistoryDialog({
     }
   }
 
+  const resetRevisionRef = useRef<string>()
   const handleReset = async (playthrough: Playthrough) => {
     if (confirmResetId !== playthrough.save_id) {
+      setWorkingId(playthrough.save_id)
+      const cached = await backend.cachedChronicle(playthrough.save_id)
+      setWorkingId(null)
+      if (cached.error) { reportError(cached.error); return }
+      resetRevisionRef.current = cached.data?.chronicle_revision
       setConfirmResetId(playthrough.save_id)
       return
     }
@@ -178,7 +184,7 @@ function CampaignHistoryDialog({
     const succeeded = await runMutation(
       playthrough,
       'reset',
-      () => backend.resetChronicle(playthrough.save_id),
+      () => backend.resetChronicle(playthrough.save_id, resetRevisionRef.current),
     )
     if (!succeeded) return
     showToast({

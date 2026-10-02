@@ -688,7 +688,10 @@
       "enhancedHelp": "Updates the current era more often while Chronicle is open.",
       "aria": "Set refresh mode to {{mode}}",
       "toastError": "Failed to update Chronicle refresh mode. Please try again.",
-      "toastSuccess": "Chronicle refresh mode set to {{mode}}."
+      "toastSuccess": "Chronicle refresh mode set to {{mode}}.",
+      "manual": "Manual",
+      "manualTag": "On request",
+      "manualHelp": "History keeps accumulating. Use Update story when you want new prose."
     },
     "modelRouting": {
       "label": "MODEL USE",
@@ -1115,5 +1118,28 @@
     "lowerUsage": "Lower usage",
     "moreModels": "More models",
     "modelUpdated": "Model updated"
+  },
+  "continuity": {
+    "historyRetry": "Chat history unavailable · Retry",
+    "restoring": "Restoring chat…",
+    "chats": "Chats",
+    "basedOnSave": "Based on save {{date}}",
+    "historyNotSaved": "This reply could not be saved.",
+    "storyCoverage": "Story covers through {{date}}",
+    "chapterTitle": "Chapter title",
+    "chapterText": "Chapter text",
+    "editProtection": "Your edits are preserved during automatic updates.",
+    "saveChanges": "Save changes",
+    "chapterActions": "Chapter actions",
+    "editText": "Edit text",
+    "undoChapter": "Undo latest change",
+    "editedByYou": "Edited by you · preserved during updates",
+    "coverageUnknown": "Coverage unknown",
+    "editConflict": "This chapter changed while you were editing. Your draft is still here; cancel and reopen to edit the latest version.",
+    "editFailed": "Could not save this chapter.",
+    "earlierMessages": "Earlier messages",
+    "latestMessages": "Return to latest",
+    "updateStory": "Update story",
+    "earlierSave": "Earlier save loaded. Your recorded story is kept."
   }
 }

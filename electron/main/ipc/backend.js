@@ -30,12 +30,15 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     return await callBackendApiEnvelope('/api/diagnostics')
   })
 
-  safeHandle('backend:chat', async ({ message, session_key, model, model_routing_mode }) => {
+  safeHandle('backend:chat', async ({ message, session_key, model, model_routing_mode, conversation_id, save_id, request_id }) => {
     return await callBackendApiEnvelope('/api/chat', {
       method: 'POST',
       body: JSON.stringify(withLanguage({
         message,
         session_key,
+        conversation_id,
+        save_id,
+        request_id,
         model: model || null,
         model_routing_mode: model_routing_mode || null,
       })),
@@ -57,6 +60,32 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
       include_trashed: include_trashed === false ? 'false' : 'true',
     })
     return await callBackendApiEnvelope(`/api/playthroughs?${query.toString()}`)
+  })
+
+  safeHandle('backend:conversations', async ({ save_id }) => {
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/conversations`)
+  })
+
+  safeHandle('backend:create-conversation', async ({ save_id }) => {
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/conversations`, { method: 'POST', body: '{}' })
+  })
+
+  safeHandle('backend:conversation', async ({ save_id, conversation_id, before_turn_id }) => {
+    const query = new URLSearchParams({ limit: '150' })
+    if (before_turn_id) query.set('before_turn_id', before_turn_id)
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/conversations/${encodeURIComponent(conversation_id)}?${query}`)
+  })
+
+  safeHandle('backend:edit-chapter', async ({ save_id, chapter_number, expected_revision, title, narrative }) => {
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/chronicle/chapters/${chapter_number}`, {
+      method: 'PUT', body: JSON.stringify(withLanguage({ expected_revision, title, narrative })),
+    })
+  })
+
+  safeHandle('backend:undo-chapter', async ({ save_id, chapter_number, expected_revision }) => {
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/chronicle/chapters/${chapter_number}/undo`, {
+      method: 'POST', body: JSON.stringify(withLanguage({ expected_revision })),
+    })
   })
 
   safeHandle('backend:cached-chronicle', async ({ save_id }) => {
@@ -84,10 +113,10 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     })
   })
 
-  safeHandle('backend:reset-chronicle', async ({ save_id }) => {
+  safeHandle('backend:reset-chronicle', async ({ save_id, expected_revision }) => {
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/reset-chronicle`, {
       method: 'POST',
-      body: JSON.stringify(withLanguage({ confirm: true })),
+      body: JSON.stringify(withLanguage({ confirm: true, expected_revision })),
     })
   })
 
@@ -140,12 +169,13 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     })
   })
 
-  safeHandle('backend:regenerate-chapter', async ({ session_id, chapter_number, confirm, regeneration_instructions, model_routing_mode }) => {
+  safeHandle('backend:regenerate-chapter', async ({ session_id, chapter_number, confirm, regeneration_instructions, model_routing_mode, expected_revision }) => {
     return await callBackendApiEnvelope('/api/chronicle/regenerate-chapter', {
       method: 'POST',
       body: JSON.stringify(withLanguage({
         session_id,
         chapter_number,
+        expected_revision,
         confirm: confirm || false,
         regeneration_instructions: regeneration_instructions || null,
         model_routing_mode: model_routing_mode || null,
