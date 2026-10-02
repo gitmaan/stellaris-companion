@@ -16,7 +16,7 @@ module.exports = async function afterPack(context) {
   const resourcesDir = path.join(appPath, "Contents", "Resources");
 
   // Resolve the signing identity from the keychain.
-  // On CI, electron-builder imports CSC_LINK into a temporary keychain.
+  // CI imports the certificate into CSC_KEYCHAIN before packaging.
   // We find the Developer ID cert hash from whatever keychain is available.
   let identity = process.env.CSC_NAME;
   if (!identity) {
