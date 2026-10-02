@@ -518,6 +518,31 @@ def test_storage_failure_leaves_usable_unsaved_reply_and_provider_failure_saves_
     db.close()
 
 
+def test_first_request_without_history_does_not_use_legacy_topic_cache(monkeypatch, tmp_path):
+    app, db, companion, generator = make_app(monkeypatch, tmp_path)
+    save_id, _ = activate(companion, db, tmp_path)
+    app.state.db = None
+    monkeypatch.setattr(
+        companion, "_load_save_memory_summary", lambda **kwargs: "Legacy goal cache"
+    )
+    updated = []
+    monkeypatch.setattr(
+        companion, "_update_save_memory_summary", lambda **kwargs: updated.append(kwargs)
+    )
+    with TestClient(app) as client:
+        reply = client.post(
+            "/api/chat",
+            headers=HEADERS,
+            json={"message": "Fresh question", "save_id": save_id, "request_id": "first-fallback"},
+        )
+        assert reply.status_code == 200
+        assert reply.json()["history_saved"] is False
+        assert "Legacy goal cache" not in generator.prompts[-1]
+        assert updated == []
+    companion.close()
+    db.close()
+
+
 def test_backup_trash_restore_delete_include_conversations(monkeypatch, tmp_path):
     app, db, companion, _ = make_app(monkeypatch, tmp_path)
     save_id, _ = activate(companion, db, tmp_path)

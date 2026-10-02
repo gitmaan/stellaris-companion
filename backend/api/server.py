@@ -925,7 +925,7 @@ def create_app() -> FastAPI:
                         language=output_language,
                         source=source,
                         restored_turns=restored,
-                        persist_memory=not history_available and not body.conversation_id,
+                        persist_memory=False,
                     )
                     response_text, elapsed, call_stats = reply.text, reply.elapsed, reply.stats
                 else:
