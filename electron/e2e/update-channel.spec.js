@@ -35,6 +35,7 @@ async function openUpdateSettings(app) {
 
 test('persists a Stable or Beta update preference across launches', async () => {
   const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-companion-updates-e2e-'))
+  await fs.writeFile(path.join(userDataDir, 'settings.json'), JSON.stringify({ updateChannel: 'stable' }))
   let app = await launchApp(userDataDir)
 
   try {
