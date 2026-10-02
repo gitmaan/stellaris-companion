@@ -191,7 +191,16 @@ jobs:
             VENV_BIN="$PWD/.venv-build/bin"
           fi
           "$PYTHON_BIN" -m pip install --upgrade pip
-          "$PYTHON_BIN" -m pip install .
+          if [[ "${{ matrix.name }}" == "mac-x64" ]]; then
+            # Cryptography no longer ships Intel macOS wheels. Its source build
+            # must not link Homebrew OpenSSL dynamically: PyInstaller also
+            # collects Python's older libssl.3.dylib under the same filename.
+            # Avoid reusing a cached wheel built without these static settings.
+            OPENSSL_DIR="$(brew --prefix openssl@3)" OPENSSL_STATIC=1 \
+              "$PYTHON_BIN" -m pip install --no-cache-dir .
+          else
+            "$PYTHON_BIN" -m pip install .
+          fi
           "$PYTHON_BIN" -m pip install pyinstaller
           echo "PYTHON_BIN=$PYTHON_BIN" >> "$GITHUB_ENV"
           echo "$VENV_BIN" >> "$GITHUB_PATH"

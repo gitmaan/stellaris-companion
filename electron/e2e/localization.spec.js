@@ -77,6 +77,7 @@ test('first-run language selection persists and never configures the backend', a
     await page.locator('#onboarding-language').selectOption('ja')
     await expect(page.locator('html')).toHaveAttribute('lang', 'ja')
     await expect(page.getByText(japanese.onboarding.welcome.title)).toBeVisible()
+    await expect(page.getByText('ステップ 1 / 3', { exact: true })).toBeVisible()
     await expect(page.getByText('言語を保存できませんでした。もう一度お試しください。')).toHaveCount(0)
     const settings = JSON.parse(await fs.readFile(path.join(profile, 'settings.json'), 'utf8'))
     expect(settings.language).toBe('ja')
@@ -84,6 +85,7 @@ test('first-run language selection persists and never configures the backend', a
     await saveScreenshot(page, 'ja-onboarding-welcome-1000x700-scale100.png')
 
     await page.getByRole('button', { name: '始める' }).click()
+    await expect(page.getByText('ステップ 2 / 3', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: /Gemini API キー/ }).click()
     await expect(page.getByRole('heading', { name: 'Gemini に接続' })).toBeVisible()
     await saveScreenshot(page, 'ja-onboarding-provider-1000x700-scale100.png')
@@ -98,6 +100,7 @@ test('first-run language selection persists and never configures the backend', a
     await page.getByRole('button', { name: '戻る', exact: true }).click()
     await page.getByRole('button', { name: '後で設定' }).click()
     await expect(page.getByRole('heading', { name: 'セーブデータを検索' })).toBeVisible()
+    await expect(page.getByText('ステップ 3 / 3', { exact: true })).toBeVisible()
     await saveScreenshot(page, 'ja-onboarding-saves-1000x700-scale100.png')
 
     await app.close()
@@ -111,6 +114,9 @@ test('first-run language selection persists and never configures the backend', a
     for (const locale of locales) {
       await relaunched.locator('#onboarding-language').selectOption(locale)
       await expect(relaunched.locator('html')).toHaveAttribute('lang', locale)
+      const catalog = require(`../renderer/i18n/locales/${locale}/common.json`)
+      const stepLabel = catalog.onboarding.step.replace('{{current}}', '1').replace('{{total}}', '3')
+      await expect(relaunched.getByText(stepLabel, { exact: true })).toBeVisible()
       await saveScreenshot(relaunched, `${locale}-onboarding-welcome-1000x700-scale100.png`)
     }
     await relaunched.locator('#onboarding-language').selectOption('de')

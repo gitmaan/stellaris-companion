@@ -11,7 +11,7 @@ export function OnboardingFrame({ step, title, icon, languageMenu, children, act
       <div className="flex h-full flex-col gap-6 p-6">
         <header className="flex shrink-0 flex-wrap items-start justify-between gap-x-6 gap-y-3">
           <div className="min-w-0 flex-1 space-y-2">
-            <p className="font-mono text-xs leading-4 tracking-[0.12em] uppercase text-accent-cyan">{t('onboarding.step', { step, total: 3 })}</p>
+            <p className="font-mono text-xs leading-4 tracking-[0.12em] uppercase text-accent-cyan">{t('onboarding.step', { current: step, total: 3 })}</p>
             <h1 id="onboarding-step-title" className="flex items-center gap-3 font-display text-xl leading-7 tracking-[0.12em] uppercase text-text-primary">{icon}{title}</h1>
           </div>
           {languageMenu}
