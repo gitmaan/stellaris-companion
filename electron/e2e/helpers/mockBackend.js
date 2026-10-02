@@ -1,14 +1,15 @@
 const http = require('http')
 const { randomUUID } = require('crypto')
+const { resolveLanguage } = require('../../main/language')
 
 function buildChronicleText(narrative) {
   return `### THE CURRENT ERA\n**2200.01.01 - Present**\n\n${narrative}`
 }
 
-function buildChronicleResponse({ narrative, eventsCovered, cached, chapters = [], revision = 'mock-1', coverageDate = '2205.01.01' }) {
+function buildChronicleResponse({ narrative, eventsCovered, cached, chapters = [], revision = 'mock-1', coverageDate = '2205.01.01', language = 'en' }) {
   return {
     chapters,
-    language: 'en',
+    language: resolveLanguage(language, language),
     chronicle_revision: revision,
     coverage_date: coverageDate,
     current_era: {
@@ -33,9 +34,10 @@ function buildChronicleResponse({ narrative, eventsCovered, cached, chapters = [
   }
 }
 
-function buildEmptyChronicleResponse() {
+function buildEmptyChronicleResponse(language = 'en') {
   return {
     chapters: [],
+    language: resolveLanguage(language, language),
     current_era: null,
     pending_chapters: 0,
     message: null,
@@ -144,9 +146,9 @@ function createMockChronicleBackend(options = {}) {
     ],
   })
 
-  const playthroughsPayload = () => ({
+  const playthroughsPayload = (language = 'en') => ({
     current_save_id: campaigns.find(campaign => campaign.current)?.saveId || null,
-    language: 'en',
+    language: resolveLanguage(language, language),
     playthroughs: campaigns.map((campaign, index) => ({
       save_id: campaign.saveId,
       empire_name: campaign.empireName,
@@ -163,7 +165,7 @@ function createMockChronicleBackend(options = {}) {
       snapshot_count: campaign.snapshotCount ?? 0,
       event_count: campaign.eventCount ?? 0,
       has_chronicle: campaign.hasChronicle ?? false,
-      cached_languages: campaign.hasChronicle ? ['en'] : [],
+      cached_languages: campaign.hasChronicle ? [resolveLanguage(language, language)] : [],
       chapter_count: 0,
       total_chapter_count: 0,
       has_current_era: campaign.hasChronicle ?? false,
@@ -189,7 +191,8 @@ function createMockChronicleBackend(options = {}) {
   })
 
   const chroniclePayload = (body) => {
-    if (options.emptyChronicle) return buildEmptyChronicleResponse()
+    const language = resolveLanguage(body.language, body.language)
+    if (options.emptyChronicle) return buildEmptyChronicleResponse(language)
     if (phase === 'initial') {
       return buildChronicleResponse({
         narrative: initialNarrative,
@@ -197,6 +200,7 @@ function createMockChronicleBackend(options = {}) {
         cached: false,
         chapters,
         revision: `mock-${revision}`,
+        language,
       })
     }
 
@@ -207,10 +211,11 @@ function createMockChronicleBackend(options = {}) {
         cached: true,
         chapters,
         revision: `mock-${revision}`,
+        language,
       })
     }
 
-    if (body.refresh_mode === 'manual' && !body.force_refresh) return buildChronicleResponse({ narrative: initialNarrative, eventsCovered: initialEventsCovered, cached: true, chapters, revision: `mock-${revision}` })
+    if (body.refresh_mode === 'manual' && !body.force_refresh) return buildChronicleResponse({ narrative: initialNarrative, eventsCovered: initialEventsCovered, cached: true, chapters, revision: `mock-${revision}`, language })
     const refreshMode = body.refresh_mode === 'enhanced' ? 'enhanced' : 'balanced'
     const eventGrowth = Math.max(0, advancedEventsCovered - initialEventsCovered)
     const threshold = refreshMode === 'enhanced' ? enhancedThreshold : balancedThreshold
@@ -221,6 +226,7 @@ function createMockChronicleBackend(options = {}) {
         cached: true,
         chapters,
         revision: `mock-${revision}`,
+        language,
       })
     }
 
@@ -231,6 +237,7 @@ function createMockChronicleBackend(options = {}) {
       chapters,
       revision: `mock-${revision}`,
       coverageDate: '2208.01.01',
+      language,
     })
   }
 
@@ -263,7 +270,7 @@ function createMockChronicleBackend(options = {}) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/playthroughs') {
-      sendJson(res, 200, playthroughsPayload())
+      sendJson(res, 200, playthroughsPayload(url.searchParams.get('language')))
       return
     }
 
@@ -314,6 +321,7 @@ function createMockChronicleBackend(options = {}) {
     if (chapterMatch) {
       const body = await readJsonBody(req)
       const number = Number(chapterMatch[2])
+      await options.onChapterChange?.({ save_id: decodeURIComponent(chapterMatch[1]), number, undo: Boolean(chapterMatch[3]) })
       if (body.expected_revision !== `mock-${revision}` || options.editConflict) {
         sendJson(res, 409, { detail: { error: 'Chapter changed', code: 'CHRONICLE_CONFLICT' } }); return
       }
@@ -328,7 +336,7 @@ function createMockChronicleBackend(options = {}) {
       }
       chapters[index].can_undo = chapterUndo.has(number)
       revision += 1
-      sendJson(res, 200, buildChronicleResponse({ narrative: initialNarrative, eventsCovered: initialEventsCovered, cached: true, chapters, revision: `mock-${revision}` }))
+      sendJson(res, 200, buildChronicleResponse({ narrative: initialNarrative, eventsCovered: initialEventsCovered, cached: true, chapters, revision: `mock-${revision}`, language: body.language }))
       return
     }
 
@@ -349,9 +357,10 @@ function createMockChronicleBackend(options = {}) {
             eventsCovered: campaign.eventCount ?? initialEventsCovered,
             cached: true,
             chapters,
-        revision: `mock-${revision}`,
+            revision: `mock-${revision}`,
+            language: url.searchParams.get('language'),
           })
-          : buildEmptyChronicleResponse())
+          : buildEmptyChronicleResponse(url.searchParams.get('language')))
         return
       }
 
@@ -426,7 +435,7 @@ function createMockChronicleBackend(options = {}) {
         save_id: saveId, conversation_id: id, turn_id: randomUUID(), history_saved: !options.historyUnavailable, source_hash: 'mock-source',
       }
       const saved = conversations.get(id) || { id, save_id: saveId, title: body.message, created_at: Date.now() / 1000, turns: [] }
-      saved.turns.push({ ...response, id: response.turn_id, request_id: body.request_id, question: body.message, answer: response.text, created_at: Date.now() / 1000, language: body.language })
+      saved.turns.push({ ...response, id: response.turn_id, request_id: body.request_id, question: body.message, answer: response.text, created_at: Date.now() / 1000, language: resolveLanguage(body.language, body.language) })
       Object.assign(saved, { updated_at: Date.now() / 1000, turn_count: saved.turns.length, last_game_date: response.game_date, title: saved.title || body.message })
       if (!options.historyUnavailable) conversations.set(id, saved)
       sendJson(res, 200, response)

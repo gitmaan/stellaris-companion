@@ -643,6 +643,9 @@ function ChroniclePage({
 
   // Load chronicle when save changes (only after sessions are cached)
   useEffect(() => {
+    // A campaign switch can occur while Edit or Undo is saving. Resume the
+    // selected reader when it settles, using the usual visibility/refresh policy.
+    if (mutationBusy) return
     if (selectedSaveId && cachedSessions.length > 0) {
       if (!isActive) {
         pendingVisibleChronicleRefreshRef.current = true
@@ -663,6 +666,7 @@ function ChroniclePage({
     finalizePendingChaptersHidden,
     isActive,
     loadChronicle,
+    mutationBusy,
     selectedSaveId,
   ])
 

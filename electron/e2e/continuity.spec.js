@@ -187,3 +187,31 @@ test('reset Undo from an earlier campaign does not replace the selected campaign
     await expect(page.getByText('The Frontier Union story remains selected.')).toBeVisible(); await expect(page.getByText('Old teaser.')).toHaveCount(0)
   })
 })
+
+for (const action of ['edit', 'undo']) {
+  test(`switching campaigns during chapter ${action} resumes the selected story after completion`, async () => {
+    let release
+    const backend = createMockChronicleBackend({ chapters, campaigns: [
+      { saveId: 'save-1', empireName: 'United Nations of Earth', current: true, hasChronicle: true, snapshotCount: 3, eventCount: 2 },
+      { saveId: 'save-2', empireName: 'Frontier Union', current: false, hasChronicle: true, snapshotCount: 3, eventCount: 2, narrative: 'The Frontier Union story remains selected.' },
+    ], onChapterChange: ({ undo }) => undo === (action === 'undo') ? new Promise(resolve => { release = resolve }) : undefined })
+    await withApp(backend, async page => {
+      try {
+        await manual(page); await page.getByRole('button', { name: /Chronicle/i }).click()
+        const block = page.locator('#chapter-1'); await block.locator('summary').click(); await block.getByRole('button', { name: 'Edit text', exact: true }).click()
+        await page.getByRole('textbox', { name: 'Chapter text', exact: true }).fill('The edited Earth chapter.')
+        await page.getByRole('button', { name: 'Save changes', exact: true }).click()
+        if (action === 'undo') {
+          await expect(block.getByRole('heading', { name: 'A Quiet Beginning' })).toBeVisible()
+          await block.locator('summary').click(); await block.getByRole('button', { name: 'Undo latest change' }).click()
+        }
+        await expect.poll(() => typeof release).toBe('function')
+        const sidebar = page.getByRole('complementary')
+        await sidebar.getByRole('button', { name: 'Choose a campaign' }).click(); await sidebar.getByRole('option', { name: /Frontier Union/ }).click()
+        release()
+        await expect(page.getByText('The Frontier Union story remains selected.')).toBeVisible()
+        await expect(page.getByText('Old teaser.')).toHaveCount(0)
+      } finally { release?.() }
+    })
+  })
+}
