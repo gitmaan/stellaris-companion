@@ -179,11 +179,14 @@ class ConversationManager:
         history: list[Turn] = []
         previous_date = None
         previous_created_at = None
+        latest_dated_game_date = None
         for row in turns:
             date = row.get("game_date")
             created_at = float(row.get("created_at") or self._now())
             previous = self._parse_game_date(previous_date)
             current = self._parse_game_date(date)
+            if current is not None:
+                latest_dated_game_date = date
             gap_months = self._game_month_delta(previous_date, date)
             idle_gap = created_at - previous_created_at if previous_created_at is not None else 0
             if (
@@ -211,7 +214,13 @@ class ConversationManager:
             last_active=history[-1].created_at if history else self._now(),
         )
         with self._lock:
-            if self._is_expired(session, current_game_date=current_game_date):
+            # A newer exchange in another language still marks the branch's date.
+            # Keep language-scoped age checks too, so newer foreign-language turns
+            # cannot make old selected-language tactical advice fresh again.
+            newest = self._parse_game_date(latest_dated_game_date)
+            active = self._parse_game_date(current_game_date)
+            rolled_back = newest is not None and active is not None and active < newest
+            if rolled_back or self._is_expired(session, current_game_date=current_game_date):
                 session = Session()
             self._sessions[session_key] = session
 

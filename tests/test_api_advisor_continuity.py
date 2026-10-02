@@ -412,6 +412,43 @@ def test_archive_pages_keep_order_and_never_cross_conversations(monkeypatch, tmp
     db.close()
 
 
+def test_active_rollback_checks_latest_dated_exchange_across_languages(monkeypatch, tmp_path):
+    app, db, companion, generator = make_app(monkeypatch, tmp_path)
+    save_id, _ = activate(companion, db, tmp_path, date="2200.06.10")
+    with TestClient(app) as client:
+        conversation = new_conversation(client, save_id)
+        ask(client, save_id, conversation, question="Old English branch discussion", language="en")
+        activate(companion, db, tmp_path, date="2200.06.25")
+        ask(
+            client,
+            save_id,
+            conversation,
+            question="Later German branch discussion",
+            request_id="german",
+            language="de",
+        )
+        activate(companion, db, tmp_path, date="2200.06.20")
+        reply = ask(
+            client,
+            save_id,
+            conversation,
+            question="English after active rewind",
+            request_id="rewound-english",
+            language="en",
+        )
+        assert reply.status_code == 200 and reply.json()["history_saved"] is True
+        assert "Old English branch discussion" not in generator.prompts[-1]
+        assert "Later German branch discussion" not in generator.prompts[-1]
+        assert "EMPIRE STATE (2200.06.20):" in generator.prompts[-1]
+        assert [turn["game_date"] for turn in db.get_advisor_turns(save_id, conversation)] == [
+            "2200.06.10",
+            "2200.06.25",
+            "2200.06.20",
+        ]
+    companion.close()
+    db.close()
+
+
 def test_rollback_boundary_is_preserved_when_language_changes(monkeypatch, tmp_path):
     app, db, companion, generator = make_app(monkeypatch, tmp_path)
     save_id, _ = activate(companion, db, tmp_path, date="2200.06.25")
