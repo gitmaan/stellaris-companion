@@ -213,6 +213,8 @@ def test_upgrade_from_v085_schema_creates_backup_and_preserves_cache_bytes(tmp_p
     before = _cache_rows(db)
     db.execute("DROP TABLE chronicle_revisions;")
     db.execute("DROP TABLE playthrough_metadata;")
+    db.execute("DROP TABLE advisor_turns;")
+    db.execute("DROP TABLE advisor_conversations;")
     # v0.8.5 shipped schema 9. Recreate that exact boundary before opening the
     # database with the campaign-history release.
     db.execute("UPDATE schema_version SET version = 9;")
@@ -222,7 +224,7 @@ def test_upgrade_from_v085_schema_creates_backup_and_preserves_cache_bytes(tmp_p
     upgraded = GameDatabase(path)
     backup_path = tmp_path / "history.db.pre-v10.backup"
 
-    assert upgraded.get_schema_version() == 10
+    assert upgraded.get_schema_version() == 11
     assert backup_path.exists()
     assert _cache_rows(upgraded) == before
     with sqlite3.connect(backup_path) as backup:

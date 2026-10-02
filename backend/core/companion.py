@@ -6,6 +6,9 @@ Provides the Companion class — the configurable strategic advisor
 used by the Electron app via the backend API.
 """
 
+from __future__ import annotations
+
+import hashlib
 import json
 import logging
 import os
@@ -13,6 +16,7 @@ import sys
 import threading
 import time
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -60,6 +64,26 @@ from stellaris_save_extractor import SaveExtractor
 logger = logging.getLogger("stellaris.companion")
 
 DEFAULT_ADVISOR_MODEL = GEMINI_FLASH_MODEL
+
+
+@dataclass(frozen=True)
+class AdvisorSource:
+    """One immutable briefing receipt captured before a provider request starts."""
+
+    briefing_json: str
+    save_id: str | None
+    game_date: str | None
+    source_hash: str
+    data_note: str | None
+    system_prompt: str
+
+
+@dataclass(frozen=True)
+class AdvisorReply:
+    text: str
+    elapsed: float
+    source: AdvisorSource
+    stats: dict[str, Any]
 
 
 # Fallback system prompt (used if personality generation fails)
@@ -164,6 +188,7 @@ class Companion:
         self._briefing_ready = threading.Event()
         self._complete_briefing_json: str | None = None
         self._briefing_game_date: str | None = None
+        self._briefing_save_path: Path | None = None
         self._briefing_updated_at: float | None = None
         self._briefing_last_error: str | None = None
         self._precompute_generation = 0
@@ -173,7 +198,7 @@ class Companion:
             max_turns=6,
             timeout_minutes=24 * 60,
             max_game_months=12,
-            max_answer_chars=500,
+            max_answer_chars=3500,
             max_question_chars=320,
             max_recent_conversation_chars=5000,
             max_summary_chars=1800,
@@ -182,6 +207,7 @@ class Companion:
         self._max_prompt_question_chars = 4000
         self._max_save_memory_chars = 2200
         self._max_save_memory_entries = 8
+        self._call_local = threading.local()
 
         # Load save if provided
         if save_path:
@@ -428,7 +454,7 @@ class Companion:
                 - response_length: length of final response text
                 - payload_sizes: dict mapping tool names to response sizes in bytes
         """
-        return self._last_call_stats.copy()
+        return getattr(self._call_local, "stats", self._last_call_stats).copy()
 
     def get_advisor_model(self) -> str:
         """Return the default advisor model for chat requests."""
@@ -476,6 +502,7 @@ class Companion:
             if save_path is not None:
                 self.save_path = Path(save_path)
             self._complete_briefing_json = briefing_json
+            self._briefing_save_path = self.save_path
             self._briefing_game_date = game_date
             self._briefing_updated_at = time.time()
             self._briefing_last_error = None
@@ -570,6 +597,7 @@ class Companion:
                 return
 
             self._complete_briefing_json = briefing_json
+            self._briefing_save_path = save_path
             self._briefing_game_date = str(game_date) if game_date is not None else None
             self._briefing_updated_at = time.time()
             self._briefing_last_error = None
@@ -974,6 +1002,49 @@ class Companion:
         rules.append("- Use the fact summary in the first paragraph, then continue in character.")
         return "\n".join(rules)
 
+    def capture_advisor_source(self, *, save_id: str | None = None) -> AdvisorSource:
+        """Capture campaign, date and full-content hash together, before any model I/O."""
+        from backend.core.history import compute_save_id
+
+        with self._briefing_lock:
+            briefing_json = self._complete_briefing_json
+            game_date = self._briefing_game_date
+            save_path = self._briefing_save_path or self.save_path
+            system_prompt = self.system_prompt
+            data_note = None if self._briefing_ready.is_set() else "cached"
+        if not briefing_json:
+            briefing_json, game_date, data_note = self._get_best_briefing_json()
+        if not briefing_json:
+            raise AdvisorProviderError(
+                "Briefing not ready yet", code="BRIEFING_NOT_READY", status_code=503
+            )
+        parsed = json.loads(briefing_json)
+        meta = parsed.get("meta", {}) if isinstance(parsed, dict) else {}
+        meta = meta if isinstance(meta, dict) else {}
+        game_date = str(meta.get("date") or game_date) if meta.get("date") or game_date else None
+        actual_save_id = save_id
+        if meta.get("campaign_id") or (save_path and (meta.get("empire_name") or meta.get("name"))):
+            actual_save_id = compute_save_id(
+                campaign_id=meta.get("campaign_id"),
+                player_id=meta.get("player_id"),
+                empire_name=meta.get("empire_name") or meta.get("name"),
+                save_path=save_path,
+            )
+        if save_id and actual_save_id != save_id:
+            raise AdvisorProviderError(
+                "The active campaign changed. Please try again with its current conversation.",
+                code="CAMPAIGN_CHANGED",
+                status_code=409,
+            )
+        return AdvisorSource(
+            briefing_json=briefing_json,
+            save_id=actual_save_id,
+            game_date=game_date,
+            source_hash=hashlib.sha256(briefing_json.encode("utf-8")).hexdigest(),
+            data_note=data_note,
+            system_prompt=system_prompt,
+        )
+
     def ask_precomputed(
         self,
         question: str,
@@ -985,6 +1056,31 @@ class Companion:
         language: str | None = None,
     ) -> tuple[str, float]:
         """Ask a question using the fully precomputed briefing (no tools)."""
+        reply = self.ask_precomputed_with_context(
+            question=question,
+            session_key=session_key,
+            save_id=save_id,
+            history_context=history_context,
+            model_name=model_name,
+            model_routing_mode=model_routing_mode,
+            language=language,
+        )
+        return reply.text, reply.elapsed
+
+    def ask_precomputed_with_context(
+        self,
+        question: str,
+        session_key: str,
+        save_id: str | None = None,
+        history_context: str | None = None,
+        model_name: str | None = None,
+        model_routing_mode: str | None = None,
+        language: str | None = None,
+        source: AdvisorSource | None = None,
+        restored_turns: list[dict[str, Any]] | None = None,
+        persist_memory: bool = True,
+    ) -> AdvisorReply:
+        """Generate with request-local diagnostics and an immutable source receipt."""
         start_time = time.time()
         output_language = normalize_language(language)
         language_scoped_session_key = f"{session_key}:lang:{output_language}"
@@ -995,11 +1091,22 @@ class Companion:
         if len(cleaned_question) > self._max_prompt_question_chars:
             cleaned_question = cleaned_question[: self._max_prompt_question_chars].rstrip() + "..."
 
-        briefing_json, game_date, data_note = self._get_best_briefing_json()
-        if not briefing_json:
-            return (
-                localized_text("no_precomputed_state", output_language),
-                0.0,
+        source = source or self.capture_advisor_source(save_id=save_id)
+        briefing_json, game_date, data_note = (
+            source.briefing_json,
+            source.game_date,
+            source.data_note,
+        )
+        save_id = source.save_id
+        # Keep the generator/config used for this call even if Settings changes during generation.
+        generator = self._advisor_generator
+        provider_config = self.advisor_provider_config
+        if restored_turns is not None:
+            self._conversations.restore(
+                language_scoped_session_key,
+                restored_turns,
+                current_game_date=game_date,
+                language=output_language,
             )
 
         if data_note:
@@ -1007,9 +1114,12 @@ class Companion:
 
         model_briefing_json = build_model_briefing_json(briefing_json)
 
-        save_memory_summary = self._load_save_memory_summary(
-            save_id=save_id,
-            language=output_language,
+        # Durable conversations restore their own completed turns. A campaign-wide legacy
+        # topic cache would otherwise leak old topics into New Chat or a rolled-back save.
+        save_memory_summary = (
+            self._load_save_memory_summary(save_id=save_id, language=output_language)
+            if persist_memory
+            else None
         )
 
         # Build prompt with sliding-window history (Phase 4)
@@ -1024,7 +1134,7 @@ class Companion:
         )
 
         ask_system_prompt = (
-            f"{self.system_prompt}\n\n"
+            f"{source.system_prompt}\n\n"
             f"{build_language_policy(output_language)}\n\n"
             "ASK MODE (NO TOOLS):\n"
             "- You are given the complete current game state as JSON in the user message.\n"
@@ -1035,7 +1145,17 @@ class Companion:
             "- If a value is missing, say so in the requested language and suggest what to check in-game.\n"
             "- Be a strategic ADVISOR: interpret, prioritize, and recommend next actions.\n"
         )
-        game_knowledge_prompt = self._build_advisor_game_knowledge(cleaned_question)
+        parsed_briefing = json.loads(briefing_json)
+        captured_meta = parsed_briefing.get("meta", {})
+        game_knowledge_prompt = (
+            build_game_knowledge_prompt(
+                str(captured_meta["version"]),
+                purpose="advisor",
+                topics=cleaned_question,
+            )
+            if isinstance(captured_meta, dict) and captured_meta.get("version")
+            else ""
+        )
         if game_knowledge_prompt:
             ask_system_prompt += f"\n{game_knowledge_prompt}\n"
         naval_cap_policy_block = self._build_naval_capacity_policy_block(
@@ -1046,14 +1166,14 @@ class Companion:
             ask_system_prompt += f"{naval_cap_policy_block}\n"
 
         try:
-            if self._advisor_generator is None:
+            if generator is None:
                 raise AdvisorProviderError(
-                    f"{self.advisor_provider_config.display_name} is not configured for the Advisor",
+                    f"{provider_config.display_name} is not configured for the Advisor",
                     code="ADVISOR_PROVIDER_NOT_CONFIGURED",
                     status_code=400,
                 )
 
-            generation = self._advisor_generator.generate(
+            generation = generator.generate(
                 system_prompt=ask_system_prompt,
                 user_prompt=user_prompt,
                 model=explicit_model,
@@ -1076,7 +1196,7 @@ class Companion:
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
 
-            self._last_call_stats = {
+            stats = {
                 "total_calls": len(generation.diagnostics) or 1,
                 "diagnostics": generation.diagnostics,
                 "tools_used": ["ask_precomputed_no_tools"],
@@ -1091,9 +1211,11 @@ class Companion:
                 "model_display": display_model_name(final_model),
                 "requested_model": requested_model,
                 "requested_model_display": display_model_name(requested_model),
-                "provider": self.advisor_provider_config.provider,
+                "provider": provider_config.provider,
                 "routing": generation.routing,
             }
+            self._call_local.stats = stats
+            self._last_call_stats = stats
 
             self._conversations.record_turn(
                 session_key=language_scoped_session_key,
@@ -1101,19 +1223,20 @@ class Companion:
                 answer=response_text,
                 game_date=game_date,
             )
-            self._update_save_memory_summary(
-                save_id=save_id,
-                question=cleaned_question,
-                game_date=game_date,
-                language=output_language,
-            )
+            if persist_memory:
+                self._update_save_memory_summary(
+                    save_id=save_id,
+                    question=cleaned_question,
+                    game_date=game_date,
+                    language=output_language,
+                )
 
-            return response_text, elapsed
+            return AdvisorReply(response_text, elapsed, source, stats)
 
         except Exception as e:
             elapsed = time.time() - start_time
             wall_time_ms = elapsed * 1000
-            self._last_call_stats = {
+            stats = {
                 "total_calls": len(getattr(e, "diagnostics", [])),
                 "diagnostics": getattr(e, "diagnostics", []),
                 "tools_used": [],
@@ -1127,12 +1250,14 @@ class Companion:
                 "error": str(e),
                 "model": selected_model,
                 "model_display": display_model_name(selected_model),
-                "provider": self.advisor_provider_config.provider,
+                "provider": provider_config.provider,
                 "routing": None,
             }
+            self._call_local.stats = stats
+            self._last_call_stats = stats
             if isinstance(e, AdvisorProviderError):
                 raise
-            return f"Error: {str(e)}", elapsed
+            return AdvisorReply(f"Error: {str(e)}", elapsed, source, stats)
 
     def get_status_data(self) -> dict:
         """Get raw status data for embedding without LLM processing.

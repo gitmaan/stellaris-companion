@@ -13,6 +13,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -122,6 +123,10 @@ class ConversationManager:
     def _is_expired(self, session: Session, *, current_game_date: str | None) -> bool:
         """Check if a session has exceeded in-game or fallback real-time staleness."""
         # Primary staleness rule: if enough in-game time passed, prior tactical turns are stale.
+        previous = self._parse_game_date(session.last_game_date)
+        current = self._parse_game_date(current_game_date)
+        if previous and current and current < previous:
+            return True
         delta_months = self._game_month_delta(session.last_game_date, current_game_date)
         if delta_months is not None:
             if delta_months < 0:
@@ -161,6 +166,54 @@ class ConversationManager:
         """
         with self._lock:
             self._sessions.pop(session_key, None)
+
+    def restore(
+        self,
+        session_key: str,
+        turns: list[dict[str, Any]],
+        *,
+        current_game_date: str | None,
+        language: str | None = None,
+    ) -> None:
+        """Hydrate a bounded completed-turn suffix; archived future branches stay out of prompts."""
+        history: list[Turn] = []
+        previous_date = None
+        previous_created_at = None
+        for row in turns:
+            date = row.get("game_date")
+            created_at = float(row.get("created_at") or self._now())
+            previous = self._parse_game_date(previous_date)
+            current = self._parse_game_date(date)
+            gap_months = self._game_month_delta(previous_date, date)
+            idle_gap = created_at - previous_created_at if previous_created_at is not None else 0
+            if (
+                (previous and current and current < previous)
+                or (gap_months is not None and gap_months >= self.max_game_months)
+                or idle_gap > self.timeout_seconds
+            ):
+                # Preserve the archive, but do not resurrect context cleared on a prior request.
+                history = []
+            previous_date, previous_created_at = date, created_at
+            # Boundary detection sees every turn, even when output language changes.
+            if language is not None and row.get("language") != language:
+                continue
+            history.append(
+                Turn(
+                    question=str(row.get("question") or ""),
+                    answer=str(row.get("answer") or ""),
+                    game_date=date,
+                    created_at=created_at,
+                )
+            )
+        session = Session(
+            history=history[-self.max_turns :],
+            last_game_date=history[-1].game_date if history else None,
+            last_active=history[-1].created_at if history else self._now(),
+        )
+        with self._lock:
+            if self._is_expired(session, current_game_date=current_game_date):
+                session = Session()
+            self._sessions[session_key] = session
 
     def build_prompt(
         self,
@@ -231,6 +284,10 @@ class ConversationManager:
 
         if session.history:
             lines.append("RECENT CONVERSATION:")
+            lines.append(
+                "These are dated prior questions and recommendations, not current observations. "
+                "Recheck factual claims against the current EMPIRE STATE."
+            )
             selected_blocks: list[str] = []
             used_chars = 0
             for turn in reversed(session.history[-self.max_turns :]):
@@ -240,7 +297,7 @@ class ConversationManager:
                 question_text = (turn.question or "").strip()
                 if len(question_text) > self.max_question_chars:
                     question_text = question_text[: self.max_question_chars].rstrip() + "..."
-                block = f"User: {question_text}\nAdvisor: {answer}\n"
+                block = f"[Save {turn.game_date or 'date unknown'}]\nUser: {question_text}\nAdvisor: {answer}\n"
                 # Keep most recent context first when budget is tight.
                 if (
                     selected_blocks

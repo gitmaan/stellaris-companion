@@ -11,6 +11,7 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -327,6 +328,37 @@ class GameDatabase:
                 );
                 """,
                 "CREATE INDEX IF NOT EXISTS idx_chronicle_revisions_save_language ON chronicle_revisions(save_id, language, created_at DESC);",
+            ],
+            11: [
+                # Completed Advisor exchanges are an archive, separate from bounded prompt memory.
+                """
+                CREATE TABLE advisor_conversations (
+                    id TEXT PRIMARY KEY,
+                    save_id TEXT NOT NULL,
+                    title TEXT NOT NULL DEFAULT '',
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                """,
+                "CREATE INDEX idx_advisor_conversations_save ON advisor_conversations(save_id, updated_at DESC);",
+                """
+                CREATE TABLE advisor_turns (
+                    id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL REFERENCES advisor_conversations(id) ON DELETE CASCADE,
+                    save_id TEXT NOT NULL,
+                    request_id TEXT NOT NULL,
+                    question TEXT NOT NULL,
+                    answer TEXT NOT NULL,
+                    language TEXT NOT NULL,
+                    game_date TEXT,
+                    source_hash TEXT,
+                    snapshot_id INTEGER,
+                    created_at REAL NOT NULL,
+                    response_json TEXT NOT NULL,
+                    UNIQUE(save_id, request_id)
+                );
+                """,
+                "CREATE INDEX idx_advisor_turns_conversation ON advisor_turns(conversation_id, created_at);",
             ],
         }
 
@@ -1656,6 +1688,9 @@ class GameDatabase:
                     (save_id, save_id),
                 )
                 self._conn.execute("DELETE FROM advisor_memory WHERE save_id = ?", (save_id,))
+                self._conn.execute(
+                    "DELETE FROM advisor_conversations WHERE save_id = ?", (save_id,)
+                )
                 self._conn.execute("DELETE FROM chronicle_revisions WHERE save_id = ?", (save_id,))
                 self._conn.execute("DELETE FROM sessions WHERE save_id = ?", (save_id,))
                 self._conn.execute("DELETE FROM playthrough_metadata WHERE save_id = ?", (save_id,))
@@ -1893,6 +1928,162 @@ class GameDatabase:
                     """,
                     (save_id, value if value else None),
                 )
+
+    def get_advisor_conversation(self, save_id: str, conversation_id: str) -> dict[str, Any] | None:
+        """Read one campaign-scoped conversation, including empty new conversations."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT c.*, COUNT(t.id) AS turn_count,
+                    (SELECT game_date FROM advisor_turns WHERE conversation_id = c.id
+                     ORDER BY rowid DESC LIMIT 1) AS last_game_date
+                FROM advisor_conversations c LEFT JOIN advisor_turns t ON t.conversation_id = c.id
+                WHERE c.save_id = ? AND c.id = ? GROUP BY c.id
+                """,
+                (save_id, conversation_id),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def list_advisor_conversations(self, save_id: str, *, limit: int = 100) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT c.*, COUNT(t.id) AS turn_count,
+                    (SELECT game_date FROM advisor_turns WHERE conversation_id = c.id
+                     ORDER BY rowid DESC LIMIT 1) AS last_game_date
+                FROM advisor_conversations c LEFT JOIN advisor_turns t ON t.conversation_id = c.id
+                WHERE c.save_id = ? GROUP BY c.id
+                ORDER BY c.updated_at DESC, c.created_at DESC, c.rowid DESC LIMIT ?
+                """,
+                (save_id, max(1, min(500, int(limit)))),
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def create_advisor_conversation(
+        self, save_id: str, *, conversation_id: str | None = None, title: str = ""
+    ) -> dict[str, Any]:
+        """Create a stable thread without changing or removing earlier conversations."""
+        identifier = conversation_id or uuid.uuid4().hex
+        now = time.time()
+        with self.transaction(immediate=True):
+            if self.get_active_or_latest_session_id(save_id=save_id) is None:
+                raise ValueError("Playthrough not found")
+            existing = self.get_advisor_conversation(save_id, identifier)
+            if existing:
+                return existing
+            self._conn.execute(
+                "INSERT INTO advisor_conversations (id, save_id, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                (identifier, save_id, str(title).strip()[:100], now, now),
+            )
+            return self.get_advisor_conversation(save_id, identifier) or {}
+
+    @staticmethod
+    def _advisor_turn_payload(row: sqlite3.Row) -> dict[str, Any]:
+        turn = dict(row)
+        # Only a fixed public response envelope is stored, never prompts or credentials.
+        response = json.loads(turn.pop("response_json"))
+        turn.update(response)
+        return turn
+
+    def get_advisor_turn_by_request(self, save_id: str, request_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM advisor_turns WHERE save_id = ? AND request_id = ?",
+                (save_id, request_id),
+            ).fetchone()
+            return self._advisor_turn_payload(row) if row else None
+
+    def get_advisor_turns(
+        self,
+        save_id: str,
+        conversation_id: str,
+        *,
+        limit: int = 300,
+        before_turn_id: str | None = None,
+        language: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Read a bounded archive page, oldest first, without modifying prompt memory."""
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT * FROM advisor_turns
+                WHERE save_id = ? AND conversation_id = ?
+                  AND (? IS NULL OR language = ?)
+                  AND (? IS NULL OR rowid < (SELECT rowid FROM advisor_turns
+                      WHERE id = ? AND save_id = ? AND conversation_id = ?))
+                ORDER BY rowid DESC LIMIT ?
+                """,
+                (
+                    save_id,
+                    conversation_id,
+                    language,
+                    language,
+                    before_turn_id,
+                    before_turn_id,
+                    save_id,
+                    conversation_id,
+                    max(1, min(501, int(limit))),
+                ),
+            ).fetchall()
+            return [self._advisor_turn_payload(row) for row in reversed(rows)]
+
+    def save_advisor_turn(
+        self,
+        *,
+        save_id: str,
+        conversation_id: str,
+        request_id: str,
+        question: str,
+        answer: str,
+        language: str,
+        game_date: str | None,
+        source_hash: str | None,
+        response: dict[str, Any],
+        snapshot_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Atomically save only a completed exchange; a request ID cannot create duplicates."""
+        now = time.time()
+        with self.transaction(immediate=True):
+            conversation = self.get_advisor_conversation(save_id, conversation_id)
+            if conversation is None:
+                raise ValueError("Conversation not found")
+            existing = self.get_advisor_turn_by_request(save_id, request_id)
+            if existing:
+                if (
+                    existing["conversation_id"] != conversation_id
+                    or existing["question"] != question
+                ):
+                    raise ValueError("Request ID already belongs to a different exchange")
+                return existing
+            identifier = uuid.uuid4().hex
+            self._conn.execute(
+                """
+                INSERT INTO advisor_turns
+                    (id, conversation_id, save_id, request_id, question, answer, language,
+                     game_date, source_hash, snapshot_id, created_at, response_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    identifier,
+                    conversation_id,
+                    save_id,
+                    request_id,
+                    question,
+                    answer,
+                    language,
+                    game_date,
+                    source_hash,
+                    snapshot_id,
+                    now,
+                    json_dumps(response),
+                ),
+            )
+            title = conversation["title"] or " ".join(question.split())[:100]
+            self._conn.execute(
+                "UPDATE advisor_conversations SET title = ?, updated_at = ? WHERE id = ? AND save_id = ?",
+                (title, now, conversation_id, save_id),
+            )
+            return self.get_advisor_turn_by_request(save_id, request_id) or {}
 
     def get_advisor_memory_summary(self, save_id: str, *, language: str = "en") -> str | None:
         """Get persisted save-scoped advisor memory summary."""
