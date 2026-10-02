@@ -341,7 +341,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Stellaris Companion API",
         description="Backend API for Stellaris Companion Electron app",
-        version="1.0.0",
+        version="1.1.0-beta.1",
         docs_url=None,  # Disable Swagger UI in production
         redoc_url=None,  # Disable ReDoc in production
     )

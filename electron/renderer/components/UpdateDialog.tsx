@@ -233,6 +233,9 @@ export default function UpdateDialog() {
   }
 
   const releaseHighlights = extractReleaseHighlights(update.releaseNotes)
+  const releaseName = update.releaseName?.trim()
+  const releaseNameVersion = releaseName?.replace(/^Stellaris Companion\s+/i, '').replace(/^v(?=\d)/i, '')
+  const showReleaseName = releaseName && releaseNameVersion !== update.version
 
   if (!update.available) return null
 
@@ -273,9 +276,9 @@ export default function UpdateDialog() {
               <p className="text-text-secondary text-sm">
                 Stellaris Companion {update.version}
               </p>
-              {update.releaseName && (
+              {showReleaseName && (
                 <p className="text-text-muted text-xs mt-1">
-                  {update.releaseName}
+                  {releaseName}
                 </p>
               )}
             </div>

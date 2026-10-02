@@ -1,6 +1,5 @@
-**The largest Stellaris Companion update yet.**
-
-- Choose the AI service that suits you, including Gemini, Ollama, LM Studio, OpenRouter, and other compatible providers.
-- Quickly find, rename, restore, or clean up previous campaigns.
-- Get more reliable Advisor guidance based on your current save and the latest Stellaris mechanics.
-- Enjoy improved performance, security, and reliability throughout the app.
+- Connect your ChatGPT account for Advisor and Chronicle, with a model choice that stays saved.
+- Get started faster with a simpler onboarding flow.
+- Use updated Gemini models with better handling of model quota limits.
+- Enjoy translated setup, settings, and campaign controls in more languages.
+- Connect AI apps to your campaign and share Chronicles more easily.
