@@ -8,6 +8,7 @@ The next release is in development on `main`. The published app remains at v1.0.
 - Broader localization across onboarding, settings, campaign history, and desktop controls.
 - More reliable campaign selection, save ingestion, and stored provider credentials.
 - Simpler AI setup, stable Gemini model selection, and bounded recovery that preserves saved Chronicles when generation fails.
+- Updated Gemini defaults to 3.8 Flash and 3.5 Flash-Lite, with a lower-cost reserve and quota cooldowns for Advisor and Chronicle.
 - Guided MCP Relay setup for supported AI apps, with campaign readiness and optional Chronicle writing controls.
 - Simpler public Chronicle sharing; existing unlisted publications retain their visibility.
 - Provisional Cygnus 4.5/4.5.1 mechanics guidance and selected-policy reporting. Coverage is partial, not full save-format certification.
@@ -18,6 +19,7 @@ The next release is in development on `main`. The published app remains at v1.0.
 - [ ] Validate a real Cygnus 4.5/4.5.1 save through ingestion, briefing, Advisor, and Chronicle; check population/faction and federation data. The current local fixture is Corvus 4.2.4. See [coverage audit](../patches/audits/4.5.1.md).
 - [ ] Confirm MCP Relay setup and a campaign query in each advertised client on its supported platform.
 - [ ] Run the final CI suite and packaged-app smoke checks, including provider setup, Chronicle refresh/sharing, and update/restart behavior.
+- [ ] Recheck Gemini model availability and retirement dates, including the 3.1 Flash-Lite reserve (earliest shutdown May 7, 2027).
 - [ ] Verify ChatGPT sign-in, protected credential storage, and an Advisor and Chronicle request in packaged macOS, Windows, and Linux builds.
 - [ ] Choose the version, prepare 3–5 user-facing release bullets, and publish only when the release is requested.
 

@@ -345,11 +345,11 @@ def test_ask_precomputed_injects_policy_block_but_uses_normal_advisor_path(compa
     )
 
     assert answer == "President, our naval ledgers remain estimates rather than certainties."
-    assert captured["model"] == "gemini-3.1-flash-lite"
+    assert captured["model"] == "gemini-3.5-flash-lite"
     assert "NAVAL CAPACITY RESPONSE POLICY:" in captured["system_instruction"]
     assert "Response state: estimated." in captured["system_instruction"]
     assert "cannot confirm whether the empire is over naval cap" in captured["system_instruction"]
-    assert companion.get_call_stats()["model"] == "gemini-3.1-flash-lite"
+    assert companion.get_call_stats()["model"] == "gemini-3.5-flash-lite"
     assert companion.get_call_stats()["tools_used"] == ["ask_precomputed_no_tools"]
 
 
@@ -424,9 +424,10 @@ def test_ask_precomputed_routes_to_flash_lite_when_flash_hits_quota(companion):
     assert answer == "Gemini Flash-Lite answered after Flash hit quota."
     assert calls == [GEMINI_FLASH_MODEL, GEMINI_FLASH_LITE_MODEL]
     assert stats["model"] == GEMINI_FLASH_LITE_MODEL
-    assert stats["model_display"] == "Gemini Flash-Lite"
+    assert stats["model_display"] == "Gemini 3.5 Flash-Lite"
     assert stats["routing"]["fallback"] is True
-    assert stats["routing"]["final_model_display"] == "Gemini Flash-Lite"
+    assert stats["routing"]["final_model_display"] == "Gemini 3.5 Flash-Lite"
     assert (
-        stats["routing"]["notice"] == "Gemini Flash is cooling down. Routing via Gemini Flash-Lite."
+        stats["routing"]["notice"]
+        == "Gemini 3.8 Flash is cooling down. Routing via Gemini 3.5 Flash-Lite."
     )

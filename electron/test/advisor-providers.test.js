@@ -319,7 +319,7 @@ test('OpenRouter model test retries route-specific HTTP 404 without schema param
 
 test('Gemini check uses the default model and verifies an actual structured answer', async () => {
   const result = await testAdvisorModel({ provider: 'gemini', apiKey: 'secret', fetchImpl: async (url, options) => {
-    assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent')
+    assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent')
     assert.equal(options.headers['x-goog-api-key'], 'secret')
     const body = JSON.parse(options.body)
     assert.equal(body.generationConfig.maxOutputTokens, 512)

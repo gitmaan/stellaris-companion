@@ -549,7 +549,7 @@ def test_gemini_billing_failure_is_not_retried_or_reported_as_rate_limit():
     models = FailingModels()
     config = AdvisorProviderConfig(
         provider="gemini",
-        model="gemini-3-flash-preview",
+        model="gemini-3.8-flash",
         api_key="test-key",
     )
     generator = GeminiAdvisorGenerator(
@@ -626,4 +626,4 @@ def test_gemini_default_reports_actionable_errors(error, expected_code):
     with pytest.raises(AdvisorProviderError) as result:
         generator.generate(system_prompt="system", user_prompt="user")
     assert result.value.code == expected_code
-    assert attempts == ["gemini-3.1-flash-lite"]
+    assert attempts == ["gemini-3.5-flash-lite"]
