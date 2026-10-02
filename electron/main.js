@@ -27,6 +27,9 @@ const {
 } = require('./main/historyUpgrade')
 const { getLinuxSaveDirCandidates } = require('./main/savePaths')
 const { createSecretStorage } = require('./main/secureStorage')
+const { createChatGPTService } = require('./main/chatgpt')
+const { createChatGPTBridge } = require('./main/chatgptBridge')
+const { registerChatGPTIpcHandlers } = require('./main/ipc/chatgpt')
 const {
   applyUpdateChannel,
   normalizeUpdateChannel,
@@ -183,6 +186,15 @@ const secretStorage = createSecretStorage({ safeStorage, store })
 const getSecret = key => secretStorage.getSecret(key)
 const setSecret = (key, value) => secretStorage.setSecret(key, value)
 
+const chatgptService = createChatGPTService({
+  store, getSecret, setSecret, openExternal: url => shell.openExternal(url),
+  onChange: status => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('chatgpt:changed', status) },
+  // Test fixtures are unreachable from packaged applications.
+  ...(IS_E2E && !app.isPackaged && process.env.NODE_ENV === 'test' && process.env.E2E_CHATGPT_MOCK === '1'
+    ? require('./e2e/helpers/chatgptFixture').createChatGPTFixture() : {}),
+})
+const chatgptBridge = createChatGPTBridge(chatgptService)
+
 const announcementsService = createAnnouncementsService({ app, store })
 
 function migrateLegacySavePathToSaveDir() {
@@ -324,6 +336,8 @@ function buildBackendEnv(settings) {
   delete env.STELLARIS_ADVISOR_MODEL
   delete env.STELLARIS_ADVISOR_BASE_URL
   delete env.STELLARIS_ADVISOR_API_KEY
+  delete env.STELLARIS_CHATGPT_BRIDGE_URL
+  delete env.STELLARIS_CHATGPT_BRIDGE_TOKEN
   env.STELLARIS_ADVISOR_PROVIDER = advisorProvider
   if (settings.advisorModel) {
     env.STELLARIS_ADVISOR_MODEL = String(settings.advisorModel).trim()
@@ -339,11 +353,17 @@ function buildBackendEnv(settings) {
   }
   const advisorApiKey = advisorProvider === 'openrouter'
     ? settings.openRouterApiKey
-    : advisorProvider === 'custom'
+    : ['custom', 'ollama', 'lm_studio'].includes(advisorProvider)
       ? settings.customProviderApiKey
       : ''
   if (advisorApiKey) {
     env.STELLARIS_ADVISOR_API_KEY = advisorApiKey
+  }
+  if (advisorProvider === 'chatgpt' && chatgptService.status().ready) {
+    const bridge = chatgptBridge.connection()
+    env.STELLARIS_CHATGPT_BRIDGE_URL = bridge.url
+    env.STELLARIS_CHATGPT_BRIDGE_TOKEN = bridge.token
+    env.STELLARIS_ADVISOR_MODEL = chatgptService.status().model
   }
 
   env.STELLARIS_MODEL_ROUTING_MODE = normalizeModelRoutingMode(settings.modelRoutingMode)
@@ -1568,6 +1588,27 @@ ipcMain.handle('get-backend-log-tail', async (event, { maxBytes } = {}) => {
 
 const openRouterOAuth = createOpenRouterOAuth({ openExternal: url => shell.openExternal(url) })
 app.on('before-quit', () => openRouterOAuth.cancel())
+async function applySavedSettings(fullSettings, changedSettings = {}) {
+  const backendRelevantSettingsChanged = changesBackendConfiguration(changedSettings)
+  if (backendRelevantSettingsChanged) backendConfigured = true
+  if (changedSettings.language !== undefined) updateTrayMenu()
+  if (backendRelevantSettingsChanged && !E2E_SKIP_BACKEND_AUTOSTART) restartPythonBackend(fullSettings)
+}
+
+registerChatGPTIpcHandlers({
+  ipcMain, validateSender, service: chatgptService,
+  activate: async (status, operation) => {
+    const modelOnly = operation === 'select-model' && store.get('advisorProvider') === 'chatgpt'
+    const settings = { advisorProvider: 'chatgpt', advisorModel: status.model, advisorBaseUrl: '' }
+    await saveSettings(settings)
+    if (!modelOnly) await applySavedSettings(await getSettingsWithSecrets(), settings)
+  },
+  changed: async () => {
+    if (store.get('advisorProvider') === 'chatgpt') {
+      await applySavedSettings(await getSettingsWithSecrets(), { advisorProvider: 'chatgpt' })
+    }
+  },
+})
 
 registerSettingsIpcHandlers({
   openRouterOAuth,
@@ -1580,17 +1621,7 @@ registerSettingsIpcHandlers({
   getSettingsWithSecrets,
   discoverAdvisorModels,
   testAdvisorModel,
-  onSettingsSaved: async (fullSettings, changedSettings = {}) => {
-    // Player-empire overrides are backend env values and require a restart too.
-    const backendRelevantSettingsChanged = changesBackendConfiguration(changedSettings)
-
-    if (backendRelevantSettingsChanged) backendConfigured = true
-    if (changedSettings.language !== undefined) updateTrayMenu()
-
-    if (backendRelevantSettingsChanged && !E2E_SKIP_BACKEND_AUTOSTART) {
-      restartPythonBackend(fullSettings)
-    }
-  },
+  onSettingsSaved: applySavedSettings,
   translate: tNative,
 })
 
@@ -1843,6 +1874,7 @@ app.whenReady().then(async () => {
 
   // Use existing token from env (dev mode) or generate new one (production)
   authToken = process.env.STELLARIS_API_TOKEN || generateAuthToken()
+  await chatgptBridge.start()
   phaseStart = logTiming('Auth token configured', phaseStart)
 
   // Check if backend is already running on default port BEFORE finding a new port.
@@ -1940,6 +1972,8 @@ app.on('before-quit', (event) => {
   if (quitCleanupStarted) return
   quitCleanupStarted = true
   isQuitting = true
+  chatgptService.close()
+  chatgptBridge.close()
   healthCheckManager.setIsQuitting(true)
 
   if (isQuittingForUpdate) {

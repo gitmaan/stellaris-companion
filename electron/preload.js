@@ -52,6 +52,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     listModels: (config) => ipcRenderer.invoke('advisor-provider:list-models', config),
     testModel: (config) => ipcRenderer.invoke('advisor-provider:test-model', config),
   },
+  chatgpt: {
+    status: () => ipcRenderer.invoke('chatgpt:status'),
+    connect: options => ipcRenderer.invoke('chatgpt:connect', options),
+    cancel: () => ipcRenderer.invoke('chatgpt:cancel'),
+    reopen: () => ipcRenderer.invoke('chatgpt:reopen'),
+    selectAccount: id => ipcRenderer.invoke('chatgpt:select-account', id),
+    selectModel: model => ipcRenderer.invoke('chatgpt:select-model', model),
+    disconnect: () => ipcRenderer.invoke('chatgpt:disconnect'),
+    check: () => ipcRenderer.invoke('chatgpt:check'),
+    models: () => ipcRenderer.invoke('chatgpt:models'),
+    acknowledgeWelcome: () => ipcRenderer.invoke('chatgpt:acknowledge-welcome'),
+    onChanged: callback => createManagedListener('chatgpt:changed', callback),
+  },
 
   // Feedback reporting
   getPlatformInfo: () => ({ platform: process.platform, arch: process.arch }),

@@ -60,6 +60,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             {toasts.map(toast => (
               <motion.div
                 key={toast.id}
+                role={toast.type === 'error' ? 'alert' : 'status'}
+                aria-atomic="true"
                 initial={{ opacity: 0, x: 50, scale: 0.95 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 50, scale: 0.95 }}

@@ -4,7 +4,7 @@ const path = require('node:path')
 const root = path.join(__dirname, '..', 'renderer', 'i18n', 'locales')
 const locales = ['de', 'fr', 'es', 'pt-BR', 'ja', 'zh-Hans']
 const english = JSON.parse(fs.readFileSync(path.join(root, 'en', 'common.json'), 'utf8'))
-const protectedWords = new Set(['Stellaris', 'Companion', 'Gemini', 'Ollama', 'OpenRouter', 'LM', 'Studio', 'Claude', 'Codex', 'Cursor', 'Discord', 'GitHub', 'API', 'MCP', 'JSON', 'HTML', 'HTTPS', 'SQLite', 'Flash', 'Lite', 'AI', 'OS', 'K', 'MB'])
+const protectedWords = new Set(['Stellaris', 'Companion', 'ChatGPT', 'OpenAI', 'Gemini', 'Ollama', 'OpenRouter', 'LM', 'Studio', 'Claude', 'Codex', 'Cursor', 'Discord', 'GitHub', 'API', 'MCP', 'JSON', 'HTML', 'HTTPS', 'SQLite', 'Flash', 'Lite', 'AI', 'OS', 'K', 'MB'])
 const accent = { a:'à', b:'ƀ', c:'ç', d:'ď', e:'ë', f:'ƒ', g:'ğ', h:'ĥ', i:'ï', j:'ĵ', k:'ķ', l:'ĺ', m:'ṁ', n:'ñ', o:'õ', p:'ṕ', q:'ɋ', r:'ŕ', s:'š', t:'ŧ', u:'ü', v:'ṽ', w:'ŵ', x:'ẋ', y:'ÿ', z:'ž' }
 
 function pseudoString(input) {
@@ -90,8 +90,9 @@ for (const locale of locales) {
 // Product names, a provider key hint, and HTML entities are intentional literals.
 const ts = require(path.join(__dirname, '..', 'renderer', 'node_modules', 'typescript'))
 const migratedComponents = [
-  'OnboardingModal', 'AdvisorInfoPanel', 'ReportIssueModal', 'ErrorBoundary',
+  'OnboardingModal', 'OnboardingAdvisorSetup', 'OnboardingFrame', 'AdvisorInfoPanel', 'ReportIssueModal', 'ErrorBoundary',
   'CampaignHistoryDialog', 'ChronicleContent', 'ChronicleChapterList',
+  'ChatGPTConnection', 'ChatGPTWelcome', 'ChatGPTUsage',
 ]
 const literalAllowlist = new Set(['Electron', '&gt;', 'AIza...'])
 for (const component of migratedComponents) {

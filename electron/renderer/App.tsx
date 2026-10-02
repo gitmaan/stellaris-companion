@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import ErrorBoundary from './components/ErrorBoundary'
 import OnboardingModal from './components/OnboardingModal'
+import ChatGPTWelcome from './components/ChatGPTWelcome'
 import ReportIssueModal from './components/ReportIssueModal'
 import UpdateDialog from './components/UpdateDialog'
 import { useErrorReporter } from './hooks/useErrorReporter'
@@ -345,6 +346,7 @@ function App() {
       </AnimatePresence>
 
       {/* Report Issue Modal */}
+      <ChatGPTWelcome enabled={onboardingDone === true} />
       <ReportIssueModal
         isOpen={modalOpen}
         onClose={closeModal}

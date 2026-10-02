@@ -1,6 +1,6 @@
 const net = require('node:net')
 
-const ADVISOR_PROVIDER_VALUES = ['gemini', 'ollama', 'lm_studio', 'openrouter', 'custom']
+const ADVISOR_PROVIDER_VALUES = ['gemini', 'chatgpt', 'ollama', 'lm_studio', 'openrouter', 'custom']
 const DEFAULT_ADVISOR_PROVIDER = 'gemini'
 
 const ADVISOR_PROVIDER_PRESETS = {
@@ -109,6 +109,7 @@ function isLocalOrPrivateHost(rawHostname) {
 
 function getAdvisorProviderBaseUrl(provider, override = '') {
   const selected = normalizeAdvisorProvider(provider)
+  if (selected === 'chatgpt') return ''
   const normalizedOverride = normalizeProviderBaseUrl(override)
   if (normalizedOverride) return normalizedOverride
   return ADVISOR_PROVIDER_PRESETS[selected]?.baseUrl || ''
@@ -117,6 +118,7 @@ function getAdvisorProviderBaseUrl(provider, override = '') {
 function getAdvisorProviderLabel(provider) {
   const selected = normalizeAdvisorProvider(provider)
   if (selected === 'gemini') return 'Gemini'
+  if (selected === 'chatgpt') return 'ChatGPT'
   if (selected === 'custom') return 'Custom provider'
   return ADVISOR_PROVIDER_PRESETS[selected]?.label || 'Provider'
 }
@@ -185,7 +187,26 @@ async function discoverAdvisorModels({
 }) {
   const selected = normalizeAdvisorProvider(provider)
   if (selected === 'gemini') {
-    return { ok: true, models: [], baseUrl: '', provider: selected }
+    // Authenticate with the model catalog without generating paid content.
+    // https://ai.google.dev/api/models#method:-models.list
+    if (!String(apiKey || '').trim()) return { ok: false, error: 'Gemini requires an API key.' }
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      const response = await fetchImpl('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', {
+        headers: { Accept: 'application/json', 'x-goog-api-key': apiKey.trim() },
+        signal: controller.signal, redirect: 'error',
+      })
+      const payload = await readJsonResponse(response)
+      if (!response.ok) return { ok: false, error: providerHttpError(selected, response, payload, apiKey) }
+      if (!Array.isArray(payload?.models)) return { ok: false, error: 'Gemini returned an invalid model catalog.' }
+      const models = payload.models.filter(entry => typeof entry?.name === 'string' && Array.isArray(entry.supportedGenerationMethods) && entry.supportedGenerationMethods.includes('generateContent'))
+        .map(entry => ({ id: String(entry.name).replace(/^models\//, ''), name: entry.displayName || entry.name, contextLength: entry.inputTokenLimit }))
+      if (!models.length) return { ok: false, error: 'No Gemini text models are available for this key.' }
+      return { ok: true, models, baseUrl: '', provider: selected }
+    } catch {
+      return { ok: false, error: 'Could not connect to Gemini. Check your API key and connection.' }
+    } finally { clearTimeout(timer) }
   }
   if (typeof fetchImpl !== 'function') {
     return { ok: false, error: 'Model discovery is unavailable in this build.' }

@@ -29,6 +29,7 @@ export const DEFAULT_LANGUAGE: LanguageSetting = 'system'
 export const DEFAULT_RESOLVED_LANGUAGE: ResolvedLanguage = 'en'
 export const ADVISOR_PROVIDER_VALUES = [
   'gemini',
+  'chatgpt',
   'ollama',
   'lm_studio',
   'openrouter',

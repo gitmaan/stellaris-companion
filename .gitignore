@@ -60,6 +60,7 @@ bin/stellaris-parser*
 *_results.md
 
 # Generated benchmark/test results
+/artifacts/
 *_results.json
 t25_*.json
 tmp/

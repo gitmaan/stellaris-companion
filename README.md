@@ -8,7 +8,7 @@
 
 Your empire's strategic council, on demand.
 
-Stellaris LLM Companion reads your save, tracks what is changing across time, and gives actionable strategic advice in your empire's voice. Gemini is the default, with Ollama, LM Studio, OpenRouter, and custom OpenAI-compatible endpoints also supported for both Advisor and Chronicle.
+Stellaris LLM Companion reads your save, tracks what is changing across time, and gives actionable strategic advice in your empire's voice. Gemini is the default, with ChatGPT plan usage, Ollama, LM Studio, OpenRouter, and custom OpenAI-compatible endpoints also supported for both Advisor and Chronicle.
 
 ![Stellaris Companion Hero Screenshot](docs/images/hero-screenshot.jpeg)
 
@@ -18,7 +18,7 @@ Stellaris LLM Companion reads your save, tracks what is changing across time, an
 - **Chronicle mode**: Turn your campaign into a narrative history with chaptered events.
 - **Local AI app access**: Use the MCP Relay to bring your current campaign context into Claude Desktop, Codex, and other MCP-compatible clients.
 - **In-game workflow**: Ask questions through Discord overlay with `/ask` while you play.
-- **Privacy-first architecture**: Saves stay local. You bring your own API key.
+- **Privacy-first architecture**: Saves stay local. Connect your ChatGPT account or bring your own provider.
 
 ## Quick Start (Recommended)
 
@@ -50,7 +50,23 @@ npm -C electron/renderer install
 ./dev.sh
 ```
 
-### Connect your AI
+### Connect your AI provider
+
+To use your ChatGPT plan, choose **Continue with ChatGPT** during onboarding, or choose
+**Config → Chat in Companion → ChatGPT**. Finish signing in with OpenAI in your browser;
+the app chooses GPT-5.6 Terra when available, checks the connection, and saves it automatically.
+The connection powers both Advisor and Chronicle. No API key is needed.
+
+Change the **ChatGPT model** directly beneath the Advisor input, in Chronicle, or in
+Config. Terra is marked **Recommended**, Luna **Lower usage**, and the remaining available
+models appear under **More models**. Your choice is saved per account and applies to both Advisor and
+Chronicle on the next request, without interrupting a reply. Terra, Luna, and Sol use low
+reasoning for Advisor and medium for Chronicle. Existing model choices are preserved.
+**Manage usage** opens ChatGPT settings to review plan and app limits. Account controls
+are under **Account options**. Credentials stay in the desktop main process and use the
+operating system's protected storage; without protected storage, the connection lasts only
+for the current session. Access depends on account and workspace eligibility during the
+[OpenAI preview](https://developers.openai.com/siwc/token-sharing-open-source).
 
 Open **Config** and choose **Chat in Companion**, or follow the first-run setup:
 

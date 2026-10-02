@@ -10,6 +10,8 @@ const { getElectronLaunchArgs } = require('./helpers/electronLaunch')
 const electronDir = path.resolve(__dirname, '..')
 
 async function launchApp(backendPort, userDataDir) {
+  const saves = path.join(userDataDir, 'saves')
+  await fs.mkdir(saves, { recursive: true })
   return electron.launch({
     args: getElectronLaunchArgs(path.join(electronDir, 'main.js')),
     env: {
@@ -21,6 +23,7 @@ async function launchApp(backendPort, userDataDir) {
       E2E_FAKE_SECURE_STORAGE: '1',
       E2E_SKIP_BACKEND_AUTOSTART: '1',
       E2E_USER_DATA_DIR: userDataDir,
+      E2E_SAVE_DIR: saves,
       STELLARIS_API_PORT: String(backendPort),
       STELLARIS_API_TOKEN: 'e2e-token',
     },
@@ -39,53 +42,43 @@ test('guides first-time players through a visual AI choice without forcing setup
     await page.waitForLoadState('domcontentloaded')
 
     const dialog = page.getByRole('dialog')
-    await expect(dialog.getByRole('heading', { name: 'FIRST CONTACT' })).toBeVisible()
-    await dialog.getByRole('button', { name: 'GET STARTED' }).click()
-
-    await expect(dialog.getByRole('heading', { name: 'CHOOSE YOUR AI' })).toBeVisible()
-    await expect(dialog.getByRole('button', { name: /Connect your AI app/ })).toBeVisible()
-    await dialog.getByRole('button', { name: /Chat in Companion/ }).click()
-    await expect(dialog.getByRole('button', { name: /Gemini.*easiest setup/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    await expect(dialog.getByRole('link', { name: /Gemini key/i })).toBeVisible()
-
-    await dialog.getByRole('button', { name: /On this device.*private by default/i }).click()
-    await expect(dialog.getByRole('button', { name: /On this device.*private by default/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
-    await expect(dialog.getByLabel('LOCAL APP')).toHaveValue('ollama')
-    await expect(dialog.getByText(/Open Ollama and download a chat model/i)).toBeVisible()
-    await expect(dialog.getByRole('button', { name: 'Find models', exact: true })).toBeVisible()
-
+    await expect(dialog.getByRole('heading', { name: 'First contact' })).toBeVisible()
+    await dialog.getByRole('button', { name: 'Get started' }).click()
+    await expect(dialog.getByRole('heading', { name: 'Connect your advisor' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Continue with ChatGPT', exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: /Local models Ollama/ }).click()
+    await expect(dialog.getByRole('radio', { name: 'Ollama', exact: true })).toBeChecked()
+    await dialog.getByRole('button', { name: 'Connection details' }).click()
+    await expect(dialog.getByLabel('Server URL')).toHaveValue('http://127.0.0.1:11434/v1')
     const actionRow = dialog.locator('[data-onboarding-actions-row="true"]')
-    const fitsCompactWindow = await actionRow.evaluate((row) => {
+    expect(await actionRow.evaluate(row => {
       const box = row.getBoundingClientRect()
       return box.left >= 0 && box.right <= window.innerWidth && box.bottom <= window.innerHeight
-    })
-    expect(fitsCompactWindow).toBe(true)
-
-    await dialog.getByRole('button', { name: /^(SET UP LATER|FINISH)$/ }).click()
-    await expect(dialog.getByRole('heading', { name: 'CONNECT YOUR SAVES' })).toBeVisible()
-    await dialog.getByRole('button', { name: 'BACK' }).click()
-    await expect(dialog.getByRole('heading', { name: 'CHOOSE YOUR AI' })).toBeVisible()
-
-    await dialog.getByRole('button', { name: /Gemini.*easiest setup/i }).click()
-    // Exercise the real main-process check without an external API call.
+    })).toBe(true)
+    await dialog.getByRole('button', { name: 'Back', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Back', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Set up later', exact: true }).click()
+    await expect(dialog.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
+    await dialog.getByRole('button', { name: 'Back', exact: true }).click()
+    await dialog.getByRole('button', { name: /Gemini API key/ }).click()
+    // Exercise catalog authentication and the real structured connection probe.
     await app.evaluate(() => {
       const realFetch = globalThis.fetch
-      globalThis.fetch = async (url, options) => String(url).startsWith('https://generativelanguage.googleapis.com/')
-        ? new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"status":"ok"}' }] } }] }), { status: 200 })
-        : realFetch(url, options)
+      globalThis.__onboardingProbeCount = 0
+      globalThis.fetch = async (url, options) => {
+        if (!String(url).startsWith('https://generativelanguage.googleapis.com/')) return realFetch(url, options)
+        if (String(url).includes(':generateContent')) {
+          globalThis.__onboardingProbeCount++
+          return Response.json({ candidates: [{ content: { parts: [{ text: '{"status":"ok"}' }] } }] })
+        }
+        return Response.json({ models: [{ name: 'models/fixture-text', supportedGenerationMethods: ['generateContent'] }] })
+      }
     })
-    await dialog.getByLabel('GEMINI KEY').fill('onboarding-test-key')
-    await expect(dialog.getByRole('button', { name: 'Check and save', exact: true })).toBeEnabled()
-    await dialog.getByRole('button', { name: 'Check and save', exact: true }).click()
-    await expect(dialog.getByRole('heading', { name: 'CONNECT YOUR SAVES' })).toBeVisible()
-
-    await dialog.getByRole('button', { name: /^(SET UP LATER|FINISH)$/ }).click()
+    await dialog.getByLabel('API key', { exact: true }).fill('onboarding-test-key')
+    await dialog.getByRole('button', { name: 'Connect Gemini', exact: true }).click()
+    await expect(dialog.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
+    expect(await app.evaluate(() => globalThis.__onboardingProbeCount)).toBe(1)
+    await dialog.getByRole('button', { name: 'Set up later', exact: true }).click()
     await expect(dialog).not.toBeVisible()
     await expect.poll(() => page.evaluate(() => window.electronAPI.onboarding.getStatus())).toBe(true)
 
@@ -106,13 +99,13 @@ test('opens existing AI app connections after onboarding without a provider key'
   try {
     const page = await app.firstWindow()
     const dialog = page.getByRole('dialog')
-    await dialog.getByRole('button', { name: 'GET STARTED' }).click()
+    await dialog.getByRole('button', { name: 'Get started' }).click()
     await dialog.getByRole('button', { name: /Connect your AI app/ }).click()
     await expect(dialog.getByRole('heading', { name: 'MCP RELAY' })).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Claude Desktop', exact: true })).toBeVisible()
     await dialog.getByRole('button', { name: 'CONTINUE', exact: true }).click()
-    await expect(dialog.getByRole('heading', { name: 'CONNECT YOUR SAVES' })).toBeVisible()
-    await dialog.getByRole('button', { name: /^(SET UP LATER|FINISH)$/ }).click()
+    await expect(dialog.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
+    await dialog.getByRole('button', { name: 'Set up later', exact: true }).click()
     await expect(dialog).not.toBeVisible()
     await expect(page.locator('#ai-app-connections')).toBeInViewport()
     await expect(page.locator('#ai-app-connections').getByText(/^Claude Desktop$/i)).toBeVisible()

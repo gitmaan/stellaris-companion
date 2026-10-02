@@ -44,18 +44,18 @@ test('Windows Electron first run, language persistence, and native folder label'
         return { canceled: true, filePaths: [] }
       }
     })
-    await page.getByRole('button', { name: japanese.onboarding.actions.start }).click()
-    await page.getByRole('button', { name: japanese.onboarding.actions.later }).click()
-    await page.getByRole('button', { name: japanese.onboarding.saves.browseFolder }).click()
+    await page.getByRole('button', { name: japanese.onboarding.actions.initialize }).click()
+    await page.getByRole('button', { name: japanese.onboarding.actions.setUpLater }).click()
+    await page.getByRole('button', { name: japanese.onboarding.slim.chooseFolder }).click()
     expect((await app.evaluate(() => globalThis.__windowsFolderOptions)).title).toBe(japanese.native.dialogs.selectSaveFolder)
 
     await page.locator('#onboarding-language').selectOption('de')
     await expect(page.locator('html')).toHaveAttribute('lang', 'de')
-    await page.getByRole('button', { name: german.onboarding.saves.browseFolder }).click()
+    await page.getByRole('button', { name: german.onboarding.slim.chooseFolder }).click()
     expect((await app.evaluate(() => globalThis.__windowsFolderOptions)).title).toBe(german.native.dialogs.selectSaveFolder)
     await page.screenshot({ path: testInfo.outputPath('windows-de-onboarding-saves-1000x700-scale100.png') })
 
-    await page.getByRole('button', { name: german.onboarding.actions.later }).click()
+    await page.getByRole('button', { name: german.onboarding.actions.setUpLater }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
     const persisted = JSON.parse(await fs.readFile(path.join(profile, 'settings.json'), 'utf8'))
     expect(persisted.language).toBe('de')

@@ -355,3 +355,31 @@ test('model discovery preserves prices without treating unknown pricing as free'
   assert.equal(result.models[1].pricing, undefined)
   assert.deepEqual(result.models[2].pricing, { inputPerMillion: 0, outputPerMillion: 0 })
 })
+
+
+test('Gemini checks the key through its catalog, without putting secrets in the URL', async () => {
+  let request
+  const result = await discoverAdvisorModels({ provider: 'gemini', apiKey: ' gemini-secret ', fetchImpl: async (url, options) => {
+    request = { url, options }
+    return Response.json({ models: [
+      { name: 'models/text-model', displayName: 'Text model', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/embedding', supportedGenerationMethods: ['embedContent'] },
+      { supportedGenerationMethods: ['generateContent'] },
+    ] })
+  } })
+  assert.equal(result.ok, true)
+  assert.equal(request.options.headers['x-goog-api-key'], 'gemini-secret')
+  assert.equal(request.options.redirect, 'error')
+  assert.equal(request.url.includes('gemini-secret'), false)
+  assert.deepEqual(result.models.map(model => model.id), ['text-model'])
+})
+
+test('Gemini rejects missing, invalid, or unusable keys and redacts provider errors', async () => {
+  const missing = await discoverAdvisorModels({ provider: 'gemini', apiKey: '', fetchImpl: () => { throw new Error('unexpected') } })
+  assert.equal(missing.ok, false)
+  const invalid = await discoverAdvisorModels({ provider: 'gemini', apiKey: 'gemini-secret', fetchImpl: async () => Response.json({ error: { message: 'Invalid gemini-secret' } }, { status: 403 }) })
+  assert.equal(invalid.ok, false)
+  assert.equal(invalid.error.includes('gemini-secret'), false)
+  const empty = await discoverAdvisorModels({ provider: 'gemini', apiKey: 'key', fetchImpl: async () => Response.json({ models: [] }) })
+  assert.equal(empty.ok, false)
+})
