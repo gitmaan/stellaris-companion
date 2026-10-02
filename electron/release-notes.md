@@ -3,3 +3,5 @@
 - Use updated Gemini models with better handling of model quota limits.
 - Enjoy translated setup, settings, and campaign controls in more languages.
 - Connect AI apps to your campaign and share Chronicles more easily.
+
+Advisor now restores saved campaign chats and shows the save date behind each reply. Chronicle remembers your reading position and adds protected editing, Undo, and manual story updates.
