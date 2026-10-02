@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useChatGPT } from '../hooks/useChatGPT'
 import {
   DEFAULT_ADVISOR_PROVIDER,
   DEFAULT_CHRONICLE_REFRESH_MODE,
@@ -115,7 +116,11 @@ function SettingsPage({
   onOpenCampaignHistory,
 }: SettingsPageProps) {
   const { t } = useTranslation()
-  const { settings, loading, saving, error, saveSettings, showFolderDialog } = useSettings()
+  const { settings, loading, saving, error, saveSettings, showFolderDialog, reload } = useSettings()
+  const { modelRevision } = useChatGPT()
+  useEffect(() => {
+    if (modelRevision) void reload()
+  }, [modelRevision, reload])
   const { showToast } = useToast()
 
   const [aiRoute, setAIRoute] = useState<AISetupRoute>('companion')
@@ -551,12 +556,13 @@ function SettingsPage({
                       }} />
                       {aiRoute === 'relay' ? <MCPRelayPanel active={isActive} onChooseCampaign={handleBrowse} /> : <>
                       {(settings?.secretStorageReadFailed || settings?.secretStorageAvailable === false) && (
-                        <HUDMicro className="block text-accent-yellow">{t(settings.secretStorageReadFailed ? 'settings.advisor.lockedSecrets' : 'settings.advisor.sessionOnlySecrets')}</HUDMicro>
+                        <HUDMicro className="block text-accent-yellow">{t(settings.secretStorageReadFailed ? (advisorProvider === 'chatgpt' ? 'chatgpt.lockedSecrets' : 'settings.advisor.lockedSecrets') : (advisorProvider === 'chatgpt' ? 'chatgpt.sessionOnly' : 'settings.advisor.sessionOnlySecrets'))}</HUDMicro>
                       )}
                       <AISetupForm
                         initialSettings={settings}
                         onSave={saveSettings}
                         onProviderChange={setAdvisorProvider}
+                        onChatGPTActivated={reload}
                       />
                       {advisorProvider === 'gemini' && <div className="space-y-3 border-t border-white/10 pt-4">
                         <HUDLabel>{t('settings.geminiQuota.label')}</HUDLabel>

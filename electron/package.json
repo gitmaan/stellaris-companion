@@ -26,13 +26,15 @@
     "test:localization": "node scripts/localization.cjs && node --test test/settings-locales.test.js test/native-i18n.test.js test/language.test.js test/localization-runtime.test.js",
     "localization:pseudo": "node scripts/localization.cjs --write-pseudo",
     "publish": "../scripts/publish-electron.sh",
-    "start": "electron ."
+    "start": "electron .",
+    "test:chatgpt": "node --test test/chatgpt.test.js test/secure-storage.test.js"
   },
   "dependencies": {
     "electron-store": "^8.1.0",
     "electron-updater": "^6.8.9",
     "semver": "^7.8.5",
-    "ws": "^8.19.0"
+    "ws": "^8.19.0",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.0",

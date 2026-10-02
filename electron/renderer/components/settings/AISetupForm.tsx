@@ -6,6 +6,7 @@ import { HUDInput } from '../hud/HUDInput'
 import { HUDSelect } from '../hud/HUDForm'
 import { HUDMicro } from '../hud/HUDText'
 import { AdvisorProviderChooser } from './AdvisorProviderChooser'
+import ChatGPTConnection from '../ChatGPTConnection'
 
 export type AISetupValues = Pick<
   Settings,
@@ -35,6 +36,7 @@ interface Props {
   onSave: (values: Partial<AISetupValues>) => Promise<boolean>
   onSaved?: () => void
   onProviderChange?: (provider: AdvisorProvider) => void
+  onChatGPTActivated?: () => Promise<void>
 }
 
 function initialValues(settings?: Partial<Settings> | null): AISetupValues {
@@ -48,6 +50,7 @@ function initialValues(settings?: Partial<Settings> | null): AISetupValues {
   }
 }
 const names: Record<AdvisorProvider, string> = {
+  chatgpt: 'ChatGPT',
   gemini: 'Gemini',
   openrouter: 'OpenRouter',
   ollama: 'Ollama',
@@ -71,6 +74,7 @@ export function AISetupForm({
   onSave,
   onSaved,
   onProviderChange,
+  onChatGPTActivated,
 }: Props) {
   const { t, i18n } = useTranslation()
   const [values, setValues] = useState(() => initialValues(initialSettings))
@@ -326,6 +330,11 @@ export function AISetupForm({
           provider={provider}
           onChange={(advisorProvider) => change({ advisorProvider })}
         />
+        {provider === 'chatgpt' ? <ChatGPTConnection active={initialSettings?.advisorProvider === 'chatgpt'} onActivated={async status => {
+          setValues(current => ({ ...current, advisorModel: status.model, advisorBaseUrl: '' }))
+          await onChatGPTActivated?.()
+          onSaved?.()
+        }} /> : <>
         <p className="text-sm leading-relaxed text-text-secondary">
           {t(`settings.aiSetup.help.${provider}`)}
         </p>
@@ -529,6 +538,7 @@ export function AISetupForm({
             </a>
           </p>
         )}
+        </>}
       </fieldset>
       {busy === 'browser' ? (
         <div className="space-y-2" role="status">
@@ -615,7 +625,7 @@ export function AISetupForm({
           )}
         </div>
       )}
-      {!isLocal && (initialSettings?.[`${keyField}Set`] || apiKey.includes('...')) && (
+      {provider !== 'chatgpt' && !isLocal && (initialSettings?.[`${keyField}Set`] || apiKey.includes('...')) && (
         <button
           type="button"
           disabled={Boolean(busy)}

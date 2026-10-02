@@ -57,7 +57,7 @@ function registerSettingsIpcHandlers({
     if (typeof submitted === 'string' && !submitted.includes('...')) return submitted.trim()
     if (provider === 'gemini') return settings.googleApiKey
     if (provider === 'openrouter') return settings.openRouterApiKey
-    if (provider === 'custom') return settings.customProviderApiKey
+    if (['custom', 'ollama', 'lm_studio'].includes(provider)) return settings.customProviderApiKey
     return ''
   }
 

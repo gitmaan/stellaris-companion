@@ -23,6 +23,20 @@ import type {
 } from './hooks/useBackend'
 import type { ChronicleRefreshMode, ModelRoutingMode } from './hooks/useSettings'
 
+export interface ChatGPTStatus {
+  connected: boolean
+  ready: boolean
+  connecting: boolean
+  welcomePending: boolean
+  account: { id: string; email: string; name: string; model: string; modelName?: string } | null
+  accounts: Array<{ id: string; email: string; name: string; model: string }>
+  model: string
+  recommendedModel?: string
+  models: Array<{ id: string; name: string; contextLength?: number }>
+  revocationConfirmed?: boolean
+}
+export interface ChatGPTResult { ok: boolean; status: ChatGPTStatus; code?: string }
+
 export interface McpRelayHealthResult {
   ok: boolean
   serverHealthy?: boolean
@@ -205,6 +219,19 @@ declare global {
         setSessionAdvisorCustom: (customInstructions: string) => Promise<BackendIpcResponse<AdvisorCustomResponse>>
       }
       // Settings
+      chatgpt: {
+        status: () => Promise<ChatGPTResult>
+        connect: (options?: { profileId?: string; newAccount?: boolean }) => Promise<ChatGPTResult>
+        cancel: () => Promise<ChatGPTResult>
+        reopen: () => Promise<ChatGPTResult>
+        selectAccount: (id: string) => Promise<ChatGPTResult>
+        selectModel: (model: string) => Promise<ChatGPTResult>
+        disconnect: () => Promise<ChatGPTResult>
+        check: () => Promise<ChatGPTResult>
+        models: () => Promise<ChatGPTResult>
+        acknowledgeWelcome: () => Promise<ChatGPTResult>
+        onChanged: (callback: (status: ChatGPTStatus) => void) => () => void
+      }
       getSettings: () => Promise<unknown>
       saveSettings: (settings: unknown) => Promise<{ success: boolean; language?: string; resolvedLanguage?: string }>
       showFolderDialog: () => Promise<string | null>
