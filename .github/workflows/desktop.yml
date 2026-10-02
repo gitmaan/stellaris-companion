@@ -54,9 +54,11 @@ jobs:
         working-directory: electron
         env:
           PYTHON_BIN: ${{ steps.python.outputs.python-path }}
-        run: |
-          npm test
-          npm run test:localization
+        run: npm test
+
+      - name: Run localization tests
+        working-directory: electron
+        run: npm run test:localization
 
       - name: Build renderer
         working-directory: electron

@@ -11,8 +11,9 @@ const {
   updateJsonClientConfig,
 } = require('../main/mcpRelay')
 
-test('JSON client config updates are scoped, backed up, and remove legacy names', () => {
+test('JSON client config updates are scoped, backed up, and remove legacy names', t => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellaris-mcp-config-'))
+  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }))
   const configPath = path.join(tempDir, 'mcp.json')
   fs.writeFileSync(configPath, JSON.stringify({
     theme: 'dark',
@@ -64,8 +65,9 @@ test('Codex setup uses structured argv without shell interpolation', () => {
   ])
 })
 
-test('Claude disconnect also disables a legacy MCPB relay', () => {
+test('Claude disconnect also disables a legacy MCPB relay', t => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellaris-mcp-claude-'))
+  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }))
   const homeDir = path.join(tempDir, 'home')
   const settingsDir = process.platform === 'darwin'
     ? path.join(homeDir, 'Library', 'Application Support', 'Claude', 'Claude Extensions Settings')
@@ -115,8 +117,9 @@ test('Claude disconnect also disables a legacy MCPB relay', () => {
   assert.equal(JSON.parse(fs.readFileSync(extensionPath, 'utf8')).isEnabled, false)
 })
 
-test('Codex update installs the current entry before removing every legacy entry', () => {
+test('Codex update installs the current entry before removing every legacy entry', t => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stellaris-mcp-codex-'))
+  t.after(() => fs.rmSync(tempDir, { recursive: true, force: true }))
   const calls = []
   let updated = false
   const currentEntry = {

@@ -26,7 +26,7 @@ function getClaudeDesktopConfigPath(home = os.homedir()) {
     return path.join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json')
   }
   if (process.platform === 'win32') {
-    const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming')
+    const appData = (home === os.homedir() && process.env.APPDATA) || path.join(home, 'AppData', 'Roaming')
     return path.join(appData, 'Claude', 'claude_desktop_config.json')
   }
   return path.join(home, '.config', 'Claude', 'claude_desktop_config.json')
@@ -37,7 +37,7 @@ function getClaudeMcpbSettingsDir(home = os.homedir()) {
     return path.join(home, 'Library', 'Application Support', 'Claude', 'Claude Extensions Settings')
   }
   if (process.platform === 'win32') {
-    const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming')
+    const appData = (home === os.homedir() && process.env.APPDATA) || path.join(home, 'AppData', 'Roaming')
     return path.join(appData, 'Claude', 'Claude Extensions Settings')
   }
   return path.join(home, '.config', 'Claude', 'Claude Extensions Settings')
@@ -561,15 +561,17 @@ function createMcpRelayService({
         if (settled) return
         settled = true
         clearTimeout(timer)
-        try { child.stdin.end() } catch { /* ignore */ }
         const shutdownTimer = setTimeout(() => {
           if (child.exitCode === null) {
             try { child.kill() } catch { /* ignore */ }
           }
         }, 500)
         shutdownTimer.unref?.()
-        child.once('exit', () => clearTimeout(shutdownTimer))
-        resolve({ ...result, durationMs: Date.now() - startedAt })
+        child.once('close', () => {
+          clearTimeout(shutdownTimer)
+          resolve({ ...result, durationMs: Date.now() - startedAt })
+        })
+        try { child.stdin.end() } catch { /* ignore */ }
       }
       const fail = message => finish({
         ok: false,
