@@ -1139,6 +1139,7 @@
     "editFailed": "Dieses Kapitel konnte nicht gespeichert werden.",
     "earlierMessages": "Ältere Nachrichten",
     "latestMessages": "Zur neuesten Nachricht",
-    "updateStory": "Geschichte aktualisieren"
+    "updateStory": "Geschichte aktualisieren",
+    "earlierSave": "Ein früherer Spielstand wurde geladen. Deine aufgezeichnete Geschichte bleibt erhalten."
   }
 }

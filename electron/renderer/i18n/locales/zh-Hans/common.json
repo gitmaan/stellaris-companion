@@ -1139,6 +1139,7 @@
     "editFailed": "无法保存此章节。",
     "earlierMessages": "较早的消息",
     "latestMessages": "返回最新消息",
-    "updateStory": "更新故事"
+    "updateStory": "更新故事",
+    "earlierSave": "已加载较早的存档。已记录的故事会被保留。"
   }
 }

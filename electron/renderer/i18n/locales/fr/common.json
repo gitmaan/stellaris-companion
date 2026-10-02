@@ -1150,6 +1150,7 @@
     "editFailed": "Impossible d’enregistrer ce chapitre.",
     "earlierMessages": "Messages précédents",
     "latestMessages": "Revenir aux derniers",
-    "updateStory": "Actualiser l’histoire"
+    "updateStory": "Actualiser l’histoire",
+    "earlierSave": "Une sauvegarde antérieure est chargée. Votre histoire enregistrée est conservée."
   }
 }

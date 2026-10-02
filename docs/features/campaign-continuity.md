@@ -8,7 +8,7 @@ Readable history and model context have different lifetimes. Advisor restores on
 
 This increment archives completed exchanges. It does not persist or replay unfinished provider requests, synthesize goals or build a semantic memory system.
 
-Chronicle displays the last source date actually covered by written prose, separately from the newest ingested save. Legacy or externally supplied prose without a verifiable source uses unknown coverage. Exported current-era dates follow the same rule. Reading position is a local preference scoped to campaign and language, anchored to a chapter and paragraph; rewritten text falls back to the chapter start.
+Chronicle displays the last source date actually covered by written prose, separately from the newest ingested save. Legacy or externally supplied prose without a verifiable source uses unknown coverage. Exported current-era dates follow the same rule. Loading an earlier save keeps the recorded story and quietly explains when its coverage is ahead of the loaded save. Reading position is a local preference scoped to campaign and language, anchored to a chapter and paragraph; rewritten text falls back to the chapter start.
 
 Chapter actions contains native Edit text, the existing confirmed AI rewrite, and Undo latest change when available. Edits retain their original coverage rather than claiming newer evidence. Saving a draft checks the revision captured when editing began. A conflict leaves the draft in place and offers recovery through reopening the current chapter. Undo restores that chapter without rolling back other chapters.
 

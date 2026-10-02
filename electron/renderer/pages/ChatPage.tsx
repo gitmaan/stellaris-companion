@@ -361,6 +361,9 @@ function ChatPage({
   useEffect(() => {
     setConversationId(undefined)
     setConversations([])
+    setViewingEarlier(false)
+    setHasEarlierMessages(false)
+    setFirstTurnId(undefined)
     if (activeCampaignId) void restoreConversation(activeCampaignId)
   }, [activeCampaignId, restoreConversation])
 
@@ -591,7 +594,7 @@ function ChatPage({
             {hasEarlierMessages && <button type="button" disabled={isLoading || historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId, firstTurnId)}>{t('continuity.earlierMessages')}</button>}
             {viewingEarlier && <button type="button" disabled={historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId)}>{t('continuity.latestMessages')}</button>}
           </div>}
-          {historyError && <button type="button" className="text-xs text-accent-yellow" onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, historyTargetRef.current ?? conversationId)}>{t('continuity.historyRetry')}</button>}
+          {historyError && <button type="button" disabled={isLoading || historyLoading} className="text-xs text-accent-yellow" onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, historyTargetRef.current ?? conversationId)}>{t('continuity.historyRetry')}</button>}
           {historyLoading && <span className="text-xs text-text-muted" role="status">{t('continuity.restoring')}</span>}
           {conversations.length > 0 && (
             <div className="relative" onBlur={event => {

@@ -1150,6 +1150,7 @@
     "editFailed": "No se pudo guardar el capítulo.",
     "earlierMessages": "Mensajes anteriores",
     "latestMessages": "Volver a los últimos",
-    "updateStory": "Actualizar historia"
+    "updateStory": "Actualizar historia",
+    "earlierSave": "Se cargó una partida anterior. Tu historia registrada se conserva."
   }
 }

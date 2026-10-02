@@ -1139,6 +1139,7 @@
     "editFailed": "この章を保存できませんでした。",
     "earlierMessages": "以前のメッセージ",
     "latestMessages": "最新の会話に戻る",
-    "updateStory": "物語を更新"
+    "updateStory": "物語を更新",
+    "earlierSave": "以前のセーブを読み込みました。記録済みの物語は保持されます。"
   }
 }

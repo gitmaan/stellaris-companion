@@ -1139,6 +1139,7 @@
     "editFailed": "Could not save this chapter.",
     "earlierMessages": "Earlier messages",
     "latestMessages": "Return to latest",
-    "updateStory": "Update story"
+    "updateStory": "Update story",
+    "earlierSave": "Earlier save loaded. Your recorded story is kept."
   }
 }

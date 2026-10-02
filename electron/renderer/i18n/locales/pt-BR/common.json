@@ -1150,6 +1150,7 @@
     "editFailed": "Não foi possível salvar este capítulo.",
     "earlierMessages": "Mensagens anteriores",
     "latestMessages": "Voltar às recentes",
-    "updateStory": "Atualizar história"
+    "updateStory": "Atualizar história",
+    "earlierSave": "Um save anterior foi carregado. Sua história registrada foi preservada."
   }
 }
