@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
 import backend.api.server as server
+from backend.core.chronicle_store import load_chapters_data
 from backend.core.database import GameDatabase
 from backend.core.history import compute_save_id
 
@@ -131,7 +132,11 @@ def test_reset_routes_are_explicit_and_reversible(monkeypatch, tmp_path):
     assert unconfirmed.status_code == 400
     assert reset.status_code == 200
     assert undo.status_code == 200
-    assert dict(db.execute("SELECT * FROM cached_chronicles;").fetchone()) == before
+    restored = dict(db.execute("SELECT * FROM cached_chronicles;").fetchone())
+    restored_data = load_chapters_data(restored)
+    restored_data.pop("revision_id", None)
+    assert restored_data == load_chapters_data(before)
+    assert restored["chronicle_text"] == before["chronicle_text"]
     db.close()
 
 

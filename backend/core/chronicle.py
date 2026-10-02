@@ -31,6 +31,17 @@ from backend.core.advisor_providers import (
     AdvisorProviderError,
     create_advisor_generator,
 )
+from backend.core.chronicle_store import (
+    ChronicleConflict,
+    cached_chronicle_response,
+    chapter_identity,
+    chronicle_revision,
+    compact_chronicle_context,
+    events_between_dates,
+    game_date_key,
+    load_chapters_data,
+    source_events,
+)
 from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
@@ -215,10 +226,12 @@ CURRENT_ERA_REGEN_MIN_NEW_EVENTS = 3
 ENHANCED_CURRENT_ERA_REGEN_MIN_NEW_EVENTS = 1
 CHRONICLE_REFRESH_MODE_BALANCED = "balanced"
 CHRONICLE_REFRESH_MODE_ENHANCED = "enhanced"
+CHRONICLE_REFRESH_MODE_MANUAL = "manual"
 DEFAULT_CHRONICLE_REFRESH_MODE = CHRONICLE_REFRESH_MODE_BALANCED
 CHRONICLE_REFRESH_MODES = {
     CHRONICLE_REFRESH_MODE_BALANCED,
     CHRONICLE_REFRESH_MODE_ENHANCED,
+    CHRONICLE_REFRESH_MODE_MANUAL,
 }
 
 CHRONICLE_EVIDENCE_RULES = """=== EVIDENCE RULES ===
@@ -426,7 +439,14 @@ class ChronicleGenerator:
             save_id = session.get("save_id")
 
         if not save_id:
-            # Fallback to session-based chronicle (legacy)
+            # Fallback to session-based chronicle (legacy), with the same manual policy.
+            if (
+                normalize_chronicle_refresh_mode(refresh_mode) == CHRONICLE_REFRESH_MODE_MANUAL
+                and not force_refresh
+            ):
+                return cached_chronicle_response(
+                    self.db.get_cached_chronicle(session_id, language=normalize_language(language))
+                )
             return self._generate_legacy_chronicle(session_id, force_refresh=force_refresh)
 
         self._model_route_events = []
@@ -438,6 +458,9 @@ class ChronicleGenerator:
         # Load existing chapters data
         cached = self.db.get_chronicle_by_save_id(save_id, language=output_language)
         chapters_data = self._load_chapters_data(cached)
+        expected_revision = chronicle_revision(chapters_data)
+        if refresh_mode == CHRONICLE_REFRESH_MODE_MANUAL and not force_refresh:
+            return cached_chronicle_response(cached)
         chapters_data["language"] = output_language
 
         # Load persistent custom instructions for this save
@@ -450,10 +473,23 @@ class ChronicleGenerator:
 
         current_date = snapshot_range.get("last_game_date")
         current_snapshot_id = snapshot_range.get("last_snapshot_id")
+        source_date = game_date_key(current_date)
+        archive_dates = [
+            game_date_key(ch.get("end_date")) for ch in chapters_data.get("chapters", [])
+        ]
+        archive_dates.append(game_date_key(chapters_data.get("coverage_date")))
+        coverage = max((date for date in archive_dates if date is not None), default=None)
+        if cached and source_date is not None and coverage is not None and source_date < coverage:
+            response = cached_chronicle_response(cached)
+            response["message"] = (
+                "This save predates the Chronicle's recorded coverage. The existing archive has been preserved."
+            )
+            return response
 
-        # Gather briefing for current session
-        briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
-        briefing = build_model_briefing(json.loads(briefing_json)) if briefing_json else {}
+        # Freeze the dated source before any provider call. Later ingestion belongs
+        # to the next refresh, even if it happens while the model is writing.
+        briefing = self.db.get_historical_chronicle_briefing(save_id, current_snapshot_id)
+        briefing = build_model_briefing(briefing) if isinstance(briefing, dict) else {}
 
         # Check if we need to finalize any chapters
         chapters_finalized = 0
@@ -488,6 +524,7 @@ class ChronicleGenerator:
                     chapters_data=chapters_data,
                     briefing=briefing,
                     trigger=trigger,
+                    snapshot_range=snapshot_range,
                     custom_instructions=custom_instructions,
                     language=output_language,
                 )
@@ -539,7 +576,11 @@ class ChronicleGenerator:
 
         regenerate_for_event_growth = False
 
-        if chapter_only:
+        if cached_current_era and cached_current_era.get("manual_edit_locked"):
+            # External/player prose remains protected even after a chapter boundary moves.
+            used_cached_current_era = True
+            current_era = cached_current_era
+        elif chapter_only:
             if isinstance(current_era_cache, dict) and isinstance(
                 current_era_cache.get("current_era"), dict
             ):
@@ -568,6 +609,8 @@ class ChronicleGenerator:
                     era_start_snapshot_id=era_start_snapshot_id,
                     cached_current_era=cached_current_era,
                     refresh_mode=refresh_mode,
+                    current_snapshot_id=current_snapshot_id,
+                    current_date=current_date,
                 )
                 if not regenerate_for_event_growth:
                     used_cached_current_era = True
@@ -594,6 +637,7 @@ class ChronicleGenerator:
                     chapters_data=chapters_data,
                     briefing=briefing,
                     current_date=current_date,
+                    current_snapshot_id=current_snapshot_id,
                     custom_instructions=custom_instructions,
                     language=output_language,
                 )
@@ -605,6 +649,7 @@ class ChronicleGenerator:
                         "last_snapshot_id": current_snapshot_id,
                         "generated_at": datetime.now(timezone.utc).isoformat(),
                         "language": output_language,
+                        "coverage_date": current_date,
                         "current_era": current_era,
                     }
                     logger.debug(
@@ -613,65 +658,55 @@ class ChronicleGenerator:
                         era_start_snapshot_id,
                     )
 
-        # Assemble full chronicle text for backward compatibility
-        full_text = self._assemble_chronicle_text(chapters_data, current_era)
+        # Coverage advances only when prose was written from a frozen source, never
+        # because a cache was viewed or background scheduling metadata was updated.
+        if chapters_finalized or (current_era and not used_cached_current_era):
+            dates = [ch.get("coverage_date") for ch in chapters_data.get("chapters", [])]
+            if current_era:
+                dates.append(current_era.get("coverage_date"))
+            known_dates = [date for date in dates if isinstance(date, str) and date]
+            chapters_data["coverage_date"] = max(known_dates, default=None)
+            chapters_data["content_generated_at"] = datetime.now(timezone.utc).isoformat()
+        elif cached:
+            chapters_data.setdefault("content_generated_at", cached.get("generated_at"))
 
-        # Calculate total event count
-        all_events = self.db.get_all_events_by_save_id(save_id=save_id)
-        event_count = len(all_events)
-        snapshot_count = snapshot_range.get("snapshot_count", 0)
-
-        # Save updated chapters
-        self.db.upsert_chronicle_by_save_id(
+        all_events = self.db.get_events_in_snapshot_range(
             save_id=save_id,
-            session_id=session_id,
-            chronicle_text=full_text,
-            chapters_json=json_dumps(chapters_data),
-            event_count=event_count,
-            snapshot_count=snapshot_count,
-            language=output_language,
+            to_snapshot_id=current_snapshot_id,
         )
-
-        # Build response
-        response_cached = (
-            not force_refresh
-            and chapters_finalized == 0
-            and (used_cached_current_era or current_era is None)
-        )
-        return {
-            # New structured format
-            "chapters": [
-                {
-                    "number": ch["number"],
-                    "title": ch["title"],
-                    "start_date": ch["start_date"],
-                    "end_date": ch["end_date"],
-                    "epigraph": ch.get("epigraph", ""),
-                    "sections": ch.get("sections"),
-                    "narrative": ch["narrative"],
-                    "summary": ch.get("summary", ""),
-                    "is_finalized": ch.get("is_finalized", True),
-                    "context_stale": ch.get("context_stale", False),
-                    "can_regenerate": ch.get("is_finalized", True),
-                    "provider": ch.get("provider"),
-                    "model": ch.get("model"),
-                }
-                for ch in chapters_data.get("chapters", [])
-            ],
-            "current_era": current_era,
-            "pending_chapters": pending_chapters,
-            "message": (
+        event_count = len(all_events)
+        content_changed = bool(chapters_finalized or (current_era and not used_cached_current_era))
+        removed_era = bool(current_era_cache and "current_era_cache" not in chapters_data)
+        if (
+            cached
+            and not content_changed
+            and not removed_era
+            and (not chapter_only or deferred_chapter_only)
+        ):
+            # Viewing existing prose keeps its revision, coverage and writing date.
+            saved = cached
+        else:
+            saved = self.db.commit_chronicle(
+                save_id=save_id,
+                session_id=session_id,
+                language=output_language,
+                expected_revision=expected_revision,
+                chapters_data=chapters_data,
+                event_count=event_count,
+                snapshot_count=snapshot_range.get("snapshot_count", 0),
+            )
+        response = cached_chronicle_response(saved)
+        response.update(
+            cached=bool(cached) and not content_changed and not removed_era,
+            pending_chapters=pending_chapters,
+            message=(
                 f"{pending_chapters} more chapters pending. Refresh to continue."
                 if pending_chapters > 0
                 else None
             ),
-            # Backward compatible
-            "chronicle": full_text,
-            "cached": response_cached,
-            "event_count": event_count,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-            "model_routing": self._model_routing_response(),
-        }
+            model_routing=self._model_routing_response(),
+        )
+        return response
 
     def _should_regenerate_current_era_for_event_growth(
         self,
@@ -680,6 +715,8 @@ class ChronicleGenerator:
         era_start_snapshot_id: int | None,
         cached_current_era: dict[str, Any] | None,
         refresh_mode: str = DEFAULT_CHRONICLE_REFRESH_MODE,
+        current_snapshot_id: int | None = None,
+        current_date: str | None = None,
     ) -> bool:
         """Refresh current era when enough new events accumulated for this era."""
         if era_start_snapshot_id is None:
@@ -694,8 +731,12 @@ class ChronicleGenerator:
         era_events = self.db.get_events_in_snapshot_range(
             save_id=save_id,
             from_snapshot_id=era_start_snapshot_id,
-            to_snapshot_id=None,
+            to_snapshot_id=current_snapshot_id,
         )
+        if current_date is not None:
+            era_events = events_between_dates(
+                era_events, cached_current_era.get("start_date"), current_date
+            )
         current_era_event_count = len(era_events)
         new_events = max(0, current_era_event_count - cached_events_covered)
         if new_events <= 0:
@@ -797,6 +838,7 @@ class ChronicleGenerator:
         *,
         confirm: bool = False,
         regeneration_instructions: str | None = None,
+        expected_revision: str | None = None,
         model_routing_mode: str | None = None,
         language: str | None = None,
     ) -> dict[str, Any]:
@@ -821,6 +863,11 @@ class ChronicleGenerator:
             raise ValueError(f"No chronicle found for save: {save_id}")
 
         chapters_data = self._load_chapters_data(cached)
+        base_revision = chronicle_revision(chapters_data)
+        if expected_revision is not None and expected_revision != base_revision:
+            raise ChronicleConflict(
+                "The Chronicle changed. Read the newer version before regenerating."
+            )
         chapters = chapters_data.get("chapters", [])
 
         if chapter_number < 1 or chapter_number > len(chapters):
@@ -833,16 +880,42 @@ class ChronicleGenerator:
         # Load persistent custom instructions for this save
         custom_instructions = self.db.get_chronicle_custom_instructions(save_id)
 
-        # Get briefing for voice/context
-        briefing_json = self.db.get_latest_session_briefing_json(session_id=session_id)
-        briefing = build_model_briefing(json.loads(briefing_json)) if briefing_json else {}
-
-        # Get events for this chapter's time range
-        events = self.db.get_events_in_snapshot_range(
-            save_id=save_id,
-            from_snapshot_id=chapter.get("start_snapshot_id"),
-            to_snapshot_id=chapter.get("end_snapshot_id"),
-        )
+        source = chapter.get("source_bundle")
+        if isinstance(source, dict) and isinstance(source.get("events"), list):
+            briefing = source.get("briefing") or {}
+            events = source["events"]
+        else:
+            # Legacy archives do not have full historical snapshots. Use only
+            # verified event records and compact context at the recorded boundary.
+            historical = self.db.get_historical_chronicle_briefing(
+                save_id, chapter.get("end_snapshot_id")
+            )
+            briefing = historical if isinstance(historical, dict) else {}
+            events = self.db.get_events_in_snapshot_range(
+                save_id=save_id,
+                from_snapshot_id=chapter.get("start_snapshot_id"),
+                to_snapshot_id=chapter.get("end_snapshot_id"),
+            )
+            start, end = chapter.get("start_date"), chapter.get("end_date")
+            if not isinstance(start, str) or not isinstance(end, str) or not parse_year(end):
+                raise ValueError("This legacy chapter has no verified date range to regenerate")
+            events = events_between_dates(events, start, end)
+            selected, partial = self._select_events_for_prompt(
+                events, max_events=MAX_EVENTS_PER_CHAPTER_PROMPT
+            )
+            source = {
+                "version": 1,
+                "start_snapshot_id": chapter.get("start_snapshot_id"),
+                "end_snapshot_id": chapter.get("end_snapshot_id"),
+                "coverage_date": chapter.get("end_date"),
+                "briefing": compact_chronicle_context(briefing),
+                "events": source_events(selected),
+                "source_event_count": len(events),
+                "selected_event_count": len(selected),
+                "partial_coverage": partial,
+                "historical_context_limited": bool(briefing.get("historical_context_limited")),
+            }
+            events = source["events"]
 
         # Get previous chapters for context
         previous_chapters = chapters[: chapter_number - 1]
@@ -870,28 +943,32 @@ class ChronicleGenerator:
         chapter["model"] = new_content.get("model")
         chapter["generated_at"] = datetime.now(timezone.utc).isoformat()
         chapter["context_stale"] = False
+        chapter["manual_edit_locked"] = False  # This explicitly requested replacement is undoable.
+        chapter["source"] = "generated"
+        chapter["source_bundle"] = source
+        chapter["coverage_date"] = source.get("coverage_date")
+        chapter["partial_coverage"] = source.get("partial_coverage", False)
+        chapter["historical_context_limited"] = source.get("historical_context_limited", False)
+        chapters_data["content_generated_at"] = chapter["generated_at"]
 
         # Mark downstream chapters as stale
         for i in range(chapter_number, len(chapters)):
             chapters[i]["context_stale"] = True
 
-        # Save updated chapters
-        full_text = self._assemble_chronicle_text(chapters_data, None)
-        snapshot_range = self.db.get_snapshot_range_for_save(save_id)
-        all_events = self.db.get_all_events_by_save_id(save_id=save_id)
-
-        self.db.upsert_chronicle_by_save_id(
+        saved = self.db.commit_chronicle(
             save_id=save_id,
             session_id=session_id,
-            chronicle_text=full_text,
-            chapters_json=json_dumps(chapters_data),
-            event_count=len(all_events),
-            snapshot_count=snapshot_range.get("snapshot_count", 0),
             language=output_language,
+            expected_revision=base_revision,
+            chapters_data=chapters_data,
+            event_count=int(cached.get("event_count") or 0),
+            snapshot_count=int(cached.get("snapshot_count") or 0),
         )
-
+        response = cached_chronicle_response(saved)
+        rendered = next(ch for ch in response["chapters"] if ch["number"] == chapter_number)
         return {
-            "chapter": chapter,
+            **response,
+            "chapter": rendered,
             "regenerated": True,
             "stale_chapters": list(range(chapter_number + 1, len(chapters) + 1)),
             "model_routing": self._model_routing_response(),
@@ -1088,21 +1165,8 @@ class ChronicleGenerator:
     # --- Private Methods ---
 
     def _load_chapters_data(self, cached: dict[str, Any] | None) -> dict[str, Any]:
-        """Load chapters_json or return default structure."""
-        if not cached:
-            return dict(DEFAULT_CHAPTERS_DATA)
-
-        chapters_json = cached.get("chapters_json")
-        if not chapters_json:
-            return dict(DEFAULT_CHAPTERS_DATA)
-
-        try:
-            data = json.loads(chapters_json)
-            if not isinstance(data, dict):
-                return dict(DEFAULT_CHAPTERS_DATA)
-            return data
-        except json.JSONDecodeError:
-            return dict(DEFAULT_CHAPTERS_DATA)
+        """Normalize stable chapter anchors consistently across every writer."""
+        return load_chapters_data(cached)
 
     def _chapter_only_cooldown_active(
         self,
@@ -1282,6 +1346,7 @@ class ChronicleGenerator:
         briefing: dict[str, Any],
         trigger: str | None,
         custom_instructions: str | None = None,
+        snapshot_range: dict[str, Any] | None = None,
         language: str = "en",
     ) -> bool:
         """Generate and finalize a new chapter.
@@ -1291,7 +1356,7 @@ class ChronicleGenerator:
         """
         chapters = chapters_data.get("chapters", [])
         chapter_number = len(chapters) + 1
-        snapshot_range = self.db.get_snapshot_range_for_save(save_id)
+        snapshot_range = snapshot_range or self.db.get_snapshot_range_for_save(save_id)
         latest_snapshot_id = snapshot_range.get("last_snapshot_id")
         latest_game_date = snapshot_range.get("last_game_date")
 
@@ -1316,6 +1381,7 @@ class ChronicleGenerator:
             snapshot_at_or_before = self.db.get_latest_snapshot_at_or_before(
                 save_id=save_id,
                 game_date=target_end_date,
+                upper_snapshot_id=latest_snapshot_id,
             )
             if snapshot_at_or_before:
                 end_snapshot_id = snapshot_at_or_before.get("id")
@@ -1327,7 +1393,9 @@ class ChronicleGenerator:
                 end_date = latest_game_date or target_end_date
         else:
             # Use the triggering event's date as chapter end
-            events = self.db.get_all_events_by_save_id(save_id=save_id)
+            events = self.db.get_events_in_snapshot_range(
+                save_id=save_id, to_snapshot_id=latest_snapshot_id
+            )
             end_date = start_date
             for event in reversed(events):
                 if event.get("event_type") == trigger:
@@ -1337,6 +1405,7 @@ class ChronicleGenerator:
                 self.db.get_latest_snapshot_at_or_before(
                     save_id=save_id,
                     game_date=end_date or (latest_game_date or "2200.01.01"),
+                    upper_snapshot_id=latest_snapshot_id,
                 )
                 if end_date
                 else None
@@ -1344,6 +1413,13 @@ class ChronicleGenerator:
             end_snapshot_id = (
                 snapshot_at_or_before.get("id") if snapshot_at_or_before else latest_snapshot_id
             )
+            # Coverage is the dated source actually available, rather than an
+            # event date for which no snapshot context has been captured.
+            end_date = (
+                snapshot_at_or_before.get("game_date")
+                if snapshot_at_or_before
+                else latest_game_date
+            ) or end_date
 
         if end_snapshot_id is None:
             return False
@@ -1357,12 +1433,27 @@ class ChronicleGenerator:
             to_snapshot_id=end_snapshot_id,
         )
 
-        # Filter events to chapter date range
-        end_year = parse_year(end_date)
-        chapter_events = [
-            e for e in chapter_events if (parse_year(e.get("game_date")) or 0) <= (end_year or 9999)
-        ]
+        # Date and captured snapshot boundaries both apply after a save rollback.
+        chapter_events = events_between_dates(chapter_events, start_date, end_date)
 
+        # Historical chapters use facts captured at their end, never today's politics.
+        historical = self.db.get_historical_chronicle_briefing(save_id, end_snapshot_id)
+        briefing = historical if isinstance(historical, dict) else {}
+        selected_events, partial = self._select_events_for_prompt(
+            chapter_events, max_events=MAX_EVENTS_PER_CHAPTER_PROMPT
+        )
+        source_bundle = {
+            "version": 1,
+            "start_snapshot_id": start_snapshot_id,
+            "end_snapshot_id": end_snapshot_id,
+            "coverage_date": end_date,
+            "briefing": compact_chronicle_context(briefing),
+            "events": source_events(selected_events),
+            "source_event_count": len(chapter_events),
+            "selected_event_count": len(selected_events),
+            "partial_coverage": partial,
+            "historical_context_limited": bool(briefing.get("historical_context_limited")),
+        }
         # Generate chapter content
         content = self._generate_chapter_content(
             chapter_number=chapter_number,
@@ -1378,6 +1469,15 @@ class ChronicleGenerator:
         # Add the new chapter
         chapters_data["chapters"].append(
             {
+                "id": chapter_identity(
+                    {
+                        "number": chapter_number,
+                        "start_snapshot_id": start_snapshot_id,
+                        "end_snapshot_id": end_snapshot_id,
+                        "start_date": start_date,
+                        "end_date": end_date,
+                    }
+                ),
                 "number": chapter_number,
                 "title": content["title"],
                 "start_date": start_date,
@@ -1393,6 +1493,11 @@ class ChronicleGenerator:
                 "context_stale": False,
                 "trigger": trigger,
                 "event_count": len(chapter_events),
+                "coverage_date": end_date,
+                "source_bundle": source_bundle,
+                "selected_event_count": len(selected_events),
+                "partial_coverage": partial,
+                "historical_context_limited": source_bundle["historical_context_limited"],
                 "provider": content.get("provider"),
                 "model": content.get("model"),
             }
@@ -1423,10 +1528,10 @@ class ChronicleGenerator:
 
         # Build context from previous chapters
         context_lines = []
-        for ch in previous_chapters:
+        for ch in previous_chapters[-8:]:
             context_lines.append(
                 f'- Chapter {ch["number"]} "{ch.get("title", "Untitled")}" '
-                f"({ch.get('start_date', '?')} - {ch.get('end_date', '?')}): {ch.get('summary', '')}"
+                f"({ch.get('start_date', '?')} - {ch.get('end_date', '?')}): {str(ch.get('summary', ''))[:2000]}"
             )
         previous_context = (
             "\n".join(context_lines) if context_lines else "This is the first chapter."
@@ -1485,8 +1590,9 @@ Incorporate this guidance while maintaining narrative consistency.
 {custom_section}
 {language_policy}
 
-=== PREVIOUS CHAPTERS ===
+=== PREVIOUS CHAPTERS (literary continuity, not additional evidence) ===
 {previous_context}
+Historical context is limited to the recorded facts supplied below. Missing politics or motives remain unknown.
 {diplomatic_section}{geographic_section}
 === EVENTS FOR THIS CHAPTER ({start_date} to {end_date}) ===
 {truncation_note}
@@ -1543,6 +1649,7 @@ than a factual claim. When a reason is not present in the event list, leave it u
         briefing: dict[str, Any],
         current_date: str | None,
         custom_instructions: str | None = None,
+        current_snapshot_id: int | None = None,
         language: str = "en",
     ) -> dict[str, Any] | None:
         """Generate the current era narrative (not finalized)."""
@@ -1564,9 +1671,10 @@ than a factual claim. When a reason is not present in the event list, leave it u
         events = self.db.get_events_in_snapshot_range(
             save_id=save_id,
             from_snapshot_id=era_start_snapshot_id,
-            to_snapshot_id=None,  # Up to current
+            to_snapshot_id=current_snapshot_id,  # Frozen request boundary
         )
 
+        events = events_between_dates(events, era_start_date, current_date)
         if not events:
             return None
 
@@ -1577,7 +1685,7 @@ than a factual claim. When a reason is not present in the event list, leave it u
 
         # Build previous chapters context
         context_lines = []
-        for ch in chapters:
+        for ch in chapters[-8:]:
             context_lines.append(
                 f'- Chapter {ch["number"]} "{ch.get("title", "Untitled")}": {ch.get("summary", "")}'
             )
@@ -1626,10 +1734,11 @@ than a factual claim. When a reason is not present in the event list, leave it u
 {era_custom_section}
 {language_policy}
 
-=== PREVIOUS CHAPTERS ===
+=== PREVIOUS CHAPTERS (literary continuity, not additional evidence) ===
 {previous_context}
+Historical context is limited to the recorded facts supplied below. Missing politics or motives remain unknown.
 {diplomatic_section}{geographic_section}
-=== CURRENT ERA EVENTS ({era_start_date} to present) ===
+=== CURRENT ERA EVENTS ({era_start_date} to {current_date or "unknown date"}) ===
 {truncation_note}
 {events_text}
 
@@ -1664,6 +1773,10 @@ Do NOT give advice. You are a historian, not an advisor.
             "sections": sections,
             "narrative": _sections_to_text(sections),
             "events_covered": len(events),
+            "selected_event_count": len(selected_events),
+            "partial_coverage": was_truncated,
+            "coverage_date": current_date,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "provider": response.provider,
             "model": response.model,
         }
@@ -1693,6 +1806,7 @@ Do NOT give advice. You are a historian, not an advisor.
     def _empty_chronicle_response(self, *, language: str = "en") -> dict[str, Any]:
         """Return empty chronicle response."""
         return {
+            **cached_chronicle_response(None),
             "chapters": [],
             "current_era": None,
             "pending_chapters": 0,
@@ -1700,7 +1814,8 @@ Do NOT give advice. You are a historian, not an advisor.
             "chronicle": localized_text("no_events_chronicle", language),
             "cached": False,
             "event_count": 0,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": "",
+            "language": language,
             "model_routing": self._model_routing_response(),
         }
 
@@ -1719,7 +1834,10 @@ Do NOT give advice. You are a historian, not an advisor.
             if cached:
                 return cached
 
-        # Gather data
+        # Capture the source revision and counts before provider work.
+        base = self.db.get_cached_chronicle(session_id)
+        expected_revision = chronicle_revision(load_chapters_data(base))
+        snapshot_count = self.db.get_snapshot_count(session_id)
         data = self._gather_session_data(session_id)
 
         if not data["events"]:
@@ -1743,21 +1861,21 @@ Do NOT give advice. You are a historian, not an advisor.
 
         chronicle_text = response.text
         event_count = len(data["events"])
-        snapshot_count = self.db.get_snapshot_count(session_id)
-
-        # Cache result
-        self.db.upsert_cached_chronicle(
+        saved = self.db.commit_legacy_chronicle(
             session_id=session_id,
+            expected_revision=expected_revision,
             chronicle_text=chronicle_text,
             event_count=event_count,
             snapshot_count=snapshot_count,
+            coverage_date=data.get("last_date"),
         )
 
         return {
+            **cached_chronicle_response(saved),
             "chronicle": chronicle_text,
             "cached": False,
             "event_count": event_count,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": cached_chronicle_response(saved)["generated_at"],
             "provider": response.provider,
             "model": response.model,
             "model_routing": self._model_routing_response(),
@@ -1940,14 +2058,9 @@ Do NOT give advice. Write as a historian, not an advisor.
             year_events = by_year[year]
             lines.append(f"\n=== {year} ===")
 
-            if len(year_events) > 15:
-                notable = [e for e in year_events if e.get("event_type") in NOTABLE_EVENT_TYPES]
-                for e in notable:
-                    lines.append(f"  * {e.get('summary', e.get('event_type', 'Unknown event'))}")
-                lines.append(f"  (+ {len(year_events) - len(notable)} other events)")
-            else:
-                for e in year_events:
-                    lines.append(f"  * {e.get('summary', e.get('event_type', 'Unknown event'))}")
+            for event in source_events(year_events):
+                date = event.get("game_date") or "Unknown date"
+                lines.append(f"  * {date}: {event['summary']}")
 
         return "\n".join(lines)
 

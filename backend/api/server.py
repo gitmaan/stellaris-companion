@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import os
 import sqlite3
 import threading
@@ -19,6 +18,7 @@ from pathlib import Path
 from typing import Annotated, Any, NoReturn
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Path as ApiPath
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
@@ -27,6 +27,7 @@ from backend.core.advisor_providers import (
     AdvisorProviderError,
     normalize_advisor_provider,
 )
+from backend.core.chronicle_store import ChronicleConflict, cached_chronicle_response
 
 _chronicle_in_flight: set[str] = set()
 _chronicle_in_flight_lock = threading.Lock()
@@ -108,10 +109,23 @@ class RegenerateChapterRequest(BaseModel):
 
     session_id: str
     chapter_number: int
+    expected_revision: str | None = None
     confirm: bool = False
     regeneration_instructions: str | None = None
     model_routing_mode: str | None = None
     language: str | None = None
+
+
+class ChronicleChapterEditRequest(BaseModel):
+    language: str | None = None
+    expected_revision: str = Field(min_length=1, max_length=80)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    narrative: str = Field(min_length=1, max_length=100_000)
+
+
+class ChronicleChapterUndoRequest(BaseModel):
+    language: str | None = None
+    expected_revision: str = Field(min_length=1, max_length=80)
 
 
 class AdvisorCustomRequest(BaseModel):
@@ -137,6 +151,7 @@ class ChronicleResetRequest(BaseModel):
 
     confirm: bool = False
     language: str | None = None
+    expected_revision: str | None = None
 
 
 class HistoryBackupRequest(BaseModel):
@@ -187,75 +202,14 @@ def _pick_latest_game_date(*values: Any) -> str | None:
 
 
 def _cached_chronicle_response(cached: dict[str, Any] | None) -> dict[str, Any]:
-    """Shape a stored Chronicle for the renderer without invoking a provider or writing data."""
-    if not cached:
-        return {
-            "chapters": [],
-            "current_era": None,
-            "pending_chapters": 0,
-            "message": None,
-            "chronicle": "",
-            "cached": False,
-            "event_count": 0,
-            "generated_at": "",
-            "model_routing": None,
-        }
-
-    chapters_data: dict[str, Any] = {}
-    cache_warning: str | None = None
-    raw_chapters = cached.get("chapters_json")
-    if isinstance(raw_chapters, str) and raw_chapters:
-        try:
-            parsed = json.loads(raw_chapters)
-            if isinstance(parsed, dict):
-                chapters_data = parsed
-            else:
-                cache_warning = "Stored chapter data is not an object; legacy prose was preserved."
-        except json.JSONDecodeError:
-            cache_warning = "Stored chapter data could not be parsed; legacy prose was preserved."
-
-    raw_list = chapters_data.get("chapters")
-    chapters: list[dict[str, Any]] = []
-    if isinstance(raw_list, list):
-        for index, raw in enumerate(raw_list, start=1):
-            if not isinstance(raw, dict):
-                continue
-            chapter = dict(raw)
-            chapter.setdefault("number", index)
-            chapter.setdefault("title", f"Chapter {index}")
-            chapter.setdefault("start_date", "")
-            chapter.setdefault("end_date", "")
-            chapter.setdefault("narrative", "")
-            chapter.setdefault("summary", "")
-            chapter.setdefault("is_finalized", True)
-            chapter.setdefault("context_stale", False)
-            chapter.setdefault("can_regenerate", bool(chapter.get("is_finalized", True)))
-            chapters.append(chapter)
-
-    era_cache = chapters_data.get("current_era_cache")
-    current_era = (
-        era_cache.get("current_era")
-        if isinstance(era_cache, dict) and isinstance(era_cache.get("current_era"), dict)
-        else None
-    )
-    response = {
-        "chapters": chapters,
-        "current_era": current_era,
-        "pending_chapters": 0,
-        "message": None,
-        "chronicle": cached.get("chronicle_text") or "",
-        "cached": True,
-        "event_count": int(cached.get("event_count") or 0),
-        "generated_at": str(cached.get("generated_at") or ""),
-        "model_routing": None,
-        "language": cached.get("language") or "en",
-    }
-    if cache_warning:
-        response["cache_warning"] = cache_warning
-    return response
+    return cached_chronicle_response(cached)
 
 
 def _raise_chronicle_value_error(error: ValueError) -> NoReturn:
+    if isinstance(error, ChronicleConflict):
+        raise HTTPException(
+            status_code=409, detail={"error": str(error), "code": "CHRONICLE_CONFLICT"}
+        ) from error
     if str(error) == "GOOGLE_API_KEY not configured":
         raise HTTPException(
             status_code=400,
@@ -1140,6 +1094,60 @@ def create_app() -> FastAPI:
         cached = db.get_cached_chronicle_for_save(save_id, language=output_language)
         return _cached_chronicle_response(cached)
 
+    def mutate_chronicle_chapter(
+        request: Request,
+        save_id: str,
+        chapter_number: int,
+        body: ChronicleChapterEditRequest | ChronicleChapterUndoRequest,
+        *,
+        undo: bool,
+    ) -> dict[str, Any]:
+        db = getattr(request.app.state, "db", None)
+        if db is None:
+            raise HTTPException(status_code=503, detail={"error": "Database not initialized"})
+        from backend.core.language import normalize_language
+
+        language = normalize_language(body.language)
+        try:
+            saved = db.edit_chronicle_chapter(
+                save_id=save_id,
+                chapter_number=chapter_number,
+                language=language,
+                expected_revision=body.expected_revision,
+                undo=undo,
+                narrative=body.narrative if isinstance(body, ChronicleChapterEditRequest) else "",
+                title=body.title if isinstance(body, ChronicleChapterEditRequest) else None,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
+        except ValueError as exc:
+            _raise_chronicle_value_error(exc)
+        return _cached_chronicle_response(saved)
+
+    @app.put(
+        "/api/playthroughs/{save_id}/chronicle/chapters/{chapter_number}",
+        dependencies=[Depends(verify_token)],
+    )
+    def edit_chronicle_chapter(
+        request: Request,
+        save_id: str,
+        chapter_number: Annotated[int, ApiPath(ge=1)],
+        body: ChronicleChapterEditRequest,
+    ) -> dict[str, Any]:
+        return mutate_chronicle_chapter(request, save_id, chapter_number, body, undo=False)
+
+    @app.post(
+        "/api/playthroughs/{save_id}/chronicle/chapters/{chapter_number}/undo",
+        dependencies=[Depends(verify_token)],
+    )
+    def undo_chronicle_chapter(
+        request: Request,
+        save_id: str,
+        chapter_number: Annotated[int, ApiPath(ge=1)],
+        body: ChronicleChapterUndoRequest,
+    ) -> dict[str, Any]:
+        return mutate_chronicle_chapter(request, save_id, chapter_number, body, undo=True)
+
     @app.post(
         "/api/playthroughs/{save_id}/label",
         dependencies=[Depends(verify_token)],
@@ -1216,10 +1224,17 @@ def create_app() -> FastAPI:
                     detail={"error": "Chronicle generation is in progress; try again shortly"},
                 )
         try:
-            rows_reset = db.reset_chronicle(save_id, language=output_language)
+            rows_reset = db.reset_chronicle(
+                save_id, language=output_language, expected_revision=body.expected_revision
+            )
+        except ChronicleConflict as exc:
+            _raise_chronicle_value_error(exc)
         except ValueError as exc:
             raise HTTPException(status_code=404, detail={"error": str(exc)}) from exc
         return {
+            "chronicle_revision": cached_chronicle_response(
+                db.get_cached_chronicle_for_save(save_id, language=output_language)
+            )["chronicle_revision"],
             "save_id": save_id,
             "language": output_language,
             "reset": True,
@@ -1242,7 +1257,12 @@ def create_app() -> FastAPI:
         from backend.core.language import normalize_language
 
         output_language = normalize_language(body.language)
-        restored = db.undo_chronicle_reset(save_id, language=output_language)
+        try:
+            restored = db.undo_chronicle_reset(
+                save_id, language=output_language, expected_revision=body.expected_revision
+            )
+        except ChronicleConflict as exc:
+            _raise_chronicle_value_error(exc)
         if not restored:
             raise HTTPException(status_code=404, detail={"error": "No Chronicle reset to undo"})
         return {"save_id": save_id, "language": output_language, "restored": True}
@@ -1614,6 +1634,7 @@ def create_app() -> FastAPI:
                 session_id=body.session_id,
                 chapter_number=body.chapter_number,
                 confirm=body.confirm,
+                expected_revision=body.expected_revision,
                 regeneration_instructions=body.regeneration_instructions,
                 model_routing_mode=body.model_routing_mode,
                 language=body.language,
