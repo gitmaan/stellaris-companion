@@ -164,7 +164,7 @@ function ChapterBlock({
 
       {editing && <div className="mb-6 space-y-3 rounded border border-accent-cyan/30 bg-black/20 p-4">
         <label className="block text-xs text-text-secondary">{t('continuity.chapterTitle')}
-          <input aria-label={t('continuity.chapterTitle')} value={draftTitle} maxLength={300} onChange={event => setDraftTitle(event.target.value)} disabled={saving} className="mt-1 w-full rounded border border-border bg-bg-primary px-3 py-2 text-sm text-text-primary" />
+          <input aria-label={t('continuity.chapterTitle')} value={draftTitle} maxLength={200} onChange={event => setDraftTitle(event.target.value)} disabled={saving} className="mt-1 w-full rounded border border-border bg-bg-primary px-3 py-2 text-sm text-text-primary" />
         </label>
         <label className="block text-xs text-text-secondary">{t('continuity.chapterText')}
           <textarea aria-label={t('continuity.chapterText')} value={draftNarrative} maxLength={100000} rows={12} onChange={event => setDraftNarrative(event.target.value)} disabled={saving} className="mt-1 w-full rounded border border-border bg-bg-primary px-3 py-2 text-sm leading-relaxed text-text-primary" />

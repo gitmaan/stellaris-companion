@@ -411,6 +411,7 @@ function createMockChronicleBackend(options = {}) {
         })
         return
       }
+      if (body.conversation_id && !options.historyUnavailable && !conversations.has(body.conversation_id)) { sendJson(res, 404, { detail: { error: 'Conversation not found' } }); return }
       const source = currentHealthPayload()
       const saveId = body.save_id || source.save_id
       const id = body.conversation_id || randomUUID()
@@ -422,12 +423,12 @@ function createMockChronicleBackend(options = {}) {
         model_display: options.chatModel ?? 'Mock Advisor Model',
         model_routing: null,
         provider: options.advisorProvider ?? 'gemini',
-        save_id: saveId, conversation_id: id, turn_id: randomUUID(), history_saved: true, source_hash: 'mock-source',
+        save_id: saveId, conversation_id: id, turn_id: randomUUID(), history_saved: !options.historyUnavailable, source_hash: 'mock-source',
       }
       const saved = conversations.get(id) || { id, save_id: saveId, title: body.message, created_at: Date.now() / 1000, turns: [] }
       saved.turns.push({ ...response, id: response.turn_id, request_id: body.request_id, question: body.message, answer: response.text, created_at: Date.now() / 1000, language: body.language })
       Object.assign(saved, { updated_at: Date.now() / 1000, turn_count: saved.turns.length, last_game_date: response.game_date, title: saved.title || body.message })
-      conversations.set(id, saved)
+      if (!options.historyUnavailable) conversations.set(id, saved)
       sendJson(res, 200, response)
       return
     }
@@ -573,6 +574,7 @@ function createMockChronicleBackend(options = {}) {
     advanceCampaign,
     setHealth: (payload) => { healthOverrides = payload },
     setChronicleError,
+    setHistoryUnavailable: value => { options.historyUnavailable = value },
     waitForChronicleRequest,
     waitForPublicationRequest,
     getChatRequests: () => [...chatRequests],

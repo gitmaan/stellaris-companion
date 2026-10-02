@@ -101,11 +101,18 @@ test('long chats paginate without losing history or mixing old follow-ups into t
 })
 
 test('unavailable history is disclosed while a new Advisor question remains usable', async () => {
-  await withApp(createMockChronicleBackend({ historyUnavailable: true }), async page => {
+  const backend = createMockChronicleBackend({ historyUnavailable: true })
+  await withApp(backend, async page => {
     await expect(page.getByRole('button', { name: 'Chat history unavailable · Retry' })).toBeVisible()
     const input = page.getByPlaceholder('HOW CAN WE HELP?'); await expect(input).toBeEnabled()
     await input.fill('What is the current priority?'); await page.getByRole('button', { name: 'SEND', exact: true }).click()
     await expect(page.getByText('Mock strategic response.')).toBeVisible()
+    await expect(page.getByText('This reply could not be saved.')).toBeVisible()
+    backend.setHistoryUnavailable(false)
+    await input.fill('Can I build another science ship?'); await page.getByRole('button', { name: 'SEND', exact: true }).click()
+    await expect.poll(() => backend.getChatRequests().length).toBe(2)
+    expect(backend.getChatRequests()[1].conversation_id).toBeUndefined()
+    await expect(page.getByRole('button', { name: 'Chat history unavailable · Retry' })).toHaveCount(0)
   })
 })
 

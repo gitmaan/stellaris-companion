@@ -11,7 +11,7 @@ interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
   timestamp?: Date
-  gameDate?: string
+  gameDate?: string | null
   historySaved?: boolean
   responseTimeMs?: number
   modelDisplay?: string

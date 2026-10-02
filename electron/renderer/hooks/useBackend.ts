@@ -75,7 +75,7 @@ export interface AdvisorConversation {
   last_game_date: string | null
 }
 
-export interface AdvisorTurn extends ChatResponse {
+export interface AdvisorTurn extends Omit<ChatResponse, 'text'> {
   id: string
   conversation_id: string
   request_id: string
@@ -92,12 +92,12 @@ export interface CreatedConversationResponse { conversation: AdvisorConversation
 export interface ChatResponse {
   save_id?: string
   conversation_id?: string
-  turn_id?: string
+  turn_id?: string | null
   source_hash?: string | null
   snapshot_id?: number | null
   history_saved?: boolean
   text: string
-  game_date: string
+  game_date: string | null
   response_time_ms: number
   model?: string
   model_display?: string

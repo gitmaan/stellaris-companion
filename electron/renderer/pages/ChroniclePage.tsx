@@ -197,6 +197,8 @@ function ChroniclePage({
 
   // Regeneration state - tracks which chapter is being regenerated
   const [regeneratingChapter, setRegeneratingChapter] = useState<number | null>(null)
+  const regeneratingChapterRef = useRef<number | null>(null)
+  regeneratingChapterRef.current = regeneratingChapter
   const confirmRevisionRef = useRef<string>()
   const [confirmRegen, setConfirmRegen] = useState<number | null>(null)
   const [justRegenerated, setJustRegenerated] = useState<number | null>(null)
@@ -282,7 +284,7 @@ function ChroniclePage({
     forceRefresh = false,
     chapterOnly = false,
   ) => {
-    if (!selectedSaveId || mutationBusyRef.current) return
+    if (!selectedSaveId || mutationBusyRef.current || regeneratingChapterRef.current !== null) return
     if (!forceRefresh && chapterOnly && refreshMode === 'manual') return
     const autoRefreshPaused = !forceRefresh && failedAutoRefreshSavesRef.current.has(selectedSaveId)
     if (autoRefreshPaused && chapterOnly) return
@@ -830,6 +832,10 @@ function ChroniclePage({
       chronicleRetryTimerRef.current = null
     }
     setLoading(false)
+    setRegeneratingChapter(null)
+    regeneratingChapterRef.current = null
+    setConfirmRegen(null)
+    setJustRegenerated(null)
     setError(null)
     setErrorNeedsSettings(false)
     window.localStorage.setItem('chronicle.lastSelectedSaveId', saveId)
@@ -845,6 +851,17 @@ function ChroniclePage({
     const affectsSelectedChronicle = saveId === selectedSaveId
       && ['trash', 'reset', 'delete'].includes(action)
     if (affectsSelectedChronicle) {
+      chronicleRequestTokenRef.current += 1
+      chronicleInFlightRef.current = false
+      queuedForceRefreshRef.current = false
+      setLoading(false)
+      setRegeneratingChapter(null)
+      regeneratingChapterRef.current = null
+      setConfirmRegen(null)
+      if (chronicleRetryTimerRef.current) {
+        clearTimeout(chronicleRetryTimerRef.current)
+        chronicleRetryTimerRef.current = null
+      }
       setChronicle(null)
       setSelectedChapter(null)
       didInitChapterSelectionRef.current = false
@@ -873,6 +890,7 @@ function ChroniclePage({
     const token = chronicleRequestTokenRef.current
     // Second click - do the regeneration
     setConfirmRegen(null)
+    regeneratingChapterRef.current = chapterNumber
     setRegeneratingChapter(chapterNumber)
     setJustRegenerated(null)
 

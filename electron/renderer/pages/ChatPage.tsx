@@ -91,7 +91,7 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
-  gameDate?: string
+  gameDate?: string | null
   historySaved?: boolean
   responseTimeMs?: number
   model?: string
@@ -221,6 +221,7 @@ function ChatPage({
   const [hasEarlierMessages, setHasEarlierMessages] = useState(false)
   const [firstTurnId, setFirstTurnId] = useState<string>()
   const [viewingEarlier, setViewingEarlier] = useState(false)
+  const historyTargetRef = useRef<string>()
   const [historyOpen, setHistoryOpen] = useState(false)
   const campaignIdRef = useRef<string | null>(null)
   const chatGenerationRef = useRef(0)
@@ -329,6 +330,7 @@ function ChatPage({
 
   const restoreConversation = useCallback(async (saveId: string, id?: string, beforeTurnId?: string) => {
     const generation = ++chatGenerationRef.current
+    historyTargetRef.current = id
     setHistoryLoading(true)
     setHistoryError(false)
     setHistoryOpen(false)
@@ -440,10 +442,10 @@ function ChatPage({
         setAdvisorConfigured(true)
         // Success - add assistant response
         const chatResponse = result.data as ChatResponse
-        if (chatResponse.conversation_id) setConversationId(chatResponse.conversation_id)
+        if (chatResponse.conversation_id && chatResponse.history_saved !== false) setConversationId(chatResponse.conversation_id)
         if (activeCampaignId && chatResponse.history_saved !== false) {
           void backend.conversations(activeCampaignId).then(list => {
-            if (isMountedRef.current && generation === chatGenerationRef.current && list.data) setConversations(list.data.conversations)
+            if (isMountedRef.current && generation === chatGenerationRef.current && list.data) { setConversations(list.data.conversations); setHistoryError(false) }
           })
         }
         const assistantMessage: Message = {
@@ -589,13 +591,15 @@ function ChatPage({
             {hasEarlierMessages && <button type="button" disabled={isLoading || historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId, firstTurnId)}>{t('continuity.earlierMessages')}</button>}
             {viewingEarlier && <button type="button" disabled={historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId)}>{t('continuity.latestMessages')}</button>}
           </div>}
-          {historyError && <button type="button" className="text-xs text-accent-yellow" onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId)}>{t('continuity.historyRetry')}</button>}
+          {historyError && <button type="button" className="text-xs text-accent-yellow" onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, historyTargetRef.current ?? conversationId)}>{t('continuity.historyRetry')}</button>}
           {historyLoading && <span className="text-xs text-text-muted" role="status">{t('continuity.restoring')}</span>}
           {conversations.length > 0 && (
-            <div className="relative">
-              <button type="button" disabled={isLoading || historyLoading} aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="px-3 py-2 font-display text-[10px] uppercase tracking-[0.12em] text-text-secondary hover:text-accent-cyan disabled:opacity-40">{t('continuity.chats')} ▾</button>
+            <div className="relative" onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setHistoryOpen(false)
+            }} onKeyDown={event => { if (event.key === 'Escape' && !event.nativeEvent.isComposing) { setHistoryOpen(false); event.currentTarget.querySelector<HTMLButtonElement>('[aria-expanded]')?.focus() } }}>
+              <button type="button" aria-haspopup="menu" disabled={isLoading || historyLoading} aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="px-3 py-2 font-display text-[10px] uppercase tracking-[0.12em] text-text-secondary hover:text-accent-cyan disabled:opacity-40">{t('continuity.chats')} ▾</button>
               {historyOpen && <div className="absolute right-0 top-full z-30 mt-1 w-72 max-h-64 overflow-y-auto rounded border border-border bg-bg-secondary p-1 shadow-xl" role="menu">
-                {conversations.map(item => <button key={item.id} type="button" role="menuitem" onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, item.id)} className={`block w-full truncate rounded px-3 py-2 text-left text-xs hover:bg-white/5 ${item.id === conversationId ? 'text-accent-cyan' : 'text-text-secondary'}`}>
+                {conversations.map(item => <button key={item.id} type="button" role="menuitem" title={item.title} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, item.id)} className={`block w-full truncate rounded px-3 py-2 text-left text-xs hover:bg-white/5 ${item.id === conversationId ? 'text-accent-cyan' : 'text-text-secondary'}`}>
                   {item.title || t('chat.newChat')}<span className="block text-[10px] text-text-muted">{item.last_game_date ?? new Date(item.created_at * 1000).toLocaleDateString()}</span>
                 </button>)}
               </div>}
