@@ -4,6 +4,10 @@ import type {
   BackendIpcResponse,
   BackendStatusEvent,
   ChatResponse,
+  ChatContinuity,
+  ConversationsResponse,
+  ConversationResponse,
+  CreatedConversationResponse,
   ChronicleCustomResponse,
   ChronicleResponse,
   DiagnosticsResponse,
@@ -180,15 +184,21 @@ declare global {
           sessionKey?: string,
           model?: string,
           modelRoutingMode?: ModelRoutingMode,
+          continuity?: ChatContinuity,
         ) => Promise<BackendIpcResponse<ChatResponse>>
         status: () => Promise<BackendIpcResponse<StatusResponse>>
         sessions: () => Promise<BackendIpcResponse<SessionsResponse>>
         playthroughs: (includeTrashed?: boolean) => Promise<BackendIpcResponse<PlaythroughsResponse>>
+        conversations: (saveId: string) => Promise<BackendIpcResponse<ConversationsResponse>>
+        createConversation: (saveId: string) => Promise<BackendIpcResponse<CreatedConversationResponse>>
+        conversation: (saveId: string, conversationId: string, beforeTurnId?: string) => Promise<BackendIpcResponse<ConversationResponse>>
+        editChapter: (saveId: string, chapterNumber: number, expectedRevision: string, title: string, narrative: string) => Promise<BackendIpcResponse<ChronicleResponse>>
+        undoChapter: (saveId: string, chapterNumber: number, expectedRevision: string) => Promise<BackendIpcResponse<ChronicleResponse>>
         cachedChronicle: (saveId: string) => Promise<BackendIpcResponse<ChronicleResponse>>
         setPlaythroughLabel: (saveId: string, displayLabel: string | null) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
         trashPlaythrough: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
         restorePlaythrough: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
-        resetChronicle: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
+        resetChronicle: (saveId: string, expectedRevision?: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
         undoChronicleReset: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
         deletePlaythrough: (saveId: string) => Promise<BackendIpcResponse<PlaythroughMutationResponse>>
         historyStorage: () => Promise<BackendIpcResponse<HistoryStorageResponse>>
@@ -211,6 +221,7 @@ declare global {
           confirm?: boolean,
           regenerationInstructions?: string,
           modelRoutingMode?: ModelRoutingMode,
+          expectedRevision?: string,
         ) => Promise<BackendIpcResponse<RegenerateChapterResponse>>
         endSession: () => Promise<BackendIpcResponse<EndSessionResponse>>
         getChronicleCustom: () => Promise<BackendIpcResponse<ChronicleCustomResponse>>

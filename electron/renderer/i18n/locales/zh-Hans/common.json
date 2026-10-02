@@ -414,7 +414,10 @@
       "enhancedHelp": "查看编年史时更快更新当前时代故事。会使用更多模型调用。",
       "aria": "将刷新模式设置为 {{mode}}",
       "toastError": "无法更新编年史刷新模式。请重试。",
-      "toastSuccess": "编年史刷新模式已设置为 {{mode}}。"
+      "toastSuccess": "编年史刷新模式已设置为 {{mode}}。",
+      "manual": "手动",
+      "manualTag": "按需更新",
+      "manualHelp": "历史事件会继续记录。需要新正文时再更新故事。"
     },
     "modelRouting": {
       "label": "模型路由",
@@ -1115,5 +1118,27 @@
     "lowerUsage": "较低用量",
     "moreModels": "更多模型",
     "modelUpdated": "模型已更新"
+  },
+  "continuity": {
+    "historyRetry": "聊天记录不可用 · 重试",
+    "restoring": "正在恢复聊天…",
+    "chats": "聊天记录",
+    "basedOnSave": "基于 {{date}} 的存档",
+    "historyNotSaved": "此回复未能保存。",
+    "storyCoverage": "故事记录至 {{date}}",
+    "chapterTitle": "章节标题",
+    "chapterText": "章节正文",
+    "editProtection": "自动更新时会保留你的编辑。",
+    "saveChanges": "保存更改",
+    "chapterActions": "章节操作",
+    "editText": "编辑正文",
+    "undoChapter": "撤销最近一次更改",
+    "editedByYou": "已手动编辑 · 更新时保留",
+    "coverageUnknown": "记录范围未知",
+    "editConflict": "编辑期间此章节已发生变化。草稿仍在，请取消并重新打开最新版本。",
+    "editFailed": "无法保存此章节。",
+    "earlierMessages": "较早的消息",
+    "latestMessages": "返回最新消息",
+    "updateStory": "更新故事"
   }
 }

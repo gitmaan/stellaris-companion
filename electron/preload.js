@@ -98,8 +98,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   backend: {
     health: () => ipcRenderer.invoke('backend:health'),
     diagnostics: () => ipcRenderer.invoke('backend:diagnostics'),
-    chat: (message, sessionKey, model, modelRoutingMode) =>
+    chat: (message, sessionKey, model, modelRoutingMode, continuity = {}) =>
       ipcRenderer.invoke('backend:chat', {
+        ...continuity,
         message,
         session_key: sessionKey,
         model,
@@ -109,6 +110,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     sessions: () => ipcRenderer.invoke('backend:sessions'),
     playthroughs: (includeTrashed = true) => ipcRenderer.invoke('backend:playthroughs', {
       include_trashed: includeTrashed,
+    }),
+    conversations: (saveId) => ipcRenderer.invoke('backend:conversations', { save_id: saveId }),
+    createConversation: (saveId) => ipcRenderer.invoke('backend:create-conversation', { save_id: saveId }),
+    conversation: (saveId, conversationId, beforeTurnId) => ipcRenderer.invoke('backend:conversation', { save_id: saveId, conversation_id: conversationId, before_turn_id: beforeTurnId }),
+    editChapter: (saveId, chapterNumber, expectedRevision, title, narrative) => ipcRenderer.invoke('backend:edit-chapter', {
+      save_id: saveId, chapter_number: chapterNumber, expected_revision: expectedRevision, title, narrative,
+    }),
+    undoChapter: (saveId, chapterNumber, expectedRevision) => ipcRenderer.invoke('backend:undo-chapter', {
+      save_id: saveId, chapter_number: chapterNumber, expected_revision: expectedRevision,
     }),
     cachedChronicle: (saveId) => ipcRenderer.invoke('backend:cached-chronicle', {
       save_id: saveId,
@@ -123,8 +133,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     restorePlaythrough: (saveId) => ipcRenderer.invoke('backend:restore-playthrough', {
       save_id: saveId,
     }),
-    resetChronicle: (saveId) => ipcRenderer.invoke('backend:reset-chronicle', {
+    resetChronicle: (saveId, expectedRevision) => ipcRenderer.invoke('backend:reset-chronicle', {
       save_id: saveId,
+      expected_revision: expectedRevision,
     }),
     undoChronicleReset: (saveId) => ipcRenderer.invoke('backend:undo-chronicle-reset', {
       save_id: saveId,
@@ -152,10 +163,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         refresh_mode: refreshMode || 'balanced',
         model_routing_mode: modelRoutingMode,
       }),
-    regenerateChapter: (sessionId, chapterNumber, confirm, regenerationInstructions, modelRoutingMode) =>
+    regenerateChapter: (sessionId, chapterNumber, confirm, regenerationInstructions, modelRoutingMode, expectedRevision) =>
       ipcRenderer.invoke('backend:regenerate-chapter', {
         session_id: sessionId,
         chapter_number: chapterNumber,
+        expected_revision: expectedRevision,
         confirm: confirm || false,
         regeneration_instructions: regenerationInstructions || null,
         model_routing_mode: modelRoutingMode,

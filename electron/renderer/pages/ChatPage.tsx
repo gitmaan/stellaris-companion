@@ -8,7 +8,7 @@ import ChatGPTUsage from '../components/ChatGPTUsage'
 import { manageChatGPTUsage } from '../hooks/useChatGPT'
 import VirtualChatList from '../components/VirtualChatList'
 import AdvisorInfoPanel from '../components/AdvisorInfoPanel'
-import { useBackend, ChatResponse, EmpireType } from '../hooks/useBackend'
+import { useBackend, ChatResponse, EmpireType, type AdvisorConversation, type AdvisorTurn } from '../hooks/useBackend'
 import type { ModelRoutingMode } from '../hooks/useSettings'
 import { HUDHeader } from '../components/hud/HUDText'
 import { HUDPanel } from '../components/hud/HUDPanel'
@@ -91,12 +91,21 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  gameDate?: string
+  historySaved?: boolean
   responseTimeMs?: number
   model?: string
   modelDisplay?: string
   modelRouting?: ChatResponse['model_routing']
   isError?: boolean
   action?: 'settings' | 'usage'
+}
+
+function restoreMessages(turns: AdvisorTurn[]): Message[] {
+  return capMessages(turns.flatMap(turn => [
+    { id: `${turn.id}-question`, role: 'user' as const, content: turn.question, timestamp: new Date(turn.created_at * 1000) },
+    { id: turn.id, role: 'assistant' as const, content: turn.answer, timestamp: new Date(turn.created_at * 1000), gameDate: turn.game_date, historySaved: true, responseTimeMs: turn.response_time_ms, model: turn.model, modelDisplay: turn.model_display, modelRouting: turn.model_routing },
+  ]))
 }
 
 const MAX_CHAT_MESSAGES = 300
@@ -204,6 +213,15 @@ function ChatPage({
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [sessionKey, setSessionKey] = useState(() => createSessionKey())
+  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null)
+  const [conversationId, setConversationId] = useState<string | undefined>()
+  const [conversations, setConversations] = useState<AdvisorConversation[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(false)
+  const [hasEarlierMessages, setHasEarlierMessages] = useState(false)
+  const [firstTurnId, setFirstTurnId] = useState<string>()
+  const [viewingEarlier, setViewingEarlier] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const campaignIdRef = useRef<string | null>(null)
   const chatGenerationRef = useRef(0)
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0)
@@ -279,6 +297,7 @@ function ChatPage({
           setAdvisorPanelOpen(false)
         }
         campaignIdRef.current = campaignId
+        setActiveCampaignId(campaignId)
       }
       if (status?.empire_type) {
         setEmpireType(status.empire_type)
@@ -308,6 +327,41 @@ function ChatPage({
     }
   }, [])
 
+  const restoreConversation = useCallback(async (saveId: string, id?: string, beforeTurnId?: string) => {
+    const generation = ++chatGenerationRef.current
+    setHistoryLoading(true)
+    setHistoryError(false)
+    setHistoryOpen(false)
+    setIsLoading(false)
+    try {
+      const list = await backend.conversations(saveId)
+      if (!isMountedRef.current || generation !== chatGenerationRef.current) return
+      if (!list.data) { setHistoryError(true); return }
+      setConversations(list.data.conversations)
+      const selectedId = id ?? list.data.conversations[0]?.id
+      if (selectedId) {
+        const saved = await backend.conversation(saveId, selectedId, beforeTurnId)
+        if (!isMountedRef.current || generation !== chatGenerationRef.current) return
+        if (!saved.data) { setHistoryError(true); return }
+        setMessages(restoreMessages(saved.data.turns))
+        setHasEarlierMessages(saved.data.has_more)
+        setFirstTurnId(saved.data.turns[0]?.id)
+        setViewingEarlier(Boolean(beforeTurnId))
+      } else { setMessages([]); setHasEarlierMessages(false); setViewingEarlier(false) }
+      setConversationId(selectedId)
+      setSessionKey(selectedId ?? createSessionKey())
+      setScrollToBottomSignal(v => v + 1)
+    } finally {
+      if (isMountedRef.current && generation === chatGenerationRef.current) setHistoryLoading(false)
+    }
+  }, [backend])
+
+  useEffect(() => {
+    setConversationId(undefined)
+    setConversations([])
+    if (activeCampaignId) void restoreConversation(activeCampaignId)
+  }, [activeCampaignId, restoreConversation])
+
   useEffect(() => {
     const handleResize = () => {
       setIsWelcomeCompact(isCompactWelcomeViewport())
@@ -326,7 +380,9 @@ function ChatPage({
   }, [isWelcomeCompact, roastSuggestion, suggestions])
 
   const handleSend = useCallback(async (text: string) => {
+    if (isLoading || historyLoading || viewingEarlier) return false
     const generation = chatGenerationRef.current
+    const requestId = crypto.randomUUID()
     // Add user message
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -340,7 +396,7 @@ function ChatPage({
     setIsLoading(true)
 
     try {
-      const result = await backend.chat(text, sessionKey, undefined, modelRoutingMode)
+      const result = await backend.chat(text, sessionKey, undefined, modelRoutingMode, { save_id: activeCampaignId ?? undefined, conversation_id: conversationId, request_id: requestId })
 
       // Only update state if component is still mounted
       if (!isMountedRef.current || generation !== chatGenerationRef.current) return
@@ -384,11 +440,19 @@ function ChatPage({
         setAdvisorConfigured(true)
         // Success - add assistant response
         const chatResponse = result.data as ChatResponse
+        if (chatResponse.conversation_id) setConversationId(chatResponse.conversation_id)
+        if (activeCampaignId && chatResponse.history_saved !== false) {
+          void backend.conversations(activeCampaignId).then(list => {
+            if (isMountedRef.current && generation === chatGenerationRef.current && list.data) setConversations(list.data.conversations)
+          })
+        }
         const assistantMessage: Message = {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
           content: chatResponse.text,
           timestamp: new Date(),
+          gameDate: chatResponse.game_date,
+          historySaved: chatResponse.history_saved,
           responseTimeMs: chatResponse.response_time_ms,
           model: chatResponse.model,
           modelDisplay: chatResponse.model_display,
@@ -416,16 +480,34 @@ function ChatPage({
         setIsLoading(false)
       }
     }
-  }, [advisorProvider, backend, sessionKey, empireType, modelRoutingMode, loadingMessages, t])
+  }, [advisorProvider, backend, sessionKey, empireType, modelRoutingMode, loadingMessages, t, activeCampaignId, conversationId, isLoading, historyLoading, historyError, viewingEarlier])
 
-  const handleNewChat = useCallback(() => {
-    if (isLoading) return
+  const handleNewChat = useCallback(async () => {
+    if (isLoading || historyLoading) return
+    const generation = chatGenerationRef.current
+    if (activeCampaignId) {
+      setHistoryLoading(true)
+      const result = await backend.createConversation(activeCampaignId)
+      if (!isMountedRef.current || generation !== chatGenerationRef.current) return
+      setHistoryLoading(false)
+      if (!result.data) { setHistoryError(true); return }
+      setConversationId(result.data.conversation.id)
+      setConversations(previous => [result.data!.conversation, ...previous])
+      setSessionKey(result.data.conversation.id)
+    } else {
+      setConversationId(undefined)
+      setSessionKey(createSessionKey())
+    }
+    chatGenerationRef.current += 1
+    setHistoryError(false)
+    setHasEarlierMessages(false)
+    setViewingEarlier(false)
+    setHistoryOpen(false)
     setMessages([])
-    setSessionKey(createSessionKey())
     setSuggestions(generateSuggestions(suggestionPools, roastSuggestion))
     setSuggestionKey(k => k + 1)
     setScrollToBottomSignal(v => v + 1)
-  }, [isLoading, roastSuggestion, suggestionPools])
+  }, [isLoading, historyLoading, activeCampaignId, backend, roastSuggestion, suggestionPools])
 
   const items = useMemo(() => {
     const base = messages.map((message, idx) => ({
@@ -437,6 +519,8 @@ function ChatPage({
           role={message.role}
           content={message.content}
           timestamp={message.timestamp}
+          gameDate={message.gameDate}
+          historySaved={message.historySaved}
           responseTimeMs={message.responseTimeMs}
           modelDisplay={message.modelDisplay}
           modelRouting={message.modelRouting}
@@ -498,6 +582,28 @@ function ChatPage({
         empireAuthority={empireAuthority}
         empireOrigin={empireOrigin}
       />
+
+      {(messages.length > 0 || conversations.length > 0 || historyLoading || historyError) && (
+        <div className="relative flex items-center justify-end gap-3 mb-3">
+          {(hasEarlierMessages || viewingEarlier) && <div className="mr-auto flex gap-3 text-xs text-text-secondary">
+            {hasEarlierMessages && <button type="button" disabled={isLoading || historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId, firstTurnId)}>{t('continuity.earlierMessages')}</button>}
+            {viewingEarlier && <button type="button" disabled={historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId)}>{t('continuity.latestMessages')}</button>}
+          </div>}
+          {historyError && <button type="button" className="text-xs text-accent-yellow" onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId)}>{t('continuity.historyRetry')}</button>}
+          {historyLoading && <span className="text-xs text-text-muted" role="status">{t('continuity.restoring')}</span>}
+          {conversations.length > 0 && (
+            <div className="relative">
+              <button type="button" disabled={isLoading || historyLoading} aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="px-3 py-2 font-display text-[10px] uppercase tracking-[0.12em] text-text-secondary hover:text-accent-cyan disabled:opacity-40">{t('continuity.chats')} ▾</button>
+              {historyOpen && <div className="absolute right-0 top-full z-30 mt-1 w-72 max-h-64 overflow-y-auto rounded border border-border bg-bg-secondary p-1 shadow-xl" role="menu">
+                {conversations.map(item => <button key={item.id} type="button" role="menuitem" onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, item.id)} className={`block w-full truncate rounded px-3 py-2 text-left text-xs hover:bg-white/5 ${item.id === conversationId ? 'text-accent-cyan' : 'text-text-secondary'}`}>
+                  {item.title || t('chat.newChat')}<span className="block text-[10px] text-text-muted">{item.last_game_date ?? new Date(item.created_at * 1000).toLocaleDateString()}</span>
+                </button>)}
+              </div>}
+            </div>
+          )}
+          <button type="button" onClick={() => void handleNewChat()} disabled={isLoading || historyLoading} className="px-4 py-2 border border-white/20 font-display text-[10px] tracking-[0.18em] uppercase text-accent-cyan/80 hover:border-accent-cyan/60 hover:bg-accent-cyan/10 disabled:opacity-40">{t('chat.newChat')}</button>
+        </div>
+      )}
 
       {messages.length === 0 ? (
         <div
@@ -652,20 +758,7 @@ function ChatPage({
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-end mb-3">
-            <button
-              type="button"
-              onClick={handleNewChat}
-              disabled={isLoading}
-              className={`px-4 py-2 border border-white/20 font-display text-[10px] tracking-[0.18em] uppercase transition-all duration-200 ${
-                isLoading
-                  ? 'text-white/25 border-white/10 cursor-not-allowed'
-                  : 'text-accent-cyan/80 hover:text-accent-cyan hover:border-accent-cyan/60 hover:bg-accent-cyan/10'
-              }`}
-            >
-              {t('chat.newChat', { defaultValue: 'New Chat' })}
-            </button>
-          </div>
+
 
           <div className="flex-1 flex flex-col overflow-hidden relative rounded-lg bg-black/20 backdrop-blur-sm border border-white/5 mb-4">
              {/* Decorative lines for chat container */}
@@ -704,7 +797,7 @@ function ChatPage({
       <ChatInput
         onSend={handleSend}
         loading={isLoading}
-        disabled={!precomputeReady || advisorConfigured === false}
+        disabled={!precomputeReady || advisorConfigured === false || historyLoading || viewingEarlier}
         onOpenAdvisorPanel={() => setAdvisorPanelOpen(true)}
       />
       {advisorProvider === 'chatgpt' && <ChatGPTUsage disabled={isLoading} />}

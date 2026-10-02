@@ -327,30 +327,15 @@ function ChronicleChapterList({
         )}
       </div>
 
-      {/* Pending chapters notification */}
-      {pendingChapters > 0 && (
-        <div className="p-4 border-t border-border flex items-center gap-2 bg-accent-yellow/5">
-          <span className="bg-accent-yellow text-bg-primary text-xs font-semibold py-0.5 px-2 rounded flex items-center gap-1">
-            <span>⚡</span>
-            {pendingChapters}
-          </span>
-          <span className="flex-1 text-xs text-text-secondary">
-            {t('chronicle.sidebar.pending', { count: pendingChapters })}
-          </span>
-          <button
-            className="w-8 h-8 border border-accent-yellow/50 rounded bg-accent-yellow/10 text-accent-yellow text-sm cursor-pointer flex items-center justify-center transition-all duration-200 hover:bg-accent-yellow/20 hover:shadow-glow-yellow disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={onRefresh}
-            disabled={loading}
-            title={t('chronicle.sidebar.generateMore')}
-          >
-            {loading ? (
-              <span className="w-3 h-3 border border-accent-yellow border-t-transparent rounded-full animate-spin-loader" />
-            ) : (
-              '↻'
-            )}
-          </button>
-        </div>
-      )}
+      {/* One explicit update action also works when automatic writing is paused. */}
+      {selectedSave && <div className="border-t border-border p-4">
+        <button type="button" onClick={onRefresh} disabled={loading || isRegenerating} className="flex w-full items-center justify-center gap-2 rounded border border-accent-cyan/30 bg-accent-cyan/5 px-3 py-2 text-xs uppercase tracking-wider text-accent-cyan transition-colors hover:bg-accent-cyan/10 disabled:opacity-40">
+          {loading ? <span className="h-3 w-3 animate-spin-loader rounded-full border border-accent-cyan border-t-transparent" /> : <span aria-hidden="true">↻</span>}
+          {t('continuity.updateStory')}
+          {pendingChapters > 0 && <span className="rounded bg-accent-yellow/20 px-1.5 text-accent-yellow">{pendingChapters}</span>}
+        </button>
+      </div>}
+
     </motion.aside>
   )
 }

@@ -11,6 +11,8 @@ interface ChatMessageProps {
   role: 'user' | 'assistant'
   content: string
   timestamp?: Date
+  gameDate?: string
+  historySaved?: boolean
   responseTimeMs?: number
   modelDisplay?: string
   modelRouting?: ModelRoutingEvent | null
@@ -93,6 +95,8 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
     role,
     content,
     timestamp,
+    gameDate,
+    historySaved,
     responseTimeMs,
     modelDisplay,
     modelRouting,
@@ -176,8 +180,12 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
         )}
 
         {/* Response actions and optional technical details */}
-        {!isUser && !isError && (responseTimeMs !== undefined || !!modelReadout || !!onReport) && (
+        {!isUser && !isError && (responseTimeMs !== undefined || !!modelReadout || !!onReport || !!gameDate || historySaved === false) && (
           <div className="mt-2 flex items-start gap-4 border-t border-white/5 pt-2">
+              <div className="flex flex-col gap-1">
+                {gameDate && <span className="font-mono text-[10px] text-text-muted">{t('continuity.basedOnSave', { date: gameDate })}</span>}
+                {historySaved === false && <span className="text-xs text-accent-yellow">{t('continuity.historyNotSaved')}</span>}
+              </div>
               {onReport && (
                 <button
                   type="button"

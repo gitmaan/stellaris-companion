@@ -14,7 +14,7 @@ export function ChronicleRefreshControl({
   onChange,
 }: ChronicleRefreshControlProps) {
   const { t } = useTranslation()
-  const options: ChronicleRefreshMode[] = ['balanced', 'enhanced']
+  const options: ChronicleRefreshMode[] = ['balanced', 'enhanced', 'manual']
 
   return (
     <div className="space-y-3 border-t border-white/10 pt-4">
@@ -22,7 +22,7 @@ export function ChronicleRefreshControl({
         <HUDLabel>{t('settings.chronicleRefresh.label')}</HUDLabel>
         {saving && <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>}
       </div>
-      <div className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
+      <div className="grid grid-cols-3 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
         {options.map(option => {
           const selected = mode === option
           return (

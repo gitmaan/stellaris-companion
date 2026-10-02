@@ -4,6 +4,11 @@ import { ChronicleChapter, CurrentEra, NarrativeSection } from '../hooks/useBack
 import Tooltip from './Tooltip'
 
 interface ChronicleContentProps {
+  revision?: string
+  coverageDate?: string | null
+  mutationBusy?: boolean
+  onEdit?: (chapterNumber: number, revision: string, title: string, narrative: string) => Promise<boolean>
+  onUndo?: (chapterNumber: number, revision: string) => void
   empireName: string
   chapters: ChronicleChapter[]
   currentEra: CurrentEra | null
@@ -20,6 +25,7 @@ interface ChronicleContentProps {
  * Renders all chapters in sequence with current era at the bottom
  */
 function ChronicleContent({
+  revision, coverageDate, mutationBusy, onEdit, onUndo,
   empireName,
   chapters,
   currentEra,
@@ -39,6 +45,7 @@ function ChronicleContent({
         <h1 className="chronicle-display-title font-display text-2xl tracking-[0.2em] text-text-primary uppercase">
           {t('chronicle.content.title', { empireName })}
         </h1>
+        {coverageDate && <p className="mt-3 text-xs text-text-secondary">{t('continuity.storyCoverage', { date: coverageDate })}</p>}
         <div className="energy-line mt-4 max-w-[200px] mx-auto" />
       </header>
 
@@ -59,6 +66,10 @@ function ChronicleContent({
         <ChapterBlock
           key={chapter.number}
           chapter={chapter}
+          revision={revision}
+          mutationBusy={mutationBusy}
+          onEdit={onEdit}
+          onUndo={onUndo}
           onRegenerate={onRegenerate}
           confirmingRegen={confirmingRegen}
           onCancelRegen={onCancelRegen}
@@ -76,7 +87,7 @@ function ChronicleContent({
  * Single chapter block with its own memoized narrative
  */
 function ChapterBlock({
-  chapter,
+  chapter, revision, mutationBusy, onEdit, onUndo,
   onRegenerate,
   confirmingRegen,
   onCancelRegen,
@@ -84,6 +95,10 @@ function ChapterBlock({
   justRegenerated,
 }: {
   chapter: ChronicleChapter
+  revision?: string
+  mutationBusy?: boolean
+  onEdit?: ChronicleContentProps['onEdit']
+  onUndo?: ChronicleContentProps['onUndo']
   onRegenerate: (chapterNumber: number, regenerationInstructions?: string) => void
   confirmingRegen: number | null
   onCancelRegen: () => void
@@ -95,6 +110,13 @@ function ChapterBlock({
   const wasJustRegenerated = justRegenerated === chapter.number
   const isConfirming = confirmingRegen === chapter.number
   const [regenInstructions, setRegenInstructions] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [draftTitle, setDraftTitle] = useState('')
+  const [draftNarrative, setDraftNarrative] = useState('')
+  const [editRevision, setEditRevision] = useState('')
+  const [saving, setSaving] = useState(false)
+  const busy = Boolean(mutationBusy || saving || regeneratingChapter !== null)
+
 
   const renderedNarrative = useMemo(
     () => {
@@ -107,7 +129,7 @@ function ChapterBlock({
   )
 
   return (
-    <div id={`chapter-${chapter.number}`} className={`stellaris-panel rounded-lg p-8 relative mb-8 ${wasJustRegenerated ? 'animate-highlight-flash' : ''}`}>
+    <div id={`chapter-${chapter.number}`} data-reading-id={chapter.id || chapter.start_date} data-reading-version={readingVersion(chapter.narrative)} className={`stellaris-panel rounded-lg p-8 relative mb-8 ${wasJustRegenerated ? 'animate-highlight-flash' : ''}`}>
       {/* Regenerating overlay */}
       {isRegenerating && (
         <div className="absolute inset-0 bg-bg-primary/90 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center gap-4 z-10">
@@ -140,13 +162,32 @@ function ChapterBlock({
         </div>
       </div>
 
+      {editing && <div className="mb-6 space-y-3 rounded border border-accent-cyan/30 bg-black/20 p-4">
+        <label className="block text-xs text-text-secondary">{t('continuity.chapterTitle')}
+          <input aria-label={t('continuity.chapterTitle')} value={draftTitle} maxLength={300} onChange={event => setDraftTitle(event.target.value)} disabled={saving} className="mt-1 w-full rounded border border-border bg-bg-primary px-3 py-2 text-sm text-text-primary" />
+        </label>
+        <label className="block text-xs text-text-secondary">{t('continuity.chapterText')}
+          <textarea aria-label={t('continuity.chapterText')} value={draftNarrative} maxLength={100000} rows={12} onChange={event => setDraftNarrative(event.target.value)} disabled={saving} className="mt-1 w-full rounded border border-border bg-bg-primary px-3 py-2 text-sm leading-relaxed text-text-primary" />
+        </label>
+        <p className="text-xs text-text-muted">{t('continuity.editProtection')}</p>
+        <div className="flex gap-3">
+          <button type="button" disabled={busy || !draftTitle.trim() || !draftNarrative.trim()} className="rounded bg-accent-cyan px-4 py-2 text-sm text-bg-primary disabled:opacity-40" onClick={async () => {
+            if (!onEdit) return
+            setSaving(true)
+            try { if (await onEdit(chapter.number, editRevision, draftTitle.trim(), draftNarrative.trim())) setEditing(false) }
+            finally { setSaving(false) }
+          }}>{t('continuity.saveChanges')}</button>
+          <button type="button" disabled={saving} className="px-3 py-2 text-sm text-text-secondary" onClick={() => setEditing(false)}>{t('chronicle.content.cancel')}</button>
+        </div>
+      </div>}
+
       {/* Chapter narrative */}
-      <div className={`chronicle-narrative text-base leading-relaxed text-text-primary ${isRegenerating ? 'blur-sm' : ''}`}>
+      <div className={`chronicle-narrative text-base leading-relaxed text-text-primary ${isRegenerating ? 'blur-sm' : ''} ${editing ? 'hidden' : ''}`}>
         {renderedNarrative}
       </div>
 
       {/* Regenerate controls */}
-      {chapter.can_regenerate && !isRegenerating && (
+      {!editing && !isRegenerating && (chapter.can_regenerate || revision) && (
         <div className="mt-8 pt-4 border-t border-border">
           {isConfirming ? (
             <div className="bg-accent-yellow/10 border border-accent-yellow/30 rounded-lg p-4">
@@ -184,14 +225,17 @@ function ChapterBlock({
               </div>
             </div>
           ) : (
-            <button
-              className="py-2.5 px-5 border border-border rounded-md bg-bg-tertiary/50 text-text-secondary text-sm font-medium cursor-pointer transition-all duration-200 hover:bg-bg-tertiary hover:border-accent-cyan/30 hover:text-accent-cyan flex items-center gap-2"
-              onClick={() => onRegenerate(chapter.number)}
-              title={t('chronicle.content.regenerateTitle')}
-            >
-              <span>↻</span>
-              {t('chronicle.content.regenerateChapter')}
-            </button>
+            <details className="relative group/actions">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded border border-border bg-bg-tertiary/50 px-4 py-2 text-xs text-text-secondary hover:border-accent-cyan/30 hover:text-accent-cyan">{t('continuity.chapterActions')} ▾</summary>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {revision && onEdit && <button type="button" disabled={busy} className="rounded px-3 py-2 text-sm text-text-secondary hover:bg-white/5 disabled:opacity-40" onClick={() => {
+                  setDraftTitle(chapter.title); setDraftNarrative(chapter.narrative); setEditRevision(revision); setEditing(true)
+                }}>{t('continuity.editText')}</button>}
+                {chapter.can_regenerate && <button type="button" disabled={busy} className="rounded px-3 py-2 text-sm text-text-secondary hover:bg-white/5 disabled:opacity-40" onClick={() => onRegenerate(chapter.number)} title={t('chronicle.content.regenerateTitle')}>{t('chronicle.content.regenerateChapter')}</button>}
+                {chapter.can_undo && revision && onUndo && <button type="button" disabled={busy} className="rounded px-3 py-2 text-sm text-text-secondary hover:bg-white/5 disabled:opacity-40" onClick={() => onUndo(chapter.number, revision)}>{t('continuity.undoChapter')}</button>}
+              </div>
+              {chapter.manual_edit_locked && <p className="mt-2 text-xs text-text-muted">{t('continuity.editedByYou')}</p>}
+            </details>
           )}
         </div>
       )}
@@ -226,7 +270,7 @@ function CurrentEraBlock({ currentEra }: { currentEra: CurrentEra }) {
   )
 
   return (
-    <div id="current-era" className="stellaris-panel rounded-lg p-8 mb-8">
+    <div id="current-era" data-reading-id={currentEra.start_date} data-reading-version={readingVersion(currentEra.narrative)} className="stellaris-panel rounded-lg p-8 mb-8">
       <div className="flex justify-between items-start mb-6 pb-4 border-b border-border">
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold text-accent-yellow uppercase tracking-wider flex items-center gap-2">
@@ -234,7 +278,7 @@ function CurrentEraBlock({ currentEra }: { currentEra: CurrentEra }) {
             {t('chronicle.content.currentEra')}
           </span>
           <h2 className="text-xl font-semibold text-text-primary m-0">{t('chronicle.content.storyContinues')}</h2>
-          <span className="text-sm text-text-secondary font-mono">{currentEra.start_date} – {t('chronicle.content.present')}</span>
+          <span className="text-sm text-text-secondary font-mono">{currentEra.start_date} – {currentEra.coverage_date || t('continuity.coverageUnknown')}</span>
         </div>
       </div>
 
@@ -248,6 +292,13 @@ function CurrentEraBlock({ currentEra }: { currentEra: CurrentEra }) {
       </div>
     </div>
   )
+}
+
+function readingVersion(text: string): string {
+  // A small content fingerprint prevents restoring into a rewritten paragraph.
+  let hash = 0
+  for (let i = 0; i < text.length; i += 1) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0
+  return String(hash)
 }
 
 /**

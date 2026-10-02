@@ -64,3 +64,16 @@ test('permanent deletion is always sent with explicit confirmation', async () =>
     options: { method: 'DELETE' },
   })
 })
+
+test('continuity routes preserve request identity, pagination and expected revision', async () => {
+  const { calls, invoke } = createHarness()
+  await invoke('backend:chat', { message: 'What about the second option?', save_id: 'campaign/1', conversation_id: 'chat-1', request_id: 'request-1' })
+  assert.deepEqual(JSON.parse(calls[0].options.body), { message: 'What about the second option?', save_id: 'campaign/1', conversation_id: 'chat-1', request_id: 'request-1', model: null, model_routing_mode: null, language: 'de' })
+  await invoke('backend:conversation', { save_id: 'campaign/1', conversation_id: 'chat/1', before_turn_id: 'turn 2' })
+  assert.equal(calls[1].url, '/api/playthroughs/campaign%2F1/conversations/chat%2F1?limit=150&before_turn_id=turn+2')
+  await invoke('backend:edit-chapter', { save_id: 'campaign/1', chapter_number: 2, expected_revision: 'revision-1', title: 'Title', narrative: 'Text' })
+  assert.equal(calls[2].options.method, 'PUT')
+  assert.deepEqual(JSON.parse(calls[2].options.body), { expected_revision: 'revision-1', title: 'Title', narrative: 'Text', language: 'de' })
+  await invoke('backend:undo-chapter', { save_id: 'campaign/1', chapter_number: 2, expected_revision: 'revision-2' })
+  assert.deepEqual(JSON.parse(calls[3].options.body), { expected_revision: 'revision-2', language: 'de' })
+})

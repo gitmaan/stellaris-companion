@@ -421,7 +421,10 @@
       "enhancedHelp": "Atualizacoes mais rapidas da era atual ao ver a Cronica. Usa mais chamadas ao modelo.",
       "aria": "Definir modo de atualizacao como {{mode}}",
       "toastError": "Falha ao atualizar o modo da Cronica. Tente novamente.",
-      "toastSuccess": "Modo da Cronica definido como {{mode}}."
+      "toastSuccess": "Modo da Cronica definido como {{mode}}.",
+      "manual": "Manual",
+      "manualTag": "Sob demanda",
+      "manualHelp": "O histórico continua crescendo. Atualize a história quando quiser novos textos."
     },
     "modelRouting": {
       "label": "ROTEAMENTO DE MODELO",
@@ -1126,5 +1129,27 @@
     "lowerUsage": "Menor consumo",
     "moreModels": "Mais modelos",
     "modelUpdated": "Modelo atualizado"
+  },
+  "continuity": {
+    "historyRetry": "Histórico indisponível · Tentar novamente",
+    "restoring": "Restaurando conversa…",
+    "chats": "Conversas",
+    "basedOnSave": "Com base no save de {{date}}",
+    "historyNotSaved": "Não foi possível salvar esta resposta.",
+    "storyCoverage": "A história abrange até {{date}}",
+    "chapterTitle": "Título do capítulo",
+    "chapterText": "Texto do capítulo",
+    "editProtection": "Suas edições são preservadas durante atualizações automáticas.",
+    "saveChanges": "Salvar alterações",
+    "chapterActions": "Ações do capítulo",
+    "editText": "Editar texto",
+    "undoChapter": "Desfazer última alteração",
+    "editedByYou": "Editado por você · preservado nas atualizações",
+    "coverageUnknown": "Período desconhecido",
+    "editConflict": "Este capítulo mudou durante a edição. Seu rascunho continua aqui; cancele e reabra a versão mais recente.",
+    "editFailed": "Não foi possível salvar este capítulo.",
+    "earlierMessages": "Mensagens anteriores",
+    "latestMessages": "Voltar às recentes",
+    "updateStory": "Atualizar história"
   }
 }
