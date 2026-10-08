@@ -2,6 +2,18 @@
   "version": 1,
   "announcements": [
     {
+      "id": "feedback-help-shape-what-comes-next-2026-10",
+      "severity": "info",
+      "title": "Help shape what comes next",
+      "body": "I’d love to hear how the Companion is getting on in your corner of the galaxy. What’s been useful, what’s a bit clunky, and what do you keep wishing it could do? This is a small project, and hearing about your campaigns helps me work out what to build next.",
+      "publishedAt": "2026-10-08T23:31:30.000Z",
+      "expiresAt": "2026-11-07T23:31:30.000Z",
+      "link": {
+        "label": "Share feedback",
+        "url": "https://galacticfilingcabinet.com/feedback"
+      }
+    },
+    {
       "id": "release-008-ai-connections-gemini-quota",
       "severity": "update",
       "title": "Stellaris Companion 0.8.0 is ready",
