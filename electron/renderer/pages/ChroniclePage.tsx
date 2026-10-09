@@ -558,9 +558,13 @@ function ChroniclePage({
       void finalizePendingChaptersHidden()
       return
     }
+    if (!isActive) {
+      pendingVisibleChronicleRefreshRef.current = true
+      return
+    }
 
     void loadSaves({ silent: true })
-  }, [finalizePendingChaptersHidden, loadSaves])
+  }, [finalizePendingChaptersHidden, isActive, loadSaves])
 
   // Refresh sessions when backend connects or ingestion advances so chronicle
   // updates while gameplay continues in the background.
@@ -641,11 +645,15 @@ function ChroniclePage({
         void finalizePendingChaptersHidden()
         return
       }
+      if (!isActive) {
+        pendingVisibleChronicleRefreshRef.current = true
+        return
+      }
       void loadSaves({ silent: true })
     }, 30000)
 
     return () => clearInterval(timer)
-  }, [finalizePendingChaptersHidden, loadSaves])
+  }, [finalizePendingChaptersHidden, isActive, loadSaves])
 
   // Load chronicle when save changes (only after sessions are cached)
   useEffect(() => {
@@ -653,13 +661,13 @@ function ChroniclePage({
     // selected reader when it settles, using the usual visibility/refresh policy.
     if (mutationBusy) return
     if (selectedSaveId && cachedSessions.length > 0) {
-      if (!isActive) {
-        pendingVisibleChronicleRefreshRef.current = true
-        return
-      }
       if (!isDocumentVisible()) {
         pendingVisibleChronicleRefreshRef.current = true
         void finalizePendingChaptersHidden()
+        return
+      }
+      if (!isActive) {
+        pendingVisibleChronicleRefreshRef.current = true
         return
       }
       if (pendingVisibleChronicleRefreshRef.current) {
@@ -822,7 +830,7 @@ function ChroniclePage({
   }, [chronicle, selectedSaveId, i18n.language, i18n.resolvedLanguage, isActive])
 
   useEffect(() => {
-    if (!chronicle) return
+    if (!chronicle || !isActive) return
     const container = scrollContainerRef.current
     if (!container) return
 
@@ -863,7 +871,7 @@ function ChroniclePage({
       clearTimeout(timer)
       observer.disconnect()
     }
-  }, [chronicle])
+  }, [chronicle, isActive])
 
   // Handle chapter selection - scroll to chapter, disabled during regeneration
   const handleSelectChapter = useCallback((chapterNumber: number | null) => {

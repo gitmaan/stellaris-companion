@@ -41,6 +41,7 @@ export default function VirtualChatList({ items, identityKey, scrollToBottomSign
   const containerRef = useRef<HTMLDivElement | null>(null)
   const nodesRef = useRef<Map<string, HTMLDivElement>>(new Map())
   const observersRef = useRef<Map<string, ResizeObserver>>(new Map())
+  const itemRefs = useRef(new Map<string, (node: HTMLDivElement | null) => void>())
   const pendingMeasureRef = useRef<Set<string>>(new Set())
   const rafRef = useRef<number | null>(null)
   const didInitialScrollRef = useRef(false)
@@ -96,34 +97,51 @@ export default function VirtualChatList({ items, identityKey, scrollToBottomSign
   }, [])
 
   const setItemRef = useCallback(
-    (index: string) => (node: HTMLDivElement | null) => {
-      const prevNode = nodesRef.current.get(index)
-      if (prevNode === node) return
+    (index: string) => {
+      const existing = itemRefs.current.get(index)
+      if (existing) return existing
+      const callback = (node: HTMLDivElement | null) => {
+        const prevNode = nodesRef.current.get(index)
+        if (prevNode === node) return
 
-      const prevObserver = observersRef.current.get(index)
-      if (prevObserver) {
-        prevObserver.disconnect()
-        observersRef.current.delete(index)
-      }
+        const prevObserver = observersRef.current.get(index)
+        if (prevObserver) {
+          prevObserver.disconnect()
+          observersRef.current.delete(index)
+        }
 
-      if (!node) {
-        nodesRef.current.delete(index)
-        return
-      }
+        if (!node) {
+          nodesRef.current.delete(index)
+          return
+        }
 
-      nodesRef.current.set(index, node)
-      pendingMeasureRef.current.add(index)
-      scheduleMeasure()
-
-      const ro = new ResizeObserver(() => {
+        nodesRef.current.set(index, node)
         pendingMeasureRef.current.add(index)
         scheduleMeasure()
-      })
-      ro.observe(node)
-      observersRef.current.set(index, ro)
+
+        const ro = new ResizeObserver(() => {
+          pendingMeasureRef.current.add(index)
+          scheduleMeasure()
+        })
+        ro.observe(node)
+        observersRef.current.set(index, ro)
+      }
+      itemRefs.current.set(index, callback)
+      return callback
     },
     [scheduleMeasure],
   )
+
+  useEffect(() => {
+    const keys = new Set(items.map(item => item.key))
+    for (const key of itemRefs.current.keys()) {
+      if (!keys.has(key)) {
+        itemRefs.current.delete(key)
+        heightsRef.current.delete(key)
+        seenRef.current.delete(key)
+      }
+    }
+  }, [items])
 
   const onScroll = useCallback((e: UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
@@ -222,11 +240,19 @@ export default function VirtualChatList({ items, identityKey, scrollToBottomSign
   }, [scrollToBottomSignal, scrollToBottom])
 
   useEffect(() => {
+    // StrictMode replays effect setup/cleanup without detaching the DOM refs.
+    // Stable callbacks must resume their observers after that replay as well.
+    for (const [key, observer] of observersRef.current) {
+      const node = nodesRef.current.get(key)
+      if (node) observer.observe(node)
+    }
+    scheduleMeasure()
     return () => {
       if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
       for (const ro of observersRef.current.values()) ro.disconnect()
     }
-  }, [])
+  }, [scheduleMeasure])
 
   return (
     <>

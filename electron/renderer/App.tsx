@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -26,16 +26,16 @@ import {
   type UiTheme,
 } from './hooks/useSettings'
 import { isRtlLanguage } from './i18n/languages'
+import { loadLanguage } from './i18n'
 import { AnnouncementPanel } from './components/AnnouncementPanel'
 import { HUDContainer } from './components/hud/HUDContainer'
 import { HUDNavBar } from './components/hud/HUDNavBar'
 import { HUDStatusBar } from './components/hud/HUDStatusBar'
 import { motionTiming } from './lib/motion'
 
-// Direct imports
 import ChatPage from './pages/ChatPage'
-import ChroniclePage from './pages/ChroniclePage'
-import SettingsPage from './pages/SettingsPage'
+const ChroniclePage = lazy(() => import('./pages/ChroniclePage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 
 type Tab = 'chat' | 'chronicle' | 'settings'
 
@@ -48,6 +48,21 @@ const tabTransition = {
 function App() {
   const { t, i18n } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('chat')
+  const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(() => new Set(['chat']))
+  useEffect(() => {
+    setMountedTabs(previous => previous.has(activeTab) ? previous : new Set([...previous, activeTab]))
+  }, [activeTab])
+  useEffect(() => {
+    // Chronicle owns chapter finalization while gameplay is in the foreground.
+    // Activate that service on minimize even if the reader has not been opened.
+    const ensureBackgroundChronicle = () => {
+      if (document.visibilityState !== 'hidden') return
+      setMountedTabs(previous => previous.has('chronicle') ? previous : new Set([...previous, 'chronicle']))
+    }
+    ensureBackgroundChronicle()
+    document.addEventListener('visibilitychange', ensureBackgroundChronicle)
+    return () => document.removeEventListener('visibilitychange', ensureBackgroundChronicle)
+  }, [])
   const [settingsTarget, setSettingsTarget] = useState({ id: 'ai-setup', request: 0 })
   const openAISetup = (id = 'ai-setup') => {
     setSettingsTarget(current => ({ id, request: current.request + 1 }))
@@ -94,7 +109,13 @@ function App() {
         loadedSettings?.chronicleRefreshMode,
       )
       const loadedModelRoutingMode = normalizeModelRoutingMode(loadedSettings?.modelRoutingMode)
-      const loadedResolvedLanguage = normalizeResolvedLanguage(loadedSettings?.resolvedLanguage)
+      let loadedResolvedLanguage = normalizeResolvedLanguage(loadedSettings?.resolvedLanguage)
+      try {
+        await loadLanguage(loadedResolvedLanguage)
+      } catch {
+        // A damaged catalog must not strand the application behind a blank window.
+        loadedResolvedLanguage = DEFAULT_RESOLVED_LANGUAGE
+      }
       await i18n.changeLanguage(loadedResolvedLanguage)
       document.documentElement.lang = loadedResolvedLanguage
       setUiTheme(loadedTheme)
@@ -111,18 +132,27 @@ function App() {
 
   const changeLanguage = useCallback(async (nextLanguage: LanguageSetting): Promise<boolean> => {
     if (!window.electronAPI) return false
+    let persisted = false
     try {
+      if (nextLanguage !== 'system') await loadLanguage(nextLanguage)
       const result = await window.electronAPI.saveSettings({ language: nextLanguage })
       if (result?.success === false) return false
+      persisted = true
       const resolved = normalizeResolvedLanguage(result.resolvedLanguage)
+      await loadLanguage(resolved)
       await i18n.changeLanguage(resolved)
       setLanguage(normalizeLanguage(result.language))
       setResolvedLanguage(resolved)
       return true
     } catch {
+      // System-default is resolved by the main process. Restore the previous
+      // preference if its catalog could not be loaded after that resolution.
+      if (persisted) {
+        try { await window.electronAPI.saveSettings({ language }) } catch { /* The selector reports the failed change. */ }
+      }
       return false
     }
-  }, [i18n])
+  }, [i18n, language])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', uiTheme)
@@ -260,6 +290,7 @@ function App() {
                   aria-hidden={!isActive}
                 >
                   <div className="h-full w-full">
+                    <Suspense fallback={<div role="status" className="p-6 text-text-secondary">{t('common.loading')}</div>}>
                     {tab === 'chat' && (
                       <ChatPage
                         isActive={isActive}
@@ -269,7 +300,7 @@ function App() {
                         onReportLlmIssue={openLLMReportModal}
                       />
                     )}
-                    {tab === 'chronicle' && (
+                    {tab === 'chronicle' && (isActive || mountedTabs.has(tab)) && (
                       <ChroniclePage
                         isActive={isActive}
                         refreshMode={chronicleRefreshMode}
@@ -278,7 +309,7 @@ function App() {
                         historyOpenRequest={campaignHistoryOpenRequest}
                       />
                     )}
-                    {tab === 'settings' && (
+                    {tab === 'settings' && (isActive || mountedTabs.has(tab)) && (
                       <SettingsPage
                         isActive={isActive}
                         openTarget={settingsTarget}
@@ -291,6 +322,7 @@ function App() {
                         onOpenCampaignHistory={handleOpenCampaignHistory}
                       />
                     )}
+                    </Suspense>
                   </div>
                 </motion.div>
               )

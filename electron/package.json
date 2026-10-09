@@ -24,6 +24,7 @@
     "test:updates": "node --test test/updates.test.js",
     "test:mcp-relay": "node --test test/mcp-relay.test.js",
     "test:localization": "node scripts/localization.cjs && node --test test/settings-locales.test.js test/native-i18n.test.js test/language.test.js test/localization-runtime.test.js",
+    "benchmark:renderer": "node scripts/benchmark-renderer.cjs",
     "localization:pseudo": "node scripts/localization.cjs --write-pseudo",
     "publish": "../scripts/publish-electron.sh",
     "start": "electron .",
@@ -40,7 +41,7 @@
     "@playwright/test": "^1.54.0",
     "concurrently": "^8.2.2",
     "cross-env": "^10.1.0",
-    "electron": "^43.2.0",
+    "electron": "^43.7.9",
     "electron-builder": "^26.15.3"
   }
 }

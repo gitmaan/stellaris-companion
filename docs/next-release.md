@@ -39,3 +39,8 @@ Keep the remaining checks current. Do not describe Cygnus support as complete un
 
 - [x] Verify fixed shell/composer geometry, compact Chronicle reading, shared modal focus, reduced motion, pending drafts, and localized recovery actions with mocked Electron journeys. See [Visual quality conventions](visual-quality.md).
 - [ ] During the next packaged release check, exercise native keyboard/IME focus and reduced-motion behavior on macOS, Windows, and Linux; the local visual proof uses an unbundled Electron renderer.
+
+## Pending frontend performance changes
+
+- [x] Verify local language/page chunks, initial backend-status replay, retained drafts and settings, long-chat rendering, and background chapter finalization with hidden Electron journeys. See [Frontend performance](frontend-performance.md).
+- [ ] During the next packaged release check, verify offline language switching and first-use page loading from the packaged archive on Electron 43.7.9 across supported platforms.

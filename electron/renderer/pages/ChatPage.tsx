@@ -499,47 +499,54 @@ function ChatPage({
   }, [isLoading, historyLoading, activeCampaignId, backend, roastSuggestion, suggestionPools])
 
   const items = useMemo(() => {
-    const base = messages.map((message, idx) => ({
-      key: message.id,
-      render: (ref: (el: HTMLDivElement | null) => void, animateEntrance: boolean) => (
-        <ChatMessage
-          key={message.id}
-          messageId={message.id}
-          ref={ref}
-          animateEntrance={animateEntrance}
-          onRetry={message.retryRequest && !isLoading && !historyLoading && !viewingEarlier && advisorConfigured !== false ? () => void handleSend(message.retryRequest!.text, { messageId: message.id, requestId: message.retryRequest!.requestId }) : undefined}
-          role={message.role}
-          content={message.content}
-          timestamp={message.timestamp}
-          gameDate={message.gameDate}
-          historySaved={message.historySaved}
-          responseTimeMs={message.responseTimeMs}
-          modelDisplay={message.modelDisplay}
-          modelRouting={message.modelRouting}
-          isError={message.isError}
-          actionLabel={
-            message.action === 'settings'
-              ? t('chat.errors.openProviderSettings')
-              : message.action === 'usage' ? t('chatgpt.manageUsage') : undefined
-          }
-          onAction={message.action === 'settings' ? onOpenSettings : message.action === 'usage' ? () => void manageChatGPTUsage() : undefined}
-          onReport={
-            onReportLlmIssue && message.role === 'assistant' && !message.isError
-              ? () => {
-                const lastPrompt = [...messages.slice(0, idx)].reverse().find((m) => m.role === 'user')?.content
-                onReportLlmIssue({
-                  lastPrompt: lastPrompt ? truncateForReport(lastPrompt) : undefined,
-                  lastResponse: truncateForReport(message.content),
-                  recentTurns: buildRecentTurnsForReport(messages, idx),
-                  responseTimeMs: message.responseTimeMs,
-                  model: message.model,
-                })
-              }
-              : undefined
-          }
-        />
-      ),
-    }))
+    const base = messages.map((message, idx) => {
+      // These actions belong to a message, not a scroll frame. Stable props let
+      // ChatMessage's memo boundary skip unchanged rows in the virtual viewport.
+      const onRetry = message.retryRequest && !isLoading && !historyLoading && !viewingEarlier && advisorConfigured !== false
+        ? () => void handleSend(message.retryRequest!.text, { messageId: message.id, requestId: message.retryRequest!.requestId })
+        : undefined
+      const onAction = message.action === 'settings' ? onOpenSettings : message.action === 'usage' ? () => void manageChatGPTUsage() : undefined
+      const onReport = onReportLlmIssue && message.role === 'assistant' && !message.isError
+        ? () => {
+          const lastPrompt = [...messages.slice(0, idx)].reverse().find(m => m.role === 'user')?.content
+          onReportLlmIssue({
+            lastPrompt: lastPrompt ? truncateForReport(lastPrompt) : undefined,
+            lastResponse: truncateForReport(message.content),
+            recentTurns: buildRecentTurnsForReport(messages, idx),
+            responseTimeMs: message.responseTimeMs,
+            model: message.model,
+          })
+        }
+        : undefined
+      return {
+        key: message.id,
+        render: (ref: (el: HTMLDivElement | null) => void, animateEntrance: boolean) => (
+          <ChatMessage
+            key={message.id}
+            messageId={message.id}
+            ref={ref}
+            animateEntrance={animateEntrance}
+            onRetry={onRetry}
+            role={message.role}
+            content={message.content}
+            timestamp={message.timestamp}
+            gameDate={message.gameDate}
+            historySaved={message.historySaved}
+            responseTimeMs={message.responseTimeMs}
+            modelDisplay={message.modelDisplay}
+            modelRouting={message.modelRouting}
+            isError={message.isError}
+            actionLabel={
+              message.action === 'settings'
+                ? t('chat.errors.openProviderSettings')
+                : message.action === 'usage' ? t('chatgpt.manageUsage') : undefined
+            }
+            onAction={onAction}
+            onReport={onReport}
+          />
+        ),
+      }
+    })
 
     if (isLoading) {
       base.push({
