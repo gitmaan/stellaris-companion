@@ -104,6 +104,9 @@ The hidden mode is gated by `E2E=1` and does not change normal app behavior.
 See [Visual quality](visual-quality.md) for layout, motion, dialog, and regression
 coverage conventions.
 
+See [Frontend performance](frontend-performance.md) for the hidden renderer
+benchmark and lazy-loading regression coverage.
+
 ## Packaged backend build (PyInstaller)
 
 ```bash

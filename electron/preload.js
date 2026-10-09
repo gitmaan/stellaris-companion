@@ -41,6 +41,14 @@ function createManagedListener(channel, callback) {
   }
 }
 
+// did-finish-load can deliver the first health result before React finishes
+// loading settings or a language catalog. Keep one listener for this preload's
+// lifetime so newly mounted views do not wait for the next health poll.
+let latestBackendStatus
+createManagedListener('backend-status', (status) => {
+  latestBackendStatus = status
+})
+
 contextBridge.exposeInMainWorld('electronAPI', {
   // Settings
   getSettings: () => ipcRenderer.invoke('load-settings'),
@@ -188,7 +196,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Backend status events (sent from main process health checks)
   // Uses managed listener to prevent accumulation
   onBackendStatus: (callback) => {
-    return createManagedListener('backend-status', callback)
+    const cleanup = createManagedListener('backend-status', callback)
+    try {
+      if (latestBackendStatus !== undefined) callback(latestBackendStatus)
+    } catch (error) {
+      cleanup()
+      throw error
+    }
+    return cleanup
   },
 
   // Updates

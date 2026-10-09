@@ -1,4 +1,4 @@
-import { forwardRef, memo, useState, useEffect } from 'react'
+import { forwardRef, memo, useState, useEffect, useMemo } from 'react'
 import type { MouseEvent } from 'react'
 import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
@@ -93,6 +93,11 @@ function createMarkdownComponents(blockedLinkTitle: string): Components {
 /**
  * ChatMessage - Data Log Style
  */
+const MessageMarkdown = memo(function MessageMarkdown({ content, blockedLinkTitle }: { content: string; blockedLinkTitle: string }) {
+  const components = useMemo(() => createMarkdownComponents(blockedLinkTitle), [blockedLinkTitle])
+  return <ReactMarkdown skipHtml components={components}>{content}</ReactMarkdown>
+})
+
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMessage(
   {
     messageId,
@@ -127,7 +132,6 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
       setCopyState('copied')
     } catch { setCopyState('failed') }
   }
-  const markdownComponents = createMarkdownComponents(t('chat.message.blockedLink'))
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
   }
@@ -182,7 +186,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
         <div className={`${bodyTextSize} leading-relaxed ${isError ? 'text-accent-red' : 'advisor-body-copy text-text-primary/90'}`}>
             {role === 'assistant' ? (
               <div className="markdown-content font-sans">
-                <ReactMarkdown skipHtml components={markdownComponents}>{content}</ReactMarkdown>
+                <MessageMarkdown content={content} blockedLinkTitle={t('chat.message.blockedLink')} />
               </div>
             ) : (
               <div className="font-mono text-white/80 whitespace-pre-wrap">{content}</div>
