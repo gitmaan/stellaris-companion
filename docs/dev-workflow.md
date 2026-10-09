@@ -100,6 +100,9 @@ frames still run. To debug with visible windows, explicitly use
 `npm -C electron run test:e2e:headed` (or set `E2E_SHOW_WINDOWS=1`). Linux CI runs
 visible windows inside Xvfb; Windows smoke tests use the runner's own desktop.
 The hidden mode is gated by `E2E=1` and does not change normal app behavior.
+Journeys that require native window visibility, such as transmission auto-open
+and tray reopening, are skipped in local hidden runs and exercised in Linux CI's
+virtual display, including the release-validation workflow.
 
 See [Visual quality](visual-quality.md) for layout, motion, dialog, and regression
 coverage conventions.
