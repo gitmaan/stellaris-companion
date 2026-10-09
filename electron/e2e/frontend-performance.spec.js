@@ -192,3 +192,39 @@ test('scrolling and response feedback preserve unchanged Markdown nodes in a lon
     expect(await page.locator('[data-message-id]').count()).toBeLessThan(40)
   }, { backend })
 })
+
+test('returning to a previously viewed history page does not replay message entrances', async () => {
+  const turns = Array.from({ length: 151 }, (_, i) => ({
+    id: `turn-${i}`, request_id: `turn-${i}`, question: `Question ${i}`,
+    answer: `Saved response ${i}.`, created_at: 1700000000 + i, language: 'en',
+  }))
+  const backend = createMockChronicleBackend({ conversations: [{ id: 'paged-chat', save_id: 'save-1', title: 'Saved history', created_at: 1, updated_at: 2, turns }] })
+  await withApp(async page => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await expect(page.locator('[data-message-id="turn-150"]')).toBeVisible()
+    await page.getByRole('button', { name: en.continuity.earlierMessages, exact: true }).click()
+    await expect(page.locator('[data-message-id="turn-0"]')).toBeVisible()
+    await page.evaluate(() => {
+      window.__historyEntranceFrames = new Promise(resolve => {
+        const values = []
+        const started = performance.now()
+        let firstSeen
+        const sample = () => {
+          const message = document.querySelector('[data-message-id="turn-150"]')
+          const now = performance.now()
+          if (message) {
+            firstSeen ??= now
+            values.push(Number(getComputedStyle(message).opacity))
+          }
+          if ((firstSeen !== undefined && now - firstSeen > 250) || now - started > 10000) resolve(values)
+          else requestAnimationFrame(sample)
+        }
+        requestAnimationFrame(sample)
+      })
+    })
+    await page.getByRole('button', { name: en.continuity.latestMessages, exact: true }).click()
+    const opacities = await page.evaluate(() => window.__historyEntranceFrames)
+    expect(opacities.length).toBeGreaterThan(0)
+    expect(Math.min(...opacities)).toBe(1)
+  }, { backend })
+})
