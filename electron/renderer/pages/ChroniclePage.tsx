@@ -8,7 +8,7 @@ import type { TFunction } from 'i18next'
 import ChronicleChapterList from '../components/ChronicleChapterList'
 import ChatGPTUsage from '../components/ChatGPTUsage'
 import { manageChatGPTUsage } from '../hooks/useChatGPT'
-import ChronicleContent, { ChronicleHeading } from '../components/ChronicleContent'
+import ChronicleContent from '../components/ChronicleContent'
 import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
 import ChroniclePublishDialog from '../components/ChroniclePublishDialog'
 import { useBackend, ChronicleResponse, type Playthrough } from '../hooks/useBackend'
@@ -762,6 +762,12 @@ function ChroniclePage({
     const blocks = () => Array.from(container.querySelectorAll<HTMLElement>('[data-reading-id]'))
     const storePosition = () => {
       if (disposed || restoredReadingKeyRef.current !== key || container.clientHeight === 0) return
+      // The opening title is part of the reading position. Mapping the top of the
+      // page to paragraph zero would skip the entire header when reopening it.
+      if (container.scrollTop <= 1) {
+        try { localStorage.setItem(key, JSON.stringify({ atStart: true })) } catch { /* Reading preferences are optional. */ }
+        return
+      }
       const top = container.getBoundingClientRect().top + 12
       const all = blocks()
       const block = all.find(item => item.getBoundingClientRect().bottom > top) || all[all.length - 1]
@@ -780,7 +786,9 @@ function ChroniclePage({
           try {
             const raw = localStorage.getItem(key)
             const saved = raw ? JSON.parse(raw) : null
-            if (saved) {
+            if (saved?.atStart === true) {
+              container.scrollTop = 0
+            } else if (saved) {
               const all = blocks()
               const block = all.find(item => item.dataset.readingId === saved.id && item.id === saved.anchor)
                 || all.find(item => item.id === saved.anchor) || all[0]
@@ -1103,12 +1111,11 @@ function ChroniclePage({
 
         {/* Right content panel - Chapter content */}
         <div className="flex-1 min-w-0 min-h-0 relative flex flex-col">
-          {compactReader && <header className="chronicle-toolbar shrink-0 flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
-            <ChronicleHeading empireName={empireName} coverageDate={chronicle?.coverage_date} compact />
+          {compactReader && <div className="chronicle-toolbar shrink-0 flex justify-end px-3 pt-2">
             <HUDButton type="button" variant="secondary" aria-haspopup="dialog" aria-controls="chronicle-navigation" aria-expanded={chapterDrawerOpen} onClick={() => setChapterDrawerOpen(true)} className="shrink-0 px-3 py-2">
               {t('chronicle.sidebar.chapters')}
             </HUDButton>
-          </header>}
+          </div>}
           <div ref={scrollContainerRef} data-chronicle-scroll className="chronicle-reader flex-1 min-h-0 overflow-y-auto p-3 lg:p-6" style={{ overflowAnchor: 'none' }}>
           <div className="relative">
             {storyAfterLoadedSave && <p role="status" className="mb-4 rounded border border-accent-yellow/20 bg-accent-yellow/5 px-4 py-3 text-xs text-text-secondary">{t('continuity.earlierSave')}</p>}
@@ -1195,7 +1202,6 @@ function ChroniclePage({
               </div>
             ) : chronicle ? (
               <ChronicleContent
-                hideHeader={compactReader}
                 revision={chronicle.chronicle_revision}
                 coverageDate={chronicle.coverage_date}
                 mutationBusy={mutationBusy || loading}

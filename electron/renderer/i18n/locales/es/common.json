@@ -1168,6 +1168,7 @@
     "analyzingHelp": "Se está analizando tu partida. Las preguntas sugeridas y el asesor estarán disponibles al terminar el análisis.",
     "saveSettings": "Revisar ajustes de partidas",
     "settingsSections": "Secciones de ajustes",
+    "jumpToSection": "Ir a la sección…",
     "settingsSaveHelp": "Las preferencias de visualización y los cambios de carpeta se guardan inmediatamente. Los campos de texto con un botón Aplicar o Guardar se guardan al pulsarlo.",
     "nextQuestion": "Escribe tu próxima pregunta mientras responde el asesor…"
   }

@@ -1157,6 +1157,7 @@
     "analyzingHelp": "Dein Spielstand wird analysiert. Vorschläge und Berater sind verfügbar, sobald die Analyse abgeschlossen ist.",
     "saveSettings": "Spielstandeinstellungen prüfen",
     "settingsSections": "Einstellungsbereiche",
+    "jumpToSection": "Zum Bereich…",
     "settingsSaveHelp": "Anzeigeeinstellungen und Ordneränderungen werden sofort gespeichert. Textfelder mit einer Schaltfläche zum Anwenden oder Speichern werden beim Drücken dieser Schaltfläche gespeichert.",
     "nextQuestion": "Schreibe deine nächste Frage, während der Berater antwortet…"
   }

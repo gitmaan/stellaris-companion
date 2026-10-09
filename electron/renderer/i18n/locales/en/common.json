@@ -1157,6 +1157,7 @@
     "analyzingHelp": "Your save is being analyzed. Suggested questions and the advisor will be available when analysis finishes.",
     "saveSettings": "Check save settings",
     "settingsSections": "Settings sections",
+    "jumpToSection": "Jump to section…",
     "settingsSaveHelp": "Display preferences and folder changes save immediately. Text fields with an Apply or Save button save when you press it.",
     "nextQuestion": "Write your next question while the advisor responds…"
   }

@@ -286,8 +286,12 @@ html, body, #root { height: 100%; overflow: hidden; }
 .chat-toolbar .chatgpt-usage { height: 100%; }
 .chat-toolbar.chat-toolbar-with-history { height: auto; min-height: 48px; flex-wrap: wrap; padding-top: 4px; }
 .chat-history-paging { order: 1; flex-basis: 100%; padding-bottom: 4px; }
-@media (min-width: 480px) {
-  .settings-preferences { grid-template-columns: minmax(0, .75fr) minmax(0, 1.15fr) minmax(0, 1.1fr); }
+/* Keep the original title hierarchy and generous controls at compact sizes. */
+.chronicle-header { padding-top: 4px; }
+.chronicle-display-title { text-wrap: balance; }
+.settings-preferences select { min-height: 40px; }
+@media (min-width: 960px) {
+  .settings-preferences { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 1100px), (max-height: 760px) {
   .chat-welcome-folder { width: 24px; height: 24px; }
@@ -309,18 +313,8 @@ html, body, #root { height: 100%; overflow: hidden; }
   .chat-welcome header > * + * { margin-top: 8px; }
   .chat-transcript { margin-bottom: 8px; }
   .chronicle-reader { padding: 12px 8px; }
-  .chronicle-header { margin-bottom: 12px; }
-  .chronicle-header .energy-line { margin-top: 8px; }
-  .chronicle-chapter { padding: 12px 16px; }
-  .chapter-header { margin-bottom: 8px; padding-bottom: 8px; }
-  .chapter-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
-  .chapter-title { grid-column: 1 / -1; grid-row: 2; }
-  .chapter-dates { grid-column: 2; grid-row: 1; font-size: .75rem; }
-  .settings-header { margin-bottom: 20px; }
-  .settings-header > * + * { margin-top: 12px; }
-  .settings-header h1 { font-size: 1.5rem; line-height: 1.2; }
-  .settings-sections { gap: 6px; }
-  .settings-sections button { padding: 6px 10px; }
+  .chronicle-chapter { padding: 16px; }
+  .settings-header { margin-bottom: 24px; }
   .settings-preferences select { padding-left: 12px; }
 }
 

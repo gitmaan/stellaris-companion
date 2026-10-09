@@ -4,7 +4,6 @@ import { ChronicleChapter, CurrentEra, NarrativeSection } from '../hooks/useBack
 import Tooltip from './Tooltip'
 
 interface ChronicleContentProps {
-  hideHeader?: boolean
   revision?: string
   coverageDate?: string | null
   mutationBusy?: boolean
@@ -26,7 +25,6 @@ interface ChronicleContentProps {
  * Renders all chapters in sequence with current era at the bottom
  */
 function ChronicleContent({
-  hideHeader = false,
   revision, coverageDate, mutationBusy, onEdit, onUndo,
   empireName,
   chapters,
@@ -42,10 +40,10 @@ function ChronicleContent({
   return (
     <article className="max-w-[800px] mx-auto">
       {/* Empire header */}
-      {!hideHeader && <header className="chronicle-header text-center mb-4 lg:mb-6 relative">
+      <header className="chronicle-header text-center mb-5 lg:mb-8 relative">
         <ChronicleHeading empireName={empireName} coverageDate={coverageDate} />
         <div className="energy-line mt-4 max-w-[200px] mx-auto" />
-      </header>}
+      </header>
 
       {chapters.length === 0 && !currentEra && legacyChronicle?.trim() && (
         <section className="chronicle-narrative text-base leading-relaxed text-text-primary">
@@ -81,19 +79,18 @@ function ChronicleContent({
   )
 }
 
-export function ChronicleHeading({ empireName, coverageDate, compact = false }: {
+function ChronicleHeading({ empireName, coverageDate }: {
   empireName: string
   coverageDate?: string | null
-  compact?: boolean
 }) {
   const { t } = useTranslation()
   const title = t('chronicle.content.title', { empireName })
   return <div className="min-w-0">
-    <h1 title={title} className={`chronicle-display-title font-display tracking-wide text-text-primary uppercase ${compact ? 'text-sm leading-snug line-clamp-2' : 'text-lg lg:text-2xl break-words'}`}>
+    <h1 title={title} className="chronicle-display-title font-display tracking-wide text-text-primary text-glow-sm uppercase text-lg lg:text-2xl leading-relaxed break-words">
       <span aria-hidden="true" className="text-accent-cyan mr-2">◈</span>
       {title}
     </h1>
-    {coverageDate && <p className={`${compact ? 'mt-1 text-[11px]' : 'mt-3 text-xs'} text-text-secondary`}>{t('continuity.storyCoverage', { date: coverageDate })}</p>}
+    {coverageDate && <p className="mt-3 text-xs text-text-secondary">{t('continuity.storyCoverage', { date: coverageDate })}</p>}
   </div>
 }
 

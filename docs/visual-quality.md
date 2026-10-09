@@ -24,11 +24,18 @@ the reader. Selecting a chapter or campaign closes it. Do not animate reader
 width: paragraphs would rewrap every frame. `useReadingAnchor` preserves the
 current paragraph across responsive width changes.
 
-At compact widths the Chronicle title, coverage date, and Chapters control share
-one header above the reader. Short or narrow windows reduce navigation padding,
-ornamental heading sizes, and chapter metadata spacing without reducing narrative
-text. Keep the first narrative line within the top two-thirds of the minimum
-window, including supported text scales and locales.
+Keep Chronicle's centered empire title, coverage date, glowing divider, and
+stacked chapter metadata at every window size. The title scrolls with the reader;
+the compact Chapters control stays reachable above it. Long empire names and
+localized titles wrap rather than truncate. Short or narrow windows reduce chrome
+padding while preserving the title hierarchy and narrative text size. Large text
+may need vertical scrolling; do not flatten the header just to show more prose.
+
+Settings retains its large HUD heading and generous display controls. A quiet
+section picker beside the heading opens the target section and moves keyboard
+focus there, including sections in a closed disclosure. Display preferences stack
+below 960 CSS pixels and use three columns when there is space. Keep helper text
+after the preferences so it does not compete with the heading or first controls.
 
 Preserve the HUD's scanlines, glowing headings, display fonts, and corner accents.
 Apply one global scanline overlay so portals and content use the same texture.
@@ -61,7 +68,7 @@ initial focus. Actionable notifications remain reachable in the focus sequence.
 
 All interactive controls have a visible focus outline, including custom
 checkboxes. Routine Settings preferences report Applying/Saved beside their
-controls in a reserved space. Settings section links precede the display controls.
+controls in a reserved space. The Settings section picker precedes the display controls.
 Errors and actionable notifications use toasts below navigation; dismissal pauses
 while the notice is hovered or focused.
 
@@ -69,7 +76,7 @@ while the notice is hovered or focused.
 
 Distinguish connecting, offline, no save, analyzing, and missing provider setup.
 Show a matching explanation and a direct configuration action when available.
-Settings section links reveal the appropriate section, and help text distinguishes
+Settings section navigation reveals the appropriate section, and help text distinguishes
 automatically saved preferences from the provider's explicit save action.
 Advisor/narrator save confirmations survive ordinary status updates; a late
 initial advisor-style load cannot overwrite instructions already being edited.
@@ -100,8 +107,8 @@ Linux CI exercises visible windows inside Xvfb. See [Development workflow](dev-w
 - Hidden local-window behavior and frame/geometry sampling across tab changes.
 - Composer alignment and upward expansion at multiple text scales; customization
   can still be saved through the person icon while a reply is pending.
-- Inline preference feedback without layout movement and compact Chronicle
-  reading space. The comparison journey uses fixed conversation/chapter content
+- Inline preference feedback without layout movement, readable Chronicle headers,
+  and scrollable compact settings. The comparison journey uses fixed conversation/chapter content
   and captures the same 1000px, 1400px, and 800×600 viewports.
 
 The suite saves screenshots and JSON measurements under `artifacts/visual-quality`.

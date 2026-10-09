@@ -54,6 +54,7 @@ function revealSettingsSection(id: string) {
   const disclosure = section?.closest('details')
   if (disclosure) disclosure.open = true
   section?.scrollIntoView()
+  section?.focus({ preventScroll: true })
 }
 
 interface SettingsPageProps {
@@ -455,18 +456,25 @@ function SettingsPage({
       <div className="max-w-4xl mx-auto pt-2">
         
         {/* Header Area */}
-        <div className="settings-header mb-6 space-y-4">
+        <header className="settings-header mb-8 space-y-6">
+          <div className="settings-heading-row flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
                 <HUDMicro className="mb-1 text-accent-cyan">{t('settings.eyebrow')}</HUDMicro>
-                <HUDHeader size="xl" className="leading-none break-words">{t('settings.title')}</HUDHeader>
+                <HUDHeader size="xl" className="leading-tight break-words text-glow-sm">{t('settings.title')}</HUDHeader>
             </div>
-            <nav aria-label={t('visualQuality.settingsSections')} className="settings-sections flex flex-wrap gap-2">
-              {[['ai-setup', 'intelligence'], ['save-data', 'data'], ['communications', 'communications'], ['updates', 'updates'], ['diagnostics', 'diagnostics']].map(([id, label]) => (
-                <button type="button" key={id} onClick={() => revealSettingsSection(id)} className="rounded border border-border px-3 py-2 text-xs text-text-secondary hover:border-accent-cyan/50 hover:text-accent-cyan">{t(`settings.sections.${label}`)}</button>
-              ))}
+            <nav aria-label={t('visualQuality.settingsSections')} className="settings-sections w-52 max-w-full min-w-0">
+              <HUDSelect
+                label={t('visualQuality.settingsSections')}
+                value=""
+                onChange={event => revealSettingsSection(event.target.value)}
+                options={[
+                  { value: '', label: t('visualQuality.jumpToSection') },
+                  ...[['ai-setup', 'intelligence'], ['save-data', 'data'], ['communications', 'communications'], ['updates', 'updates'], ['diagnostics', 'diagnostics']].map(([value, label]) => ({ value, label: t(`settings.sections.${label}`) })),
+                ]}
+              />
             </nav>
-            <p className="text-xs text-text-secondary">{t('visualQuality.settingsSaveHelp')}</p>
-            <div className="settings-preferences grid grid-cols-1 sm:grid-cols-3 gap-3">
+          </div>
+            <div className="settings-preferences grid grid-cols-1 gap-x-5 gap-y-4">
               <div>
                 <HUDSelect
                   label={t('settings.textSize')}
@@ -498,7 +506,8 @@ function SettingsPage({
                 <div className="mt-1"><PreferenceFeedback saving={languageSaving} saved={savedPreferences.language} hint={t('settings.languageHint')} /></div>
               </div>
             </div>
-        </div>
+            <p className="text-xs text-text-secondary">{t('visualQuality.settingsSaveHelp')}</p>
+        </header>
 
         {/* Top Status Messages */}
         {error && (
@@ -517,7 +526,7 @@ function SettingsPage({
             {/* Column 1: Core Systems */}
             <div className={`space-y-8 ${aiRoute === 'relay' ? 'md:col-span-2' : ''}`}>
                 
-                <section id="ai-setup">
+                <section id="ai-setup" tabIndex={-1}>
                   <HUDSectionTitle number="01">{t('settings.sections.intelligence')}</HUDSectionTitle>
                   <HUDPanel decoration="tech" title={t('settings.aiSetup.chooseRoute')} quiet>
                     <div className="space-y-4 pt-2">
@@ -559,7 +568,7 @@ function SettingsPage({
             <div className="space-y-8">
 
                 {/* Save Data Section */}
-                <section id="save-data">
+                <section id="save-data" tabIndex={-1}>
                     <HUDSectionTitle number="02">{t('settings.sections.data')}</HUDSectionTitle>
                     <div className="space-y-4">
                       <HUDPanel decoration="brackets" title={t('settings.panels.saveSource')} quiet>
@@ -706,7 +715,7 @@ function SettingsPage({
             {/* Optional connections */}
             <div className="space-y-8">
                 {/* Discord Section */}
-                <section id="communications">
+                <section id="communications" tabIndex={-1}>
                     <HUDSectionTitle number="04">{t('settings.sections.communications')}</HUDSectionTitle>
                     <HUDPanel decoration="scanline" variant={discordStatus?.connected ? 'primary' : 'secondary'} title={t('settings.panels.discordLink')} quiet>
                         <div className="space-y-4 pt-2">
@@ -785,7 +794,7 @@ function SettingsPage({
             <div className="space-y-8">
 
                 {/* Software Updates Section */}
-                <section id="updates">
+                <section id="updates" tabIndex={-1}>
                     <HUDSectionTitle number="05">{t('settings.sections.updates')}</HUDSectionTitle>
                     <HUDPanel decoration="brackets" title={t('settings.panels.updateChannel')} quiet>
                         <div className="space-y-3 pt-2">
@@ -838,7 +847,7 @@ function SettingsPage({
                 </section>
 
                 {/* Feedback Section */}
-                <section id="diagnostics">
+                <section id="diagnostics" tabIndex={-1}>
                     <HUDSectionTitle number="06">{t('settings.sections.diagnostics')}</HUDSectionTitle>
                     <div className="flex gap-4 items-center p-4 border border-white/5 bg-black/15 rounded-sm">
                         <div className="flex-1">

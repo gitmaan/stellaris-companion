@@ -1168,6 +1168,7 @@
     "analyzingHelp": "Seu jogo salvo está sendo analisado. As perguntas sugeridas e o conselheiro estarão disponíveis ao fim da análise.",
     "saveSettings": "Verificar configurações de jogos salvos",
     "settingsSections": "Seções de configurações",
+    "jumpToSection": "Ir para a seção…",
     "settingsSaveHelp": "As preferências de exibição e as mudanças de pasta são salvas imediatamente. Campos de texto com um botão Aplicar ou Salvar são salvos quando você pressiona esse botão.",
     "nextQuestion": "Escreva sua próxima pergunta enquanto o conselheiro responde…"
   }

@@ -1157,6 +1157,7 @@
     "analyzingHelp": "正在分析你的存档。分析完成后，即可使用建议问题和顾问。",
     "saveSettings": "检查存档设置",
     "settingsSections": "设置分区",
+    "jumpToSection": "跳转到分区…",
     "settingsSaveHelp": "显示偏好和文件夹更改会立即保存。带有“应用”或“保存”按钮的文本字段会在按下相应按钮时保存。",
     "nextQuestion": "顾问正在回答，你可以先写下一个问题…"
   }

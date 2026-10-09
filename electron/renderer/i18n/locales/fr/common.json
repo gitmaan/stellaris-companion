@@ -1168,6 +1168,7 @@
     "analyzingHelp": "Votre sauvegarde est en cours d’analyse. Les questions suggérées et le conseiller seront disponibles à la fin de l’analyse.",
     "saveSettings": "Vérifier les paramètres des sauvegardes",
     "settingsSections": "Sections des paramètres",
+    "jumpToSection": "Aller à la section…",
     "settingsSaveHelp": "Les préférences d’affichage et les changements de dossier sont enregistrés immédiatement. Les champs de texte dotés d’un bouton Appliquer ou Enregistrer sont enregistrés quand vous appuyez dessus.",
     "nextQuestion": "Rédigez votre prochaine question pendant que le conseiller répond…"
   }
