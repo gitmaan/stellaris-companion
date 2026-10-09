@@ -22,7 +22,7 @@ export interface UseAnnouncementsResult {
 export function useAnnouncements(): UseAnnouncementsResult {
   const [allAnnouncements, setAllAnnouncements] = useState<Announcement[]>([])
   const [dismissedIds, setDismissedIds] = useState<string[]>([])
-  const [lastRead, setLastRead] = useState<number>(0)
+  const [readIds, setReadIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   // Load initial state
@@ -36,16 +36,16 @@ export function useAnnouncements(): UseAnnouncementsResult {
 
     const loadInitialState = async () => {
       try {
-        const [dismissed, readTs] = await Promise.all([
+        const [dismissed, read] = await Promise.all([
           api.announcements.getDismissed(),
-          api.announcements.getLastRead(),
+          api.announcements.getReadIds(),
         ])
         if (cancelled) return
         // Merge instead of replace to avoid race with local dismisses.
         setDismissedIds((prev) => mergeUniqueIds(prev, dismissed))
-        setLastRead(readTs)
+        setReadIds((prev) => mergeUniqueIds(prev, read))
 
-        const announcements = await api.announcements.fetch()
+        const announcements = await api.announcements.fetch(true)
         if (cancelled) return
         setAllAnnouncements(announcements)
       } catch {
@@ -85,13 +85,11 @@ export function useAnnouncements(): UseAnnouncementsResult {
     return allAnnouncements.filter((a) => dismissedIds.includes(a.id))
   }, [allAnnouncements, dismissedIds])
 
-  // Count unread: announcements published after lastRead
+  // Publication time cannot tell us whether a delayed or cached item was seen.
   const unreadCount = useMemo(() => {
-    return announcements.filter((a) => {
-      const published = new Date(a.publishedAt).getTime()
-      return published > lastRead
-    }).length
-  }, [announcements, lastRead])
+    const read = new Set(readIds)
+    return announcements.filter((a) => !read.has(a.id)).length
+  }, [announcements, readIds])
 
   const dismissAnnouncement = useCallback((id: string) => {
     setDismissedIds((prev) => mergeUniqueIds(prev, [id]))
@@ -128,10 +126,10 @@ export function useAnnouncements(): UseAnnouncementsResult {
   }, [])
 
   const markAllRead = useCallback(() => {
-    const now = Date.now()
-    setLastRead(now)
-    window.electronAPI?.announcements?.markRead().catch(() => {})
-  }, [])
+    const ids = announcements.map((announcement) => announcement.id)
+    setReadIds((prev) => mergeUniqueIds(prev, ids))
+    window.electronAPI?.announcements?.markRead(ids).catch(() => {})
+  }, [announcements])
 
   const refresh = useCallback(() => {
     window.electronAPI?.announcements?.fetch(true).then((result) => {

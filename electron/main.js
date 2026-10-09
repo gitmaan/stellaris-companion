@@ -1951,7 +1951,7 @@ app.whenReady().then(async () => {
   })
 
   // Announcements: initial fetch + periodic polling
-  announcementsService.fetchAnnouncements().then((announcements) => {
+  announcementsService.fetchAnnouncements(true).then((announcements) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('announcements-updated', announcements)
     }

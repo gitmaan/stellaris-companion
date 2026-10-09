@@ -381,7 +381,8 @@ declare global {
         undismiss: (id: string) => Promise<{ success: boolean; error?: string }>
         resetDismissed: () => Promise<{ success: boolean }>
         getDismissed: () => Promise<string[]>
-        markRead: () => Promise<{ success: boolean }>
+        getReadIds: () => Promise<string[]>
+        markRead: (ids: string[]) => Promise<{ success: boolean; readIds: string[] }>
         getLastRead: () => Promise<number>
       }
       onAnnouncementsUpdated: (callback: (announcements: Announcement[]) => void) => () => void

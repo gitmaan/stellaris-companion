@@ -205,22 +205,22 @@ function App() {
       setTransmissionsOpen(false)
       return
     }
-    if (announcementsLoading || unreadCount <= 0 || didAutoOpenTransmissionsRef.current) return
+    if (!languageReady || onboardingDone !== true || announcementsLoading
+      || unreadCount <= 0 || didAutoOpenTransmissionsRef.current) return
 
     didAutoOpenTransmissionsRef.current = true
     setTransmissionsOpen(true)
-    markAllRead()
-  }, [hasTransmissions, announcementsLoading, unreadCount, markAllRead])
+  }, [hasTransmissions, languageReady, onboardingDone, announcementsLoading, unreadCount])
+
+  // Only acknowledge IDs after their panel has rendered in the ready app.
+  useEffect(() => {
+    if (transmissionsOpen && languageReady && onboardingDone === true
+      && !announcementsLoading && unreadCount > 0) markAllRead()
+  }, [transmissionsOpen, languageReady, onboardingDone, announcementsLoading, unreadCount, markAllRead])
 
   const handleToggleTransmissions = useCallback(() => {
-    setTransmissionsOpen((prev) => {
-      const next = !prev
-      if (next && unreadCount > 0) {
-        markAllRead()
-      }
-      return next
-    })
-  }, [unreadCount, markAllRead])
+    setTransmissionsOpen((prev) => !prev)
+  }, [])
 
   const handleCloseTransmissions = useCallback(() => {
     setTransmissionsOpen(false)

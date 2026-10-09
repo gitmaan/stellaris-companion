@@ -264,7 +264,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     undismiss: (id) => ipcRenderer.invoke('announcements:undismiss', { id }),
     resetDismissed: () => ipcRenderer.invoke('announcements:reset-dismissed'),
     getDismissed: () => ipcRenderer.invoke('announcements:get-dismissed'),
-    markRead: () => ipcRenderer.invoke('announcements:mark-read'),
+    getReadIds: () => ipcRenderer.invoke('announcements:get-read-ids'),
+    markRead: (ids) => ipcRenderer.invoke('announcements:mark-read', { ids }),
     getLastRead: () => ipcRenderer.invoke('announcements:get-last-read'),
   },
   onAnnouncementsUpdated: (callback) => {
