@@ -127,8 +127,9 @@ export function useAnnouncements(): UseAnnouncementsResult {
 
   const markAllRead = useCallback(() => {
     const ids = announcements.map((announcement) => announcement.id)
-    setReadIds((prev) => mergeUniqueIds(prev, ids))
-    window.electronAPI?.announcements?.markRead(ids).catch(() => {})
+    window.electronAPI?.announcements?.markRead(ids).then((result) => {
+      if (result.success) setReadIds((prev) => mergeUniqueIds(prev, result.readIds))
+    }).catch(() => {})
   }, [announcements])
 
   const refresh = useCallback(() => {

@@ -103,6 +103,7 @@ test('mark-read acknowledges only displayed IDs and validates its sender', async
     validateSender: (event) => { if (event !== 'trusted') throw new Error('Untrusted sender') },
     store,
     announcementsService: service(store),
+    isWindowVisible: () => true,
   })
   const invoke = (channel, payload, sender = 'trusted') => handlers.get(channel)(sender, payload)
   await assert.rejects(invoke('announcements:mark-read', { ids: ['unseen'] }, 'untrusted'), /Untrusted/)
@@ -114,4 +115,22 @@ test('mark-read acknowledges only displayed IDs and validates its sender', async
   assert.deepEqual(await invoke('announcements:get-read-ids'), ['seen', 'displayed'])
   assert.deepEqual(await invoke('announcements:get-dismissed'), ['dismissed'])
   assert.deepEqual((await invoke('announcements:mark-read')).readIds, ['seen', 'displayed'])
+})
+
+test('a late renderer read acknowledgment cannot mark hidden transmissions as seen', async () => {
+  const store = createStore({ announcementsReadIds: ['seen'], announcementsLastRead: 123 })
+  const handlers = new Map()
+  let visible = false
+  registerAnnouncementsIpcHandlers({
+    ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
+    validateSender: () => {},
+    store,
+    announcementsService: service(store),
+    isWindowVisible: () => visible,
+  })
+  const markRead = () => handlers.get('announcements:mark-read')({}, { ids: ['received-while-hidden'] })
+  assert.deepEqual(await markRead(), { success: false, readIds: ['seen'] })
+  assert.equal(store.get('announcementsLastRead'), 123)
+  visible = true
+  assert.deepEqual(await markRead(), { success: true, readIds: ['seen', 'received-while-hidden'] })
 })

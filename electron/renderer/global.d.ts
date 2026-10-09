@@ -373,6 +373,9 @@ declare global {
       }
       onDiscordRelayStatus: (callback: (status: DiscordRelayStatus) => void) => () => void
       onDiscordAuthRequired: (callback: (data: { reason: string }) => void) => () => void
+      // Native window visibility
+      getWindowVisible: () => Promise<boolean>
+      onWindowVisibilityChanged: (callback: (visible: boolean) => void) => () => void
       // Announcements
       announcements: {
         fetch: (forceRefresh?: boolean) => Promise<Announcement[]>

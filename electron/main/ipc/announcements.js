@@ -11,7 +11,7 @@ function setDismissedIds(store, ids) {
   return uniqueIds
 }
 
-function registerAnnouncementsIpcHandlers({ ipcMain, validateSender, store, announcementsService }) {
+function registerAnnouncementsIpcHandlers({ ipcMain, validateSender, store, announcementsService, isWindowVisible }) {
   ipcMain.handle('announcements:fetch', async (event, payload = {}) => {
     validateSender(event)
     const forceRefresh = !!payload.forceRefresh
@@ -71,6 +71,9 @@ function registerAnnouncementsIpcHandlers({ ipcMain, validateSender, store, anno
 
   ipcMain.handle('announcements:mark-read', async (event, payload = {}) => {
     validateSender(event)
+    // A native hide event can reach the renderer after a feed update. Check here
+    // as well so that race cannot persist unseen IDs as read.
+    if (!isWindowVisible()) return { success: false, readIds: getAnnouncementReadIds(store) }
     const readIds = markAnnouncementIdsRead(store, payload.ids)
     store.set('announcementsLastRead', Date.now())
     return { success: true, readIds }

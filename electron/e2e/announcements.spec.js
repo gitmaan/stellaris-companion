@@ -34,6 +34,31 @@ async function setup(settings) {
       })
       return app.firstWindow()
     },
+    async hide() {
+      await app.evaluate(async ({ BrowserWindow }) => {
+        const window = BrowserWindow.getAllWindows()[0]
+        await new Promise((resolve) => {
+          window.once('hide', () => resolve())
+          window.hide()
+        })
+      })
+    },
+    async show() {
+      await app.evaluate(async ({ BrowserWindow }) => {
+        const window = BrowserWindow.getAllWindows()[0]
+        await new Promise((resolve) => {
+          window.once('show', () => resolve())
+          window.show()
+        })
+        window.focus()
+      })
+    },
+    async updateFeed(items, push = false) {
+      await app.evaluate(({ BrowserWindow }, { items, push }) => {
+        process.env.E2E_ANNOUNCEMENTS_FIXTURE = JSON.stringify({ version: 1, announcements: items })
+        if (push) BrowserWindow.getAllWindows()[0].webContents.send('announcements-updated', items)
+      }, { items, push })
+    },
     async dispose() {
       if (app) await app.close().catch(() => {})
       await backend.stop()
@@ -106,6 +131,45 @@ test('first-run onboarding finishes before transmissions are opened or marked re
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: item.title })).toBeVisible()
     await expect.poll(() => readIds(page)).toEqual([item.id])
+  } finally {
+    await fixture.dispose()
+  }
+})
+
+test('reopening from the tray refreshes the feed and does not lose hidden transmissions', async () => {
+  test.setTimeout(60_000)
+  const first = announcement('first')
+  const hidden = announcement('received-while-hidden')
+  const fresh = announcement('fresh-on-reopen')
+  const fixture = await setup({ hasCompletedOnboarding: true })
+  try {
+    const page = await fixture.launch([first])
+    await expect(page.getByRole('heading', { name: first.title })).toBeVisible()
+    await expect.poll(() => readIds(page)).toEqual([first.id])
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('heading', { name: first.title })).toHaveCount(0)
+
+    await fixture.hide()
+    await expect.poll(() => page.evaluate(() => window.electronAPI.getWindowVisible())).toBe(false)
+    await fixture.updateFeed([first, hidden], true)
+    await expect(page.getByTitle('Transmissions', { exact: true }).locator('.animate-pulse')).toHaveCount(1)
+    expect(await readIds(page)).toEqual([first.id])
+    await expect(page.getByRole('heading', { name: hidden.title })).toHaveCount(0)
+
+    await fixture.show()
+    await expect(page.getByRole('heading', { name: hidden.title })).toBeVisible()
+    await expect.poll(() => readIds(page)).toEqual([first.id, hidden.id])
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('heading', { name: hidden.title })).toHaveCount(0)
+
+    await fixture.hide()
+    await expect.poll(() => page.evaluate(() => window.electronAPI.getWindowVisible())).toBe(false)
+    // No push: visibility alone must refresh a feed that changed in the tray.
+    await fixture.updateFeed([first, hidden, fresh])
+    expect(await page.evaluate(async () => (await window.electronAPI.announcements.fetch(true)).map((item) => item.id))).toEqual([first.id, hidden.id, fresh.id])
+    await fixture.show()
+    await expect(page.getByRole('heading', { name: fresh.title })).toBeVisible()
+    await expect.poll(() => readIds(page)).toEqual([first.id, hidden.id, fresh.id])
   } finally {
     await fixture.dispose()
   }

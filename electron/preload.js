@@ -256,6 +256,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     detectSavesInDir: (directory) => ipcRenderer.invoke('onboarding:detect-saves-in-dir', { directory }),
   },
 
+  // Native window visibility
+  getWindowVisible: () => ipcRenderer.invoke('window:get-visible'),
+  onWindowVisibilityChanged: (callback) => createManagedListener('window-visibility-changed', callback),
+
   // Announcements
   announcements: {
     fetch: (forceRefresh = false) => ipcRenderer.invoke('announcements:fetch', { forceRefresh }),

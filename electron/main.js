@@ -1376,6 +1376,10 @@ function revealMainWindow() {
 
 // Window Management
 
+function isMainWindowVisible() {
+  return !!mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() && !mainWindow.isMinimized()
+}
+
 function createWindow() {
   // Restore window state from previous session
   const windowState = store.get('windowState', { width: 1000, height: 700 })
@@ -1401,6 +1405,20 @@ function createWindow() {
       backgroundThrottling: !E2E_HIDDEN,
     },
   })
+
+  // Native visibility is authoritative when the window is hidden in the tray.
+  const window = mainWindow
+  const publishWindowVisibility = (visible) => {
+    if (!window.isDestroyed()) {
+      window.webContents.send('window-visibility-changed', visible)
+    }
+  }
+  for (const event of ['show', 'restore']) {
+    window.on(event, () => publishWindowVisibility(true))
+  }
+  for (const event of ['hide', 'minimize']) {
+    window.on(event, () => publishWindowVisibility(false))
+  }
 
   // Remove default menu bar on Windows/Linux (macOS uses system menu bar)
   if (process.platform !== 'darwin') {
@@ -1547,6 +1565,12 @@ ipcMain.handle('capture-screenshot', async (event) => {
     console.error('Failed to capture screenshot:', e)
     return null
   }
+})
+
+// Native window visibility for renderer announcements.
+ipcMain.handle('window:get-visible', async (event) => {
+  validateSender(event)
+  return isMainWindowVisible()
 })
 
 // App version for feedback reports
@@ -1848,7 +1872,7 @@ ipcMain.handle('onboarding:detect-saves-in-dir', async (event, payload) => {
 // =============================================================================
 // Announcements IPC Handlers
 // =============================================================================
-registerAnnouncementsIpcHandlers({ ipcMain, validateSender, store, announcementsService })
+registerAnnouncementsIpcHandlers({ ipcMain, validateSender, store, announcementsService, isWindowVisible: isMainWindowVisible })
 
 // =============================================================================
 // Discord IPC Handlers (DISC-007 / DISC-008)
