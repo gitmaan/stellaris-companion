@@ -7,6 +7,10 @@ const { getElectronLaunchArgs } = require('./helpers/electronLaunch')
 
 const electronDir = path.resolve(__dirname, '..')
 
+// These journeys verify real native visibility, including read acknowledgments
+// while hidden. Linux CI runs them in Xvfb; local hidden runs must stay hidden.
+test.skip(process.env.E2E_SHOW_WINDOWS !== '1', 'Native window visibility is exercised in visible-window CI')
+
 function announcement(id) {
   return { id, severity: 'info', title: `Fictional transmission: ${id}`, body: 'A local test announcement.', publishedAt: '2020-01-01T00:00:00Z' }
 }
@@ -128,7 +132,8 @@ test('first-run onboarding finishes before transmissions are opened or marked re
     await page.getByRole('heading', { name: 'Find your saves', exact: true }).waitFor()
     expect(await readIds(page)).toEqual([])
     await page.getByRole('button', { name: 'Set up later', exact: true }).click()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('dialog', { name: 'Find your saves', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('dialog', { name: 'Transmissions', exact: true })).toBeVisible()
     await expect(page.getByRole('heading', { name: item.title })).toBeVisible()
     await expect.poll(() => readIds(page)).toEqual([item.id])
   } finally {
