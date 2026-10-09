@@ -1,4 +1,49 @@
-# 1.1.0 release validation
+# 1.1.1-beta.1 release validation
+
+This beta candidate combines the visual quality changes in [#66](https://github.com/gitmaan/stellaris-companion/pull/66), frontend performance improvements in [#69](https://github.com/gitmaan/stellaris-companion/pull/69), and transmission startup fixes in [#68](https://github.com/gitmaan/stellaris-companion/pull/68). Stable remains [v1.1.0](https://github.com/gitmaan/stellaris-companion/releases/tag/v1.1.0) until a separate stable release is published.
+
+The candidate has completed automated integration and unpublished package validation. Keep final publishing receipts and package-review results with the release PR; broader gameplay and update/restart checks remain open below.
+
+## Release notes
+
+Use the same bullets in `electron/release-notes.md` and the GitHub Release body:
+
+- Faster startup and more efficient rendering of long conversations.
+- Improved HUD layouts, text scaling, and keyboard interactions.
+- New transmissions appear once and remain unread while the app is hidden.
+
+The frontend benchmark uses a ready mock backend and warm OS caches. Do not turn its measured startup or scrolling results into universal timing or frame-rate promises.
+
+## Candidate validation
+
+The unpublished [four-platform candidate build](https://github.com/gitmaan/stellaris-companion/actions/runs/37904431373) passed on `f6332aa`. Its [release PR](https://github.com/gitmaan/stellaris-companion/pull/70) records package downloads and review evidence. Publication rebuilds from the final `main` commit; verify that run and its final assets separately.
+
+- [x] Run the combined renderer build, 105 desktop unit tests, 9 localization checks, and Electron journeys; all 10 candidate PR CI checks passed, including native transmission visibility in Linux CI's virtual display.
+- [x] Run the release workflow manually with all four platforms and confirm publication is disabled; release validation and all platform builds passed.
+- [x] Verify signatures, Gatekeeper assessment, and notarization tickets for both macOS architectures; validate versions, release notes, asset sizes, and SHA-512 checksums in all four platform manifests and the combined macOS feed.
+- [x] Check packaged offline Japanese and first-use Settings/Chronicle loading from the archive on Apple silicon with Electron 43.7.9.
+- [x] Check fresh startup and isolated fictional saved profiles on Apple silicon; preserve language, text scaling, chat drafts, onboarding completion, and a saved Stable update-track preference.
+- [x] Exercise compact HUD layouts, text scaling, keyboard/IME focus, background Chronicle finalization, and transmission startup/reopening through automated Electron journeys; local package windows remain hidden.
+- [x] Confirm the actual bundled Apple silicon backend starts in MCP stdio and Electron HTTP modes; CI also smoke-tests each platform backend before packaging.
+- [ ] Check packaged offline language/page loading and native keyboard/IME/reduced-motion behavior manually on Windows, Linux, and Intel macOS.
+- [ ] Check an isolated copy of a real 1.1.0 campaign profile, including saved chats, reading positions, provider credentials, and database migration.
+- [ ] Load a representative save and exercise Advisor and Chronicle with a configured provider before calling the beta gameplay-validated.
+- [ ] Check beta update feed eligibility and a controlled download/install/restart. Ordinary Electron journeys disable real updates, so they do not prove this packaged update path.
+
+## Publication and follow-up
+
+1. Integrate #66, replay only #69's own commits after the squash, then integrate #68 with the reviewed import and test adjustments. Keep the final branch checks green; the release PR records the merge commits.
+2. Merge beta version/release preparation and confirm the tested source is on `main`. Keep package, renderer, backend, and Python project versions synchronized at `1.1.1-beta.1`; the MCPB version follows the app package.
+3. Review unpublished packages from a manual workflow run. A manual run uploads Actions artifacts with `--publish never`; it does not publish a GitHub Release.
+4. Only after package review, push `v1.1.1-beta.1` at the approved `main` commit. Tagging starts the publishing workflow: all platform builds upload to a draft, and finalization publishes the prerelease once every required job succeeds.
+5. Verify the three beta manifests, both macOS architecture entries, release notes, and upgrade behavior. Stable must still resolve to v1.1.0 and the promo site must remain unchanged.
+6. Capture feedback from representative gameplay. Use `1.1.1-beta.2` for corrections, then a new `1.1.1` version/tag for stable promotion; do not merely clear the prerelease flag on a beta build.
+
+Existing users opt in through Config → More Settings → Update Track → Beta. Publishing reaches all users already on that track. Fresh beta profiles default to Beta; saved preferences are preserved. Switching back to Stable does not downgrade an installed beta and takes effect when a newer stable release is available. Test profiles and packaged-app checks must not overwrite the user's installed app or personal campaign data.
+
+## Previous stable release record
+
+The following records the v1.1.0 release and its broader outstanding validation. Those open checks are carried forward; preparing this beta does not mark them complete.
 
 Stable v1.1.0 combines [`v1.1.0-beta.1`](https://github.com/gitmaan/stellaris-companion/releases/tag/v1.1.0-beta.1) with campaign chat restoration and Chronicle continuity improvements. Both update channels receive v1.1.0 after publication.
 

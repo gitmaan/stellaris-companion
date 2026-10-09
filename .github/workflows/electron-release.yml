@@ -134,6 +134,7 @@ jobs:
           xvfb-run --auto-servernum npm run test:e2e --prefix electron
         env:
           E2E_NO_SANDBOX: '1'
+          E2E_SHOW_WINDOWS: '1'
 
   release:
     needs: [setup, release_checks]
