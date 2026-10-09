@@ -347,8 +347,13 @@ test('settings feedback leaves navigation and the composer clear; keyboard focus
     const config = page.locator('button[aria-controls="page-settings"]')
     await config.focus(); await page.keyboard.press('Enter')
     expect(await config.evaluate(element => getComputedStyle(element).outlineStyle)).toBe('solid')
-    // Chromium snaps the two-pixel outline to device pixels at fractional zoom.
-    expect(await config.evaluate(element => parseFloat(getComputedStyle(element).outlineWidth))).toBeGreaterThanOrEqual(1.5)
+    // Chromium snaps the 2 CSS-pixel outline down to whole device pixels.
+    // Compare in physical pixels so 140% zoom works on both 1x and 2x displays.
+    const outline = await config.evaluate(element => ({
+      physicalWidth: parseFloat(getComputedStyle(element).outlineWidth) * devicePixelRatio,
+      expectedWidth: Math.floor(2 * devicePixelRatio),
+    }))
+    expect(outline.physicalWidth).toBeGreaterThanOrEqual(outline.expectedWidth - 0.01)
     await page.getByLabel(catalog('en').settings.colorTheme, { exact: true }).selectOption('tactica-green')
     const notice = page.locator('[data-notifications] > div').first()
     await expect(notice).toBeVisible()
