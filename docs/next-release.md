@@ -34,3 +34,8 @@ This list records remaining validation follow-ups. The beta passed release CI an
 - Existing installations keep their saved provider and model preferences. New installations use the simpler First contact onboarding, with ChatGPT leading the provider choices.
 
 Keep the remaining checks current. Do not describe Cygnus support as complete until the save validation above passes.
+
+## Pending visual quality changes
+
+- [x] Verify fixed shell/composer geometry, compact Chronicle reading, shared modal focus, reduced motion, pending drafts, and localized recovery actions with mocked Electron journeys. See [Visual quality conventions](visual-quality.md).
+- [ ] During the next packaged release check, exercise native keyboard/IME focus and reduced-motion behavior on macOS, Windows, and Linux; the local visual proof uses an unbundled Electron renderer.

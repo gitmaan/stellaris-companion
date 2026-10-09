@@ -1,3 +1,4 @@
+const { openChapterNavigation } = require('./helpers/chronicleNavigation')
 const fs = require('fs/promises')
 const os = require('os')
 const path = require('path')
@@ -69,7 +70,7 @@ test('campaign manager supports bulk cleanup, restore, labels, reset undo, and p
     await page.getByRole('button', { name: /Chronicle/i }).click()
     await expect(page.getByText('Old teaser.')).toBeVisible()
 
-    await page.getByRole('complementary').getByRole('button', { name: 'Manage campaigns' }).click()
+    await (await openChapterNavigation(page)).getByRole('button', { name: 'Manage campaigns' }).click()
     const dialog = page.getByRole('dialog', { name: 'Campaign History' })
     await expect(dialog).toBeVisible()
     await dialog.getByRole('button', { name: 'Select unused campaigns (2)' }).click()
@@ -137,7 +138,7 @@ test('game data settings use plain language and open campaign management directl
     await page.waitForLoadState('domcontentloaded')
     await page.getByRole('button', { name: /Config/i }).click()
 
-    await expect(page.getByText('GAME & CAMPAIGNS', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'GAME & CAMPAIGNS', exact: true })).toBeVisible()
     await expect(page.getByText('SAVE GAME LOCATION', { exact: true })).toBeVisible()
     await expect(page.getByText('CAMPAIGN HISTORY', { exact: true })).toBeVisible()
     await expect(page.getByText('18.0 MB stored on this device')).toBeVisible()
@@ -212,10 +213,11 @@ test('selecting historical campaigns reads cache without generating Chronicle co
     await backend.waitForChronicleRequest(() => true)
     const generationCount = backend.getChronicleRequests().length
 
-    const sidebar = page.getByRole('complementary')
+    const sidebar = await openChapterNavigation(page)
     const currentEra = sidebar.getByRole('button', { name: 'Current Era' })
     await currentEra.focus()
     await currentEra.press('Enter')
+    await openChapterNavigation(page)
     await sidebar.getByRole('button', { name: 'Choose a campaign' }).click()
     const historicalCampaign = sidebar.getByRole('option', { name: /Duplicate Start One/ })
     await historicalCampaign.focus()

@@ -7,6 +7,7 @@
     }
   },
   "common": {
+    "saved": "保存しました",
     "apply": "適用",
     "applying": "適用中...",
     "browse": "参照",
@@ -1141,5 +1142,23 @@
     "latestMessages": "最新の会話に戻る",
     "updateStory": "物語を更新",
     "earlierSave": "以前のセーブを読み込みました。記録済みの物語は保持されます。"
+  },
+  "visualQuality": {
+    "retry": "再試行",
+    "copy": "回答をコピー",
+    "copied": "コピーしました",
+    "copyFailed": "コピーできませんでした",
+    "jumpLatest": "最新のメッセージへ",
+    "offline": "Companion サービスがオフラインです",
+    "noSave": "セーブデータがまだ見つかりません",
+    "connectingHelp": "Companion サービスに接続しています。通常は少し待つだけで完了します。",
+    "offlineHelp": "Companion サービスが実行中で、セーブフォルダーにアクセスできることを確認してください。自動的に再接続します。",
+    "noSaveHelp": "Stellaris でゲームを保存し、設定でセーブフォルダーを確認してください。セーブデータが検出されると、ここに帝国が表示されます。",
+    "analyzingHelp": "セーブデータを分析しています。分析が完了すると、質問の候補とアドバイザーが利用できるようになります。",
+    "saveSettings": "セーブ設定を確認",
+    "settingsSections": "設定のセクション",
+    "jumpToSection": "セクションへ移動…",
+    "settingsSaveHelp": "表示設定とフォルダーの変更はすぐに保存されます。「適用」または「保存」ボタンのあるテキスト欄は、そのボタンを押すと保存されます。",
+    "nextQuestion": "アドバイザーの回答を待つ間に、次の質問を入力できます…"
   }
 }

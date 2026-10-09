@@ -111,7 +111,6 @@ html[lang='ja'] .chronicle-display-title, html[lang='zh-Hans'] .chronicle-displa
   --theme-logo-filter: none;
   --theme-scanline-alpha: 0.015;
   --theme-vignette-alpha: 0.8;
-  --theme-hud-scanline-opacity: 0.1;
   --theme-stars-opacity: 0.3;
   --theme-grid-opacity: 0.2;
 }
@@ -152,7 +151,6 @@ html[lang='ja'] .chronicle-display-title, html[lang='zh-Hans'] .chronicle-displa
   --theme-logo-filter: hue-rotate(70deg) saturate(1.25) brightness(1.05);
   --theme-scanline-alpha: 0.008;
   --theme-vignette-alpha: 0.66;
-  --theme-hud-scanline-opacity: 0.06;
   --theme-stars-opacity: 0.18;
   --theme-grid-opacity: 0.11;
 }
@@ -193,7 +191,6 @@ html[lang='ja'] .chronicle-display-title, html[lang='zh-Hans'] .chronicle-displa
   --theme-logo-filter: hue-rotate(210deg) saturate(1.1) brightness(1.05);
   --theme-scanline-alpha: 0.01;
   --theme-vignette-alpha: 0.7;
-  --theme-hud-scanline-opacity: 0.08;
   --theme-stars-opacity: 0.22;
   --theme-grid-opacity: 0.13;
 }
@@ -201,6 +198,28 @@ html[lang='ja'] .chronicle-display-title, html[lang='zh-Hans'] .chronicle-displa
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Interaction contract: feedback 120 ms, content 160 ms, surfaces 200 ms.
+   Scroll owners reserve their gutter; page changes never scale the text. */
+:root { --motion-feedback: 120ms; --motion-content: 160ms; --motion-surface: 200ms; }
+html, body, #root { height: 100%; overflow: hidden; }
+:is(button, a, input, textarea, select, summary, [tabindex]):focus-visible,
+.hud-checkbox:has(input:focus-visible) {
+  outline: 2px solid rgb(var(--color-accent-cyan));
+  outline-offset: 3px;
+}
+.overflow-y-auto { scrollbar-gutter: stable; }
+.app-page[data-active='false'] *, .app-page[data-active='false'] *::before,
+.app-page[data-active='false'] *::after { animation-play-state: paused !important; }
+.modal-surface { overscroll-behavior: contain; }
+.markdown-content { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ============================================
    Base Styles
@@ -261,6 +280,42 @@ html[lang='ja'] .chronicle-display-title, html[lang='zh-Hans'] .chronicle-displa
 
 .platform-mac .hud-corner-top {
   top: 48px;
+}
+
+/* Scale the chrome down in short or narrow windows; reading text keeps its size. */
+.chat-toolbar .chatgpt-usage { height: 100%; }
+.chat-toolbar.chat-toolbar-with-history { height: auto; min-height: 48px; flex-wrap: wrap; padding-top: 4px; }
+.chat-history-paging { order: 1; flex-basis: 100%; padding-bottom: 4px; }
+/* Keep the original title hierarchy and generous controls at compact sizes. */
+.chronicle-header { padding-top: 4px; }
+.chronicle-display-title { text-wrap: balance; }
+.settings-preferences select { min-height: 40px; }
+@media (min-width: 960px) {
+  .settings-preferences { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1100px), (max-height: 760px) {
+  .chat-welcome-folder { width: 24px; height: 24px; }
+  .chat-welcome header h1 { font-size: 1.5rem; line-height: 1.3; }
+}
+@media (max-width: 760px), (max-height: 700px) {
+  .status-bar { height: 44px; gap: 12px; }
+  .status-empire { gap: 8px; }
+  .status-divider { width: 8px; }
+  .app-navigation { padding-block: 4px; }
+  .hud-nav { padding-block: 0; }
+  .hud-nav-track { padding: 4px; }
+  .hud-nav button { padding-block: 6px; }
+  .hud-corner { width: 80px; height: 80px; }
+  .platform-mac .hud-corner-top { top: 44px; }
+  .chat-toolbar { height: 40px; gap: 8px; }
+  .chat-welcome { padding-top: 8px; padding-bottom: 12px; }
+  .chat-welcome-content { gap: 12px; }
+  .chat-welcome header > * + * { margin-top: 8px; }
+  .chat-transcript { margin-bottom: 8px; }
+  .chronicle-reader { padding: 12px 8px; }
+  .chronicle-chapter { padding: 16px; }
+  .settings-header { margin-bottom: 24px; }
+  .settings-preferences select { padding-left: 12px; }
 }
 
 /* ============================================
@@ -572,11 +627,11 @@ html[lang='ja'] .chronicle-display-title, html[lang='zh-Hans'] .chronicle-displa
 
   /* Text glow effect */
   .text-glow {
-    text-shadow: 0 0 10px currentColor;
+    text-shadow: 0 0 2px rgb(var(--color-text-primary) / 0.45), 0 0 12px rgb(var(--color-accent-cyan) / 0.5);
   }
 
   .text-glow-sm {
-    text-shadow: 0 0 5px currentColor;
+    text-shadow: 0 0 2px rgb(var(--color-text-primary) / 0.3), 0 0 6px rgb(var(--color-accent-cyan) / 0.5);
   }
 }
 

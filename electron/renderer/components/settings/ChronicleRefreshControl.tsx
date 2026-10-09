@@ -1,16 +1,19 @@
 import { useTranslation } from 'react-i18next'
 import type { ChronicleRefreshMode } from '../../hooks/useSettings'
 import { HUDLabel, HUDMicro } from '../hud/HUDText'
+import { PreferenceFeedback } from './PreferenceFeedback'
 
 interface ChronicleRefreshControlProps {
   mode: ChronicleRefreshMode
   saving: boolean
+  saved?: boolean
   onChange: (mode: ChronicleRefreshMode) => void
 }
 
 export function ChronicleRefreshControl({
   mode,
   saving,
+  saved,
   onChange,
 }: ChronicleRefreshControlProps) {
   const { t } = useTranslation()
@@ -20,7 +23,7 @@ export function ChronicleRefreshControl({
     <div className="space-y-3 border-t border-white/10 pt-4">
       <div className="flex items-center justify-between gap-3">
         <HUDLabel>{t('settings.chronicleRefresh.label')}</HUDLabel>
-        {saving && <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>}
+        <PreferenceFeedback saving={saving} saved={saved} />
       </div>
       <div className="grid grid-cols-3 gap-2 rounded-sm border border-white/10 bg-black/20 p-1">
         {options.map(option => {

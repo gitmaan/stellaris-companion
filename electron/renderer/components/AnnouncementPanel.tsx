@@ -1,8 +1,8 @@
-import { useEffect, useMemo } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { useMemo } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import type { Announcement } from '../hooks/useBackend'
-import { isCompositionKey } from '../lib/compositionKey'
+import Modal from './Modal'
 
 const SEVERITY_PRIORITY: Record<Announcement['severity'], number> = {
   known_issue: 5,
@@ -159,25 +159,6 @@ export function AnnouncementPanel({
 
   const activeItems = useMemo(() => sortAnnouncements(announcements), [announcements])
 
-  useEffect(() => {
-    if (!isOpen) return
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isCompositionKey(event)) onClose()
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-    }
-  }, [isOpen, onClose])
-
-  if (activeItems.length === 0) return null
-
-  const panelTransition = reduceMotion
-    ? { duration: 0 }
-    : { duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] as const }
-
   const cardReveal = (idx: number) => {
     if (reduceMotion || idx > 2) {
       return {
@@ -194,15 +175,7 @@ export function AnnouncementPanel({
   }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={reduceMotion ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: -8, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={reduceMotion ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: -8, scale: 0.98 }}
-          transition={panelTransition}
-          className="origin-top-right will-change-transform w-full rounded-sm border border-white/15 bg-black/80 backdrop-blur-md shadow-[0_0_24px_rgba(0,0,0,0.6)]"
-        >
+    <Modal open={isOpen && activeItems.length > 0} onClose={onClose} label={t('announcements.title')} placement="right" className="w-full overflow-y-auto">
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
             <div className="flex items-center gap-2">
               <span className="text-accent-cyan text-xs">{'\u25C8'}</span>
@@ -272,8 +245,6 @@ export function AnnouncementPanel({
             </div>
 
           </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </Modal>
   )
 }

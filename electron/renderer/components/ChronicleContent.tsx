@@ -40,12 +40,8 @@ function ChronicleContent({
   return (
     <article className="max-w-[800px] mx-auto">
       {/* Empire header */}
-      <header className="text-center mb-10 relative">
-        <div className="text-accent-cyan text-3xl mb-3">◈</div>
-        <h1 className="chronicle-display-title font-display text-2xl tracking-[0.2em] text-text-primary uppercase">
-          {t('chronicle.content.title', { empireName })}
-        </h1>
-        {coverageDate && <p className="mt-3 text-xs text-text-secondary">{t('continuity.storyCoverage', { date: coverageDate })}</p>}
+      <header className="chronicle-header text-center mb-5 lg:mb-8 relative">
+        <ChronicleHeading empireName={empireName} coverageDate={coverageDate} />
         <div className="energy-line mt-4 max-w-[200px] mx-auto" />
       </header>
 
@@ -81,6 +77,21 @@ function ChronicleContent({
       {currentEra && <CurrentEraBlock currentEra={currentEra} />}
     </article>
   )
+}
+
+function ChronicleHeading({ empireName, coverageDate }: {
+  empireName: string
+  coverageDate?: string | null
+}) {
+  const { t } = useTranslation()
+  const title = t('chronicle.content.title', { empireName })
+  return <div className="min-w-0">
+    <h1 title={title} className="chronicle-display-title font-display tracking-wide text-text-primary text-glow-sm uppercase text-lg lg:text-2xl leading-relaxed break-words">
+      <span aria-hidden="true" className="text-accent-cyan mr-2">◈</span>
+      {title}
+    </h1>
+    {coverageDate && <p className="mt-3 text-xs text-text-secondary">{t('continuity.storyCoverage', { date: coverageDate })}</p>}
+  </div>
 }
 
 /**
@@ -129,7 +140,7 @@ function ChapterBlock({
   )
 
   return (
-    <div id={`chapter-${chapter.number}`} data-reading-id={chapter.id || chapter.start_date} data-reading-version={readingVersion(chapter.narrative)} className={`stellaris-panel rounded-lg p-8 relative mb-8 ${wasJustRegenerated ? 'animate-highlight-flash' : ''}`}>
+    <div id={`chapter-${chapter.number}`} data-reading-id={chapter.id || chapter.start_date} data-reading-version={readingVersion(chapter.narrative)} className={`chronicle-chapter stellaris-panel rounded-lg p-4 lg:p-8 relative mb-8 ${wasJustRegenerated ? 'animate-highlight-flash' : ''}`}>
       {/* Regenerating overlay */}
       {isRegenerating && (
         <div className="absolute inset-0 bg-bg-primary/90 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center gap-4 z-10">
@@ -139,14 +150,14 @@ function ChapterBlock({
       )}
 
       {/* Chapter header */}
-      <div className="flex justify-between items-start mb-6 pb-4 border-b border-border">
-        <div className="flex flex-col gap-2">
+      <div className="chapter-header flex justify-between items-start gap-3 mb-3 pb-3 lg:mb-6 lg:pb-4 border-b border-border">
+        <div className="chapter-heading flex flex-col gap-1 lg:gap-2 min-w-0 flex-1">
           <span className="text-xs font-semibold text-accent-cyan uppercase tracking-wider flex items-center gap-2">
             <span>◇</span>
             {t('chronicle.content.chapter', { number: /^(ja|zh)/.test(i18n.language) ? chapter.number : toRoman(chapter.number) })}
           </span>
-          <h2 className="text-xl font-semibold text-text-primary m-0">{cleanTitle(chapter.title)}</h2>
-          <span className="text-sm text-text-secondary font-mono">{chapter.start_date} – {chapter.end_date}</span>
+          <h2 className="chapter-title text-xl font-semibold text-text-primary m-0">{cleanTitle(chapter.title)}</h2>
+          <span className="chapter-dates text-sm text-text-secondary font-mono">{chapter.start_date} – {chapter.end_date}</span>
         </div>
         <div className="flex items-center gap-2 text-lg">
           {chapter.context_stale && (
@@ -270,15 +281,15 @@ function CurrentEraBlock({ currentEra }: { currentEra: CurrentEra }) {
   )
 
   return (
-    <div id="current-era" data-reading-id={currentEra.start_date} data-reading-version={readingVersion(currentEra.narrative)} className="stellaris-panel rounded-lg p-8 mb-8">
-      <div className="flex justify-between items-start mb-6 pb-4 border-b border-border">
-        <div className="flex flex-col gap-2">
+    <div id="current-era" data-reading-id={currentEra.start_date} data-reading-version={readingVersion(currentEra.narrative)} className="chronicle-chapter stellaris-panel rounded-lg p-4 lg:p-8 mb-8">
+      <div className="chapter-header flex justify-between items-start gap-3 mb-3 pb-3 lg:mb-6 lg:pb-4 border-b border-border">
+        <div className="chapter-heading flex flex-col gap-1 lg:gap-2 min-w-0 flex-1">
           <span className="text-xs font-semibold text-accent-yellow uppercase tracking-wider flex items-center gap-2">
             <span>⏳</span>
             {t('chronicle.content.currentEra')}
           </span>
-          <h2 className="text-xl font-semibold text-text-primary m-0">{t('chronicle.content.storyContinues')}</h2>
-          <span className="text-sm text-text-secondary font-mono">{currentEra.start_date} – {currentEra.coverage_date || t('continuity.coverageUnknown')}</span>
+          <h2 className="chapter-title text-xl font-semibold text-text-primary m-0">{t('chronicle.content.storyContinues')}</h2>
+          <span className="chapter-dates text-sm text-text-secondary font-mono">{currentEra.start_date} – {currentEra.coverage_date || t('continuity.coverageUnknown')}</span>
         </div>
       </div>
 

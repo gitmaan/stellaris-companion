@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { createPortal } from 'react-dom'
+import Modal from './Modal'
 import { useTranslation } from 'react-i18next'
-import { isCompositionKey } from '../lib/compositionKey'
 import type { ChronicleResponse } from '../hooks/useBackend'
 import type {
   ChroniclePublicationReceipt,
@@ -76,14 +74,7 @@ function ChroniclePublishDialog({
     void loadStatus()
   }, [isOpen, loadStatus])
 
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isCompositionKey(event) && !submitting && !removing) onClose()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose, removing, submitting])
+
 
   const handlePublish = async () => {
     if (!saveId || !chronicle || !window.electronAPI?.chroniclePublishing) {
@@ -166,28 +157,8 @@ function ChroniclePublishDialog({
         ? t('chronicle.publish.unlistedStatus')
         : null
 
-  return createPortal(
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target && !submitting && !removing) onClose()
-          }}
-        >
-          <motion.section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="chronicle-publish-title"
-            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-accent-cyan/30 bg-bg-secondary shadow-[0_0_70px_rgba(0,212,255,0.14)] rounded-lg"
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            transition={{ duration: 0.18 }}
-          >
+  return (
+    <Modal open={isOpen} onClose={submitting || removing ? undefined : onClose} labelledBy="chronicle-publish-title" className="w-full max-w-2xl overflow-y-auto">
             <header className="flex items-start gap-4 border-b border-border p-5">
               <div className="flex-1">
                 <p className="text-[10px] uppercase tracking-[0.25em] text-accent-teal mb-1">{t('chronicle.publish.eyebrow')}</p>
@@ -311,11 +282,7 @@ function ChroniclePublishDialog({
                 </>
               )}
             </div>
-          </motion.section>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
+              </Modal>
   )
 }
 

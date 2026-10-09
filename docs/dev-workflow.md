@@ -88,6 +88,22 @@ Main process syntax check:
 node --check electron/main.js
 ```
 
+Electron journeys:
+
+```bash
+npm -C electron run test:e2e
+```
+
+Local journeys create hidden, non-focusable windows by default and suppress the
+macOS Dock icon. Renderer layout, screenshots, keyboard events, and animation
+frames still run. To debug with visible windows, explicitly use
+`npm -C electron run test:e2e:headed` (or set `E2E_SHOW_WINDOWS=1`). Linux CI runs
+visible windows inside Xvfb; Windows smoke tests use the runner's own desktop.
+The hidden mode is gated by `E2E=1` and does not change normal app behavior.
+
+See [Visual quality](visual-quality.md) for layout, motion, dialog, and regression
+coverage conventions.
+
 ## Packaged backend build (PyInstaller)
 
 ```bash

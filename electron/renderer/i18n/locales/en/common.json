@@ -7,6 +7,7 @@
     }
   },
   "common": {
+    "saved": "Saved",
     "apply": "Apply",
     "applying": "Applying...",
     "browse": "Browse",
@@ -1141,5 +1142,23 @@
     "latestMessages": "Return to latest",
     "updateStory": "Update story",
     "earlierSave": "Earlier save loaded. Your recorded story is kept."
+  },
+  "visualQuality": {
+    "retry": "Retry",
+    "copy": "Copy response",
+    "copied": "Copied",
+    "copyFailed": "Copy failed",
+    "jumpLatest": "Jump to latest",
+    "offline": "Companion service is offline",
+    "noSave": "No save found yet",
+    "connectingHelp": "Connecting to your companion service. This usually takes a moment.",
+    "offlineHelp": "Check that the companion service is running and your save folder is available. Reconnection is automatic.",
+    "noSaveHelp": "Save your game in Stellaris, then check the save folder in Settings. Your empire will appear here when the save is detected.",
+    "analyzingHelp": "Your save is being analyzed. Suggested questions and the advisor will be available when analysis finishes.",
+    "saveSettings": "Check save settings",
+    "settingsSections": "Settings sections",
+    "jumpToSection": "Jump to section…",
+    "settingsSaveHelp": "Display preferences and folder changes save immediately. Text fields with an Apply or Save button save when you press it.",
+    "nextQuestion": "Write your next question while the advisor responds…"
   }
 }

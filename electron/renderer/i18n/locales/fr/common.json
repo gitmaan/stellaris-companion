@@ -7,6 +7,7 @@
     }
   },
   "common": {
+    "saved": "Enregistré",
     "apply": "Appliquer",
     "applying": "Application...",
     "browse": "Parcourir",
@@ -1152,5 +1153,23 @@
     "latestMessages": "Revenir aux derniers",
     "updateStory": "Actualiser l’histoire",
     "earlierSave": "Une sauvegarde antérieure est chargée. Votre histoire enregistrée est conservée."
+  },
+  "visualQuality": {
+    "retry": "Réessayer",
+    "copy": "Copier la réponse",
+    "copied": "Copié",
+    "copyFailed": "Échec de la copie",
+    "jumpLatest": "Aller au dernier message",
+    "offline": "Le service Companion est hors ligne",
+    "noSave": "Aucune sauvegarde trouvée",
+    "connectingHelp": "Connexion au service Companion. Cela prend généralement un instant.",
+    "offlineHelp": "Vérifiez que le service Companion fonctionne et que votre dossier de sauvegardes est accessible. La reconnexion est automatique.",
+    "noSaveHelp": "Sauvegardez votre partie dans Stellaris, puis vérifiez le dossier de sauvegardes dans les paramètres. Votre empire apparaîtra ici dès la détection de la sauvegarde.",
+    "analyzingHelp": "Votre sauvegarde est en cours d’analyse. Les questions suggérées et le conseiller seront disponibles à la fin de l’analyse.",
+    "saveSettings": "Vérifier les paramètres des sauvegardes",
+    "settingsSections": "Sections des paramètres",
+    "jumpToSection": "Aller à la section…",
+    "settingsSaveHelp": "Les préférences d’affichage et les changements de dossier sont enregistrés immédiatement. Les champs de texte dotés d’un bouton Appliquer ou Enregistrer sont enregistrés quand vous appuyez dessus.",
+    "nextQuestion": "Rédigez votre prochaine question pendant que le conseiller répond…"
   }
 }

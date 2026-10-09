@@ -7,6 +7,7 @@
     }
   },
   "common": {
+    "saved": "Gespeichert",
     "apply": "Anwenden",
     "applying": "Wird angewendet...",
     "browse": "Durchsuchen",
@@ -1141,5 +1142,23 @@
     "latestMessages": "Zur neuesten Nachricht",
     "updateStory": "Geschichte aktualisieren",
     "earlierSave": "Ein früherer Spielstand wurde geladen. Deine aufgezeichnete Geschichte bleibt erhalten."
+  },
+  "visualQuality": {
+    "retry": "Erneut versuchen",
+    "copy": "Antwort kopieren",
+    "copied": "Kopiert",
+    "copyFailed": "Kopieren fehlgeschlagen",
+    "jumpLatest": "Zur neuesten Nachricht",
+    "offline": "Companion-Dienst ist offline",
+    "noSave": "Noch kein Spielstand gefunden",
+    "connectingHelp": "Verbindung zum Companion-Dienst wird hergestellt. Dies dauert normalerweise einen Moment.",
+    "offlineHelp": "Prüfe, ob der Companion-Dienst läuft und dein Spielstandordner verfügbar ist. Die Verbindung wird automatisch wiederhergestellt.",
+    "noSaveHelp": "Speichere dein Spiel in Stellaris und prüfe den Spielstandordner in den Einstellungen. Dein Reich erscheint hier, sobald der Spielstand erkannt wird.",
+    "analyzingHelp": "Dein Spielstand wird analysiert. Vorschläge und Berater sind verfügbar, sobald die Analyse abgeschlossen ist.",
+    "saveSettings": "Spielstandeinstellungen prüfen",
+    "settingsSections": "Einstellungsbereiche",
+    "jumpToSection": "Zum Bereich…",
+    "settingsSaveHelp": "Anzeigeeinstellungen und Ordneränderungen werden sofort gespeichert. Textfelder mit einer Schaltfläche zum Anwenden oder Speichern werden beim Drücken dieser Schaltfläche gespeichert.",
+    "nextQuestion": "Schreibe deine nächste Frage, während der Berater antwortet…"
   }
 }

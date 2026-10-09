@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { motionTiming } from '../lib/motion'
 
 interface TooltipProps {
   content: ReactNode
@@ -20,6 +21,7 @@ function Tooltip({ content, children, position = 'top', delay = 100 }: TooltipPr
   const timeoutRef = useRef<NodeJS.Timeout>()
 
   const showTooltip = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => {
       if (triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect()
@@ -50,6 +52,8 @@ function Tooltip({ content, children, position = 'top', delay = 100 }: TooltipPr
         ref={triggerRef}
         onMouseEnter={showTooltip}
         onMouseLeave={hideTooltip}
+        onFocusCapture={showTooltip}
+        onBlurCapture={hideTooltip}
         className="inline-flex"
       >
         {children}
@@ -58,10 +62,11 @@ function Tooltip({ content, children, position = 'top', delay = 100 }: TooltipPr
         <AnimatePresence>
           {isVisible && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.1 }}
+              role="tooltip"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: motionTiming.feedback }}
               className="fixed z-[9999] pointer-events-none"
               style={style}
             >

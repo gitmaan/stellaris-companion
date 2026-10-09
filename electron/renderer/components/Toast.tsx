@@ -1,6 +1,8 @@
-import { useState, createContext, useContext, useCallback, ReactNode } from 'react'
+import { useState, useEffect, createContext, useContext, useCallback, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
+import { motionTiming } from '../lib/motion'
 
 interface Toast {
   id: string
@@ -26,10 +28,10 @@ export function useToast() {
 }
 
 const typeStyles = {
-  error: 'bg-accent-red/10 border-accent-red/40 text-accent-red',
-  warning: 'bg-accent-yellow/10 border-accent-yellow/40 text-accent-yellow',
-  success: 'bg-accent-green/10 border-accent-green/40 text-accent-green',
-  info: 'bg-accent-cyan/10 border-accent-cyan/40 text-accent-cyan',
+  error: 'border-accent-red/40 text-accent-red',
+  warning: 'border-accent-yellow/40 text-accent-yellow',
+  success: 'border-accent-green/40 text-accent-green',
+  info: 'border-accent-cyan/40 text-accent-cyan',
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -38,13 +40,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const showToast = useCallback((toast: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).slice(2)
     setToasts(prev => [...prev, { ...toast, id }])
-
-    // Auto-dismiss (duration: 0 means persistent)
-    if (toast.duration !== 0) {
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== id))
-      }, toast.duration || 8000)
-    }
   }, [])
 
   const dismiss = useCallback((id: string) => {
@@ -55,18 +50,37 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {createPortal(
-        <div className="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
+        <div data-notifications className="fixed top-32 right-4 z-[10001] w-96 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-17rem)] overflow-y-auto flex flex-col gap-2 pointer-events-none">
           <AnimatePresence>
-            {toasts.map(toast => (
-              <motion.div
+            {toasts.map(toast => <ToastNotice key={toast.id} toast={toast} dismiss={dismiss} />)}
+          </AnimatePresence>
+        </div>,
+        document.body
+      )}
+    </ToastContext.Provider>
+  )
+}
+
+function ToastNotice({ toast, dismiss }: { toast: Toast; dismiss: (id: string) => void }) {
+  const { t } = useTranslation()
+  const [hovered, setHovered] = useState(false)
+  const [focused, setFocused] = useState(false)
+  useEffect(() => {
+    if (hovered || focused || toast.duration === 0) return
+    const timer = setTimeout(() => dismiss(toast.id), toast.duration ?? 8000)
+    return () => clearTimeout(timer)
+  }, [toast, dismiss, hovered, focused])
+  return <motion.div
                 key={toast.id}
+                onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+                onFocusCapture={() => setFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }}
                 role={toast.type === 'error' ? 'alert' : 'status'}
                 aria-atomic="true"
-                initial={{ opacity: 0, x: 50, scale: 0.95 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 50, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                className={`relative min-w-[300px] max-w-[400px] p-4 rounded-lg border backdrop-blur-sm pointer-events-auto ${typeStyles[toast.type]}`}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: motionTiming.content }}
+                className={`relative shrink-0 w-full p-4 rounded-lg border bg-bg-secondary pointer-events-auto ${typeStyles[toast.type]}`}
                 style={{ boxShadow: '0 0 20px rgba(0, 0, 0, 0.4)' }}
               >
                 {/* Corner accents */}
@@ -79,6 +93,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   <p className="text-sm text-text-primary flex-1">{toast.message}</p>
                   <button
                     onClick={() => dismiss(toast.id)}
+                    aria-label={t('common.close')}
                     className="text-text-secondary hover:text-text-primary transition-colors text-lg leading-none"
                   >
                     ×
@@ -97,13 +112,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   </button>
                 )}
               </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>,
-        document.body
-      )}
-    </ToastContext.Provider>
-  )
 }
 
 export default ToastProvider

@@ -30,6 +30,7 @@ import { AnnouncementPanel } from './components/AnnouncementPanel'
 import { HUDContainer } from './components/hud/HUDContainer'
 import { HUDNavBar } from './components/hud/HUDNavBar'
 import { HUDStatusBar } from './components/hud/HUDStatusBar'
+import { motionTiming } from './lib/motion'
 
 // Direct imports
 import ChatPage from './pages/ChatPage'
@@ -40,7 +41,7 @@ type Tab = 'chat' | 'chronicle' | 'settings'
 
 // Shared transition for tab crossfade
 const tabTransition = {
-  duration: 0.3,
+  duration: motionTiming.content,
   ease: [0.25, 0.46, 0.45, 0.94] as const,
 }
 
@@ -216,7 +217,7 @@ function App() {
         </div>
 
         {/* Floating Navigation */}
-        <div className="flex-none pt-2 pb-2">
+        <div className="app-navigation flex-none pt-2 pb-2">
             <HUDNavBar
               tabs={tabs}
               activeTab={activeTab}
@@ -224,64 +225,29 @@ function App() {
             />
         </div>
 
-        {/* Transmissions backdrop */}
-        <AnimatePresence>
-          {hasTransmissions && transmissionsOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="absolute inset-0 z-[70]"
-            >
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="absolute inset-0 bg-gradient-to-l from-black/45 via-black/30 to-black/20"
-                onClick={handleCloseTransmissions}
-              />
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.22 }}
-                className="absolute inset-0 pointer-events-none bg-gradient-to-l from-black/12 via-black/8 to-black/5 backdrop-blur-[2px]"
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {hasTransmissions && (
-          <div className="absolute right-6 top-14 z-[85] w-[min(34rem,calc(100%-3rem))] pointer-events-none">
-            <div className="pointer-events-auto">
-              <AnnouncementPanel
-                announcements={announcements}
-                unreadCount={unreadCount}
-                isOpen={transmissionsOpen}
-                onClose={handleCloseTransmissions}
-                onDismiss={dismissAnnouncement}
-                onDismissAll={dismissAllAnnouncements}
-                onMarkRead={markAllRead}
-              />
-            </div>
-          </div>
-        )}
+        <AnnouncementPanel
+          announcements={announcements}
+          unreadCount={unreadCount}
+          isOpen={transmissionsOpen}
+          onClose={handleCloseTransmissions}
+          onDismiss={dismissAnnouncement}
+          onDismissAll={dismissAllAnnouncements}
+          onMarkRead={markAllRead}
+        />
 
         {/* Main Content Area */}
-        <main className="flex-1 relative overflow-hidden px-6 pb-6">
+        <main className="flex-1 min-h-0 relative overflow-hidden">
             {(['chat', 'chronicle', 'settings'] as const).map((tab) => {
               const isActive = activeTab === tab
               return (
                 <motion.div
                   key={tab}
-                  className={`absolute inset-0 px-6 pb-6 ${
-                    tab === 'chat' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'
-                  }`}
+                  id={`page-${tab}`}
+                  data-active={isActive}
+                  className="app-page absolute inset-0 px-4 pb-4 min-h-0 overflow-hidden"
+                  initial={false}
                   animate={{
                     opacity: isActive ? 1 : 0,
-                    scale: isActive ? 1 : 0.98,
                   }}
                   transition={tabTransition}
                   style={{
@@ -299,6 +265,7 @@ function App() {
                         isActive={isActive}
                         modelRoutingMode={modelRoutingMode}
                         onOpenSettings={() => openAISetup()}
+                        onOpenSaveSettings={() => openAISetup('save-data')}
                         onReportLlmIssue={openLLMReportModal}
                       />
                     )}

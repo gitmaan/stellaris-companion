@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import PersonIcon from './PersonIcon'
-import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import Modal from './Modal'
 import { useTranslation } from 'react-i18next'
-import { isCompositionKey } from '../lib/compositionKey'
 
 interface AdvisorInfoPanelProps {
   isOpen: boolean
@@ -36,43 +34,16 @@ export default function AdvisorInfoPanel({
   empireOrigin,
 }: AdvisorInfoPanelProps) {
   const { t } = useTranslation()
-  const panelTransition = {
-    type: 'spring' as const,
-    stiffness: 420,
-    damping: 38,
-  }
-
-  const blurTransition = {
-    duration: 0.42,
-    ease: 'easeOut' as const,
-    delay: 0.05,
-  }
-
-  const strongBlurTransition = {
-    duration: 0.6,
-    ease: 'easeOut' as const,
-    delay: 0.22,
-  }
-
-  // Note: animating `backdrop-filter` is unreliable in Electron/Chromium (often snaps).
-  // Use two overlays instead: a dim layer plus a blurred layer that crossfades via opacity.
-  const dimVariants = {
-    closed: { opacity: 0 },
-    open: { opacity: 1 },
-  }
-  const blurVariants = {
-    closed: { opacity: 0 },
-    open: { opacity: 1 },
-  }
-
-  const panelVariants = {
-    closed: { x: 28, opacity: 0 },
-    open: { x: 0, opacity: 1 },
-  }
-
   const [customInstructions, setCustomInstructions] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const editedSinceOpen = useRef(false)
+
+  const editInstructions = (value: string) => {
+    editedSinceOpen.current = true
+    setCustomInstructions(value)
+    setSaveResult(null)
+  }
 
   const traitGroups = useMemo(() => [
     {
@@ -95,34 +66,28 @@ export default function AdvisorInfoPanel({
 
   useEffect(() => {
     if (!isOpen) return
-
     setSaveResult(null)
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isCompositionKey(e)) onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    if (!isOpen) return
+    editedSinceOpen.current = false
+    let cancelled = false
 
     const load = async () => {
       // Custom instructions (persisted if session exists, otherwise in-memory).
       try {
         const res = await window.electronAPI?.backend?.getSessionAdvisorCustom()
+        // A late load must not replace instructions already being edited.
+        if (cancelled || editedSinceOpen.current) return
         if (res && typeof res === 'object' && 'ok' in res && res.ok) {
           setCustomInstructions((res.data.custom_instructions || '') as string)
         } else {
           setCustomInstructions('')
         }
       } catch {
-        setCustomInstructions('')
+        if (!cancelled && !editedSinceOpen.current) setCustomInstructions('')
       }
     }
 
-    load()
+    void load()
+    return () => { cancelled = true }
   }, [isOpen])
 
   const handleApply = async () => {
@@ -149,63 +114,8 @@ export default function AdvisorInfoPanel({
     }
   }
 
-  return createPortal(
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9998]"
-        >
-          {/* Backdrop (dim layer) */}
-          <motion.div
-            variants={dimVariants}
-            initial="closed"
-            animate="open"
-            exit="closed"
-            transition={panelTransition}
-            className="absolute inset-0 bg-gradient-to-l from-black/40 via-black/25 to-transparent backdrop-blur-[0px]"
-            onClick={onClose}
-          />
-
-          {/* Backdrop (blur layer) - crossfaded for smoothness */}
-          <motion.div
-            variants={blurVariants}
-            initial="closed"
-            animate="open"
-            exit="closed"
-            transition={blurTransition}
-            className="absolute inset-0 pointer-events-none bg-gradient-to-l from-black/12 via-black/6 to-transparent backdrop-blur-[1px]"
-          />
-
-          {/* Backdrop (strong blur layer) - delayed so compositor snap happens near-zero opacity */}
-          <motion.div
-            variants={blurVariants}
-            initial="closed"
-            animate="open"
-            exit="closed"
-            transition={strongBlurTransition}
-            className="absolute inset-0 pointer-events-none bg-gradient-to-l from-black/6 via-black/3 to-transparent backdrop-blur-[3px]"
-          />
-
-          {/* Right-side panel */}
-          <motion.div
-            variants={panelVariants}
-            initial="closed"
-            animate="open"
-            exit="closed"
-            transition={panelTransition}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="advisor-style-title"
-            className="absolute right-0 top-0 bottom-0 w-full max-w-[420px] bg-bg-secondary border-l border-border"
-            style={{
-              boxShadow:
-                '0 0 30px rgb(var(--color-accent-cyan) / 0.18), inset 0 0 20px rgb(var(--color-accent-cyan) / 0.04)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
+  return (
+    <Modal open={isOpen} onClose={onClose} placement="right" label={t('advisorPanel.title')} className="w-full">
             <div className="h-full flex flex-col">
               {/* Header */}
               <div className="relative px-5 py-4 border-b border-border">
@@ -280,12 +190,12 @@ export default function AdvisorInfoPanel({
                   </p>
                   <textarea
                     value={customInstructions}
-                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    onChange={(e) => editInstructions(e.target.value)}
                     placeholder={t('advisorPanel.placeholder')}
                     aria-label={t('advisorPanel.personalityInstructions')}
                     maxLength={300}
                     rows={4}
-                    disabled={!saveLoaded}
+                    disabled={!saveLoaded || saving}
                     className="w-full px-4 py-3 border border-border rounded-md bg-bg-primary/50 text-text-primary text-sm font-sans outline-none transition-all duration-200 focus:border-accent-cyan/50 focus:shadow-glow-sm placeholder:text-text-secondary/60 resize-none disabled:opacity-60 disabled:cursor-not-allowed"
                   />
 
@@ -302,8 +212,8 @@ export default function AdvisorInfoPanel({
                           <button
                             key={example}
                             type="button"
-                            disabled={!saveLoaded}
-                            onClick={() => setCustomInstructions(example)}
+                            disabled={!saveLoaded || saving}
+                            onClick={() => editInstructions(example)}
                             className="px-2.5 py-1.5 text-xs text-text-secondary border border-border/60 rounded bg-bg-primary/30 hover:text-accent-cyan hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-150 text-left disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             {example}
@@ -351,10 +261,6 @@ export default function AdvisorInfoPanel({
               {/* Footer energy line */}
               <div className="energy-line" />
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body
+    </Modal>
   )
 }

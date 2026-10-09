@@ -37,7 +37,7 @@ export const HUDLabel: React.FC<TextProps> = ({ children, className = '' }) => {
 export const HUDMicro: React.FC<TextProps> = ({ children, className = '', title }) => {
   return (
     <span
-      className={`font-mono text-[9px] tracking-[0.1em] text-white/30 uppercase ${className}`}
+      className={`font-mono text-[11px] tracking-[0.06em] text-text-secondary uppercase ${className}`}
       title={title}
     >
       {children}

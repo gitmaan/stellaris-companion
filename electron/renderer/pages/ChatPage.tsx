@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import ChatMessage from '../components/ChatMessage'
@@ -59,25 +59,6 @@ function createSessionKey(): string {
   return `chat-${Date.now()}-${nonce}`
 }
 
-// Animation variants for the welcome screen staggered reveal
-const EASE_CURVE: [number, number, number, number] = [0.25, 0.46, 0.45, 0.94]
-const welcomeContainer = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.15 } },
-}
-const welcomeItem = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE_CURVE } },
-}
-const suggestionContainer = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
-}
-const suggestionItem = {
-  hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: EASE_CURVE } },
-}
-
 const COMPACT_WELCOME_HEIGHT = 760
 const COMPACT_WELCOME_WIDTH = 1100
 
@@ -97,6 +78,7 @@ interface Message {
   model?: string
   modelDisplay?: string
   modelRouting?: ChatResponse['model_routing']
+  retryRequest?: { text: string; requestId: string }
   isError?: boolean
   action?: 'settings' | 'usage'
 }
@@ -192,6 +174,7 @@ function getProviderErrorMessage({
 interface ChatPageProps {
   isActive?: boolean
   modelRoutingMode?: ModelRoutingMode
+  onOpenSaveSettings?: () => void
   onOpenSettings?: () => void
   onReportLlmIssue?: (llm: {
     lastPrompt?: string
@@ -203,15 +186,16 @@ interface ChatPageProps {
 }
 
 function ChatPage({
-  isActive = true,
   modelRoutingMode,
   onOpenSettings,
+  onOpenSaveSettings,
   onReportLlmIssue,
 }: ChatPageProps) {
   const { t } = useTranslation()
   const backend = useBackend()
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [consumedDraft, setConsumedDraft] = useState<{ text: string } | null>(null)
   const [sessionKey, setSessionKey] = useState(() => createSessionKey())
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | undefined>()
@@ -227,6 +211,9 @@ function ChatPage({
   const chatGenerationRef = useRef(0)
   const [scrollToBottomSignal, setScrollToBottomSignal] = useState(0)
   const [empireType, setEmpireType] = useState<EmpireType | null>(null)
+  const [backendConnected, setBackendConnected] = useState<boolean | null>(null)
+  const [backendConfigured, setBackendConfigured] = useState(true)
+  const sendingRef = useRef(false)
   const [saveLoaded, setSaveLoaded] = useState(false)
   const [precomputeReady, setPrecomputeReady] = useState(false)
   const [empireName, setEmpireName] = useState<string | null>(null)
@@ -241,7 +228,6 @@ function ChatPage({
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [advisorPanelOpen, setAdvisorPanelOpen] = useState(false)
   const [isWelcomeCompact, setIsWelcomeCompact] = useState<boolean>(() => isCompactWelcomeViewport())
-  const [suggestionKey, setSuggestionKey] = useState(0)
 
   const loadingMessages = useMemo<LoadingMessagePools>(() => ({
     universal: t('chat.loading.universal', { returnObjects: true }) as string[],
@@ -260,17 +246,7 @@ function ChatPage({
   useEffect(() => {
     setLoadingMessage(getLoadingMessage(empireType, loadingMessages))
     setSuggestions(generateSuggestions(suggestionPools, roastSuggestion))
-    setSuggestionKey(k => k + 1)
   }, [empireType, loadingMessages, roastSuggestion, suggestionPools])
-
-  // Re-animate suggestions when tab becomes active again
-  const wasActiveRef = useRef(isActive)
-  useEffect(() => {
-    if (isActive && !wasActiveRef.current) {
-      setSuggestionKey(k => k + 1)
-    }
-    wasActiveRef.current = isActive
-  }, [isActive])
 
   // Track mounted state to prevent state updates after unmount
   const isMountedRef = useRef(true)
@@ -288,10 +264,13 @@ function ChatPage({
     if (!window.electronAPI?.onBackendStatus) return
 
     const cleanup = window.electronAPI.onBackendStatus((status) => {
+      setBackendConnected(status?.connected !== false && (status?.status === 'healthy' || status?.status === 'ok'))
+      setBackendConfigured(status?.backend_configured !== false)
       const campaignId = status?.save_id
       if (campaignId && campaignId !== campaignIdRef.current) {
         if (campaignIdRef.current !== null) {
           chatGenerationRef.current += 1
+          sendingRef.current = false
           setMessages([])
           setSessionKey(createSessionKey())
           setIsLoading(false)
@@ -384,10 +363,11 @@ function ChatPage({
     return roast ? [...base, roast] : suggestions.slice(0, 4)
   }, [isWelcomeCompact, roastSuggestion, suggestions])
 
-  const handleSend = useCallback(async (text: string) => {
-    if (isLoading || historyLoading || viewingEarlier) return false
+  const handleSend = useCallback(async (text: string, retry?: { messageId: string; requestId: string }) => {
+    if (sendingRef.current || isLoading || historyLoading || viewingEarlier || !precomputeReady || advisorConfigured === false) return false
+    sendingRef.current = true
     const generation = chatGenerationRef.current
-    const requestId = crypto.randomUUID()
+    const requestId = retry?.requestId ?? crypto.randomUUID()
     // Add user message
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -395,7 +375,7 @@ function ChatPage({
       content: text,
       timestamp: new Date(),
     }
-    setMessages(prev => capMessages([...prev, userMessage]))
+    setMessages(prev => retry ? prev.filter(message => message.id !== retry.messageId) : capMessages([...prev, userMessage]))
     setScrollToBottomSignal(v => v + 1)
     setLoadingMessage(getLoadingMessage(empireType, loadingMessages))
     setIsLoading(true)
@@ -417,6 +397,7 @@ function ChatPage({
             }),
             timestamp: new Date(),
             isError: true,
+            retryRequest: { text, requestId },
           }
           setMessages(prev => capMessages([...prev, retryMessage]))
           return false
@@ -437,6 +418,7 @@ function ChatPage({
           content: providerError.content,
           timestamp: new Date(),
           isError: true,
+          retryRequest: { text, requestId },
           action: providerError.action,
         }
         setMessages(prev => capMessages([...prev, errorMessage]))
@@ -464,6 +446,7 @@ function ChatPage({
           modelRouting: chatResponse.model_routing,
         }
         setMessages(prev => capMessages([...prev, assistantMessage]))
+        if (retry) setConsumedDraft({ text })
         return true
       }
     } catch (err) {
@@ -477,15 +460,17 @@ function ChatPage({
         content: err instanceof Error ? err.message : t('chat.errors.unexpected'),
         timestamp: new Date(),
         isError: true,
+        retryRequest: { text, requestId },
       }
       setMessages(prev => capMessages([...prev, errorMessage]))
       return false
     } finally {
       if (isMountedRef.current && generation === chatGenerationRef.current) {
+        sendingRef.current = false
         setIsLoading(false)
       }
     }
-  }, [advisorProvider, backend, sessionKey, empireType, modelRoutingMode, loadingMessages, t, activeCampaignId, conversationId, isLoading, historyLoading, historyError, viewingEarlier])
+  }, [precomputeReady, advisorConfigured, advisorProvider, backend, sessionKey, empireType, modelRoutingMode, loadingMessages, t, activeCampaignId, conversationId, isLoading, historyLoading, historyError, viewingEarlier])
 
   const handleNewChat = useCallback(async () => {
     if (isLoading || historyLoading) return
@@ -510,17 +495,19 @@ function ChatPage({
     setHistoryOpen(false)
     setMessages([])
     setSuggestions(generateSuggestions(suggestionPools, roastSuggestion))
-    setSuggestionKey(k => k + 1)
     setScrollToBottomSignal(v => v + 1)
   }, [isLoading, historyLoading, activeCampaignId, backend, roastSuggestion, suggestionPools])
 
   const items = useMemo(() => {
     const base = messages.map((message, idx) => ({
       key: message.id,
-      render: (ref: (el: HTMLDivElement | null) => void) => (
+      render: (ref: (el: HTMLDivElement | null) => void, animateEntrance: boolean) => (
         <ChatMessage
           key={message.id}
+          messageId={message.id}
           ref={ref}
+          animateEntrance={animateEntrance}
+          onRetry={message.retryRequest && !isLoading && !historyLoading && !viewingEarlier && advisorConfigured !== false ? () => void handleSend(message.retryRequest!.text, { messageId: message.id, requestId: message.retryRequest!.requestId }) : undefined}
           role={message.role}
           content={message.content}
           timestamp={message.timestamp}
@@ -557,8 +544,8 @@ function ChatPage({
     if (isLoading) {
       base.push({
         key: '__loading__',
-        render: (ref: (el: HTMLDivElement | null) => void) => (
-          <div key="__loading__" ref={ref} className="max-w-[85%] self-start flex items-center gap-3 p-4 text-text-secondary text-sm mb-2">
+        render: (ref: (el: HTMLDivElement | null) => void, _animateEntrance: boolean) => (
+          <div key="__loading__" ref={ref} className="max-w-[92%] shrink-0 mb-3 self-start flex items-center gap-3 p-4 text-text-secondary text-sm" role="status">
             <div className="flex gap-1.5">
               <span className="w-2 h-2 rounded-full bg-accent-cyan shadow-glow-dot animate-bounce-dot animate-bounce-dot-1"></span>
               <span className="w-2 h-2 rounded-full bg-accent-cyan shadow-glow-dot animate-bounce-dot animate-bounce-dot-2"></span>
@@ -571,10 +558,10 @@ function ChatPage({
     }
 
     return base
-  }, [messages, isLoading, loadingMessage, onOpenSettings, onReportLlmIssue, t])
+  }, [messages, isLoading, historyLoading, viewingEarlier, advisorConfigured, handleSend, loadingMessage, onOpenSettings, onReportLlmIssue, t])
 
   return (
-    <div className="flex flex-col h-full min-h-0 relative">
+    <div className="chat-column flex flex-col h-full min-h-0 relative w-full max-w-[1000px] mx-auto">
       <AdvisorInfoPanel
         key={campaignIdRef.current}
         isOpen={advisorPanelOpen}
@@ -588,19 +575,19 @@ function ChatPage({
         empireOrigin={empireOrigin}
       />
 
-      {(messages.length > 0 || conversations.length > 0 || historyLoading || historyError) && (
-        <div className="relative flex items-center justify-end gap-3 mb-3">
-          {(hasEarlierMessages || viewingEarlier) && <div className="mr-auto flex gap-3 text-xs text-text-secondary">
+      <div className={`chat-toolbar ${hasEarlierMessages || viewingEarlier ? 'chat-toolbar-with-history' : ''} relative shrink-0 flex h-12 items-center justify-end gap-3 mb-1`}>
+          {advisorProvider === 'chatgpt' && <div className="h-full min-w-0 flex-1 mr-auto"><ChatGPTUsage disabled={isLoading} /></div>}
+          {(hasEarlierMessages || viewingEarlier) && <div className="chat-history-paging mr-auto flex flex-wrap gap-3 text-xs text-text-secondary">
             {hasEarlierMessages && <button type="button" disabled={isLoading || historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId, firstTurnId)}>{t('continuity.earlierMessages')}</button>}
             {viewingEarlier && <button type="button" disabled={historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId)}>{t('continuity.latestMessages')}</button>}
           </div>}
-          {historyError && <button type="button" disabled={isLoading || historyLoading} className="text-xs text-accent-yellow" onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, historyTargetRef.current ?? conversationId)}>{t('continuity.historyRetry')}</button>}
-          {historyLoading && <span className="text-xs text-text-muted" role="status">{t('continuity.restoring')}</span>}
+          {historyError && <button type="button" disabled={isLoading || historyLoading} className="min-w-0 truncate text-xs text-accent-yellow" title={t('continuity.historyRetry')} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, historyTargetRef.current ?? conversationId)}>{t('continuity.historyRetry')}</button>}
+          {historyLoading && <span className="min-w-0 truncate text-xs text-text-muted" role="status">{t('continuity.restoring')}</span>}
           {conversations.length > 0 && (
             <div className="relative" onBlur={event => {
               if (!event.currentTarget.contains(event.relatedTarget)) setHistoryOpen(false)
             }} onKeyDown={event => { if (event.key === 'Escape' && !event.nativeEvent.isComposing) { setHistoryOpen(false); event.currentTarget.querySelector<HTMLButtonElement>('[aria-expanded]')?.focus() } }}>
-              <button type="button" aria-haspopup="menu" disabled={isLoading || historyLoading} aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="px-3 py-2 font-display text-[10px] uppercase tracking-[0.12em] text-text-secondary hover:text-accent-cyan disabled:opacity-40">{t('continuity.chats')} ▾</button>
+              <button type="button" aria-haspopup="menu" disabled={isLoading || historyLoading} aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="whitespace-nowrap px-3 py-2 font-display text-[10px] uppercase tracking-[0.12em] text-text-secondary hover:text-accent-cyan disabled:opacity-40">{t('continuity.chats')} ▾</button>
               {historyOpen && <div className="absolute right-0 top-full z-30 mt-1 w-72 max-h-64 overflow-y-auto rounded border border-border bg-bg-secondary p-1 shadow-xl" role="menu">
                 {conversations.map(item => <button key={item.id} type="button" role="menuitem" title={item.title} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, item.id)} className={`block w-full truncate rounded px-3 py-2 text-left text-xs hover:bg-white/5 ${item.id === conversationId ? 'text-accent-cyan' : 'text-text-secondary'}`}>
                   {item.title || t('chat.newChat')}<span className="block text-[10px] text-text-muted">{item.last_game_date ?? new Date(item.created_at * 1000).toLocaleDateString()}</span>
@@ -608,166 +595,58 @@ function ChatPage({
               </div>}
             </div>
           )}
-          <button type="button" onClick={() => void handleNewChat()} disabled={isLoading || historyLoading} className="px-4 py-2 border border-white/20 font-display text-[10px] tracking-[0.18em] uppercase text-accent-cyan/80 hover:border-accent-cyan/60 hover:bg-accent-cyan/10 disabled:opacity-40">{t('chat.newChat')}</button>
+          <button type="button" onClick={() => void handleNewChat()} disabled={isLoading || historyLoading} className="shrink-0 whitespace-nowrap px-4 py-2 border border-white/20 font-display text-[10px] tracking-[0.18em] uppercase text-accent-cyan/80 hover:border-accent-cyan/60 hover:bg-accent-cyan/10 disabled:opacity-40">{t('chat.newChat')}</button>
         </div>
-      )}
 
       {messages.length === 0 ? (
-        <div
-          className={`flex-1 overflow-y-auto flex flex-col items-center ${
-            isWelcomeCompact ? 'justify-start p-4 pt-5' : 'justify-center p-6'
-          }`}
-        >
-          <motion.div
-            className={`w-full max-w-2xl flex flex-col items-center ${
-              isWelcomeCompact ? 'gap-6' : 'gap-12'
-            }`}
-            variants={welcomeContainer}
-            initial="hidden"
-            animate="show"
-          >
-
-            {/* Header Section */}
-            <div className={`text-center ${isWelcomeCompact ? 'space-y-2.5' : 'space-y-4'}`}>
-              <motion.div
-                className={`inline-flex justify-center items-center rounded-full border border-accent-cyan/30 bg-accent-cyan/5 shadow-glow-sm animate-pulse-glow ${
-                  isWelcomeCompact ? 'w-10 h-10 mb-2' : 'w-16 h-16 mb-4'
-                }`}
-                variants={welcomeItem}
-                style={{ scale: 0 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: EASE_CURVE }}
-              >
-                 <FolderIconG className="text-accent-cyan" size={isWelcomeCompact ? 20 : 32} />
-              </motion.div>
-
-              <motion.div className="relative" variants={welcomeItem}>
-                <HUDHeader
-                  size={isWelcomeCompact ? 'lg' : 'xl'}
-                  className={`${isWelcomeCompact ? 'tracking-[0.12em]' : 'tracking-[0.2em]'} text-accent-cyan text-glow`}
-                >
-                  {t('chat.welcome.title')}
-                </HUDHeader>
-                <motion.div
-                  className="absolute -bottom-2 inset-x-0 mx-auto w-1/2 h-px bg-gradient-to-r from-transparent via-accent-cyan/50 to-transparent"
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ duration: 0.6, delay: 0.4, ease: EASE_CURVE }}
-                />
-              </motion.div>
-
-              <motion.p
-                className={`text-text-secondary font-mono tracking-wide ${isWelcomeCompact ? 'text-xs' : 'text-sm'}`}
-                variants={welcomeItem}
-              >
-                {precomputeReady
-                  ? t('chat.welcome.ready', { defaultValue: 'YOUR FILE IS OPEN // SUBMIT YOUR REQUEST' })
-                  : <>{t('chat.welcome.scanning', { defaultValue: 'INITIALIZING // SCANNING EMPIRE DATA' })}<span className="animate-pulse-text ml-1">▍</span></>}
-              </motion.p>
+        <div className="chat-welcome flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 pt-4 pb-6">
+          <div className="chat-welcome-content w-full max-w-2xl mx-auto flex flex-col items-center gap-6">
+            <header className="text-center space-y-3">
+              <FolderIconG className="chat-welcome-folder text-accent-cyan mx-auto" size={36} />
+              <HUDHeader size="xl" className="tracking-wide text-accent-cyan text-glow">
+                {t('chat.welcome.title')}
+              </HUDHeader>
+              <p className="min-h-10 text-text-secondary font-mono text-sm" role="status">
+                {t(backendConnected === null ? 'status.connecting' : !backendConnected ? (backendConfigured ? 'visualQuality.offline' : 'status.notConfigured') : !saveLoaded ? 'visualQuality.noSave' : !precomputeReady ? 'chat.welcome.scanningShort' : advisorConfigured === false ? 'chat.providerSetup.title' : 'chat.welcome.ready')}
+              </p>
+            </header>
+            <div className="w-full min-h-48">
+              {backendConnected && saveLoaded && precomputeReady && advisorConfigured !== false ? (
+                <HUDPanel title={t('chat.welcome.suggested')} variant="primary">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {visibleSuggestions.map((suggestion, idx) => (
+                      <button key={suggestion} onClick={() => void handleSend(suggestion)} disabled={historyLoading}
+                        className="flex items-start gap-3 p-3 text-left border border-transparent rounded hover:border-accent-cyan/20 hover:bg-accent-cyan/5 transition-colors disabled:opacity-50">
+                        <span aria-hidden="true" className="font-mono text-xs text-accent-cyan/70">{String(idx + 1).padStart(2, '0')}</span>
+                        <span className="font-mono text-xs text-text-primary">{suggestion}</span>
+                      </button>
+                    ))}
+                  </div>
+                </HUDPanel>
+              ) : (
+                <HUDPanel variant="secondary">
+                  <div className="flex flex-col items-start gap-4 p-1">
+                    <p className="text-sm leading-relaxed text-text-secondary">
+                      {advisorConfigured === false
+                        ? t('chat.providerSetup.description', { provider: getAdvisorProviderName(advisorProvider) })
+                        : t(backendConnected === null ? 'visualQuality.connectingHelp' : !backendConnected ? 'visualQuality.offlineHelp' : !saveLoaded ? 'visualQuality.noSaveHelp' : 'visualQuality.analyzingHelp')}
+                    </p>
+                    {(advisorConfigured === false || backendConnected === false || (backendConnected && !saveLoaded)) && (
+                      <HUDButton type="button" variant="secondary" onClick={advisorConfigured === false || !backendConfigured ? onOpenSettings : onOpenSaveSettings}>
+                        {t(advisorConfigured === false || !backendConfigured ? 'chat.errors.openProviderSettings' : 'visualQuality.saveSettings')}
+                      </HUDButton>
+                    )}
+                  </div>
+                </HUDPanel>
+              )}
             </div>
-
-            {/* Suggestions Panel / Scanning Indicator */}
-            <motion.div className="w-full" variants={welcomeItem}>
-              <AnimatePresence mode="wait">
-                {precomputeReady ? (
-                  advisorConfigured === false ? (
-                    <motion.div
-                      key="provider-setup"
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.4, ease: EASE_CURVE }}
-                    >
-                      <HUDPanel title={t('chat.providerSetup.title')} variant="secondary">
-                        <div className="flex flex-col items-start gap-4 p-1">
-                          <p className="font-mono text-sm leading-relaxed text-text-secondary">
-                            {t('chat.providerSetup.description', {
-                              provider: getAdvisorProviderName(advisorProvider),
-                            })}
-                          </p>
-                          <HUDButton
-                            type="button"
-                            variant="primary"
-                            onClick={onOpenSettings}
-                            disabled={!onOpenSettings}
-                            className="px-4"
-                          >
-                            {t('chat.errors.openProviderSettings')}
-                          </HUDButton>
-                        </div>
-                      </HUDPanel>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="suggestions"
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.4, ease: EASE_CURVE }}
-                    >
-                      <HUDPanel
-                        className={`w-full ${isWelcomeCompact ? 'max-h-[42vh]' : ''}`}
-                        title={t('chat.welcome.suggested', { defaultValue: 'Suggested Inquiries' })}
-                        variant="primary"
-                      >
-                        <div className={isWelcomeCompact ? 'max-h-[30vh] overflow-y-auto custom-scrollbar pr-1' : ''}>
-                          <motion.div
-                            key={suggestionKey}
-                            className={`grid grid-cols-1 md:grid-cols-2 ${isWelcomeCompact ? 'gap-2' : 'gap-3'}`}
-                            variants={suggestionContainer}
-                            initial="hidden"
-                            animate="show"
-                          >
-                            {visibleSuggestions.map((suggestion, idx) => (
-                              <motion.button
-                                key={suggestion}
-                                variants={suggestionItem}
-                                onClick={() => handleSend(suggestion)}
-                                className={`group relative flex items-start text-left transition-all duration-200 hover:bg-accent-cyan/5 border border-transparent hover:border-accent-cyan/20 rounded-sm ${
-                                  isWelcomeCompact ? 'p-2.5' : 'p-3'
-                                }`}
-                              >
-                                <span className="font-mono text-xs text-accent-cyan/50 mr-3 opacity-50 group-hover:opacity-100 group-hover:text-accent-cyan transition-all">
-                                  {String(idx + 1).padStart(2, '0')}
-                                </span>
-                                <span className={`font-mono tracking-wide text-text-primary group-hover:text-accent-cyan transition-all ${isWelcomeCompact ? 'text-[11px]' : 'text-xs'}`}>
-                                  {suggestion}
-                                </span>
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-1 bg-accent-cyan/50 rounded-full opacity-0 group-hover:opacity-100 shadow-glow-sm transition-opacity" />
-                              </motion.button>
-                            ))}
-                          </motion.div>
-                        </div>
-                      </HUDPanel>
-                    </motion.div>
-                  )
-                ) : (
-                  <motion.div
-                    key="scanning"
-                    className={`flex items-center justify-center gap-3 ${isWelcomeCompact ? 'py-5' : 'py-8'}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-cyan/60" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent-cyan shadow-glow-indicator" />
-                    </span>
-                    <span className="font-mono text-xs text-accent-cyan/70 tracking-wider animate-pulse-text">
-                      {t('chat.welcome.scanningShort', { defaultValue: 'Scanning empire data...' })}
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          </motion.div>
+          </div>
         </div>
       ) : (
         <>
 
 
-          <div className="flex-1 flex flex-col overflow-hidden relative rounded-lg bg-black/20 backdrop-blur-sm border border-white/5 mb-4">
+          <div className="chat-transcript flex-1 min-h-0 flex flex-col overflow-hidden relative rounded-lg bg-black/20 backdrop-blur-sm border border-white/5 mb-3">
              {/* Decorative lines for chat container */}
              <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-white/10 pointer-events-none" />
              <div className="absolute top-0 right-0 w-4 h-4 border-t border-r border-white/10 pointer-events-none" />
@@ -802,12 +681,13 @@ function ChatPage({
       )}
 
       <ChatInput
+        identityKey={sessionKey}
+        consumedDraft={consumedDraft}
         onSend={handleSend}
         loading={isLoading}
-        disabled={!precomputeReady || advisorConfigured === false || historyLoading || viewingEarlier}
+        disabled={!backendConnected || !precomputeReady || advisorConfigured === false || historyLoading || viewingEarlier}
         onOpenAdvisorPanel={() => setAdvisorPanelOpen(true)}
       />
-      {advisorProvider === 'chatgpt' && <ChatGPTUsage disabled={isLoading} />}
     </div>
   )
 }

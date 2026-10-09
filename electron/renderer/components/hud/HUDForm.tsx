@@ -8,7 +8,7 @@ interface HUDCheckboxProps extends InputHTMLAttributes<HTMLInputElement> {
 export const HUDCheckbox: React.FC<HUDCheckboxProps> = ({ label, className = '', ...props }) => {
   return (
     <label className={`flex items-center gap-3 cursor-pointer group ${className}`}>
-      <div className="relative w-5 h-5 flex items-center justify-center border border-white/20 bg-black/40 group-hover:border-accent-cyan/50 transition-colors duration-200 rounded-sm">
+      <div className="hud-checkbox relative w-5 h-5 flex items-center justify-center border border-white/20 bg-black/40 group-hover:border-accent-cyan/50 transition-colors duration-[var(--motion-feedback)] rounded-sm">
         <input 
           type="checkbox" 
           className="peer appearance-none w-full h-full cursor-pointer opacity-0 absolute inset-0 z-10"
@@ -50,7 +50,7 @@ export const HUDSelect: React.FC<HUDSelectProps> = ({ label, options, className 
       )}
       <div className="relative group">
         <select
-          className="w-full appearance-none bg-black/20 border border-white/10 px-4 py-2 pr-8 font-mono text-sm text-text-primary focus:outline-none focus:border-accent-cyan/50 focus:bg-accent-cyan/5 transition-all duration-200 rounded-sm"
+          className="w-full appearance-none bg-black/20 border border-white/10 px-4 py-2 pr-8 font-mono text-sm text-text-primary focus:outline-none focus:border-accent-cyan/50 focus:bg-accent-cyan/5 transition-colors duration-[var(--motion-feedback)] rounded-sm"
           aria-label={props['aria-label'] || label}
           {...props}
         >

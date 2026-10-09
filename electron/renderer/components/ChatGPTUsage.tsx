@@ -4,11 +4,11 @@ import ChatGPTModelPicker from './ChatGPTModelPicker'
 
 export default function ChatGPTUsage({ disabled = false }: { disabled?: boolean }) {
   const { t } = useTranslation()
-  return <div className="flex flex-wrap justify-between items-center gap-2 px-1 py-2 text-[11px] text-text-secondary">
-    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
-      <span>{t('chatgpt.usingPlan')}</span>
+  return <div className="chatgpt-usage flex h-12 justify-between items-center gap-2 px-1 text-[11px] text-text-secondary">
+    <div className="flex flex-1 min-w-0 items-center gap-2">
+      <span className="max-w-[45%] truncate" title={t('chatgpt.usingPlan')}>{t('chatgpt.usingPlan')}</span>
       <ChatGPTModelPicker compact disabled={disabled} />
     </div>
-    <button type="button" onClick={() => void manageChatGPTUsage()} className="text-accent-cyan hover:underline">{t('chatgpt.manageUsage')}</button>
+    <button type="button" onClick={() => void manageChatGPTUsage()} title={t('chatgpt.manageUsage')} className="max-w-[35%] shrink-0 truncate text-accent-cyan hover:underline">{t('chatgpt.manageUsage')}</button>
   </div>
 }

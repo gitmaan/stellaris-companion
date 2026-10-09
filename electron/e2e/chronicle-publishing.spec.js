@@ -1,3 +1,4 @@
+const { openChapterNavigation } = require('./helpers/chronicleNavigation')
 const fs = require('fs/promises')
 const os = require('os')
 const path = require('path')
@@ -41,7 +42,7 @@ test('publishes, updates, and removes a Chronicle without sending save data', as
     await page.getByRole('button', { name: /Chronicle/i }).click()
     await expect(page.getByText('Old teaser.')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Share Chronicle' }).click()
+    await (await openChapterNavigation(page)).getByRole('button', { name: 'Share Chronicle' }).click()
     await expect(page.getByRole('dialog', { name: 'Share Chronicle' })).toBeVisible()
     await expect(page.getByText(/public story link/)).toBeVisible()
     await expect(page.getByText(/Never your save file, save path, API key, prompts, or AI provider details/)).toBeVisible()
@@ -131,7 +132,7 @@ test('updating an existing unlisted Chronicle preserves its visibility', async (
     }))
     expect(seeded.ok, JSON.stringify(seeded)).toBe(true)
 
-    await page.getByRole('button', { name: 'Share Chronicle' }).click()
+    await (await openChapterNavigation(page)).getByRole('button', { name: 'Share Chronicle' }).click()
     await expect(page.getByText('This story is private-by-link and excluded from search discovery.')).toBeVisible()
     await page.getByLabel('Story title').fill('Updated unlisted story')
     await page.getByRole('dialog', { name: 'Share Chronicle' }).getByRole('button', { name: 'Update story' }).click()

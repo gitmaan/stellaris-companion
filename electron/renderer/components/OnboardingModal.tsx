@@ -1,3 +1,4 @@
+import { useModalFocus } from '../hooks/useModalFocus'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -40,6 +41,7 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
   const [completionError, setCompletionError] = useState(false)
   const [browseError, setBrowseError] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
+  useModalFocus(dialogRef, true)
   const scanRequest = useRef(0)
   const browseRequest = useRef(0)
   const selectedPathRef = useRef(selectedPath)
@@ -71,10 +73,6 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
     return () => clearTimeout(timer)
   }, [step, scanning, saveResult, detectSaves])
   useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null
-    return () => previous?.focus()
-  }, [])
-  useEffect(() => {
     const dialog = dialogRef.current
     if (!dialog) return
     const frame = requestAnimationFrame(() => {
@@ -84,21 +82,6 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
     })
     return () => cancelAnimationFrame(frame)
   }, [step, advisor.view, aiApps, scanning, saveResult?.found])
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-    const trap = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]')).filter(node => node.getClientRects().length)
-      const first = focusable[0], last = focusable[focusable.length - 1]
-      const active = document.activeElement
-      if (!first) { event.preventDefault(); dialog.focus() }
-      else if (event.shiftKey && (active === first || !dialog.contains(active))) { event.preventDefault(); last.focus() }
-      else if (!event.shiftKey && (active === last || !dialog.contains(active))) { event.preventDefault(); first.focus() }
-    }
-    dialog.addEventListener('keydown', trap)
-    return () => dialog.removeEventListener('keydown', trap)
-  }, [])
   async function selectLanguage(value: string) {
     setLanguageSaving(true); setLanguageError(false)
     try { setLanguageError(!await onLanguageSelect(value as LanguageSetting)) }
@@ -145,9 +128,9 @@ export default function OnboardingModal({ onComplete, language, onLanguageSelect
         {!scanning && (saveResult?.found ? <HUDButton data-onboarding-primary="true" disabled={completionSaving} onClick={() => void complete(true)}>{t('onboarding.slim.openCompanion')}</HUDButton>
           : <div className="ml-auto flex flex-wrap justify-end gap-2"><HUDButton variant="ghost" disabled={completionSaving} onClick={() => void complete(false)}>{t('onboarding.actions.setUpLater')}</HUDButton>
             <HUDButton data-onboarding-primary="true" disabled={completionSaving} onClick={() => void browse()}>{t('onboarding.slim.chooseFolder')}</HUDButton></div>)}</>
-  return createPortal(<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+  return createPortal(<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
     <motion.div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="onboarding-step-title" tabIndex={-1}
-      initial={reducedMotion ? false : { opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.2 }}
+      initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
       className="relative w-full max-w-[704px] outline-none" style={{ height: 'min(500px, calc(100dvh - 32px))' }}>
       <OnboardingFrame step={step} title={title} languageMenu={languageMenu} actions={actions}>
         {step === 1 ? <div className="flex flex-1 flex-col items-center justify-center gap-4 py-3 text-center">

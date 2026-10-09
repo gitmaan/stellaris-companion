@@ -1,6 +1,5 @@
 import { useRef, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { createPortal } from 'react-dom'
+import Modal from './Modal'
 import { useTranslation } from 'react-i18next'
 import { type Playthrough, useBackend } from '../hooks/useBackend'
 import type { ChroniclePublicationSummary } from '../global'
@@ -59,14 +58,7 @@ function CampaignHistoryDialog({
     })
   }, [isOpen])
 
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isCompositionKey(event) && !workingId) onClose()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose, workingId])
+
 
   const publicationBySaveId = useMemo(
     () => new Map(publications.map(publication => [publication.saveId, publication])),
@@ -259,27 +251,8 @@ function CampaignHistoryDialog({
     showToast({ type: 'success', message: t('chronicle.history.publishedRemoved') })
   }
 
-  return createPortal(
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm sm:p-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onMouseDown={event => {
-            if (event.currentTarget === event.target && !workingId) onClose()
-          }}
-        >
-          <motion.section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="campaign-history-title"
-            className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-accent-cyan/30 bg-bg-secondary shadow-[0_0_70px_rgba(0,212,255,0.14)]"
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.98 }}
-          >
+  return (
+    <Modal open={isOpen} onClose={workingId ? undefined : onClose} labelledBy="campaign-history-title" className="flex w-full max-w-5xl flex-col overflow-hidden">
             <header className="flex items-start gap-4 border-b border-border p-5">
               <div className="flex-1">
                 <p className="mb-1 text-[10px] uppercase tracking-[0.25em] text-accent-teal">
@@ -564,11 +537,7 @@ function CampaignHistoryDialog({
             <footer className="border-t border-border bg-bg-tertiary/30 px-5 py-3 text-xs leading-relaxed text-text-muted">
               {t('chronicle.history.safetyNote')}
             </footer>
-          </motion.section>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
+              </Modal>
   )
 }
 

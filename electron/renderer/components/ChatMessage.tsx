@@ -1,4 +1,4 @@
-import { forwardRef, memo } from 'react'
+import { forwardRef, memo, useState, useEffect } from 'react'
 import type { MouseEvent } from 'react'
 import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
@@ -6,8 +6,10 @@ import type { Components } from 'react-markdown'
 import { useTranslation } from 'react-i18next'
 import { HUDMicro } from './hud/HUDText'
 import type { ModelRoutingEvent } from '../hooks/useBackend'
+import { motionTiming } from '../lib/motion'
 
 interface ChatMessageProps {
+  messageId: string
   role: 'user' | 'assistant'
   content: string
   timestamp?: Date
@@ -20,14 +22,15 @@ interface ChatMessageProps {
   actionLabel?: string
   onAction?: () => void
   onReport?: () => void
+  onRetry?: () => void
+  animateEntrance?: boolean
 }
 
 const messageVariants = {
-  initial: (role: 'user' | 'assistant') => ({
+  initial: {
     opacity: 0,
-    x: role === 'user' ? 20 : -20,
-    y: 10,
-  }),
+    y: 4,
+  },
   animate: {
     opacity: 1,
     x: 0,
@@ -92,6 +95,7 @@ function createMarkdownComponents(blockedLinkTitle: string): Components {
  */
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMessage(
   {
+    messageId,
     role,
     content,
     timestamp,
@@ -104,10 +108,25 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
     actionLabel,
     onAction,
     onReport,
+    onRetry,
+    animateEntrance = false,
   }: ChatMessageProps,
   ref,
 ) {
   const { t, i18n } = useTranslation()
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  useEffect(() => {
+    if (copyState === 'idle') return
+    const timer = setTimeout(() => setCopyState('idle'), 2000)
+    return () => clearTimeout(timer)
+  }, [copyState])
+  const copy = async () => {
+    try {
+      const result = await window.electronAPI?.copyToClipboard(content)
+      if (!result?.success) throw new Error('Copy failed')
+      setCopyState('copied')
+    } catch { setCopyState('failed') }
+  }
   const markdownComponents = createMarkdownComponents(t('chat.message.blockedLink'))
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
@@ -130,12 +149,13 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
   return (
     <motion.div
       ref={ref}
-      className={`max-w-[85%] mb-2 ${isUser ? 'self-end' : 'self-start'}`}
+      data-message-id={messageId}
+      className={`max-w-[92%] min-w-0 shrink-0 mb-3 ${isUser ? 'self-end' : 'self-start'}`}
       custom={role}
       variants={messageVariants}
-      initial="initial"
+      initial={animateEntrance ? 'initial' : false}
       animate="animate"
-      transition={{ duration: 0.2 }}
+      transition={{ duration: motionTiming.content }}
     >
       <div className={`relative px-4 py-3 rounded-lg border transition-all duration-200 group ${
         isError
@@ -178,10 +198,16 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
             {actionLabel}
           </button>
         )}
+        {isError && onRetry && <button type="button" onClick={onRetry} className="mt-3 px-3 py-1.5 text-sm text-accent-cyan border border-accent-cyan/40 rounded">{t('visualQuality.retry')}</button>}
 
         {/* Response actions and optional technical details */}
-        {!isUser && !isError && (responseTimeMs !== undefined || !!modelReadout || !!onReport || !!gameDate || historySaved === false) && (
-          <div className="mt-2 flex items-start gap-4 border-t border-white/5 pt-2">
+        {!isUser && !isError && (
+          <div className="mt-2 flex flex-wrap items-start gap-4 border-t border-white/5 pt-2">
+              <button type="button" onClick={() => void copy()} className="grid text-left text-xs text-text-secondary hover:text-accent-cyan" aria-label={t('visualQuality.copy')}>
+                {['copy', 'copied', 'copyFailed'].map(key => <span key={key} className="invisible col-start-1 row-start-1" aria-hidden="true">{t(`visualQuality.${key}`)}</span>)}
+                <span className="col-start-1 row-start-1" aria-hidden="true">{t(copyState === 'copied' ? 'visualQuality.copied' : copyState === 'failed' ? 'visualQuality.copyFailed' : 'visualQuality.copy')}</span>
+              </button>
+              <span role="status" className="sr-only">{copyState === 'copied' ? t('visualQuality.copied') : copyState === 'failed' ? t('visualQuality.copyFailed') : ''}</span>
               <div className="flex flex-col gap-1">
                 {gameDate && <span className="font-mono text-[10px] text-text-muted">{t('continuity.basedOnSave', { date: gameDate })}</span>}
                 {historySaved === false && <span className="text-xs text-accent-yellow">{t('continuity.historyNotSaved')}</span>}

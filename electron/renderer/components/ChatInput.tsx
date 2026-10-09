@@ -1,18 +1,19 @@
 import { useState, useCallback, useLayoutEffect, useEffect, useRef, KeyboardEvent } from 'react'
-import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import Tooltip from './Tooltip'
 import PersonIcon from './PersonIcon'
 import { isCompositionKey } from '../lib/compositionKey'
 
 interface ChatInputProps {
+  identityKey?: string
+  consumedDraft?: { text: string } | null
   onSend: (message: string) => void | Promise<boolean | void>
   onOpenAdvisorPanel?: () => void
   disabled?: boolean
   loading?: boolean
 }
 
-const MIN_TEXTAREA_HEIGHT = 48
+const MIN_TEXTAREA_HEIGHT = 40
 const BASE_MAX_TEXTAREA_HEIGHT = 220
 const MIN_MAX_TEXTAREA_HEIGHT = 120
 
@@ -25,11 +26,16 @@ function getViewportAwareMaxHeight() {
 /**
  * ChatInput - Text input with Cinematic HUD design
  */
-function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputProps) {
+function ChatInput({ identityKey, consumedDraft, onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputProps) {
   const { t } = useTranslation()
   const [message, setMessage] = useState('')
   const [maxTextareaHeight, setMaxTextareaHeight] = useState(() => getViewportAwareMaxHeight())
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sendingRef = useRef<symbol | null>(null)
+  useLayoutEffect(() => { sendingRef.current = null }, [identityKey])
+  useLayoutEffect(() => {
+    if (consumedDraft) setMessage(current => current.trim() === consumedDraft.text ? '' : current)
+  }, [consumedDraft])
 
   const isDisabled = disabled || loading
 
@@ -54,18 +60,35 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
 
   useLayoutEffect(() => {
     resizeTextarea()
-  }, [message, maxTextareaHeight, resizeTextarea])
+  }, [message, maxTextareaHeight, resizeTextarea, t])
+
+  useLayoutEffect(() => {
+    const container = textareaRef.current?.parentElement
+    if (!container) return
+    let width = container.getBoundingClientRect().width
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width === width) return
+      width = entry.contentRect.width
+      resizeTextarea()
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [resizeTextarea])
 
   const send = useCallback(async () => {
-    if (message.trim() && !isDisabled) {
+    if (message.trim() && !isDisabled && !sendingRef.current) {
+      const submission = Symbol()
+      sendingRef.current = submission
       const sent = message.trim()
       setMessage('')
+      // Return focus after clicking Send, without stealing it when a reply arrives.
+      textareaRef.current?.focus({ preventScroll: true })
       try {
-        if (await onSend(sent) === false) {
+        if (await onSend(sent) === false && sendingRef.current === submission) {
           setMessage(current => current || sent)
-          textareaRef.current?.focus()
         }
-      } catch { setMessage(current => current || sent) }
+      } catch { if (sendingRef.current === submission) setMessage(current => current || sent) }
+      finally { if (sendingRef.current === submission) sendingRef.current = null }
     }
   }, [message, isDisabled, onSend])
 
@@ -84,7 +107,7 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
 
   return (
     <form
-      className="relative rounded-lg border border-white/10 bg-black/35 backdrop-blur-sm px-2 py-1.5 flex items-end gap-2 transition-colors duration-200 focus-within:border-accent-cyan/45 focus-within:shadow-focus-cyan"
+      className="chat-composer relative rounded-lg border border-white/15 bg-bg-primary/80 backdrop-blur-sm px-2 py-[7px] flex items-end gap-2 transition-colors duration-200 focus-within:border-accent-cyan/45 focus-within:shadow-focus-cyan"
       onSubmit={handleSubmit}
     >
       <div className="relative group flex-1 min-w-0">
@@ -93,22 +116,23 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={loading ? t('chat.input.transmitting') : t('chat.input.placeholder')}
-          disabled={isDisabled}
+          placeholder={loading ? t('visualQuality.nextQuestion') : t('chat.input.placeholder')}
+          aria-label={t('chat.input.placeholder')}
+          disabled={disabled}
           autoFocus
           rows={1}
-          className="w-full px-3 py-2.5 pr-44 bg-transparent text-text-primary font-mono text-sm leading-relaxed outline-none transition-[background-color] duration-200 disabled:opacity-50 placeholder:text-white/20 resize-none min-h-[48px] composer-scrollbar"
+          className="block w-full px-3 py-2 bg-transparent text-text-primary font-mono text-sm leading-6 outline-none transition-[background-color] duration-150 disabled:opacity-50 placeholder:text-text-secondary resize-none min-h-[40px] composer-scrollbar"
         />
       </div>
 
-      <div className="absolute right-3 bottom-3 z-10 flex items-center gap-2">
+      <div className="shrink-0 flex items-center gap-2">
         <Tooltip content={t('chat.input.advisorInfo')} position="top">
           <button
             type="button"
             onClick={onOpenAdvisorPanel}
             disabled={!onOpenAdvisorPanel}
             aria-label={t('chat.input.advisorInfo')}
-            className={`h-9 w-9 rounded-sm border border-white/10 flex items-center justify-center text-accent-cyan/70 hover:text-accent-cyan hover:border-accent-cyan/50 hover:bg-accent-cyan/10 transition-all duration-200 ${
+            className={`h-10 w-10 rounded-sm border border-white/15 flex items-center justify-center text-accent-cyan/80 hover:text-accent-cyan hover:border-accent-cyan/50 hover:bg-accent-cyan/10 transition-colors duration-150 ${
               !onOpenAdvisorPanel ? 'opacity-30 cursor-not-allowed' : ''
             }`}
           >
@@ -116,23 +140,20 @@ function ChatInput({ onSend, onOpenAdvisorPanel, disabled, loading }: ChatInputP
           </button>
         </Tooltip>
 
-        <motion.button
+        <button
           type="submit"
           disabled={!canSend}
-          whileHover={canSend ? { scale: 1.03 } : undefined}
-          whileTap={canSend ? { scale: 0.97 } : undefined}
-          className={`h-9 px-4 rounded-sm border font-display text-xs tracking-[0.18em] uppercase transition-all duration-200 ${
+          aria-label={loading ? t('chat.input.sending') : t('chat.input.send')}
+          aria-busy={loading}
+          className={`relative h-10 min-w-16 px-3 grid place-items-center rounded-sm border font-display text-xs tracking-wide uppercase transition-colors duration-150 ${
             canSend
               ? 'border-accent-cyan/45 text-accent-cyan hover:bg-accent-cyan/12 hover:shadow-glow-sm'
               : 'border-white/10 text-white/25 cursor-not-allowed'
           }`}
         >
-          {loading ? (
-            <span className="animate-pulse">{t('chat.input.sending')}</span>
-          ) : (
-            <span>{t('chat.input.send')}</span>
-          )}
-        </motion.button>
+          <span className={loading ? 'invisible' : ''} aria-hidden="true">{t('chat.input.send')}</span>
+          {loading && <span aria-hidden="true" className="absolute h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin-loader" />}
+        </button>
       </div>
     </form>
   )

@@ -22,8 +22,12 @@ export const HUDContainer: React.FC<HUDContainerProps> = ({ children, className 
       
       {/* 2. Stars / Nebula subtle effect (CSS generated) */}
       <div
-        className="absolute inset-0 z-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] mix-blend-screen"
-        style={{ opacity: 'var(--theme-stars-opacity, 0.3)' }}
+        className="absolute inset-0 z-0 mix-blend-screen pointer-events-none"
+        style={{
+          opacity: 'var(--theme-stars-opacity, 0.3)',
+          backgroundImage: 'radial-gradient(circle at 25% 30%, rgb(255 255 255 / 0.3) 0.5px, transparent 1px), radial-gradient(circle at 70% 75%, rgb(255 255 255 / 0.2) 0.5px, transparent 1px)',
+          backgroundSize: '113px 137px, 179px 193px',
+        }}
       />
       
       {/* 3. Grid Overlay (The "Floor" or tactical map feel) */}
@@ -40,17 +44,13 @@ export const HUDContainer: React.FC<HUDContainerProps> = ({ children, className 
         }}
       />
 
-      {/* 5. Scanline Effect */}
-      <div
-        className="absolute inset-0 bg-scanline pointer-events-none z-50"
-        style={{ opacity: 'var(--theme-hud-scanline-opacity, 0.1)' }}
-      />
-      
-      {/* 6. Decorative Corner HUD Elements (Fixed to screen) */}
-      <div className="absolute top-4 left-4 w-32 h-32 border-l border-t border-border-glow opacity-50 z-20 pointer-events-none hud-corner-top" />
-      <div className="absolute top-4 right-4 w-32 h-32 border-r border-t border-border-glow opacity-50 z-20 pointer-events-none hud-corner-top" />
-      <div className="absolute bottom-4 left-4 w-32 h-32 border-l border-b border-border-glow opacity-50 z-20 pointer-events-none" />
-      <div className="absolute bottom-4 right-4 w-32 h-32 border-r border-b border-border-glow opacity-50 z-20 pointer-events-none" />
+      {/* Scanlines are applied once by body::after, including over portals. */}
+
+      {/* Decorative Corner HUD Elements (Fixed to screen) */}
+      <div className="hud-corner absolute top-4 left-4 w-32 h-32 border-l border-t border-border-glow opacity-50 z-20 pointer-events-none hud-corner-top" />
+      <div className="hud-corner absolute top-4 right-4 w-32 h-32 border-r border-t border-border-glow opacity-50 z-20 pointer-events-none hud-corner-top" />
+      <div className="hud-corner absolute bottom-4 left-4 w-32 h-32 border-l border-b border-border-glow opacity-50 z-20 pointer-events-none" />
+      <div className="hud-corner absolute bottom-4 right-4 w-32 h-32 border-r border-b border-border-glow opacity-50 z-20 pointer-events-none" />
 
       {/* Content Layer */}
       <div className="relative z-30 h-full w-full overflow-hidden flex flex-col">
