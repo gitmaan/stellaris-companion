@@ -7,6 +7,7 @@
     }
   },
   "common": {
+    "saved": "Enregistré",
     "apply": "Appliquer",
     "applying": "Application...",
     "browse": "Parcourir",

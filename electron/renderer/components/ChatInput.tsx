@@ -13,7 +13,7 @@ interface ChatInputProps {
   loading?: boolean
 }
 
-const MIN_TEXTAREA_HEIGHT = 48
+const MIN_TEXTAREA_HEIGHT = 40
 const BASE_MAX_TEXTAREA_HEIGHT = 220
 const MIN_MAX_TEXTAREA_HEIGHT = 120
 
@@ -60,7 +60,20 @@ function ChatInput({ identityKey, consumedDraft, onSend, onOpenAdvisorPanel, dis
 
   useLayoutEffect(() => {
     resizeTextarea()
-  }, [message, maxTextareaHeight, resizeTextarea])
+  }, [message, maxTextareaHeight, resizeTextarea, t])
+
+  useLayoutEffect(() => {
+    const container = textareaRef.current?.parentElement
+    if (!container) return
+    let width = container.getBoundingClientRect().width
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width === width) return
+      width = entry.contentRect.width
+      resizeTextarea()
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [resizeTextarea])
 
   const send = useCallback(async () => {
     if (message.trim() && !isDisabled && !sendingRef.current) {
@@ -94,7 +107,7 @@ function ChatInput({ identityKey, consumedDraft, onSend, onOpenAdvisorPanel, dis
 
   return (
     <form
-      className="relative rounded-lg border border-white/10 bg-black/35 backdrop-blur-sm px-2 py-1.5 flex items-end gap-2 transition-colors duration-200 focus-within:border-accent-cyan/45 focus-within:shadow-focus-cyan"
+      className="chat-composer relative rounded-lg border border-white/15 bg-bg-primary/80 backdrop-blur-sm px-2 py-[7px] flex items-end gap-2 transition-colors duration-200 focus-within:border-accent-cyan/45 focus-within:shadow-focus-cyan"
       onSubmit={handleSubmit}
     >
       <div className="relative group flex-1 min-w-0">
@@ -108,18 +121,18 @@ function ChatInput({ identityKey, consumedDraft, onSend, onOpenAdvisorPanel, dis
           disabled={disabled}
           autoFocus
           rows={1}
-          className="w-full px-3 py-2.5 bg-transparent text-text-primary font-mono text-sm leading-relaxed outline-none transition-[background-color] duration-150 disabled:opacity-50 placeholder:text-text-secondary resize-none min-h-[48px] composer-scrollbar"
+          className="block w-full px-3 py-2 bg-transparent text-text-primary font-mono text-sm leading-6 outline-none transition-[background-color] duration-150 disabled:opacity-50 placeholder:text-text-secondary resize-none min-h-[40px] composer-scrollbar"
         />
       </div>
 
-      <div className="shrink-0 pb-2 flex items-center gap-2">
+      <div className="shrink-0 flex items-center gap-2">
         <Tooltip content={t('chat.input.advisorInfo')} position="top">
           <button
             type="button"
             onClick={onOpenAdvisorPanel}
             disabled={!onOpenAdvisorPanel}
             aria-label={t('chat.input.advisorInfo')}
-            className={`h-9 w-9 rounded-sm border border-white/10 flex items-center justify-center text-accent-cyan/70 hover:text-accent-cyan hover:border-accent-cyan/50 hover:bg-accent-cyan/10 transition-all duration-200 ${
+            className={`h-10 w-10 rounded-sm border border-white/15 flex items-center justify-center text-accent-cyan/80 hover:text-accent-cyan hover:border-accent-cyan/50 hover:bg-accent-cyan/10 transition-colors duration-150 ${
               !onOpenAdvisorPanel ? 'opacity-30 cursor-not-allowed' : ''
             }`}
           >
@@ -130,19 +143,16 @@ function ChatInput({ identityKey, consumedDraft, onSend, onOpenAdvisorPanel, dis
         <button
           type="submit"
           disabled={!canSend}
-          className={`h-9 px-3 grid rounded-sm border font-display text-xs tracking-wide uppercase transition-colors duration-150 ${
+          aria-label={loading ? t('chat.input.sending') : t('chat.input.send')}
+          aria-busy={loading}
+          className={`relative h-10 min-w-16 px-3 grid place-items-center rounded-sm border font-display text-xs tracking-wide uppercase transition-colors duration-150 ${
             canSend
               ? 'border-accent-cyan/45 text-accent-cyan hover:bg-accent-cyan/12 hover:shadow-glow-sm'
               : 'border-white/10 text-white/25 cursor-not-allowed'
           }`}
         >
-          <span className="invisible col-start-1 row-start-1" aria-hidden="true">{t('chat.input.sending')}</span>
-          <span className="invisible col-start-1 row-start-1" aria-hidden="true">{t('chat.input.send')}</span>
-          <span className="col-start-1 row-start-1 self-center">{loading ? (
-            <span className="animate-pulse">{t('chat.input.sending')}</span>
-          ) : (
-            <span>{t('chat.input.send')}</span>
-          )}</span>
+          <span className={loading ? 'invisible' : ''} aria-hidden="true">{t('chat.input.send')}</span>
+          {loading && <span aria-hidden="true" className="absolute h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin-loader" />}
         </button>
       </div>
     </form>

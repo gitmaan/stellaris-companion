@@ -217,7 +217,7 @@ function App() {
         </div>
 
         {/* Floating Navigation */}
-        <div className="flex-none pt-2 pb-2">
+        <div className="app-navigation flex-none pt-2 pb-2">
             <HUDNavBar
               tabs={tabs}
               activeTab={activeTab}

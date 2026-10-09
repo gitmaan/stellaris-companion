@@ -32,6 +32,7 @@ import { HUDSelect } from '../components/hud/HUDForm'
 import { useToast } from '../components/Toast'
 import { AISetupForm } from '../components/settings/AISetupForm'
 import { ChronicleRefreshControl } from '../components/settings/ChronicleRefreshControl'
+import { PreferenceFeedback } from '../components/settings/PreferenceFeedback'
 import { AISetupChoice, type AISetupRoute } from '../components/settings/AISetupChoice'
 import { MCPRelayPanel } from '../components/settings/MCPRelayPanel'
 import type { HistoryStorageResponse } from '../hooks/useBackend'
@@ -78,12 +79,6 @@ const UI_THEME_OPTIONS: { value: UiTheme; label: string }[] = [
   { value: 'tactica-green', label: 'Tactica Green' },
   { value: 'command-amber', label: 'Command Amber' },
 ]
-
-const UI_THEME_LABELS: Record<UiTheme, string> = {
-  'stellaris-cyan': 'Ion Cyan',
-  'tactica-green': 'Tactica Green',
-  'command-amber': 'Command Amber',
-}
 
 function formatBytes(bytes: number | null | undefined): string {
   if (typeof bytes !== 'number' || !Number.isFinite(bytes)) return '—'
@@ -160,6 +155,8 @@ function SettingsPage({
   const [modelRoutingModeSaving, setModelRoutingModeSaving] = useState(false)
   const [language, setLanguage] = useState<LanguageSetting>(DEFAULT_LANGUAGE)
   const [languageSaving, setLanguageSaving] = useState(false)
+  const [savedPreferences, setSavedPreferences] = useState<Record<string, boolean>>({})
+  const markPreferenceSaved = (name: string, saved: boolean) => setSavedPreferences(current => ({ ...current, [name]: saved }))
   const [updateChannel, setUpdateChannel] = useState<UpdateChannel>(DEFAULT_UPDATE_CHANNEL)
   const [updateChannelSaving, setUpdateChannelSaving] = useState(false)
   const [historyStorage, setHistoryStorage] = useState<HistoryStorageResponse | null>(null)
@@ -263,6 +260,7 @@ function SettingsPage({
     const previousChannel = updateChannel
     setUpdateChannel(nextChannel)
     setUpdateChannelSaving(true)
+    markPreferenceSaved('updateChannel', false)
     const success = await saveSettings({ updateChannel: nextChannel })
     setUpdateChannelSaving(false)
 
@@ -276,13 +274,7 @@ function SettingsPage({
       return
     }
 
-    showToast({
-      type: 'success',
-      message: t('settings.updateChannel.toastSuccess', {
-        channel: t(`settings.updateChannel.${nextChannel}`),
-      }),
-      duration: 1800,
-    })
+    markPreferenceSaved('updateChannel', true)
   }
 
   const [retrying, setRetrying] = useState(false)
@@ -294,6 +286,7 @@ function SettingsPage({
     const previousScale = uiScale
     setUiScale(nextScale)
     setUiScaleSaving(true)
+    markPreferenceSaved('uiScale', false)
 
     const success = await saveSettings({ uiScale: nextScale })
     setUiScaleSaving(false)
@@ -308,11 +301,7 @@ function SettingsPage({
       return
     }
 
-    showToast({
-      type: 'success',
-      message: t('settings.toasts.textSizeSuccess', { percent: Math.round(nextScale * 100) }),
-      duration: 1800,
-    })
+    markPreferenceSaved('uiScale', true)
   }
 
   const handleUiThemeChange = async (rawValue: string) => {
@@ -323,6 +312,7 @@ function SettingsPage({
     setUiTheme(nextTheme)
     onThemeChange?.(nextTheme)
     setUiThemeSaving(true)
+    markPreferenceSaved('uiTheme', false)
 
     const success = await saveSettings({ uiTheme: nextTheme })
     setUiThemeSaving(false)
@@ -338,11 +328,7 @@ function SettingsPage({
       return
     }
 
-    showToast({
-      type: 'success',
-      message: t('settings.toasts.themeSuccess', { theme: UI_THEME_LABELS[nextTheme] }),
-      duration: 1800,
-    })
+    markPreferenceSaved('uiTheme', true)
   }
 
   const handleChronicleRefreshModeChange = async (rawValue: string) => {
@@ -353,6 +339,7 @@ function SettingsPage({
     setChronicleRefreshMode(nextMode)
     onChronicleRefreshModeChange?.(nextMode)
     setChronicleRefreshModeSaving(true)
+    markPreferenceSaved('chronicleRefreshMode', false)
 
     const success = await saveSettings({ chronicleRefreshMode: nextMode })
     setChronicleRefreshModeSaving(false)
@@ -368,13 +355,7 @@ function SettingsPage({
       return
     }
 
-    showToast({
-      type: 'success',
-      message: t('settings.chronicleRefresh.toastSuccess', {
-        mode: t(`settings.chronicleRefresh.${nextMode}`),
-      }),
-      duration: 1800,
-    })
+    markPreferenceSaved('chronicleRefreshMode', true)
   }
 
   const handleModelRoutingModeChange = async (rawValue: string) => {
@@ -385,6 +366,7 @@ function SettingsPage({
     setModelRoutingMode(nextMode)
     onModelRoutingModeChange?.(nextMode)
     setModelRoutingModeSaving(true)
+    markPreferenceSaved('modelRoutingMode', false)
 
     const success = await saveSettings({ modelRoutingMode: nextMode })
     setModelRoutingModeSaving(false)
@@ -400,13 +382,7 @@ function SettingsPage({
       return
     }
 
-    showToast({
-      type: 'success',
-      message: t('settings.modelRouting.toastSuccess', {
-        mode: t(`settings.modelRouting.${nextMode === 'quality_first' ? 'qualityFirst' : 'conserve'}`),
-      }),
-      duration: 1800,
-    })
+    markPreferenceSaved('modelRoutingMode', true)
   }
 
   const handleGeminiQuotaModeChange = async (nextQuotaMode: GeminiQuotaMode) => {
@@ -420,6 +396,7 @@ function SettingsPage({
     const previousLanguage = language
     setLanguage(nextLanguage)
     setLanguageSaving(true)
+    markPreferenceSaved('language', false)
 
     const success = await onLanguageSelect?.(nextLanguage) ?? false
     setLanguageSaving(false)
@@ -434,13 +411,7 @@ function SettingsPage({
       return
     }
 
-    showToast({
-      type: 'success',
-      message: t('settings.toasts.languageSuccess', {
-        language: t(`languages.${nextLanguage}`),
-      }),
-      duration: 1800,
-    })
+    markPreferenceSaved('language', true)
   }
 
   const handleRetryConnection = async () => {
@@ -480,16 +451,22 @@ function SettingsPage({
   }
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar pr-2 pb-10">
+    <div className="settings-scroll h-full overflow-y-auto custom-scrollbar pr-2 pb-10">
       <div className="max-w-4xl mx-auto pt-2">
         
         {/* Header Area */}
-        <div className="mb-6 space-y-4">
+        <div className="settings-header mb-6 space-y-4">
             <div className="min-w-0">
                 <HUDMicro className="mb-1 text-accent-cyan">{t('settings.eyebrow')}</HUDMicro>
                 <HUDHeader size="xl" className="leading-none break-words">{t('settings.title')}</HUDHeader>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <nav aria-label={t('visualQuality.settingsSections')} className="settings-sections flex flex-wrap gap-2">
+              {[['ai-setup', 'intelligence'], ['save-data', 'data'], ['communications', 'communications'], ['updates', 'updates'], ['diagnostics', 'diagnostics']].map(([id, label]) => (
+                <button type="button" key={id} onClick={() => revealSettingsSection(id)} className="rounded border border-border px-3 py-2 text-xs text-text-secondary hover:border-accent-cyan/50 hover:text-accent-cyan">{t(`settings.sections.${label}`)}</button>
+              ))}
+            </nav>
+            <p className="text-xs text-text-secondary">{t('visualQuality.settingsSaveHelp')}</p>
+            <div className="settings-preferences grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <HUDSelect
                   label={t('settings.textSize')}
@@ -498,9 +475,7 @@ function SettingsPage({
                   onChange={(e) => void handleUiScaleChange(e.target.value)}
                   options={UI_SCALE_OPTIONS}
                 />
-                <HUDMicro className="block mt-1 text-right">
-                  {uiScaleSaving ? t('common.applying') : 'CMD/CTRL +/-/0'}
-                </HUDMicro>
+                <div className="mt-1"><PreferenceFeedback saving={uiScaleSaving} saved={savedPreferences.uiScale} hint="CMD/CTRL +/-/0" /></div>
               </div>
               <div>
                 <HUDSelect
@@ -510,9 +485,7 @@ function SettingsPage({
                   onChange={(e) => void handleUiThemeChange(e.target.value)}
                   options={UI_THEME_OPTIONS}
                 />
-                <HUDMicro className="block mt-1 text-right">
-                  {uiThemeSaving ? t('common.applying') : t('settings.themePreset')}
-                </HUDMicro>
+                <div className="mt-1"><PreferenceFeedback saving={uiThemeSaving} saved={savedPreferences.uiTheme} hint={t('settings.themePreset')} /></div>
               </div>
               <div>
                 <HUDSelect
@@ -522,19 +495,11 @@ function SettingsPage({
                   onChange={(e) => void handleLanguageChange(e.target.value)}
                   options={languageOptions}
                 />
-                <HUDMicro className="block mt-1 text-right">
-                  {languageSaving ? t('common.applying') : t('settings.languageHint')}
-                </HUDMicro>
+                <div className="mt-1"><PreferenceFeedback saving={languageSaving} saved={savedPreferences.language} hint={t('settings.languageHint')} /></div>
               </div>
             </div>
         </div>
 
-        <nav aria-label={t('visualQuality.settingsSections')} className="flex flex-wrap gap-2 mb-5">
-          {[['ai-setup', 'intelligence'], ['save-data', 'data'], ['communications', 'communications'], ['updates', 'updates'], ['diagnostics', 'diagnostics']].map(([id, label]) => (
-            <button type="button" key={id} onClick={() => revealSettingsSection(id)} className="rounded border border-border px-3 py-2 text-xs text-text-secondary hover:border-accent-cyan/50 hover:text-accent-cyan">{t(`settings.sections.${label}`)}</button>
-          ))}
-        </nav>
-        <p className="text-xs text-text-secondary mb-6">{t('visualQuality.settingsSaveHelp')}</p>
         {/* Top Status Messages */}
         {error && (
             <HUDPanel variant="alert" className="mb-6 flex items-center gap-4" decoration="scanline">
@@ -571,7 +536,10 @@ function SettingsPage({
                         onChatGPTActivated={reload}
                       />
                       {advisorProvider === 'gemini' && <div className="space-y-3 border-t border-white/10 pt-4">
-                        <HUDLabel>{t('settings.geminiQuota.label')}</HUDLabel>
+                        <div className="flex items-center justify-between gap-3">
+                          <HUDLabel>{t('settings.geminiQuota.label')}</HUDLabel>
+                          <PreferenceFeedback saving={modelRoutingModeSaving} saved={savedPreferences.modelRoutingMode} />
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                           {GEMINI_QUOTA_MODES.map(mode => <button key={mode} type="button" disabled={modelRoutingModeSaving} aria-pressed={geminiQuotaMode === mode} aria-label={t('settings.geminiQuota.aria', { mode: geminiQuotaLabel(mode) })} onClick={() => void handleGeminiQuotaModeChange(mode)} className={`rounded border p-3 text-left ${geminiQuotaMode === mode ? 'border-accent-cyan text-accent-cyan' : 'border-white/20 text-text-secondary'}`}>
                             <span className="block text-sm">{geminiQuotaLabel(mode)}</span>
@@ -580,7 +548,7 @@ function SettingsPage({
                         </div>
                         <p className="text-xs text-text-secondary">{geminiQuotaHelper(geminiQuotaMode)}</p>
                       </div>}
-                      <ChronicleRefreshControl mode={chronicleRefreshMode} saving={chronicleRefreshModeSaving} onChange={mode => void handleChronicleRefreshModeChange(mode)} />
+                      <ChronicleRefreshControl mode={chronicleRefreshMode} saving={chronicleRefreshModeSaving} saved={savedPreferences.chronicleRefreshMode} onChange={mode => void handleChronicleRefreshModeChange(mode)} />
                       </>}
                     </div>
                   </HUDPanel>
@@ -823,9 +791,7 @@ function SettingsPage({
                         <div className="space-y-3 pt-2">
                             <div className="flex items-center justify-between gap-3">
                                 <HUDLabel>{t('settings.updateChannel.label')}</HUDLabel>
-                                {updateChannelSaving && (
-                                  <HUDMicro className="text-right">{t('common.applying')}</HUDMicro>
-                                )}
+                                <PreferenceFeedback saving={updateChannelSaving} saved={savedPreferences.updateChannel} />
                             </div>
                             <div
                               className="grid grid-cols-2 gap-2 rounded-sm border border-white/10 bg-black/20 p-1"

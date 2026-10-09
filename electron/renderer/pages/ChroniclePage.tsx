@@ -8,7 +8,7 @@ import type { TFunction } from 'i18next'
 import ChronicleChapterList from '../components/ChronicleChapterList'
 import ChatGPTUsage from '../components/ChatGPTUsage'
 import { manageChatGPTUsage } from '../hooks/useChatGPT'
-import ChronicleContent from '../components/ChronicleContent'
+import ChronicleContent, { ChronicleHeading } from '../components/ChronicleContent'
 import ChronicleInfoPanel from '../components/ChronicleInfoPanel'
 import ChroniclePublishDialog from '../components/ChroniclePublishDialog'
 import { useBackend, ChronicleResponse, type Playthrough } from '../hooks/useBackend'
@@ -1103,12 +1103,13 @@ function ChroniclePage({
 
         {/* Right content panel - Chapter content */}
         <div className="flex-1 min-w-0 min-h-0 relative flex flex-col">
-          {compactReader && <div className="shrink-0 h-11 flex items-center border-b border-white/10 px-2">
-            <HUDButton type="button" variant="ghost" aria-haspopup="dialog" aria-controls="chronicle-navigation" aria-expanded={chapterDrawerOpen} onClick={() => setChapterDrawerOpen(true)} className="px-3 py-1.5">
+          {compactReader && <header className="chronicle-toolbar shrink-0 flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2">
+            <ChronicleHeading empireName={empireName} coverageDate={chronicle?.coverage_date} compact />
+            <HUDButton type="button" variant="secondary" aria-haspopup="dialog" aria-controls="chronicle-navigation" aria-expanded={chapterDrawerOpen} onClick={() => setChapterDrawerOpen(true)} className="shrink-0 px-3 py-2">
               {t('chronicle.sidebar.chapters')}
             </HUDButton>
-          </div>}
-          <div ref={scrollContainerRef} data-chronicle-scroll className="flex-1 min-h-0 overflow-y-auto p-3 lg:p-6" style={{ overflowAnchor: 'none' }}>
+          </header>}
+          <div ref={scrollContainerRef} data-chronicle-scroll className="chronicle-reader flex-1 min-h-0 overflow-y-auto p-3 lg:p-6" style={{ overflowAnchor: 'none' }}>
           <div className="relative">
             {storyAfterLoadedSave && <p role="status" className="mb-4 rounded border border-accent-yellow/20 bg-accent-yellow/5 px-4 py-3 text-xs text-text-secondary">{t('continuity.earlierSave')}</p>}
             {chronicleConfigured === false && (
@@ -1194,6 +1195,7 @@ function ChroniclePage({
               </div>
             ) : chronicle ? (
               <ChronicleContent
+                hideHeader={compactReader}
                 revision={chronicle.chronicle_revision}
                 coverageDate={chronicle.coverage_date}
                 mutationBusy={mutationBusy || loading}

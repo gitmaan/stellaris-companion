@@ -59,17 +59,134 @@ async function preferences(page, values) {
   await expect(page.locator('#page-chat textarea')).toBeEnabled()
   await page.evaluate(() => document.fonts.ready)
 }
-async function screenshot(page, app, filename) {
-  await fs.mkdir(proof, { recursive: true })
+async function screenshot(page, app, filename, crop) {
+  await fs.mkdir(path.dirname(path.join(proof, filename)), { recursive: true })
   await page.waitForFunction(() => !document.querySelector('[data-overlay] [aria-hidden="true"][role="dialog"]'))
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('[data-overlay], .modal-surface')).every(element => {
+    const style = getComputedStyle(element)
+    return style.opacity === '1' && (style.transform === 'none' || style.transform === 'matrix(1, 0, 0, 1, 0, 0)')
+  }))
   await page.waitForFunction(() => Array.from(document.querySelectorAll('.app-page')).every(page => getComputedStyle(page).opacity === (page.dataset.active === 'true' ? '1' : '0')))
-  const png = await app.evaluate(async ({ BrowserWindow }) => {
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  const png = await app.evaluate(async ({ BrowserWindow }, crop) => {
     const window = BrowserWindow.getAllWindows()[0]
-    const image = await window.webContents.capturePage()
-    return image.resize({ width: window.getContentSize()[0] }).toPNG().toString('base64')
-  })
+    const image = await window.webContents.capturePage(crop)
+    return image.resize({ width: crop?.width || window.getContentSize()[0] }).toPNG().toString('base64')
+  }, crop)
   await fs.writeFile(path.join(proof, filename), Buffer.from(png, 'base64'))
 }
+
+test('visual polish comparison uses matching content and compact window sizes', async () => {
+  const stage = process.env.E2E_VISUAL_PROOF_STAGE === 'before' ? 'before' : 'after'
+  const folder = `polish/${stage}`
+  const backend = createMockChronicleBackend({
+    chapters: [chapter(1)],
+    conversations: [{ id: 'fleet-review', save_id: 'save-1', title: 'Fleet readiness', created_at: 1, updated_at: 2, turns: [{
+      id: 'fleet-review-1', request_id: 'fleet-review-1', game_date: '2205.01.01', created_at: 1, language: 'en',
+      question: 'How should we prepare for the next expedition?',
+      answer: '## Prepare before departure\n\nYour frontier needs a dependable supply line. Reinforce the escort fleet, review the nearest shipyards, and leave enough alloys in reserve to replace losses.\n\n**Next step:** check fleet readiness before committing to another route.',
+    }] }],
+  })
+  await withApp(backend, async (page, app) => {
+    await resize(app, 1000, 700); await preferences(page, { uiScale: 1 })
+    await expect(page.getByText('Prepare before departure', { exact: true })).toBeVisible()
+    const input = page.locator('#page-chat textarea')
+    await input.fill('Review my fleet readiness.')
+    await expect(page.locator('#page-chat button[type=submit]')).toBeEnabled()
+    await input.blur()
+    await screenshot(page, app, `${folder}/advisor-1000.png`)
+    await screenshot(page, app, `${folder}/composer-1000.png`, { x: 0, y: 536, width: 1000, height: 164 })
+    await resize(app, 1400, 900)
+    await screenshot(page, app, `${folder}/advisor-1400.png`)
+    await resize(app, 800, 600); await preferences(page, { uiScale: 1.25 })
+    await expect(page.getByText('Prepare before departure', { exact: true })).toBeVisible()
+    await input.fill('Review my fleet readiness.'); await input.blur()
+    await expect(page.locator('#page-chat button[type=submit]')).toBeEnabled()
+    await screenshot(page, app, `${folder}/advisor-800-scale125.png`)
+    const advisor = page.getByRole('button', { name: 'Advisor info' })
+    await advisor.click()
+    await expect(page.getByRole('dialog', { name: 'Advisor style' })).toBeVisible()
+    await screenshot(page, app, `${folder}/advisor-tweaks-800-scale125.png`)
+    await page.keyboard.press('Escape')
+    await expect(advisor).toBeFocused()
+    await page.locator('button[aria-controls="page-chronicle"]').click()
+    await expect(page.locator('#chapter-1 .chronicle-narrative p').first()).toBeVisible()
+    await page.locator('[data-chronicle-scroll]').evaluate(element => { element.scrollTop = 0 })
+    await screenshot(page, app, `${folder}/chronicle-800-scale125.png`)
+    const firstParagraph = await page.locator('#chapter-1 .chronicle-narrative p').first().boundingBox()
+    await preferences(page, { uiScale: 1.4 })
+    await page.locator('button[aria-controls="page-settings"]').click()
+    await page.getByLabel(catalog('en').settings.colorTheme, { exact: true }).selectOption('tactica-green')
+    await expect(page.getByLabel(catalog('en').settings.colorTheme, { exact: true })).toBeEnabled()
+    await screenshot(page, app, `${folder}/settings-800-scale140.png`)
+    await fs.writeFile(path.join(proof, folder, 'geometry.json'), JSON.stringify({ firstParagraph }, null, 2))
+  })
+})
+
+test('composer aligns controls, grows upward, and keeps advisor tweaks available during replies', async () => {
+  let release
+  const backend = createMockChronicleBackend({ onChat: () => new Promise(resolve => { release = () => resolve('Fleet review complete.') }) })
+  await withApp(backend, async (page, app) => {
+    try {
+      await resize(app, 800, 600)
+      for (const uiScale of [1, 1.25, 1.4]) {
+        await preferences(page, { uiScale })
+        const input = page.locator('#page-chat textarea')
+        await input.fill('Review my fleet readiness.')
+        await expect(page.locator('#page-chat button[type=submit]')).toBeEnabled()
+        const alignment = await input.evaluate(element => {
+          const input = element.getBoundingClientRect(), style = getComputedStyle(element)
+          const form = element.closest('form'), bounds = form.getBoundingClientRect()
+          const buttons = Array.from(form.querySelectorAll('button')).map(button => button.getBoundingClientRect())
+          return {
+            height: bounds.height,
+            emptyFooter: form.parentElement.getBoundingClientRect().bottom - bounds.bottom,
+            offsets: buttons.map(button => Math.abs(input.top + parseFloat(style.paddingTop) + parseFloat(style.lineHeight) / 2 - (button.top + button.height / 2))),
+          }
+        })
+        expect(alignment.height).toBeLessThanOrEqual(58)
+        expect(alignment.emptyFooter).toBeLessThanOrEqual(1)
+        expect(alignment.offsets.every(offset => offset <= 1)).toBe(true)
+        const singleLine = await page.locator('#page-chat form').boundingBox()
+        await input.fill('Review my fleet readiness.\nInclude the nearest shipyard.\nKeep an alloy reserve.')
+        const multiLine = await page.locator('#page-chat form').boundingBox()
+        expect(multiLine.height).toBeGreaterThan(singleLine.height)
+        expect(Math.abs(multiLine.y + multiLine.height - singleLine.y - singleLine.height)).toBeLessThanOrEqual(1)
+      }
+      const input = page.locator('#page-chat textarea')
+      await resize(app, 1000, 600)
+      await input.fill('Fleet readiness and nearby shipyards. '.repeat(5))
+      const widerDraft = await input.boundingBox()
+      await resize(app, 800, 600)
+      await expect.poll(async () => (await input.boundingBox()).height).toBeGreaterThan(widerDraft.height)
+      await input.fill('Review my fleet readiness.')
+      const button = page.locator('#page-chat button[type=submit]')
+      const before = await button.boundingBox()
+      await button.click()
+      await expect.poll(() => typeof release).toBe('function')
+      const during = await button.boundingBox()
+      expect(Math.abs(before.width - during.width)).toBeLessThanOrEqual(1)
+      await input.fill('My next question stays here.')
+      const advisor = page.getByRole('button', { name: 'Advisor info' })
+      await advisor.click()
+      const dialog = page.getByRole('dialog', { name: 'Advisor style' })
+      const instructions = dialog.getByLabel(catalog('en').advisorPanel.personalityInstructions)
+      await instructions.fill('Be concise and focus on fleet readiness.')
+      await dialog.getByRole('button', { name: catalog('en').advisorPanel.saveStyle, exact: true }).click()
+      await expect(dialog.getByText(catalog('en').advisorPanel.saved, { exact: true })).toBeVisible()
+      backend.setHealth({ empire_name: 'United Nations of Sol' })
+      await expect(dialog.getByText(/United Nations of Sol/)).toBeVisible()
+      await expect(dialog.getByText(catalog('en').advisorPanel.saved, { exact: true })).toBeVisible()
+      await page.keyboard.press('Escape'); await expect(advisor).toBeFocused()
+      await advisor.click()
+      await expect(instructions).toHaveValue('Be concise and focus on fleet readiness.')
+      await page.keyboard.press('Escape')
+      release()
+      await expect(page.getByText('Fleet review complete.')).toBeVisible()
+      await expect(input).toHaveValue('My next question stays here.')
+    } finally { release?.() }
+  })
+})
 async function geometry(page) {
   return page.evaluate(() => Object.fromEntries(['.status-bar', 'nav', 'main', '#page-chat header h1', '#page-chat form'].map(selector => {
     const { x, y, width, height } = document.querySelector(selector).getBoundingClientRect()
@@ -243,6 +360,9 @@ test('all text sizes fit the minimum window in long and CJK locales', async () =
         await fits(page, ['[data-chronicle-scroll]'])
         const width = await page.locator('#page-chronicle article').evaluate(element => element.clientWidth)
         expect(width).toBeGreaterThan(470)
+        const readingStart = await page.locator('#chapter-1 .chronicle-narrative p').first().evaluate(element => element.getBoundingClientRect().top / innerHeight)
+        expect(readingStart).toBeLessThan(0.66)
+        await fits(page, ['.chronicle-toolbar'])
         if (uiScale === 1.4 && ['de', 'ja'].includes(language)) await screenshot(page, app, `${language}-chronicle-800-scale140.png`)
       }
     }
@@ -269,23 +389,28 @@ test('reduced motion disables decorative animation, tab scaling, and smooth chap
   })
 })
 
-test('long chat preserves the reading anchor when replies arrive and offers Jump to latest', async () => {
+test('long ChatGPT chat keeps provider and history controls usable and preserves reading position', async () => {
   let release
-  const turns = Array.from({ length: 150 }, (_, i) => ({
+  const turns = Array.from({ length: 151 }, (_, i) => ({
     id: `turn-${i}`, question: `Question ${i + 1}: review this sector.`,
     answer: `Response ${i + 1}. ${'Survey the surrounding systems and maintain an alloy reserve before the next expansion. '.repeat(i % 5 + 1)}`,
     created_at: i + 1, game_date: '2205.01.01', language: 'en',
   }))
   const backend = createMockChronicleBackend({
+    advisorProvider: 'chatgpt',
     conversations: [{ id: 'long-chat', save_id: 'save-1', title: 'Sector reviews', created_at: 1, updated_at: 150, turns }],
     onChat: () => new Promise(resolve => { release = () => resolve('The latest strategic response has arrived.') }),
   })
-  await withApp(backend, async page => {
+  await withApp(backend, async (page, app) => {
     try {
+      await resize(app, 800, 600); await preferences(page, { uiScale: 1.4 })
       const input = page.locator('#page-chat textarea')
       await expect(input).toBeEnabled()
       const reader = page.locator('[data-chat-scroll]')
-      await expect(page.getByText('Question 150: review this sector.', { exact: true })).toBeVisible()
+      await expect(page.getByText('Question 151: review this sector.', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: catalog('en').continuity.earlierMessages, exact: true })).toBeVisible()
+      await fits(page, ['.chat-toolbar', '.chat-toolbar button', '.chatgpt-usage'])
+      await screenshot(page, app, 'polish/after/chatgpt-history-800-scale140.png')
       await input.fill('One more review.'); await page.locator('#page-chat button[type=submit]').click()
       await expect.poll(() => typeof release).toBe('function')
       await reader.evaluate(element => { element.scrollTop = element.scrollHeight * 0.4 })
@@ -341,7 +466,7 @@ test('Chronicle keeps the current paragraph across a responsive rail change', as
   })
 })
 
-test('settings feedback leaves navigation and the composer clear; keyboard focus is visible', async () => {
+test('settings feedback stays inline without moving controls; section links and focus remain visible', async () => {
   await withApp(createMockChronicleBackend(), async (page, app) => {
     await resize(app, 800, 600); await preferences(page, { uiScale: 1.4 })
     const config = page.locator('button[aria-controls="page-settings"]')
@@ -354,18 +479,15 @@ test('settings feedback leaves navigation and the composer clear; keyboard focus
       expectedWidth: Math.floor(2 * devicePixelRatio),
     }))
     expect(outline.physicalWidth).toBeGreaterThanOrEqual(outline.expectedWidth - 0.01)
+    const preferencesBefore = await page.locator('.settings-preferences').boundingBox()
     await page.getByLabel(catalog('en').settings.colorTheme, { exact: true }).selectOption('tactica-green')
-    const notice = page.locator('[data-notifications] > div').first()
-    await expect(notice).toBeVisible()
-    await fits(page, ['[data-notifications]'])
-    const toast = await notice.boundingBox()
-    const navigation = await page.locator('button[aria-controls="page-settings"]').boundingBox()
-    const composer = await page.locator('#page-chat form').boundingBox()
-    expect(toast.y).toBeGreaterThan(navigation.y + navigation.height)
-    expect(toast.y + toast.height).toBeLessThan(composer.y)
+    await expect(page.locator('.settings-preferences [role=status]').filter({ hasText: /^Saved$/ })).toBeVisible()
+    await expect(page.locator('[data-notifications] > div')).toHaveCount(0)
+    const preferencesAfter = await page.locator('.settings-preferences').boundingBox()
+    stable({ preferences: preferencesBefore }, { preferences: preferencesAfter })
+    await fits(page, ['.settings-sections', '.settings-preferences'])
+    expect((await page.locator('.settings-sections').boundingBox()).y).toBeLessThan(preferencesAfter.y)
     await screenshot(page, app, 'settings-feedback-800-scale140.png')
-    await notice.getByRole('button', { name: 'Close' }).click()
-    await expect(notice).toHaveCount(0)
   })
 })
 

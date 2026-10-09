@@ -110,16 +110,16 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
   const statusLabel = getStatusLabel(state.connectionStatus, state.stage, t)
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 px-6 h-12 title-bar-drag-region status-bar z-50 pointer-events-none">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.55fr)] items-center gap-4 px-6 h-12 title-bar-drag-region status-bar z-50 pointer-events-none">
       {/* Left: Empire Info */}
-      <div className="flex min-w-0 items-center gap-3 pointer-events-auto">
+      <div className="status-empire flex min-w-0 items-center gap-3 pointer-events-auto">
         <div className="w-2 h-2 shrink-0 bg-accent-cyan rounded-full shadow-glow-sm" />
         <h2 title={state.empireName ?? t('status.unknownEmpire')} className="truncate font-display font-bold text-sm tracking-wide text-text-primary uppercase">
           {state.empireName ?? t('status.unknownEmpire')}
         </h2>
         {state.gameDate && (
           <>
-            <span className="w-4 h-px shrink-0 bg-white/30" />
+            <span className="status-divider w-4 h-px shrink-0 bg-white/30" />
             <HUDValue className="text-xs text-text-secondary whitespace-nowrap tabular-nums">{state.gameDate}</HUDValue>
           </>
         )}

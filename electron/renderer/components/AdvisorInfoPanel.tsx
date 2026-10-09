@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import PersonIcon from './PersonIcon'
 import Modal from './Modal'
 import { useTranslation } from 'react-i18next'
@@ -37,6 +37,13 @@ export default function AdvisorInfoPanel({
   const [customInstructions, setCustomInstructions] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const editedSinceOpen = useRef(false)
+
+  const editInstructions = (value: string) => {
+    editedSinceOpen.current = true
+    setCustomInstructions(value)
+    setSaveResult(null)
+  }
 
   const traitGroups = useMemo(() => [
     {
@@ -59,29 +66,28 @@ export default function AdvisorInfoPanel({
 
   useEffect(() => {
     if (!isOpen) return
-
     setSaveResult(null)
-
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    if (!isOpen) return
+    editedSinceOpen.current = false
+    let cancelled = false
 
     const load = async () => {
       // Custom instructions (persisted if session exists, otherwise in-memory).
       try {
         const res = await window.electronAPI?.backend?.getSessionAdvisorCustom()
+        // A late load must not replace instructions already being edited.
+        if (cancelled || editedSinceOpen.current) return
         if (res && typeof res === 'object' && 'ok' in res && res.ok) {
           setCustomInstructions((res.data.custom_instructions || '') as string)
         } else {
           setCustomInstructions('')
         }
       } catch {
-        setCustomInstructions('')
+        if (!cancelled && !editedSinceOpen.current) setCustomInstructions('')
       }
     }
 
-    load()
+    void load()
+    return () => { cancelled = true }
   }, [isOpen])
 
   const handleApply = async () => {
@@ -184,12 +190,12 @@ export default function AdvisorInfoPanel({
                   </p>
                   <textarea
                     value={customInstructions}
-                    onChange={(e) => setCustomInstructions(e.target.value)}
+                    onChange={(e) => editInstructions(e.target.value)}
                     placeholder={t('advisorPanel.placeholder')}
                     aria-label={t('advisorPanel.personalityInstructions')}
                     maxLength={300}
                     rows={4}
-                    disabled={!saveLoaded}
+                    disabled={!saveLoaded || saving}
                     className="w-full px-4 py-3 border border-border rounded-md bg-bg-primary/50 text-text-primary text-sm font-sans outline-none transition-all duration-200 focus:border-accent-cyan/50 focus:shadow-glow-sm placeholder:text-text-secondary/60 resize-none disabled:opacity-60 disabled:cursor-not-allowed"
                   />
 
@@ -206,8 +212,8 @@ export default function AdvisorInfoPanel({
                           <button
                             key={example}
                             type="button"
-                            disabled={!saveLoaded}
-                            onClick={() => setCustomInstructions(example)}
+                            disabled={!saveLoaded || saving}
+                            onClick={() => editInstructions(example)}
                             className="px-2.5 py-1.5 text-xs text-text-secondary border border-border/60 rounded bg-bg-primary/30 hover:text-accent-cyan hover:border-accent-cyan/40 hover:bg-accent-cyan/5 transition-all duration-150 text-left disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             {example}

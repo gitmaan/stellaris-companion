@@ -16,11 +16,11 @@ interface HUDNavBarProps {
 
 export const HUDNavBar: React.FC<HUDNavBarProps> = ({ tabs, activeTab, onTabChange, badges }) => {
   return (
-    <nav className="flex justify-center items-center py-1 px-4 relative z-50">
+    <nav className="hud-nav flex justify-center items-center py-1 px-4 relative z-50">
       {/* Decorative center line */}
       <div className="absolute top-1/2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent -z-10" />
 
-      <div className="grid grid-cols-3 gap-1 p-2 w-full max-w-2xl bg-black/40 backdrop-blur-md rounded-full border border-white/5 shadow-glass">
+      <div className="hud-nav-track grid grid-cols-3 gap-1 p-2 w-full max-w-2xl bg-black/40 backdrop-blur-md rounded-full border border-white/5 shadow-glass">
         {tabs.map((tab) => {
           const badgeCount = badges?.[tab.id] ?? 0;
           return (

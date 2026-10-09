@@ -79,6 +79,7 @@ function createMockChronicleBackend(options = {}) {
   let publication = null
   let chronicleError = options.chronicleError ?? null
   let healthOverrides = {}
+  let advisorCustomInstructions = ''
   const conversations = new Map((options.conversations ?? []).map(item => [item.id, structuredClone(item)]))
   let revision = 1
   let chapters = structuredClone(options.chapters ?? [])
@@ -261,6 +262,12 @@ function createMockChronicleBackend(options = {}) {
 
     if (req.method === 'GET' && url.pathname === '/api/status') {
       sendJson(res, 200, statusPayload())
+      return
+    }
+
+    if (url.pathname === '/api/session-advisor-custom' && ['GET', 'POST'].includes(req.method)) {
+      if (req.method === 'POST') advisorCustomInstructions = String((await readJsonBody(req)).custom_instructions || '').trim()
+      sendJson(res, 200, { custom_instructions: advisorCustomInstructions || null, persisted: true })
       return
     }
 

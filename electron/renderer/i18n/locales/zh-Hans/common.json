@@ -7,6 +7,7 @@
     }
   },
   "common": {
+    "saved": "已保存",
     "apply": "应用",
     "applying": "正在应用...",
     "browse": "浏览",

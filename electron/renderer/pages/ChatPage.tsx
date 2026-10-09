@@ -561,7 +561,7 @@ function ChatPage({
   }, [messages, isLoading, historyLoading, viewingEarlier, advisorConfigured, handleSend, loadingMessage, onOpenSettings, onReportLlmIssue, t])
 
   return (
-    <div className="flex flex-col h-full min-h-0 relative">
+    <div className="chat-column flex flex-col h-full min-h-0 relative w-full max-w-[1000px] mx-auto">
       <AdvisorInfoPanel
         key={campaignIdRef.current}
         isOpen={advisorPanelOpen}
@@ -575,18 +575,19 @@ function ChatPage({
         empireOrigin={empireOrigin}
       />
 
-      <div className="relative shrink-0 flex h-12 items-center justify-end gap-3 mb-1">
-          {(hasEarlierMessages || viewingEarlier) && <div className="mr-auto flex gap-3 text-xs text-text-secondary">
+      <div className={`chat-toolbar ${hasEarlierMessages || viewingEarlier ? 'chat-toolbar-with-history' : ''} relative shrink-0 flex h-12 items-center justify-end gap-3 mb-1`}>
+          {advisorProvider === 'chatgpt' && <div className="h-full min-w-0 flex-1 mr-auto"><ChatGPTUsage disabled={isLoading} /></div>}
+          {(hasEarlierMessages || viewingEarlier) && <div className="chat-history-paging mr-auto flex flex-wrap gap-3 text-xs text-text-secondary">
             {hasEarlierMessages && <button type="button" disabled={isLoading || historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId, firstTurnId)}>{t('continuity.earlierMessages')}</button>}
             {viewingEarlier && <button type="button" disabled={historyLoading} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, conversationId)}>{t('continuity.latestMessages')}</button>}
           </div>}
-          {historyError && <button type="button" disabled={isLoading || historyLoading} className="text-xs text-accent-yellow" onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, historyTargetRef.current ?? conversationId)}>{t('continuity.historyRetry')}</button>}
-          {historyLoading && <span className="text-xs text-text-muted" role="status">{t('continuity.restoring')}</span>}
+          {historyError && <button type="button" disabled={isLoading || historyLoading} className="min-w-0 truncate text-xs text-accent-yellow" title={t('continuity.historyRetry')} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, historyTargetRef.current ?? conversationId)}>{t('continuity.historyRetry')}</button>}
+          {historyLoading && <span className="min-w-0 truncate text-xs text-text-muted" role="status">{t('continuity.restoring')}</span>}
           {conversations.length > 0 && (
             <div className="relative" onBlur={event => {
               if (!event.currentTarget.contains(event.relatedTarget)) setHistoryOpen(false)
             }} onKeyDown={event => { if (event.key === 'Escape' && !event.nativeEvent.isComposing) { setHistoryOpen(false); event.currentTarget.querySelector<HTMLButtonElement>('[aria-expanded]')?.focus() } }}>
-              <button type="button" aria-haspopup="menu" disabled={isLoading || historyLoading} aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="px-3 py-2 font-display text-[10px] uppercase tracking-[0.12em] text-text-secondary hover:text-accent-cyan disabled:opacity-40">{t('continuity.chats')} ▾</button>
+              <button type="button" aria-haspopup="menu" disabled={isLoading || historyLoading} aria-expanded={historyOpen} onClick={() => setHistoryOpen(open => !open)} className="whitespace-nowrap px-3 py-2 font-display text-[10px] uppercase tracking-[0.12em] text-text-secondary hover:text-accent-cyan disabled:opacity-40">{t('continuity.chats')} ▾</button>
               {historyOpen && <div className="absolute right-0 top-full z-30 mt-1 w-72 max-h-64 overflow-y-auto rounded border border-border bg-bg-secondary p-1 shadow-xl" role="menu">
                 {conversations.map(item => <button key={item.id} type="button" role="menuitem" title={item.title} onClick={() => activeCampaignId && void restoreConversation(activeCampaignId, item.id)} className={`block w-full truncate rounded px-3 py-2 text-left text-xs hover:bg-white/5 ${item.id === conversationId ? 'text-accent-cyan' : 'text-text-secondary'}`}>
                   {item.title || t('chat.newChat')}<span className="block text-[10px] text-text-muted">{item.last_game_date ?? new Date(item.created_at * 1000).toLocaleDateString()}</span>
@@ -594,15 +595,15 @@ function ChatPage({
               </div>}
             </div>
           )}
-          <button type="button" onClick={() => void handleNewChat()} disabled={isLoading || historyLoading} className="px-4 py-2 border border-white/20 font-display text-[10px] tracking-[0.18em] uppercase text-accent-cyan/80 hover:border-accent-cyan/60 hover:bg-accent-cyan/10 disabled:opacity-40">{t('chat.newChat')}</button>
+          <button type="button" onClick={() => void handleNewChat()} disabled={isLoading || historyLoading} className="shrink-0 whitespace-nowrap px-4 py-2 border border-white/20 font-display text-[10px] tracking-[0.18em] uppercase text-accent-cyan/80 hover:border-accent-cyan/60 hover:bg-accent-cyan/10 disabled:opacity-40">{t('chat.newChat')}</button>
         </div>
 
       {messages.length === 0 ? (
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 pt-4 pb-6">
-          <div className="w-full max-w-2xl mx-auto flex flex-col items-center gap-6">
+        <div className="chat-welcome flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3 pt-4 pb-6">
+          <div className="chat-welcome-content w-full max-w-2xl mx-auto flex flex-col items-center gap-6">
             <header className="text-center space-y-3">
-              <FolderIconG className="text-accent-cyan mx-auto" size={isWelcomeCompact ? 24 : 36} />
-              <HUDHeader size={isWelcomeCompact ? 'lg' : 'xl'} className="tracking-wide text-accent-cyan text-glow">
+              <FolderIconG className="chat-welcome-folder text-accent-cyan mx-auto" size={36} />
+              <HUDHeader size="xl" className="tracking-wide text-accent-cyan text-glow">
                 {t('chat.welcome.title')}
               </HUDHeader>
               <p className="min-h-10 text-text-secondary font-mono text-sm" role="status">
@@ -645,7 +646,7 @@ function ChatPage({
         <>
 
 
-          <div className="flex-1 flex flex-col overflow-hidden relative rounded-lg bg-black/20 backdrop-blur-sm border border-white/5 mb-4">
+          <div className="chat-transcript flex-1 min-h-0 flex flex-col overflow-hidden relative rounded-lg bg-black/20 backdrop-blur-sm border border-white/5 mb-3">
              {/* Decorative lines for chat container */}
              <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-white/10 pointer-events-none" />
              <div className="absolute top-0 right-0 w-4 h-4 border-t border-r border-white/10 pointer-events-none" />
@@ -687,7 +688,6 @@ function ChatPage({
         disabled={!backendConnected || !precomputeReady || advisorConfigured === false || historyLoading || viewingEarlier}
         onOpenAdvisorPanel={() => setAdvisorPanelOpen(true)}
       />
-      <div className="h-12 shrink-0">{advisorProvider === 'chatgpt' && <ChatGPTUsage disabled={isLoading} />}</div>
     </div>
   )
 }

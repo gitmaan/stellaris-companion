@@ -44,17 +44,13 @@ export const HUDContainer: React.FC<HUDContainerProps> = ({ children, className 
         }}
       />
 
-      {/* 5. Scanline Effect */}
-      <div
-        className="absolute inset-0 bg-scanline pointer-events-none z-50"
-        style={{ opacity: 'var(--theme-hud-scanline-opacity, 0.1)' }}
-      />
-      
-      {/* 6. Decorative Corner HUD Elements (Fixed to screen) */}
-      <div className="absolute top-4 left-4 w-32 h-32 border-l border-t border-border-glow opacity-50 z-20 pointer-events-none hud-corner-top" />
-      <div className="absolute top-4 right-4 w-32 h-32 border-r border-t border-border-glow opacity-50 z-20 pointer-events-none hud-corner-top" />
-      <div className="absolute bottom-4 left-4 w-32 h-32 border-l border-b border-border-glow opacity-50 z-20 pointer-events-none" />
-      <div className="absolute bottom-4 right-4 w-32 h-32 border-r border-b border-border-glow opacity-50 z-20 pointer-events-none" />
+      {/* Scanlines are applied once by body::after, including over portals. */}
+
+      {/* Decorative Corner HUD Elements (Fixed to screen) */}
+      <div className="hud-corner absolute top-4 left-4 w-32 h-32 border-l border-t border-border-glow opacity-50 z-20 pointer-events-none hud-corner-top" />
+      <div className="hud-corner absolute top-4 right-4 w-32 h-32 border-r border-t border-border-glow opacity-50 z-20 pointer-events-none hud-corner-top" />
+      <div className="hud-corner absolute bottom-4 left-4 w-32 h-32 border-l border-b border-border-glow opacity-50 z-20 pointer-events-none" />
+      <div className="hud-corner absolute bottom-4 right-4 w-32 h-32 border-r border-b border-border-glow opacity-50 z-20 pointer-events-none" />
 
       {/* Content Layer */}
       <div className="relative z-30 h-full w-full overflow-hidden flex flex-col">

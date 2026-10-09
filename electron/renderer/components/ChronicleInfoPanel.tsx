@@ -33,7 +33,7 @@ export default function ChronicleInfoPanel({
 
     setSaveResult(null)
 
-  }, [isOpen, onClose])
+  }, [isOpen, selectedSaveId])
 
   useEffect(() => {
     if (!isOpen || !selectedSaveId) return
