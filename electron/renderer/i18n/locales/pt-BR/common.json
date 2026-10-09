@@ -1152,5 +1152,22 @@
     "latestMessages": "Voltar às recentes",
     "updateStory": "Atualizar história",
     "earlierSave": "Um save anterior foi carregado. Sua história registrada foi preservada."
+  },
+  "visualQuality": {
+    "retry": "Tentar novamente",
+    "copy": "Copiar resposta",
+    "copied": "Copiado",
+    "copyFailed": "Falha ao copiar",
+    "jumpLatest": "Ir para a última mensagem",
+    "offline": "O serviço Companion está offline",
+    "noSave": "Nenhum jogo salvo encontrado ainda",
+    "connectingHelp": "Conectando ao serviço Companion. Isso costuma levar um momento.",
+    "offlineHelp": "Verifique se o serviço Companion está em execução e se a pasta de jogos salvos está disponível. A reconexão é automática.",
+    "noSaveHelp": "Salve sua partida no Stellaris e confira a pasta de jogos salvos nas Configurações. Seu império aparecerá aqui quando o arquivo for detectado.",
+    "analyzingHelp": "Seu jogo salvo está sendo analisado. As perguntas sugeridas e o conselheiro estarão disponíveis ao fim da análise.",
+    "saveSettings": "Verificar configurações de jogos salvos",
+    "settingsSections": "Seções de configurações",
+    "settingsSaveHelp": "As preferências de exibição e as mudanças de pasta são salvas imediatamente. Campos de texto com um botão Aplicar ou Salvar são salvos quando você pressiona esse botão.",
+    "nextQuestion": "Escreva sua próxima pergunta enquanto o conselheiro responde…"
   }
 }

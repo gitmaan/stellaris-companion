@@ -582,6 +582,7 @@ function createMockChronicleBackend(options = {}) {
     stop,
     advanceCampaign,
     setHealth: (payload) => { healthOverrides = payload },
+    setChatError: error => { options.chatError = error },
     setChronicleError,
     setHistoryUnavailable: value => { options.historyUnavailable = value },
     waitForChronicleRequest,

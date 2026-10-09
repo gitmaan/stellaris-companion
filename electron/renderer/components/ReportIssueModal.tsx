@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import Modal from './Modal'
 import { HUDButton } from './hud/HUDButton'
 import { HUDSelect, HUDCheckbox } from './hud/HUDForm'
 import { HUDTextArea } from './hud/HUDInput'
@@ -422,29 +421,8 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     }
   }
 
-  if (!isOpen) return null
-
-  return createPortal(
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <motion.div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="report-issue-title"
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          transition={{ duration: 0.2 }}
-          className="relative w-full max-w-lg mx-4 p-6 bg-bg-elevated border border-border rounded-lg max-h-[calc(100vh-2rem)] overflow-y-auto custom-scrollbar"
-          style={{ boxShadow: '0 0 40px rgb(var(--color-accent-cyan) / 0.1), 0 8px 32px rgb(0 0 0 / 0.5)' }}
-          onClick={(e) => e.stopPropagation()}
-        >
+  return (
+    <Modal open={isOpen} onClose={busy ? undefined : onClose} labelledBy="report-issue-title" className="w-full max-w-lg p-6 overflow-y-auto custom-scrollbar">
           <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-accent-cyan/60" />
           <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-accent-cyan/60" />
           <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-accent-cyan/60" />
@@ -568,9 +546,6 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               {t('report.close')}
             </HUDButton>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>,
-    document.body,
+    </Modal>
   )
 }

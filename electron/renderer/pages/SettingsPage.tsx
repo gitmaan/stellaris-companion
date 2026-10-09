@@ -529,6 +529,12 @@ function SettingsPage({
             </div>
         </div>
 
+        <nav aria-label={t('visualQuality.settingsSections')} className="flex flex-wrap gap-2 mb-5">
+          {[['ai-setup', 'intelligence'], ['save-data', 'data'], ['communications', 'communications'], ['updates', 'updates'], ['diagnostics', 'diagnostics']].map(([id, label]) => (
+            <button type="button" key={id} onClick={() => revealSettingsSection(id)} className="rounded border border-border px-3 py-2 text-xs text-text-secondary hover:border-accent-cyan/50 hover:text-accent-cyan">{t(`settings.sections.${label}`)}</button>
+          ))}
+        </nav>
+        <p className="text-xs text-text-secondary mb-6">{t('visualQuality.settingsSaveHelp')}</p>
         {/* Top Status Messages */}
         {error && (
             <HUDPanel variant="alert" className="mb-6 flex items-center gap-4" decoration="scanline">
@@ -585,7 +591,7 @@ function SettingsPage({
             <div className="space-y-8">
 
                 {/* Save Data Section */}
-                <section>
+                <section id="save-data">
                     <HUDSectionTitle number="02">{t('settings.sections.data')}</HUDSectionTitle>
                     <div className="space-y-4">
                       <HUDPanel decoration="brackets" title={t('settings.panels.saveSource')} quiet>
@@ -732,7 +738,7 @@ function SettingsPage({
             {/* Optional connections */}
             <div className="space-y-8">
                 {/* Discord Section */}
-                <section>
+                <section id="communications">
                     <HUDSectionTitle number="04">{t('settings.sections.communications')}</HUDSectionTitle>
                     <HUDPanel decoration="scanline" variant={discordStatus?.connected ? 'primary' : 'secondary'} title={t('settings.panels.discordLink')} quiet>
                         <div className="space-y-4 pt-2">
@@ -811,7 +817,7 @@ function SettingsPage({
             <div className="space-y-8">
 
                 {/* Software Updates Section */}
-                <section>
+                <section id="updates">
                     <HUDSectionTitle number="05">{t('settings.sections.updates')}</HUDSectionTitle>
                     <HUDPanel decoration="brackets" title={t('settings.panels.updateChannel')} quiet>
                         <div className="space-y-3 pt-2">
@@ -866,7 +872,7 @@ function SettingsPage({
                 </section>
 
                 {/* Feedback Section */}
-                <section>
+                <section id="diagnostics">
                     <HUDSectionTitle number="06">{t('settings.sections.diagnostics')}</HUDSectionTitle>
                     <div className="flex gap-4 items-center p-4 border border-white/5 bg-black/15 rounded-sm">
                         <div className="flex-1">

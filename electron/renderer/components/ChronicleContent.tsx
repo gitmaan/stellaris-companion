@@ -40,9 +40,9 @@ function ChronicleContent({
   return (
     <article className="max-w-[800px] mx-auto">
       {/* Empire header */}
-      <header className="text-center mb-10 relative">
-        <div className="text-accent-cyan text-3xl mb-3">◈</div>
-        <h1 className="chronicle-display-title font-display text-2xl tracking-[0.2em] text-text-primary uppercase">
+      <header className="text-center mb-4 lg:mb-6 relative">
+        <h1 className="chronicle-display-title font-display text-lg lg:text-2xl tracking-wide break-words text-text-primary uppercase">
+          <span aria-hidden="true" className="text-accent-cyan mr-2">◈</span>
           {t('chronicle.content.title', { empireName })}
         </h1>
         {coverageDate && <p className="mt-3 text-xs text-text-secondary">{t('continuity.storyCoverage', { date: coverageDate })}</p>}
@@ -129,7 +129,7 @@ function ChapterBlock({
   )
 
   return (
-    <div id={`chapter-${chapter.number}`} data-reading-id={chapter.id || chapter.start_date} data-reading-version={readingVersion(chapter.narrative)} className={`stellaris-panel rounded-lg p-8 relative mb-8 ${wasJustRegenerated ? 'animate-highlight-flash' : ''}`}>
+    <div id={`chapter-${chapter.number}`} data-reading-id={chapter.id || chapter.start_date} data-reading-version={readingVersion(chapter.narrative)} className={`stellaris-panel rounded-lg p-4 lg:p-8 relative mb-8 ${wasJustRegenerated ? 'animate-highlight-flash' : ''}`}>
       {/* Regenerating overlay */}
       {isRegenerating && (
         <div className="absolute inset-0 bg-bg-primary/90 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center gap-4 z-10">
@@ -139,8 +139,8 @@ function ChapterBlock({
       )}
 
       {/* Chapter header */}
-      <div className="flex justify-between items-start mb-6 pb-4 border-b border-border">
-        <div className="flex flex-col gap-2">
+      <div className="flex justify-between items-start mb-3 pb-3 lg:mb-6 lg:pb-4 border-b border-border">
+        <div className="flex flex-col gap-1 lg:gap-2 min-w-0">
           <span className="text-xs font-semibold text-accent-cyan uppercase tracking-wider flex items-center gap-2">
             <span>◇</span>
             {t('chronicle.content.chapter', { number: /^(ja|zh)/.test(i18n.language) ? chapter.number : toRoman(chapter.number) })}
@@ -270,9 +270,9 @@ function CurrentEraBlock({ currentEra }: { currentEra: CurrentEra }) {
   )
 
   return (
-    <div id="current-era" data-reading-id={currentEra.start_date} data-reading-version={readingVersion(currentEra.narrative)} className="stellaris-panel rounded-lg p-8 mb-8">
-      <div className="flex justify-between items-start mb-6 pb-4 border-b border-border">
-        <div className="flex flex-col gap-2">
+    <div id="current-era" data-reading-id={currentEra.start_date} data-reading-version={readingVersion(currentEra.narrative)} className="stellaris-panel rounded-lg p-4 lg:p-8 mb-8">
+      <div className="flex justify-between items-start mb-3 pb-3 lg:mb-6 lg:pb-4 border-b border-border">
+        <div className="flex flex-col gap-1 lg:gap-2 min-w-0">
           <span className="text-xs font-semibold text-accent-yellow uppercase tracking-wider flex items-center gap-2">
             <span>⏳</span>
             {t('chronicle.content.currentEra')}

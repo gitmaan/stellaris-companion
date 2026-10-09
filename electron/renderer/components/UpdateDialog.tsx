@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
+import Modal from './Modal'
 import { useTranslation } from 'react-i18next'
 
 interface UpdateState {
@@ -92,6 +93,7 @@ function extractReleaseHighlights(releaseNotes?: string, maxHighlights = 5): str
 
 export default function UpdateDialog() {
   const { t } = useTranslation()
+  const reducedMotion = useReducedMotion()
   const [update, setUpdate] = useState<UpdateState>({
     available: false,
     checking: false,
@@ -237,27 +239,8 @@ export default function UpdateDialog() {
   const releaseNameVersion = releaseName?.replace(/^Stellaris Companion\s+/i, '').replace(/^v(?=\d)/i, '')
   const showReleaseName = releaseName && releaseNameVersion !== update.version
 
-  if (!update.available) return null
-
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] flex items-center justify-center overflow-y-auto p-4"
-        onClick={() => {
-          if (!update.installing) handleDismiss()
-        }}
-      >
-        <motion.div
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="relative w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto p-8 bg-bg-secondary border border-border rounded-lg shadow-panel-cyan-update"
-          onClick={e => e.stopPropagation()}
-        >
+    <Modal open={update.available} onClose={update.installing ? undefined : handleDismiss} label={t('update.title')} className="w-full max-w-md overflow-y-auto p-6">
           {/* Corner accents */}
           <div className="absolute top-0 left-0 w-3 h-3 border-l-2 border-t-2 border-accent-cyan/50" />
           <div className="absolute top-0 right-0 w-3 h-3 border-r-2 border-t-2 border-accent-cyan/50" />
@@ -331,7 +314,7 @@ export default function UpdateDialog() {
                         }}
                         initial={{ width: 0 }}
                         animate={{ width: `${update.progress}%` }}
-                        transition={{ duration: 0.3 }}
+                        transition={{ duration: reducedMotion ? 0 : 0.16 }}
                       />
                     </div>
                   </div>
@@ -387,8 +370,6 @@ export default function UpdateDialog() {
               )}
             </div>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+    </Modal>
   )
 }

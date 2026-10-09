@@ -22,8 +22,12 @@ export const HUDContainer: React.FC<HUDContainerProps> = ({ children, className 
       
       {/* 2. Stars / Nebula subtle effect (CSS generated) */}
       <div
-        className="absolute inset-0 z-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] mix-blend-screen"
-        style={{ opacity: 'var(--theme-stars-opacity, 0.3)' }}
+        className="absolute inset-0 z-0 mix-blend-screen pointer-events-none"
+        style={{
+          opacity: 'var(--theme-stars-opacity, 0.3)',
+          backgroundImage: 'radial-gradient(circle at 25% 30%, rgb(255 255 255 / 0.3) 0.5px, transparent 1px), radial-gradient(circle at 70% 75%, rgb(255 255 255 / 0.2) 0.5px, transparent 1px)',
+          backgroundSize: '113px 137px, 179px 193px',
+        }}
       />
       
       {/* 3. Grid Overlay (The "Floor" or tactical map feel) */}

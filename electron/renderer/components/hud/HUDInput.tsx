@@ -29,7 +29,7 @@ export const HUDInput: React.FC<HUDInputProps> = ({
       <div className="relative group">
         <input
           id={inputId}
-          className={`w-full bg-black/20 border-b border-white/20 px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted/50 focus:outline-none focus:border-accent-cyan focus:bg-accent-cyan/5 transition-all duration-300 rounded-t-sm ${statusText ? 'pr-24' : ''}`}
+          className={`w-full bg-black/20 border-b border-white/20 px-3 py-2 font-mono text-sm text-text-primary placeholder-text-muted/50 focus:outline-none focus:border-accent-cyan focus:bg-accent-cyan/5 transition-colors duration-[var(--motion-feedback)] rounded-t-sm ${statusText ? 'pr-24' : ''}`}
           {...props}
         />
         {statusText && (
@@ -38,7 +38,7 @@ export const HUDInput: React.FC<HUDInputProps> = ({
           </span>
         )}
         {/* Animated bottom line on focus */}
-        <div className="absolute bottom-0 left-0 w-0 h-px bg-accent-cyan transition-all duration-500 group-focus-within:w-full" />
+        <div className="absolute bottom-0 left-0 w-full h-px bg-accent-cyan opacity-0 transition-opacity duration-[var(--motion-feedback)] group-focus-within:opacity-100" />
       </div>
       {error && <span className="text-xs text-accent-red mt-1">{error}</span>}
     </div>
@@ -49,7 +49,7 @@ export const HUDTextArea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElem
   return (
     <div className="relative group w-full">
        <textarea
-          className={`w-full bg-black/20 border border-white/10 px-4 py-3 font-mono text-sm text-text-primary placeholder-text-muted/50 focus:outline-none focus:border-accent-cyan/50 focus:bg-accent-cyan/5 transition-all duration-300 rounded-sm resize-none ${className}`}
+          className={`w-full bg-black/20 border border-white/10 px-4 py-3 font-mono text-sm text-text-primary placeholder-text-muted/50 focus:outline-none focus:border-accent-cyan/50 focus:bg-accent-cyan/5 transition-colors duration-[var(--motion-feedback)] rounded-sm resize-none ${className}`}
           {...props}
         />
          {/* Corner accents */}

@@ -1152,5 +1152,22 @@
     "latestMessages": "Volver a los últimos",
     "updateStory": "Actualizar historia",
     "earlierSave": "Se cargó una partida anterior. Tu historia registrada se conserva."
+  },
+  "visualQuality": {
+    "retry": "Reintentar",
+    "copy": "Copiar respuesta",
+    "copied": "Copiado",
+    "copyFailed": "Error al copiar",
+    "jumpLatest": "Ir al último mensaje",
+    "offline": "El servicio Companion está desconectado",
+    "noSave": "Aún no se encontró una partida guardada",
+    "connectingHelp": "Conectando con el servicio Companion. Esto suele tardar un momento.",
+    "offlineHelp": "Comprueba que el servicio Companion esté en ejecución y que la carpeta de partidas esté disponible. La reconexión es automática.",
+    "noSaveHelp": "Guarda tu partida en Stellaris y comprueba la carpeta de partidas en Ajustes. Tu imperio aparecerá aquí cuando se detecte la partida guardada.",
+    "analyzingHelp": "Se está analizando tu partida. Las preguntas sugeridas y el asesor estarán disponibles al terminar el análisis.",
+    "saveSettings": "Revisar ajustes de partidas",
+    "settingsSections": "Secciones de ajustes",
+    "settingsSaveHelp": "Las preferencias de visualización y los cambios de carpeta se guardan inmediatamente. Los campos de texto con un botón Aplicar o Guardar se guardan al pulsarlo.",
+    "nextQuestion": "Escribe tu próxima pregunta mientras responde el asesor…"
   }
 }

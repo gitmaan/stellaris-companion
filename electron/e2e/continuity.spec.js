@@ -1,3 +1,4 @@
+const { openChapterNavigation, closeChapterNavigation } = require('./helpers/chronicleNavigation')
 const fs = require('fs/promises')
 const os = require('os')
 const path = require('path')
@@ -60,7 +61,7 @@ test('Manual mode suppresses passive work across ingestion and focus; explicit u
     await manual(page); await page.getByRole('button', { name: /Chronicle/i }).click(); await expect(page.getByText('Story covers through 2205.01.01')).toBeVisible()
     backend.advanceCampaign(); await page.evaluate(() => window.dispatchEvent(new Event('focus'))); await expect(page.locator('.status-bar')).toContainText('2208.01.01'); await page.waitForTimeout(1200)
     expect(backend.getChronicleRequests()).toHaveLength(0)
-    await page.getByRole('button', { name: /Update|Generate/i }).first().click(); await expect.poll(() => backend.getChronicleRequests().length).toBe(1)
+    await openChapterNavigation(page); await page.getByRole('button', { name: /Update|Generate/i }).first().click(); await closeChapterNavigation(page); await expect.poll(() => backend.getChronicleRequests().length).toBe(1)
     expect(backend.getChronicleRequests()[0]).toMatchObject({ force_refresh: true, refresh_mode: 'manual' }); await expect(page.getByText('Story covers through 2208.01.01')).toBeVisible()
   })
 })
@@ -69,7 +70,7 @@ test('Chronicle resumes a paragraph after reload without moving on passive updat
   const backend = createMockChronicleBackend({ chapters })
   await withApp(backend, async page => {
     await manual(page); await page.getByRole('button', { name: /Chronicle/i }).click(); await expect(page.locator('#chapter-2')).toBeAttached()
-    const reader = page.locator('.absolute.inset-0.overflow-y-auto.p-6')
+    const reader = page.locator('[data-chronicle-scroll]')
     await page.evaluate(() => document.fonts.ready)
     await reader.evaluate(container => { const paragraph = container.querySelector('#chapter-2 .chronicle-narrative p:nth-child(4)'); container.scrollTop += paragraph.getBoundingClientRect().top - container.getBoundingClientRect().top + 30 })
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('chronicle-reading:save-1:en') || 'null')?.anchor)).toBe('chapter-2')
@@ -174,7 +175,7 @@ test('reset Undo from an earlier campaign does not replace the selected campaign
   ] })
   await withApp(backend, async page => {
     await manual(page); await page.getByRole('button', { name: /Chronicle/i }).click(); await expect(page.getByText('Old teaser.')).toBeVisible()
-    const sidebar = page.getByRole('complementary')
+    const sidebar = await openChapterNavigation(page)
     await sidebar.getByRole('button', { name: 'Manage campaigns' }).click()
     const dialog = page.getByRole('dialog', { name: 'Campaign History' })
     const row = dialog.locator('article').filter({ hasText: 'United Nations of Earth' })
@@ -206,7 +207,7 @@ for (const action of ['edit', 'undo']) {
           await block.locator('summary').click(); await block.getByRole('button', { name: 'Undo latest change' }).click()
         }
         await expect.poll(() => typeof release).toBe('function')
-        const sidebar = page.getByRole('complementary')
+        const sidebar = await openChapterNavigation(page)
         await sidebar.getByRole('button', { name: 'Choose a campaign' }).click(); await sidebar.getByRole('option', { name: /Frontier Union/ }).click()
         release()
         await expect(page.getByText('The Frontier Union story remains selected.')).toBeVisible()

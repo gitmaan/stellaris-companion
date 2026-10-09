@@ -64,6 +64,10 @@ const {
 
 const IS_DEV = process.env.NODE_ENV === 'development'
 const IS_E2E = process.env.E2E === '1'
+// Local journeys must not steal the desktop. Opt in to visible windows for
+// interactive debugging or for CI running inside its own virtual display.
+const E2E_HIDDEN = IS_E2E && process.env.E2E_SHOW_WINDOWS !== '1'
+if (E2E_HIDDEN && process.platform === 'darwin') app.setActivationPolicy('accessory')
 
 function tNative(key, values) {
   let locale = 'en'
@@ -99,7 +103,7 @@ if (E2E_USER_DATA_DIR) {
 let hasShownFatalErrorDialog = false
 process.on('uncaughtException', async (err) => {
   console.error('Uncaught exception in main process:', err)
-  if (!hasShownFatalErrorDialog && app?.isReady?.()) {
+  if (!E2E_HIDDEN && !hasShownFatalErrorDialog && app?.isReady?.()) {
     hasShownFatalErrorDialog = true
     try {
       await dialog.showMessageBox({
@@ -1351,6 +1355,7 @@ function updateTrayMenu() {
 }
 
 function revealMainWindow() {
+  if (E2E_HIDDEN) return
   if (!mainWindow || mainWindow.isDestroyed()) {
     createWindow()
     return
@@ -1376,6 +1381,8 @@ function createWindow() {
   const windowState = store.get('windowState', { width: 1000, height: 700 })
 
   mainWindow = new BrowserWindow({
+    show: !E2E_HIDDEN,
+    focusable: !E2E_HIDDEN,
     width: windowState.width,
     height: windowState.height,
     x: windowState.x,
@@ -1390,6 +1397,8 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       webviewTag: false,
+      // Keep layout, animation frames and screenshots working while hidden.
+      backgroundThrottling: !E2E_HIDDEN,
     },
   })
 
@@ -1957,6 +1966,7 @@ app.whenReady().then(async () => {
   })
 
   app.on('activate', () => {
+    if (E2E_HIDDEN) return
     // macOS: clicking dock icon should show the window
     if (mainWindow) {
       mainWindow.show()

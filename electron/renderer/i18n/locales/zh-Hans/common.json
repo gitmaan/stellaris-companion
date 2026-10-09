@@ -1141,5 +1141,22 @@
     "latestMessages": "返回最新消息",
     "updateStory": "更新故事",
     "earlierSave": "已加载较早的存档。已记录的故事会被保留。"
+  },
+  "visualQuality": {
+    "retry": "重试",
+    "copy": "复制回答",
+    "copied": "已复制",
+    "copyFailed": "复制失败",
+    "jumpLatest": "跳转到最新消息",
+    "offline": "Companion 服务已离线",
+    "noSave": "尚未找到存档",
+    "connectingHelp": "正在连接 Companion 服务，通常只需片刻。",
+    "offlineHelp": "请确认 Companion 服务正在运行，并且可以访问存档文件夹。系统会自动重新连接。",
+    "noSaveHelp": "请在 Stellaris 中保存游戏，然后在设置中检查存档文件夹。检测到存档后，你的帝国就会显示在这里。",
+    "analyzingHelp": "正在分析你的存档。分析完成后，即可使用建议问题和顾问。",
+    "saveSettings": "检查存档设置",
+    "settingsSections": "设置分区",
+    "settingsSaveHelp": "显示偏好和文件夹更改会立即保存。带有“应用”或“保存”按钮的文本字段会在按下相应按钮时保存。",
+    "nextQuestion": "顾问正在回答，你可以先写下一个问题…"
   }
 }

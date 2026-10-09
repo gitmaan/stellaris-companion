@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { UIEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const ITEM_GAP_PX = 12
 const ESTIMATED_ITEM_HEIGHT_PX = 92
@@ -19,7 +20,7 @@ function lowerBound(offsets: number[], value: number): number {
 
 export interface VirtualChatItem {
   key: string
-  render: (ref: (el: HTMLDivElement | null) => void) => JSX.Element
+  render: (ref: (el: HTMLDivElement | null) => void, animateEntrance: boolean) => JSX.Element
 }
 
 interface VirtualChatListProps {
@@ -30,27 +31,35 @@ interface VirtualChatListProps {
 }
 
 export default function VirtualChatList({ items, identityKey, scrollToBottomSignal }: VirtualChatListProps) {
+  const { t } = useTranslation()
+  const [atBottom, setAtBottom] = useState(true)
+  const seenRef = useRef(new Set(items.map(item => item.key)))
+  const anchorRef = useRef<{ key: string; offset: number } | null>(null)
+  const offsetsRef = useRef<number[]>([])
+  const itemsRef = useRef(items)
+  itemsRef.current = items
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const nodesRef = useRef<Map<number, HTMLDivElement>>(new Map())
-  const observersRef = useRef<Map<number, ResizeObserver>>(new Map())
-  const pendingMeasureRef = useRef<Set<number>>(new Set())
+  const nodesRef = useRef<Map<string, HTMLDivElement>>(new Map())
+  const observersRef = useRef<Map<string, ResizeObserver>>(new Map())
+  const pendingMeasureRef = useRef<Set<string>>(new Set())
   const rafRef = useRef<number | null>(null)
   const didInitialScrollRef = useRef(false)
   const isAtBottomRef = useRef(true)
 
-  const heightsRef = useRef<Map<number, number>>(new Map())
+  const heightsRef = useRef<Map<string, number>>(new Map())
   const [layoutVersion, setLayoutVersion] = useState(0)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(0)
 
   // If the list identity changes (e.g., session reset), clear cached measurements.
   const cacheIdentityKey = identityKey ?? (items.length > 0 ? items[0].key : 'empty')
-  useEffect(() => {
+  useLayoutEffect(() => {
     heightsRef.current = new Map()
-    nodesRef.current = new Map()
-    for (const ro of observersRef.current.values()) ro.disconnect()
-    observersRef.current = new Map()
-    pendingMeasureRef.current = new Set()
+    for (const key of nodesRef.current.keys()) pendingMeasureRef.current.add(key)
+    scheduleMeasure()
+    seenRef.current = new Set(itemsRef.current.map(item => item.key))
+    anchorRef.current = null
+    setAtBottom(true)
     setLayoutVersion(v => v + 1)
     didInitialScrollRef.current = false
     isAtBottomRef.current = true
@@ -87,7 +96,7 @@ export default function VirtualChatList({ items, identityKey, scrollToBottomSign
   }, [])
 
   const setItemRef = useCallback(
-    (index: number) => (node: HTMLDivElement | null) => {
+    (index: string) => (node: HTMLDivElement | null) => {
       const prevNode = nodesRef.current.get(index)
       if (prevNode === node) return
 
@@ -121,6 +130,10 @@ export default function VirtualChatList({ items, identityKey, scrollToBottomSign
     setScrollTop(el.scrollTop)
     const distanceFromBottom = el.scrollHeight - el.clientHeight - el.scrollTop
     isAtBottomRef.current = distanceFromBottom <= STICKY_BOTTOM_THRESHOLD_PX
+    setAtBottom(isAtBottomRef.current)
+    const index = Math.min(itemsRef.current.length - 1, Math.max(0, lowerBound(offsetsRef.current, el.scrollTop) - 1))
+    const item = itemsRef.current[index]
+    if (item) anchorRef.current = { key: item.key, offset: el.scrollTop - (offsetsRef.current[index] ?? 0) }
   }, [])
 
   // Track viewport height for range calculations.
@@ -141,11 +154,22 @@ export default function VirtualChatList({ items, identityKey, scrollToBottomSign
     const arr = new Array<number>(count + 1)
     arr[0] = 0
     for (let i = 0; i < count; i++) {
-      const h = heightsRef.current.get(i) ?? ESTIMATED_ITEM_HEIGHT_PX
+      const h = heightsRef.current.get(items[i].key) ?? ESTIMATED_ITEM_HEIGHT_PX
       arr[i + 1] = arr[i] + h
     }
     return arr
-  }, [items.length, layoutVersion])
+  }, [items, layoutVersion])
+
+  offsetsRef.current = offsets
+
+  useLayoutEffect(() => {
+    const el = containerRef.current, anchor = anchorRef.current
+    if (!el || isAtBottomRef.current || !anchor) return
+    const index = items.findIndex(item => item.key === anchor.key)
+    if (index < 0) return
+    el.scrollTop = offsets[index] + anchor.offset
+    setScrollTop(el.scrollTop)
+  }, [items, offsets])
 
   const totalHeight = offsets[offsets.length - 1] ?? 0
 
@@ -170,6 +194,10 @@ export default function VirtualChatList({ items, identityKey, scrollToBottomSign
 
     return { startIndex: start, endIndex: end, topSpacer: top, bottomSpacer: bottom }
   }, [items.length, offsets, scrollTop, totalHeight, viewportHeight])
+
+  useLayoutEffect(() => {
+    for (const item of items) seenRef.current.add(item.key)
+  }, [items])
 
   // Best-practice chat behavior:
   // - Stick to bottom only if the user is already near the bottom.
@@ -201,14 +229,16 @@ export default function VirtualChatList({ items, identityKey, scrollToBottomSign
   }, [])
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto p-4 flex flex-col" onScroll={onScroll}>
+    <>
+    <div ref={containerRef} data-chat-scroll className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col" style={{ overflowAnchor: 'none' }} onScroll={onScroll}>
       {topSpacer > 0 && <div style={{ height: topSpacer, flex: '0 0 auto' }} />}
       {endIndex >= startIndex &&
-        items.slice(startIndex, endIndex + 1).map((item, i) => {
-          const index = startIndex + i
-          return item.render(setItemRef(index))
+        items.slice(startIndex, endIndex + 1).map(item => {
+          return item.render(setItemRef(item.key), !seenRef.current.has(item.key))
         })}
       {bottomSpacer > 0 && <div style={{ height: bottomSpacer, flex: '0 0 auto' }} />}
     </div>
+    {!atBottom && <button type="button" onClick={() => { isAtBottomRef.current = true; setAtBottom(true); scrollToBottom() }} className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-accent-cyan/40 bg-bg-secondary px-4 py-2 text-sm text-accent-cyan shadow-lg">{t('visualQuality.jumpLatest')}</button>}
+    </>
   )
 }

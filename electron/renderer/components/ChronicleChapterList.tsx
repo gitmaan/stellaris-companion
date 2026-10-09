@@ -48,7 +48,7 @@ interface ChronicleChapterListProps {
   onOpenNarratorPanel?: () => void
   onPublish?: () => void
   onExport?: () => void
-  collapsed?: boolean
+  compact?: boolean
   onToggleCollapse?: () => void
 }
 
@@ -72,7 +72,7 @@ function ChronicleChapterList({
   onOpenNarratorPanel,
   onPublish,
   onExport,
-  collapsed = false,
+  compact = false,
   onToggleCollapse,
 }: ChronicleChapterListProps) {
   const { t, i18n } = useTranslation()
@@ -80,11 +80,7 @@ function ChronicleChapterList({
   const selectedSave = saves.find(s => s.save_id === selectedSaveId)
 
   return (
-    <motion.aside
-      className="flex-shrink-0 flex flex-col relative overflow-hidden"
-      animate={{ width: collapsed ? 0 : 280 }}
-      transition={{ duration: 0.25, ease: 'easeInOut' }}
-    >
+    <aside id="chronicle-navigation" className={`w-[280px] h-full shrink-0 flex flex-col relative ${compact ? 'overflow-y-auto [&>div]:shrink-0' : 'overflow-hidden'}`}>
       {/* Right border - fades at top and bottom */}
       <div className="absolute right-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-border to-transparent" />
       {/* Subtle cyan glow overlay */}
@@ -101,6 +97,7 @@ function ChronicleChapterList({
               onClick={onToggleCollapse}
               className="ml-auto w-5 h-5 flex items-center justify-center rounded text-text-secondary hover:text-accent-cyan transition-colors duration-150"
               title={t('chronicle.sidebar.closeSidebar')}
+              aria-label={t('chronicle.sidebar.closeSidebar')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
@@ -145,7 +142,7 @@ function ChronicleChapterList({
       </div>
 
       {/* Chapter list */}
-      <nav className="flex-1 overflow-y-auto py-3">
+      <nav className={`py-3 ${compact ? 'shrink-0' : 'flex-1 min-h-0 overflow-y-auto'}`}>
         <h3 className="px-4 py-2 text-xs font-semibold text-text-secondary uppercase tracking-wider flex items-center gap-2">
           <span className="text-accent-cyan/60">◇</span>
           {t('chronicle.sidebar.chapters')}
@@ -167,7 +164,7 @@ function ChronicleChapterList({
           <motion.ul
             className={`list-none m-0 p-0 ${isRegenerating ? 'opacity-60 pointer-events-none' : ''}`}
             variants={listVariants}
-            initial="initial"
+            initial={false}
             animate="animate"
           >
             {chapters.map(chapter => {
@@ -188,8 +185,6 @@ function ChronicleChapterList({
                         : 'hover:border-border hover:bg-bg-tertiary/50'
                     } ${chapter.context_stale ? 'opacity-70' : ''} ${isThisRegenerating ? 'animate-pulse-text' : ''}`}
                     onClick={() => onSelectChapter(chapter.number)}
-                    whileHover={{ x: 4 }}
-                    whileTap={{ scale: 0.98 }}
                     transition={{ duration: 0.1 }}
                   >
                     <span className={`w-8 text-center text-xs font-mono ${isSelected ? 'text-accent-cyan' : 'text-text-secondary'}`}>
@@ -243,8 +238,6 @@ function ChronicleChapterList({
                         : 'hover:border-border hover:bg-bg-tertiary/50'
                     }`}
                     onClick={() => onSelectChapter(null)}
-                    whileHover={{ x: 4 }}
-                    whileTap={{ scale: 0.98 }}
                     transition={{ duration: 0.1 }}
                   >
                     <span className="w-8 text-center text-accent-yellow text-sm">⏳</span>
@@ -336,7 +329,7 @@ function ChronicleChapterList({
         </button>
       </div>}
 
-    </motion.aside>
+    </aside>
   )
 }
 
@@ -361,6 +354,7 @@ function CampaignPicker({
       }}
       onKeyDown={event => {
         if (event.key !== 'Escape' || isCompositionKey(event)) return
+        if (open) { event.preventDefault(); event.stopPropagation() }
         setOpen(false)
         event.currentTarget.querySelector<HTMLElement>('[aria-haspopup="listbox"]')?.focus()
       }}

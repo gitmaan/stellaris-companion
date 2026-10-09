@@ -1,5 +1,8 @@
 import { lazy, Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useReducedMotion } from 'framer-motion'
+import Modal from '../components/Modal'
+import { useMediaQuery } from '../hooks/useMediaQuery'
+import { useReadingAnchor } from '../hooks/useReadingAnchor'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import ChronicleChapterList from '../components/ChronicleChapterList'
@@ -202,7 +205,10 @@ function ChroniclePage({
   }, [historyOpenRequest])
 
   // Sidebar collapse state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const compactReader = useMediaQuery('(max-width: 1100px)')
+  const reduceMotion = useReducedMotion()
+  const [chapterDrawerOpen, setChapterDrawerOpen] = useState(false)
+  useEffect(() => { if (!compactReader || !isActive) setChapterDrawerOpen(false) }, [compactReader, isActive])
 
   // Regeneration state - tracks which chapter is being regenerated
   const [regeneratingChapter, setRegeneratingChapter] = useState<number | null>(null)
@@ -737,6 +743,9 @@ function ChroniclePage({
   // Scroll spy: track which chapter is in view
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrollingToRef = useRef(false)
+  const scrollSpyTimer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => () => clearTimeout(scrollSpyTimer.current), [])
+  useReadingAnchor(scrollContainerRef, selectedSaveId)
 
   const restoredReadingKeyRef = useRef<string | null>(null)
   useEffect(() => { restoredReadingKeyRef.current = null }, [selectedSaveId, i18n.language])
@@ -859,11 +868,12 @@ function ChroniclePage({
     const el = document.getElementById(targetId)
     if (el) {
       isScrollingToRef.current = true
-      el.scrollIntoView({ behavior: 'smooth' })
+      el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
       // Re-enable scroll spy after the smooth scroll completes
-      setTimeout(() => { isScrollingToRef.current = false }, 800)
+      clearTimeout(scrollSpyTimer.current)
+      scrollSpyTimer.current = setTimeout(() => { isScrollingToRef.current = false }, reduceMotion ? 0 : 800)
     }
-  }, [regeneratingChapter])
+  }, [regeneratingChapter, reduceMotion])
 
   // Handle save/game change
   const handleSelectSave = useCallback((saveId: string) => {
@@ -1057,18 +1067,16 @@ function ChroniclePage({
     }
   }, [chronicle, empireName, i18n, showToast, t])
 
-  return (
-    <div className="h-full">
-      <div className="flex h-full">
-        {/* Left sidebar - Chapter navigation */}
-        <ChronicleChapterList
+  const chapterNavigation = (
+    <ChronicleChapterList
+          compact={compactReader}
           saves={saves}
           selectedSaveId={selectedSaveId}
-          onSelectSave={handleSelectSave}
+          onSelectSave={saveId => { handleSelectSave(saveId); setChapterDrawerOpen(false) }}
           chapters={chronicle?.chapters || []}
           currentEra={chronicle?.current_era || null}
           selectedChapter={selectedChapter}
-          onSelectChapter={handleSelectChapter}
+          onSelectChapter={chapter => { handleSelectChapter(chapter); setChapterDrawerOpen(false) }}
           pendingChapters={chronicle?.pending_chapters || 0}
           eventCount={chronicle?.event_count || 0}
           loading={savesLoading || loading}
@@ -1078,33 +1086,29 @@ function ChroniclePage({
           onOpenNarratorPanel={() => setNarratorPanelOpen(true)}
           onPublish={() => setPublishDialogOpen(true)}
           onExport={handleExport}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(c => !c)}
+          onToggleCollapse={compactReader ? () => setChapterDrawerOpen(false) : undefined}
         />
+  )
+
+  return (
+    <div className="h-full">
+      <div className="flex h-full">
+        {/* Left sidebar - Chapter navigation */}
+        {compactReader ? (
+          <Modal open={chapterDrawerOpen} onClose={() => setChapterDrawerOpen(false)} label={t('chronicle.sidebar.chapters')} placement="left" className="w-[280px] flex">
+            {chapterNavigation}
+          </Modal>
+        ) : chapterNavigation}
+
 
         {/* Right content panel - Chapter content */}
-        <div className="flex-1 relative">
-          {/* Expand sidebar button (visible when collapsed) - outside scroll area */}
-          <AnimatePresence>
-            {sidebarCollapsed && (
-              <motion.button
-                type="button"
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ duration: 0.2 }}
-                onClick={() => setSidebarCollapsed(false)}
-                className="absolute top-3 left-3 z-10 w-7 h-7 flex items-center justify-center rounded text-text-secondary hover:text-accent-cyan transition-colors duration-150"
-                title={t('chronicle.page.openSidebar')}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
-                  <line x1="5.5" y1="2.5" x2="5.5" y2="13.5" />
-                </svg>
-              </motion.button>
-            )}
-          </AnimatePresence>
-          <div ref={scrollContainerRef} className="absolute inset-0 overflow-y-auto p-6">
+        <div className="flex-1 min-w-0 min-h-0 relative flex flex-col">
+          {compactReader && <div className="shrink-0 h-11 flex items-center border-b border-white/10 px-2">
+            <HUDButton type="button" variant="ghost" aria-haspopup="dialog" aria-controls="chronicle-navigation" aria-expanded={chapterDrawerOpen} onClick={() => setChapterDrawerOpen(true)} className="px-3 py-1.5">
+              {t('chronicle.sidebar.chapters')}
+            </HUDButton>
+          </div>}
+          <div ref={scrollContainerRef} data-chronicle-scroll className="flex-1 min-h-0 overflow-y-auto p-3 lg:p-6" style={{ overflowAnchor: 'none' }}>
           <div className="relative">
             {storyAfterLoadedSave && <p role="status" className="mb-4 rounded border border-accent-yellow/20 bg-accent-yellow/5 px-4 py-3 text-xs text-text-secondary">{t('continuity.earlierSave')}</p>}
             {chronicleConfigured === false && (

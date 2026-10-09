@@ -110,23 +110,23 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
   const statusLabel = getStatusLabel(state.connectionStatus, state.stage, t)
 
   return (
-    <div className="flex justify-between items-start px-6 pt-4 title-bar-drag-region status-bar z-50 pointer-events-none">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 px-6 h-12 title-bar-drag-region status-bar z-50 pointer-events-none">
       {/* Left: Empire Info */}
-      <div className="flex items-center gap-3 pointer-events-auto">
-        <div className="w-2 h-2 bg-accent-cyan rounded-full shadow-glow-sm" />
-        <h2 className="font-display font-bold text-sm tracking-wide text-text-primary uppercase">
+      <div className="flex min-w-0 items-center gap-3 pointer-events-auto">
+        <div className="w-2 h-2 shrink-0 bg-accent-cyan rounded-full shadow-glow-sm" />
+        <h2 title={state.empireName ?? t('status.unknownEmpire')} className="truncate font-display font-bold text-sm tracking-wide text-text-primary uppercase">
           {state.empireName ?? t('status.unknownEmpire')}
         </h2>
         {state.gameDate && (
           <>
-            <span className="w-4 h-px bg-white/30" />
-            <HUDValue className="text-xs text-text-secondary">{state.gameDate}</HUDValue>
+            <span className="w-4 h-px shrink-0 bg-white/30" />
+            <HUDValue className="text-xs text-text-secondary whitespace-nowrap tabular-nums">{state.gameDate}</HUDValue>
           </>
         )}
       </div>
 
       {/* Right: Status */}
-      <div className="flex items-center gap-2 pointer-events-auto" title={state.error ?? undefined}>
+      <div className="flex min-w-0 items-center justify-end gap-2 pointer-events-auto" title={state.error ?? statusLabel}>
         {onToggleTransmissions && transmissionsTotal > 0 && (
           <button
             onClick={onToggleTransmissions}
@@ -136,9 +136,11 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
                 : 'border-white/15 bg-black/30 text-text-secondary hover:text-text-primary hover:border-white/35'
             }`}
             title={t('announcements.title')}
+            aria-label={t('announcements.title')}
+            aria-expanded={transmissionsOpen}
           >
             <span className="text-[10px]">{'\u25C8'}</span>
-            <span className="font-mono text-[10px] tracking-[0.14em] uppercase">
+            <span className="hidden xl:inline font-mono text-[10px] tracking-[0.14em] uppercase">
               {t('announcements.title')}
             </span>
             {transmissionsUnread > 0 && (
@@ -146,10 +148,10 @@ export const HUDStatusBar: React.FC<HUDStatusBarProps> = ({
             )}
           </button>
         )}
-        <HUDLabel className={`${statusColor} transition-colors duration-300`}>
+        <HUDLabel className={`${statusColor} truncate whitespace-nowrap transition-colors duration-150`}>
           {statusLabel}
         </HUDLabel>
-        <div className={`w-1.5 h-1.5 rounded-full ${statusColor.replace('text-', 'bg-')} shadow-glow-sm animate-pulse-slow`} />
+        <div className={`w-1.5 h-1.5 shrink-0 rounded-full ${statusColor.replace('text-', 'bg-')} shadow-glow-sm`} />
       </div>
     </div>
   )

@@ -18,7 +18,7 @@
     "build:mcpb": "python3 ../scripts/package_mcpb.py",
     "test": "node --test test/*.test.js",
     "test:e2e": "npm run build:renderer && playwright test",
-    "test:e2e:headed": "npm run build:renderer && playwright test --headed",
+    "test:e2e:headed": "npm run build:renderer && cross-env E2E_SHOW_WINDOWS=1 playwright test --headed",
     "test:chronicle-publishing": "node --test test/chronicle-publishing.test.js",
     "test:advisor-providers": "node --test test/advisor-providers.test.js",
     "test:updates": "node --test test/updates.test.js",

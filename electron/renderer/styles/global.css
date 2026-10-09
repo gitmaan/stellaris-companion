@@ -202,6 +202,28 @@ html[lang='ja'] .chronicle-display-title, html[lang='zh-Hans'] .chronicle-displa
 @tailwind components;
 @tailwind utilities;
 
+/* Interaction contract: feedback 120 ms, content 160 ms, surfaces 200 ms.
+   Scroll owners reserve their gutter; page changes never scale the text. */
+:root { --motion-feedback: 120ms; --motion-content: 160ms; --motion-surface: 200ms; }
+html, body, #root { height: 100%; overflow: hidden; }
+:is(button, a, input, textarea, select, summary, [tabindex]):focus-visible,
+.hud-checkbox:has(input:focus-visible) {
+  outline: 2px solid rgb(var(--color-accent-cyan));
+  outline-offset: 3px;
+}
+.overflow-y-auto { scrollbar-gutter: stable; }
+.app-page[data-active='false'] *, .app-page[data-active='false'] *::before,
+.app-page[data-active='false'] *::after { animation-play-state: paused !important; }
+.modal-surface { overscroll-behavior: contain; }
+.markdown-content { overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ============================================
    Base Styles
    ============================================ */

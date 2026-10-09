@@ -35,7 +35,14 @@ export default function ChatGPTModelPicker({ compact = false, disabled = false }
         duration: 5000, ...(code === 'CHATGPT_LIMIT' ? { action: { label: t('chatgpt.manageUsage'), onClick: () => void manageChatGPTUsage() } } : {}) })
     }
   }
-  return <div className={`min-w-0 ${compact ? 'max-w-full' : 'space-y-1.5'}`} data-testid="chatgpt-model-picker">
+  if (compact && catalogError) {
+    const message = t(`chatgpt.errors.${catalogError}`, { defaultValue: t('chatgpt.errors.CHATGPT_UNAVAILABLE') })
+    return <div className="min-w-0 flex-1">
+      <span className="sr-only" role="alert">{message}</span>
+      <button type="button" title={message} aria-label={`${message} ${t('chatgpt.tryAgain')}`} disabled={saving} onClick={() => void loadModels()} className="max-w-full truncate text-accent-yellow underline">{t('chatgpt.tryAgain')}</button>
+    </div>
+  }
+  return <div className={`min-w-0 ${compact ? 'flex-1 max-w-full' : 'space-y-1.5'}`} data-testid="chatgpt-model-picker">
     {!compact && <label htmlFor={id} className="block pl-1 font-display text-[10px] tracking-widest text-text-secondary uppercase">{t('chatgpt.model')}</label>}
     <div className="relative group max-w-full">
       <select id={id} aria-label={t('chatgpt.model')} aria-busy={saving} disabled={disabled || saving || status.connecting || !status.models.length}

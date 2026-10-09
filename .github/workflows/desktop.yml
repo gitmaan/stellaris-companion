@@ -97,6 +97,17 @@ jobs:
         run: xvfb-run --auto-servernum npx playwright test
         env:
           E2E_NO_SANDBOX: '1'
+          E2E_SHOW_WINDOWS: '1'
+
+      - name: Upload Electron journey evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-journeys-linux
+          path: |
+            electron/test-results
+            artifacts/visual-quality
+          if-no-files-found: ignore
 
   desktop-e2e-windows:
     name: Desktop E2E - Windows localization smoke
@@ -129,6 +140,8 @@ jobs:
       - name: Run Windows Electron localization smoke
         working-directory: electron
         run: npx playwright test e2e/windows-localization-smoke.spec.js
+        env:
+          E2E_SHOW_WINDOWS: '1'
 
       - name: Upload Windows smoke evidence
         if: always()

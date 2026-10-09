@@ -14,7 +14,11 @@ async function launchRelay() {
     env: { ...process.env, NODE_ENV: 'test', E2E: '1', E2E_ONBOARDING_COMPLETE: '1', E2E_BACKEND_CONFIGURED: '1', E2E_FAKE_SECURE_STORAGE: '1', E2E_SKIP_BACKEND_AUTOSTART: '1', E2E_USER_DATA_DIR: profile, STELLARIS_API_PORT: String(port), STELLARIS_API_TOKEN: 'e2e-token' },
   })
   // Replace setup handlers before using any action; never touch installed AI apps.
-  await app.evaluate(({ ipcMain }) => {
+  await app.evaluate(({ ipcMain, clipboard }) => {
+    // Keep local journeys from replacing the developer's system clipboard.
+    let copiedText = ''
+    clipboard.writeText = value => { copiedText = value }
+    clipboard.readText = () => copiedText
     globalThis.relayFixture = {
       clients: {
         claude: { configured: false, current: false },
