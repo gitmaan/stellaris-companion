@@ -1,3 +1,5 @@
+const { getAnnouncementReadIds } = require('./announcementsState')
+
 const DEFAULT_ANNOUNCEMENTS_URL = 'https://raw.githubusercontent.com/gitmaan/stellaris-companion/main/announcements.json'
 const DEFAULT_FETCH_INTERVAL_MS = 1800000 // 30 minutes
 const IS_E2E = process.env.E2E === '1'
@@ -40,6 +42,10 @@ function filterAnnouncements(data, appVersion) {
 
 function createAnnouncementsService({ app, store, url = DEFAULT_ANNOUNCEMENTS_URL, fetchIntervalMs = DEFAULT_FETCH_INTERVAL_MS }) {
   let pollTimer = null
+  let fetchInFlight = null
+
+  // Migrate before startup refresh can replace the cache used by legacy read state.
+  getAnnouncementReadIds(store)
 
   async function fetchAnnouncements(forceRefresh = false) {
     if (IS_E2E) {
@@ -52,15 +58,23 @@ function createAnnouncementsService({ app, store, url = DEFAULT_ANNOUNCEMENTS_UR
     const appVersion = app.getVersion()
     const cached = store.get('announcementsCache')
 
+    if (fetchInFlight) return fetchInFlight
+
     if (!forceRefresh && cached && cached.fetchedAt && (Date.now() - cached.fetchedAt < fetchIntervalMs)) {
       return filterAnnouncements(cached.data, appVersion)
     }
 
+    fetchInFlight = fetchLatestAnnouncements(appVersion, cached).finally(() => {
+      fetchInFlight = null
+    })
+    return fetchInFlight
+  }
+
+  async function fetchLatestAnnouncements(appVersion, cached) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
     try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 10000)
       const response = await fetch(url, { signal: controller.signal })
-      clearTimeout(timeout)
 
       if (!response.ok) {
         console.error(`Announcements: fetch failed with HTTP ${response.status}`)
@@ -85,6 +99,8 @@ function createAnnouncementsService({ app, store, url = DEFAULT_ANNOUNCEMENTS_UR
         console.error('Announcements: fetch error:', e instanceof Error ? e.message : String(e))
       }
       return cached ? filterAnnouncements(cached.data, appVersion) : []
+    } finally {
+      clearTimeout(timeout)
     }
   }
 

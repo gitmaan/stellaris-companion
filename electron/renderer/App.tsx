@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -187,12 +187,37 @@ function App() {
     dismissAnnouncement,
     dismissAllAnnouncements,
     markAllRead,
+    refresh: refreshAnnouncements,
   } = useAnnouncements()
 
   const totalTransmissions = announcements.length
   const hasTransmissions = totalTransmissions > 0
   const [transmissionsOpen, setTransmissionsOpen] = useState(false)
-  const didAutoOpenTransmissionsRef = useRef(false)
+  const [windowVisible, setWindowVisible] = useState(false)
+
+  // Closing the desktop window usually hides it in the tray, without a new launch.
+  useEffect(() => {
+    const api = window.electronAPI
+    if (!api) {
+      setWindowVisible(document.visibilityState === 'visible')
+      return
+    }
+    let cancelled = false
+    let receivedVisibilityEvent = false
+    const cleanup = api.onWindowVisibilityChanged((visible) => {
+      receivedVisibilityEvent = true
+      setWindowVisible(visible)
+      if (visible) refreshAnnouncements()
+      else setTransmissionsOpen(false)
+    })
+    api.getWindowVisible().then((visible) => {
+      if (!cancelled && !receivedVisibilityEvent) setWindowVisible(visible)
+    }).catch(() => {})
+    return () => {
+      cancelled = true
+      cleanup()
+    }
+  }, [refreshAnnouncements])
 
   // Set platform class on body for platform-specific styling
   useEffect(() => {
@@ -205,22 +230,21 @@ function App() {
       setTransmissionsOpen(false)
       return
     }
-    if (announcementsLoading || unreadCount <= 0 || didAutoOpenTransmissionsRef.current) return
+    if (!windowVisible || !languageReady || onboardingDone !== true
+      || announcementsLoading || unreadCount <= 0) return
 
-    didAutoOpenTransmissionsRef.current = true
     setTransmissionsOpen(true)
-    markAllRead()
-  }, [hasTransmissions, announcementsLoading, unreadCount, markAllRead])
+  }, [hasTransmissions, windowVisible, languageReady, onboardingDone, announcementsLoading, unreadCount])
+
+  // Only acknowledge IDs after their panel has rendered in the ready app.
+  useEffect(() => {
+    if (transmissionsOpen && windowVisible && languageReady && onboardingDone === true
+      && !announcementsLoading && unreadCount > 0) markAllRead()
+  }, [transmissionsOpen, windowVisible, languageReady, onboardingDone, announcementsLoading, unreadCount, markAllRead])
 
   const handleToggleTransmissions = useCallback(() => {
-    setTransmissionsOpen((prev) => {
-      const next = !prev
-      if (next && unreadCount > 0) {
-        markAllRead()
-      }
-      return next
-    })
-  }, [unreadCount, markAllRead])
+    setTransmissionsOpen((prev) => !prev)
+  }, [])
 
   const handleCloseTransmissions = useCallback(() => {
     setTransmissionsOpen(false)

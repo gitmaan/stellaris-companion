@@ -357,6 +357,10 @@ test('Japanese announcement panel ignores composition Escape', async () => {
   try {
     app = await launch(port, profile, saves, '', { E2E_ANNOUNCEMENTS_FIXTURE: JSON.stringify(fixture) })
     const page = await app.firstWindow()
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ja')
+    if (process.env.E2E_SHOW_WINDOWS !== '1') {
+      await page.getByTitle(japanese.announcements.title, { exact: true }).click()
+    }
     await expect(page.getByText('架空のお知らせ')).toBeVisible()
     await saveScreenshot(page, 'ja-announcements-1000x700-scale100-default.png')
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', isComposing: true, bubbles: true })))
