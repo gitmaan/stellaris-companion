@@ -113,7 +113,7 @@ jobs:
           if-no-files-found: ignore
 
   desktop-e2e-windows:
-    name: Desktop E2E - Windows localization and feedback
+    name: Desktop E2E - Windows regressions
     runs-on: windows-latest
     env:
       VITE_REPORT_ENDPOINT: https://feedback.galacticfilingcabinet.com/report
@@ -143,9 +143,9 @@ jobs:
         working-directory: electron
         run: npm run build:renderer
 
-      - name: Run Windows Electron localization smoke
+      - name: Run Windows Electron regressions
         working-directory: electron
-        run: npx playwright test e2e/windows-localization-smoke.spec.js e2e/feedback-capture.spec.js
+        run: npx playwright test '(windows-localization-smoke|feedback-capture|response-completeness)\.spec\.js$'
         env:
           E2E_SHOW_WINDOWS: '1'
 
