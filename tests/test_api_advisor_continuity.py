@@ -157,6 +157,59 @@ def test_restart_rehydrates_recent_followup_and_new_chat_keeps_archive(monkeypat
     db.close()
 
 
+def test_partial_completion_survives_replay_and_restart_without_becoming_prompt_history(
+    monkeypatch, tmp_path
+):
+    completion = {
+        "status": "truncated",
+        "finish_reason": "length",
+        "attempts": 2,
+        "output_limit": 8192,
+        "usage": {"input_tokens": 100, "output_tokens": 8192},
+        "recovered": False,
+    }
+    partial = "Unfinished advice must remain visible but out of completed context."
+    generator = Generator(
+        callback=lambda kwargs: AdvisorGenerationResult(
+            text=partial,
+            model="test/strategist",
+            requested_model="test/strategist",
+            provider="custom",
+            completion=completion,
+        )
+    )
+    app, db, companion, _ = make_app(monkeypatch, tmp_path, generator=generator)
+    save_id, _ = activate(companion, db, tmp_path)
+    with TestClient(app) as client:
+        conversation = new_conversation(client, save_id)
+        first = ask(client, save_id, conversation).json()
+        replay = ask(client, save_id, conversation).json()
+        assert first == replay
+        assert first["text"] == partial and first["completion"] == completion
+        assert first["history_saved"] is True and len(generator.prompts) == 1
+    companion.close()
+    db.close()
+
+    app, db, companion, generator = make_app(monkeypatch, tmp_path)
+    activate(companion, db, tmp_path)
+    with TestClient(app) as client:
+        restored = client.get(
+            f"/api/playthroughs/{save_id}/conversations/{conversation}",
+            headers=HEADERS,
+        ).json()["turns"][0]
+        assert restored["answer"] == partial and restored["completion"] == completion
+        assert (
+            ask(
+                client, save_id, conversation, question="A new attempt", request_id="retry"
+            ).status_code
+            == 200
+        )
+        assert partial not in generator.prompts[-1]
+        assert len(db.get_advisor_turns(save_id, conversation)) == 2
+    companion.close()
+    db.close()
+
+
 def test_campaign_switch_restores_only_its_own_conversation(monkeypatch, tmp_path):
     app, db, companion, generator = make_app(monkeypatch, tmp_path)
     with TestClient(app) as client:

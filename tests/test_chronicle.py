@@ -1,6 +1,7 @@
 """Unit tests for chronicle.py."""
 
 import json
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
@@ -1507,7 +1508,8 @@ class TestChronicleProviderRouting:
             base_url="http://127.0.0.1:8080/v1",
         )
 
-    def test_retries_invalid_json_on_the_same_provider(self, provider_config):
+    def test_chatgpt_retries_invalid_json_without_a_second_schema_fallback(self, provider_config):
+        provider_config = replace(provider_config, provider="chatgpt")
         provider = MagicMock()
         provider.config = provider_config
         provider.generate.side_effect = [
@@ -1551,9 +1553,10 @@ class TestChronicleProviderRouting:
         assert "previous response could not be validated" in second_prompt
         assert provider.generate.call_args_list[0].kwargs["allow_schema_fallback"] is True
         assert provider.generate.call_args_list[1].kwargs["allow_schema_fallback"] is False
-        assert generator._model_routing_response()["provider"] == "custom"  # type: ignore[attr-defined]
+        assert generator._model_routing_response()["provider"] == "chatgpt"  # type: ignore[attr-defined]
 
-    def test_retries_empty_structured_response_once(self, provider_config):
+    def test_chatgpt_retries_empty_structured_response_once(self, provider_config):
+        provider_config = replace(provider_config, provider="chatgpt")
         provider = MagicMock()
         provider.config = provider_config
         provider.generate.side_effect = [
@@ -1703,7 +1706,7 @@ class TestChronicleProviderRouting:
             )
 
         assert exc_info.value.code == "PROVIDER_INVALID_RESPONSE"
-        assert provider.generate.call_count == 2
+        assert provider.generate.call_count == 1
 
 
 class TestSectionsToText:

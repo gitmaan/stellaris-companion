@@ -68,7 +68,9 @@
       "responseTime": "响应时间：{{seconds}}s",
       "routingNotice": "已切换到 {{model}}。",
       "routingVia": "当前模型：{{model}}",
-      "modelReadout": "模型：{{model}}"
+      "modelReadout": "模型：{{model}}",
+      "incomplete": "模型已达到回复长度限制，此回答尚未完成。请重试，或缩小提问范围。",
+      "retryIncomplete": "重新生成回答"
     },
     "errors": {
       "briefingNotReady": "顾问仍在分析你的存档。请在 {{seconds}} 秒后重试。",

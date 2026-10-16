@@ -58,7 +58,7 @@ def generator_with(*responses):
 
 
 @pytest.mark.parametrize(
-    ("purpose", "limits"), [("advisor", [4096, 8192]), ("chronicle", [8192, 16384])]
+    ("purpose", "limits"), [("advisor", [8192, 16384]), ("chronicle", [8192, 16384])]
 )
 def test_truncation_gets_one_larger_attempt_even_when_json_parses(purpose, limits, caplog):
     generator, models = generator_with(response(VALID_JSON, "MAX_TOKENS"), response(VALID_JSON))
@@ -157,14 +157,23 @@ def test_terminal_errors_do_not_retry_the_same_model(error):
     assert models.generate_content.call_count == 1
 
 
-def test_twice_truncated_answer_is_never_returned():
+@pytest.mark.parametrize("purpose", ["advisor", "chronicle"])
+def test_twice_truncated_answer_is_preserved_only_for_advisor(purpose):
     generator, models = generator_with(
         response("partial", "MAX_TOKENS"), response("still partial", "MAX_TOKENS")
     )
-    with pytest.raises(AdvisorProviderError) as error:
-        generator.generate(system_prompt="system", user_prompt="user")
-    assert error.value.code == "PROVIDER_INVALID_RESPONSE"
-    assert len(error.value.diagnostics) == models.generate_content.call_count == 2
+    if purpose == "advisor":
+        result = generator.generate(system_prompt="system", user_prompt="user", purpose=purpose)
+        assert result.text == "still partial"
+        assert result.completion["status"] == "truncated"
+        assert result.completion["finish_reason"] == "MAX_TOKENS"
+        assert result.completion["attempts"] == 2
+    else:
+        with pytest.raises(AdvisorProviderError) as error:
+            generator.generate(system_prompt="system", user_prompt="user", purpose=purpose)
+        assert error.value.code == "PROVIDER_INVALID_RESPONSE"
+        assert len(error.value.diagnostics) == 2
+    assert models.generate_content.call_count == 2
 
 
 @pytest.mark.parametrize("prompt_blocked", [False, True])

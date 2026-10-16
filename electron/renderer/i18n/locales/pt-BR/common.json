@@ -68,7 +68,9 @@
       "responseTime": "Tempo de resposta: {{seconds}}s",
       "routingNotice": "Roteamento por {{model}}.",
       "routingVia": "ROTEAMENTO POR {{model}}",
-      "modelReadout": "MODELO: {{model}}"
+      "modelReadout": "MODELO: {{model}}",
+      "incomplete": "O provedor atingiu o limite de resposta. Esta resposta está incompleta. Tente novamente ou faça uma pergunta mais específica.",
+      "retryIncomplete": "Tentar responder novamente"
     },
     "errors": {
       "briefingNotReady": "O conselheiro ainda esta analisando seu arquivo de salvamento. Tente novamente em {{seconds}} segundos.",

@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import { useTranslation } from 'react-i18next'
 import { HUDMicro } from './hud/HUDText'
-import type { ModelRoutingEvent } from '../hooks/useBackend'
+import type { ModelRoutingEvent, GenerationCompletion } from '../hooks/useBackend'
 import { motionTiming } from '../lib/motion'
 
 interface ChatMessageProps {
@@ -18,6 +18,7 @@ interface ChatMessageProps {
   responseTimeMs?: number
   modelDisplay?: string
   modelRouting?: ModelRoutingEvent | null
+  completion?: GenerationCompletion | null
   isError?: boolean
   actionLabel?: string
   onAction?: () => void
@@ -109,6 +110,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
     responseTimeMs,
     modelDisplay,
     modelRouting,
+    completion,
     isError,
     actionLabel,
     onAction,
@@ -192,6 +194,13 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
               <div className="font-mono text-white/80 whitespace-pre-wrap">{content}</div>
             )}
         </div>
+
+        {completion?.status === 'truncated' && (
+          <div className="mt-3 border-t border-accent-yellow/30 pt-3 text-sm text-accent-yellow" data-completion-status="truncated">
+            <p role="status">{t('chat.message.incomplete')}</p>
+            {onRetry && <button type="button" onClick={onRetry} className="mt-2 rounded border border-accent-cyan/40 px-3 py-1.5 text-accent-cyan">{t('chat.message.retryIncomplete')}</button>}
+          </div>
+        )}
 
         {isError && actionLabel && onAction && (
           <button

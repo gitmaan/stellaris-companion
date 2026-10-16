@@ -1180,7 +1180,6 @@ class Companion:
                 model_routing_mode=model_routing_mode or self.model_routing_mode,
                 thinking_level=self._thinking_level,
                 temperature=1.0,
-                max_output_tokens=4096,
             )
             requested_model = generation.requested_model
             final_model = generation.model
@@ -1197,8 +1196,11 @@ class Companion:
             wall_time_ms = elapsed * 1000
 
             stats = {
-                "total_calls": len(generation.diagnostics) or 1,
+                "total_calls": generation.completion.get("attempts")
+                or len(generation.diagnostics)
+                or 1,
                 "diagnostics": generation.diagnostics,
+                "completion": generation.completion,
                 "tools_used": ["ask_precomputed_no_tools"],
                 "wall_time_ms": wall_time_ms,
                 "response_length": len(response_text),
@@ -1217,13 +1219,14 @@ class Companion:
             self._call_local.stats = stats
             self._last_call_stats = stats
 
-            self._conversations.record_turn(
-                session_key=language_scoped_session_key,
-                question=cleaned_question,
-                answer=response_text,
-                game_date=game_date,
-            )
-            if persist_memory:
+            if generation.completion.get("status") != "truncated":
+                self._conversations.record_turn(
+                    session_key=language_scoped_session_key,
+                    question=cleaned_question,
+                    answer=response_text,
+                    game_date=game_date,
+                )
+            if persist_memory and generation.completion.get("status") != "truncated":
                 self._update_save_memory_summary(
                     save_id=save_id,
                     question=cleaned_question,

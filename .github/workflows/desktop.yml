@@ -71,6 +71,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Chinese and Japanese fonts for layout validation
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y fonts-noto-cjk
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -110,7 +113,7 @@ jobs:
           if-no-files-found: ignore
 
   desktop-e2e-windows:
-    name: Desktop E2E - Windows localization smoke
+    name: Desktop E2E - Windows regressions
     runs-on: windows-latest
 
     steps:
@@ -137,9 +140,9 @@ jobs:
         working-directory: electron
         run: npm run build:renderer
 
-      - name: Run Windows Electron localization smoke
+      - name: Run Windows Electron regressions
         working-directory: electron
-        run: npx playwright test e2e/windows-localization-smoke.spec.js
+        run: npx playwright test '(windows-localization-smoke|feedback-capture|response-completeness)\.spec\.js$'
         env:
           E2E_SHOW_WINDOWS: '1'
 

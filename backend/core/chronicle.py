@@ -1078,8 +1078,10 @@ class ChronicleGenerator:
         validation_error: Exception | None = None
         prompt = contents
 
-        # Native Gemini owns schema recovery and model fallback in one two-call loop.
-        attempts = 1 if self.provider_config.provider == ADVISOR_PROVIDER_GEMINI else 2
+        # Gemini and compatible adapters own all recovery in one two-call loop.
+        # The ChatGPT bridge owns schema fallback only; a second bridge call is
+        # allowed only when the first did not fall back, and disables fallback.
+        attempts = 2 if self.provider_config.provider == "chatgpt" else 1
         for attempt in range(attempts):
             try:
                 result = self._generate_content_with_routing(
@@ -1103,6 +1105,12 @@ class ChronicleGenerator:
                     continue
                 raise
             try:
+                if result.completion.get("status") == "truncated":
+                    raise AdvisorProviderError(
+                        "The provider did not complete the Chronicle response",
+                        code="PROVIDER_INVALID_RESPONSE",
+                        diagnostics=result.diagnostics,
+                    )
                 return _validate_structured_response(result.text, response_schema), result
             except Exception as exc:
                 validation_error = exc
@@ -1144,6 +1152,7 @@ class ChronicleGenerator:
         event.setdefault("error", None)
         event["provider"] = result.provider
         event["diagnostics"] = result.diagnostics
+        event["completion"] = result.completion
         self._model_route_events.append(event)
 
     def _model_routing_response(self) -> dict[str, Any]:

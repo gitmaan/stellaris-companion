@@ -68,7 +68,9 @@
       "responseTime": "Reaktionszeit: {{seconds}}s",
       "routingNotice": "Weiterleitung über {{model}}.",
       "routingVia": "WEITERLEITUNG ÜBER {{model}}",
-      "modelReadout": "MODELL: {{model}}"
+      "modelReadout": "MODELL: {{model}}",
+      "incomplete": "Der Anbieter hat sein Antwortlimit erreicht. Diese Antwort ist unvollständig. Versuche es erneut oder stelle eine enger gefasste Frage.",
+      "retryIncomplete": "Antwort erneut anfordern"
     },
     "errors": {
       "briefingNotReady": "Der Berater analysiert deine Speicherdatei noch. Bitte versuche es in {{seconds}} Sekunden erneut.",

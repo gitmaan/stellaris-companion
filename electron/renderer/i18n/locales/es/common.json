@@ -68,7 +68,9 @@
       "responseTime": "Tiempo de respuesta: {{seconds}}s",
       "routingNotice": "Enrutamiento mediante {{model}}.",
       "routingVia": "ENRUTAMIENTO MEDIANTE {{model}}",
-      "modelReadout": "MODELO: {{model}}"
+      "modelReadout": "MODELO: {{model}}",
+      "incomplete": "El proveedor ha alcanzado el límite de respuesta. Esta respuesta está incompleta. Reinténtalo o haz una pregunta más específica.",
+      "retryIncomplete": "Reintentar respuesta"
     },
     "errors": {
       "briefingNotReady": "El asesor aun esta analizando tu archivo de guardado. Intentalo de nuevo en {{seconds}} segundos.",

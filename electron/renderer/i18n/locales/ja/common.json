@@ -68,7 +68,9 @@
       "responseTime": "応答時間: {{seconds}}s",
       "routingNotice": "{{model}}に切り替えました。",
       "routingVia": "使用モデル：{{model}}",
-      "modelReadout": "モデル：{{model}}"
+      "modelReadout": "モデル：{{model}}",
+      "incomplete": "プロバイダーの応答上限に達したため、回答が途中で終わっています。再試行するか、質問の範囲を絞ってください。",
+      "retryIncomplete": "回答を再試行"
     },
     "errors": {
       "briefingNotReady": "アドバイザーはまだセーブデータを分析しています。{{seconds}}秒後にもう一度お試しください。",

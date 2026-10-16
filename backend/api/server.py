@@ -844,6 +844,7 @@ def create_app() -> FastAPI:
                                     "requested_model",
                                     "requested_model_display",
                                     "model_routing",
+                                    "completion",
                                     "provider",
                                 )
                             },
@@ -913,6 +914,7 @@ def create_app() -> FastAPI:
                 "requested_model": call_stats.get("requested_model"),
                 "requested_model_display": call_stats.get("requested_model_display"),
                 "model_routing": call_stats.get("routing"),
+                "completion": call_stats.get("completion"),
                 "provider": call_stats.get("provider")
                 or getattr(companion, "get_advisor_provider", lambda: "gemini")(),
             }
@@ -927,6 +929,7 @@ def create_app() -> FastAPI:
                             "requested_model",
                             "requested_model_display",
                             "model_routing",
+                            "completion",
                             "provider",
                         )
                     }
