@@ -139,7 +139,7 @@ jobs:
 
       - name: Run Windows Electron regressions
         working-directory: electron
-        run: npx playwright test "windows-localization-smoke|feedback-capture|response-completeness"
+        run: npx playwright test '(windows-localization-smoke|feedback-capture|response-completeness)\.spec\.js$'
         env:
           E2E_SHOW_WINDOWS: '1'
 
