@@ -25,7 +25,10 @@ async function withApp(run) {
     await page.getByRole('button', { name: zh.chat.message.report, exact: true }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.getByPlaceholder(zh.report.descriptionPlaceholder).fill('文字不全，显示有问题')
-    await app.evaluate(({ BrowserWindow }) => {
+    await app.evaluate(({ BrowserWindow, clipboard }) => {
+      // Keep the renderer/preload/main Copy path, without touching the host clipboard.
+      globalThis.feedbackCopiedText = ''
+      clipboard.writeText = text => { globalThis.feedbackCopiedText = text }
       const contents = BrowserWindow.getAllWindows()[0].webContents
       globalThis.feedbackCaptures = []
       globalThis.originalCapture = contents.capturePage.bind(contents)
@@ -65,8 +68,9 @@ test('feedback previews the unobscured screen and submits exactly the opted-in p
     await fs.writeFile(testInfo.outputPath('feedback-unobscured.png'), Buffer.from(image.split(',')[1], 'base64'))
     await page.getByLabel(zh.report.includeDiagnostics, { exact: true }).check()
     await page.getByRole('button', { name: zh.report.copy, exact: true }).click()
-    const markdown = await app.evaluate(({ clipboard }) => clipboard.readText())
-    expect(markdown).toContain('"page": "chat"')
+    // Copy gathers native/backend diagnostics before invoking the clipboard IPC.
+    await expect.poll(() => app.evaluate(() => globalThis.feedbackCopiedText)).toContain('"page": "chat"')
+    const markdown = await app.evaluate(() => globalThis.feedbackCopiedText)
     expect(markdown).toContain('"language": "zh-Hans"')
     expect(markdown).toContain('"zoomFactor": 1')
     const submit = page.getByRole('button', { name: zh.report.submit, exact: true })
