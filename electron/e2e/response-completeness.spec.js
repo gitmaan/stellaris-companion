@@ -72,6 +72,32 @@ const paragraphs = Array.from({ length: 36 }, (_, i) =>
 const sentinel = '最终校验：全文已完整显示。'
 const answer = `## 战略报告\n\n${paragraphs.join('\n\n')}\n\n${sentinel}`
 
+async function waitForChatLayout(page, contentSize, zoom) {
+  // Native setSize returns before the renderer resize and virtual-list measurements.
+  // Let the resize finish before testing a subsequent, explicit user scroll.
+  await expect.poll(() => page.evaluate(({ contentSize, zoom }) =>
+    Math.abs(innerWidth * zoom - contentSize[0]) <= zoom
+      && Math.abs(innerHeight * zoom - contentSize[1]) <= zoom,
+  { contentSize, zoom })).toBe(true)
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    let previous = '', stableFrames = 0
+    for (let frame = 0; frame < 90; frame++) {
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      const scroller = document.querySelector('[data-chat-scroll]')
+      const message = document.querySelector('[data-message-id="long-answer"]')
+      if (!scroller || !message) { stableFrames = 0; previous = ''; continue }
+      const bounds = message.getBoundingClientRect()
+      const current = [scroller.clientWidth, scroller.clientHeight, scroller.scrollHeight,
+        scroller.scrollTop, bounds.width, bounds.height].join(',')
+      stableFrames = current === previous ? stableFrames + 1 : 0
+      if (stableFrames >= 3) return
+      previous = current
+    }
+    throw new Error('Chat layout did not settle after native resize')
+  })
+}
+
 for (const scenario of [{ scale: 1, uiScale: 1 }, { scale: 1.25, uiScale: 1 }, { scale: 1.5, uiScale: 1.25 }]) {
   test(`long Chinese history remains readable and copyable at display ${scenario.scale} / app ${scenario.uiScale}`, async ({}, testInfo) => {
     test.setTimeout(90_000)
@@ -90,12 +116,17 @@ for (const scenario of [{ scale: 1, uiScale: 1 }, { scale: 1.25, uiScale: 1 }, {
       expect(actualZoom).toBeCloseTo(scenario.uiScale, 2)
       expect(actualScale).toBeCloseTo(scenario.scale * scenario.uiScale, 2)
       for (const size of [[1280, 900], [800, 700], [1600, 1000]]) {
-        await app.evaluate(({ BrowserWindow }, [width, height]) => BrowserWindow.getAllWindows()[0].setSize(width, height), size)
+        const contentSize = await app.evaluate(({ BrowserWindow }, [width, height]) => {
+          const window = BrowserWindow.getAllWindows()[0]
+          window.setSize(width, height)
+          return window.getContentSize()
+        }, size)
+        await waitForChatLayout(page, contentSize, actualZoom)
         await expect(message.locator('.markdown-content p')).toHaveCount(paragraphs.length + 1)
         const blocks = message.locator('.markdown-content p')
         for (let index = 0; index <= paragraphs.length; index++) {
           const block = blocks.nth(index)
-          await block.evaluate(element => element.scrollIntoView({ block: 'center' }))
+          await block.evaluate(element => element.scrollIntoView({ block: 'center', behavior: 'instant' }))
           await expect.poll(() => block.evaluate(element => {
             const bounds = element.getBoundingClientRect()
             const viewport = element.closest('[data-chat-scroll]').getBoundingClientRect()
@@ -113,6 +144,9 @@ for (const scenario of [{ scale: 1, uiScale: 1 }, { scale: 1.25, uiScale: 1 }, {
         expect(await scroller.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
         expect(await page.locator('[data-message-id]').count()).toBeLessThan(40)
       }
+      await message.getByText(sentinel, { exact: true }).evaluate(element =>
+        element.scrollIntoView({ block: 'center', behavior: 'instant' }))
+      await expect(message.getByText(sentinel, { exact: true })).toBeInViewport({ ratio: 1 })
       // CDP screenshots can crop zoomed Electron windows; capture the native surface.
       const png = await app.evaluate(async ({ BrowserWindow }) =>
         (await BrowserWindow.getAllWindows()[0].webContents.capturePage()).toPNG().toString('base64'))

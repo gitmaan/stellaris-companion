@@ -71,6 +71,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Chinese and Japanese fonts for layout validation
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y fonts-noto-cjk
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
