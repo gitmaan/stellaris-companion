@@ -26,6 +26,17 @@ interface ReportPayload {
     platform: string
     electronVersion?: string
     diagnostics?: {
+      display?: {
+        page?: string
+        language?: string
+        viewportWidth?: number
+        viewportHeight?: number
+        devicePixelRatio?: number
+        windowWidth?: number
+        windowHeight?: number
+        zoomFactor?: number
+        displayScaleFactor?: number
+      }
       stellarisVersion?: string
       dlcs?: string[]
       empireName?: string
@@ -287,6 +298,25 @@ async function serveScreenshot(env: Env, pathname: string): Promise<Response> {
 }
 
 // Helper: Create GitHub issue
+function displayDiagnostics(data: ReportPayload): string[] {
+  const display = data.context.diagnostics?.display
+  if (!display || typeof display !== 'object') return []
+  // Keep the diagnostic allowlist small: no screen identifiers or arbitrary
+  // renderer state, and no prompt/response text outside the AI-context opt-in.
+  const safe: Record<string, string | number> = {}
+  for (const key of ['page', 'language'] as const) {
+    const value = display[key]
+    if (typeof value === 'string') safe[key] = value.slice(0, 40)
+  }
+  for (const key of ['viewportWidth', 'viewportHeight', 'devicePixelRatio', 'windowWidth', 'windowHeight', 'zoomFactor', 'displayScaleFactor'] as const) {
+    const value = display[key]
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) safe[key] = value
+  }
+  return Object.keys(safe).length
+    ? ['', '### Display diagnostics', '```json', JSON.stringify(safe, null, 2), '```']
+    : []
+}
+
 async function createGitHubIssue(
   env: Env,
   data: ReportPayload,
@@ -308,6 +338,7 @@ async function createGitHubIssue(
   }
 
   bodyParts.push('', '### Description', description)
+  bodyParts.push(...displayDiagnostics(data))
 
   // Diagnostics (opt-in game context)
   if (diag) {
@@ -455,6 +486,7 @@ async function addGitHubComment(
     `**Platform:** ${data.context.platform}`,
     `**Version:** ${data.context.appVersion}`,
   ]
+  bodyParts.push(...displayDiagnostics(data))
 
   if (diag) {
     if (diag.empireName) bodyParts.push(`**Empire:** ${diag.empireName}`)

@@ -77,6 +77,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Feedback reporting
   getPlatformInfo: () => ({ platform: process.platform, arch: process.arch }),
   captureScreenshot: () => ipcRenderer.invoke('capture-screenshot'),
+  getFeedbackDisplay: () => ipcRenderer.invoke('feedback:get-display'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getInstallId: () => ipcRenderer.invoke('get-install-id'),
   copyToClipboard: (text) => ipcRenderer.invoke('copy-to-clipboard', { text }),

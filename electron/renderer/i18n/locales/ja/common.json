@@ -1008,7 +1008,7 @@
     "app": "アプリ",
     "platform": "プラットフォーム",
     "optional": "追加情報（初期状態では送信しません）",
-    "includeDiagnostics": "ゲームの診断情報を含める（メタデータと一部の戦争計算）",
+    "includeDiagnostics": "ゲームと表示の診断情報を含める",
     "includeLogs": "最近のバックエンドログを含める",
     "includeScreenshot": "スクリーンショットを含める",
     "includeError": "エラーの詳細を含める（メッセージとスタック）",
@@ -1075,8 +1075,13 @@
         "message": "メッセージ：{{value}}",
         "model": "モデル：{{value}}",
         "responseTime": "応答時間：{{value}} ms"
-      }
-    }
+      },
+      "display": "表示の診断情報（任意）"
+    },
+    "screenshotPreview": "スクリーンショットのプレビュー — 送信前に画像を確認してください。",
+    "retakeScreenshot": "撮り直す",
+    "screenshotFailed": "スクリーンショットを撮影できませんでした。再試行するか、画像の添付をオフにしてください。",
+    "screenshotTooLarge": "画像が大きすぎます。ウィンドウを小さくして再試行してください。"
   },
   "chatgpt": {
     "title": "ChatGPTプランを使用",

@@ -7,7 +7,7 @@
 // - rust-parser/: Rust CLI parser binary (stellaris-parser) used by stellaris_companion/rust_bridge.py
 //   The Rust parser handles Clausewitz save file parsing with proper edge case handling.
 
-const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, shell, safeStorage, autoUpdater: nativeAutoUpdater } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage, shell, safeStorage, screen, autoUpdater: nativeAutoUpdater } = require('electron')
 const { clipboard } = require('electron')
 const fs = require('fs')
 const path = require('path')
@@ -1553,6 +1553,18 @@ registerBackendIpcHandlers({
 // =============================================================================
 
 // Screenshot capture for feedback reports
+ipcMain.handle('feedback:get-display', async (event) => {
+  validateSender(event)
+  if (!mainWindow || mainWindow.isDestroyed()) return null
+  const [windowWidth, windowHeight] = mainWindow.getContentSize()
+  return {
+    windowWidth,
+    windowHeight,
+    zoomFactor: mainWindow.webContents.getZoomFactor(),
+    displayScaleFactor: screen.getDisplayMatching(mainWindow.getBounds()).scaleFactor,
+  }
+})
+
 ipcMain.handle('capture-screenshot', async (event) => {
   validateSender(event)
   try {
