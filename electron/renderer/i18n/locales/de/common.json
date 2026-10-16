@@ -1008,7 +1008,7 @@
     "app": "App",
     "platform": "Plattform",
     "optional": "Optionale Angaben (standardmäßig aus)",
-    "includeDiagnostics": "Spieldiagnosen beifügen (Metadaten und begrenzte Kriegsberechnungen)",
+    "includeDiagnostics": "Spiel- und Anzeigediagnose einschließen",
     "includeLogs": "Aktuelle Backend-Protokolle beifügen",
     "includeScreenshot": "Screenshot beifügen",
     "includeError": "Fehlerdetails beifügen (Meldung und Stack)",
@@ -1075,8 +1075,13 @@
         "message": "Meldung: {{value}}",
         "model": "Modell: {{value}}",
         "responseTime": "Antwortzeit: {{value}} ms"
-      }
-    }
+      },
+      "display": "Anzeigediagnose (optional)"
+    },
+    "screenshotPreview": "Screenshot-Vorschau – prüfe das Bild vor dem Senden.",
+    "retakeScreenshot": "Screenshot erneut aufnehmen",
+    "screenshotFailed": "Screenshot konnte nicht aufgenommen werden. Versuche es erneut oder deaktiviere die Screenshot-Option.",
+    "screenshotTooLarge": "Der Screenshot ist zu groß. Verkleinere das Fenster und versuche es erneut."
   },
   "chatgpt": {
     "title": "ChatGPT-Abo nutzen",

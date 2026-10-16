@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import Modal from './Modal'
 import { HUDButton } from './hud/HUDButton'
 import { HUDSelect, HUDCheckbox } from './hud/HUDForm'
@@ -10,6 +11,17 @@ interface ReportContext {
   appVersion: string
   platform: string
   electronVersion: string
+  display?: {
+    page: string
+    language: string
+    viewportWidth: number
+    viewportHeight: number
+    devicePixelRatio: number
+    windowWidth?: number
+    windowHeight?: number
+    zoomFactor?: number
+    displayScaleFactor?: number
+  }
   empireName?: string
   empireEthics?: string[]
   empireCivics?: string[]
@@ -66,11 +78,18 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
   const [includeScreenshot, setIncludeScreenshot] = useState(false)
   const [includeErrorContext, setIncludeErrorContext] = useState(false)
   const [includeLlmContext, setIncludeLlmContext] = useState(false)
+  const [screenshot, setScreenshot] = useState<string | null>(null)
+  const [captureHidden, setCaptureHidden] = useState(false)
+  const captureSequence = useRef(0)
 
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
 
   useEffect(() => {
+    captureSequence.current += 1
+    setCaptureHidden(false)
+    setScreenshot(null)
+    setBusy(false)
     if (!isOpen) return
     ;(async () => {
       const info = window.electronAPI?.getPlatformInfo?.()
@@ -94,10 +113,61 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     setStatus(null)
   }, [isOpen, prefill])
 
+  async function captureScreenshot() {
+    const sequence = ++captureSequence.current
+    const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    setBusy(true)
+    setStatus(null)
+    setScreenshot(null)
+    try {
+      // Keep the dialog mounted and its focus trap intact, but omit both the
+      // panel and its backdrop from the compositor before capturing the page.
+      flushSync(() => setCaptureHidden(true))
+      const image = await Promise.race([
+        (async () => {
+          await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+          return window.electronAPI?.captureScreenshot?.()
+        })(),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error('Screenshot timed out')), 5000)
+        }),
+      ])
+      if (sequence !== captureSequence.current) return
+      if (!image?.startsWith('data:image/png;base64,') || image.length > 2_000_000) {
+        setStatus(t(image && image.length > 2_000_000 ? 'report.screenshotTooLarge' : 'report.screenshotFailed'))
+        return
+      }
+      setScreenshot(image)
+    } catch {
+      if (sequence === captureSequence.current) setStatus(t('report.screenshotFailed'))
+    } finally {
+      clearTimeout(timeout)
+      if (sequence === captureSequence.current) {
+        flushSync(() => {
+          setCaptureHidden(false)
+          setBusy(false)
+        })
+        focused?.focus({ preventScroll: true })
+      }
+    }
+  }
+
   async function enrichContext(base: ReportContext): Promise<ReportContext> {
     const ctx: ReportContext = { ...base }
 
     if (includeDiagnostics) {
+      ctx.display = {
+        page: document.querySelector('.app-page[data-active="true"]')?.id.replace('page-', '') || 'unknown',
+        language: document.documentElement.lang,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio,
+      }
+      try {
+        const nativeDisplay = await window.electronAPI?.getFeedbackDisplay?.()
+        if (nativeDisplay) Object.assign(ctx.display, nativeDisplay)
+      } catch { /* Renderer measurements remain useful if native diagnostics fail. */ }
       try {
         const diagnosticsResp = await window.electronAPI?.backend?.diagnostics()
         if (diagnosticsResp && typeof diagnosticsResp === 'object' && 'ok' in diagnosticsResp && diagnosticsResp.ok) {
@@ -158,6 +228,9 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     lines.push('')
 
     if (includeDiagnostics) {
+      if (ctx.display) {
+        lines.push(`## ${t('report.markdown.display')}`, '```json', JSON.stringify(ctx.display, null, 2), '```', '')
+      }
       lines.push(`## ${t('report.markdown.gameContext')}`)
       if (ctx.stellarisVersion) lines.push(field('stellarisVersion', ctx.stellarisVersion))
       if (typeof ctx.saveFileSizeMb === 'number') lines.push(field('saveSize', ctx.saveFileSizeMb))
@@ -291,7 +364,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
   }
 
   async function submitToWorker() {
-    if (!category || !description.trim()) return
+    if (!category || !description.trim() || busy || (includeScreenshot && !screenshot)) return
     if (!REPORT_ENDPOINT) {
       setStatus(t('report.submitUnavailable'))
       return
@@ -317,15 +390,6 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
         }
       }
 
-      let screenshot: string | undefined
-      if (includeScreenshot) {
-        screenshot = await window.electronAPI?.captureScreenshot?.() || undefined
-        // Avoid shipping multi-megabyte screenshots by accident.
-        if (screenshot && screenshot.length > 2_000_000) {
-          screenshot = undefined
-        }
-      }
-
       const payload = {
         schema_version: 2,
         submitted_at_ms: Date.now(),
@@ -339,6 +403,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
           // Opt-in sections
           diagnostics: includeDiagnostics
             ? {
+              display: enriched.display,
               stellarisVersion: enriched.stellarisVersion,
               dlcs: enriched.dlcs,
               empireName: enriched.empireName,
@@ -422,7 +487,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
   }
 
   return (
-    <Modal open={isOpen} onClose={busy ? undefined : onClose} labelledBy="report-issue-title" className="w-full max-w-lg p-6 overflow-y-auto custom-scrollbar">
+    <Modal open={isOpen} onClose={busy ? undefined : onClose} captureHidden={captureHidden} labelledBy="report-issue-title" className="w-full max-w-lg p-6 overflow-y-auto custom-scrollbar">
           <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-accent-cyan/60" />
           <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-accent-cyan/60" />
           <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-accent-cyan/60" />
@@ -469,7 +534,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               </div>
             )}
 
-            <div className="space-y-3">
+            <fieldset disabled={busy} className="space-y-3">
               <span className="font-display text-[10px] tracking-widest text-text-secondary uppercase pl-1">
                 {t('report.optional')}
               </span>
@@ -486,8 +551,21 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               <HUDCheckbox
                 label={t('report.includeScreenshot')}
                 checked={includeScreenshot}
-                onChange={(e) => setIncludeScreenshot(e.target.checked)}
+                onChange={(e) => {
+                  setIncludeScreenshot(e.target.checked)
+                  if (e.target.checked) void captureScreenshot()
+                  else setScreenshot(null)
+                }}
               />
+              {includeScreenshot && (
+                <div className="space-y-2" data-feedback-preview>
+                  <p className="text-sm text-text-secondary">{t('report.screenshotPreview')}</p>
+                  {screenshot && <img src={screenshot} alt={t('report.screenshotPreview')} className="w-full rounded border border-border" />}
+                  <HUDButton type="button" variant="secondary" onClick={() => void captureScreenshot()} disabled={busy}>
+                    {t('report.retakeScreenshot')}
+                  </HUDButton>
+                </div>
+              )}
               {prefill?.error && (
                 <HUDCheckbox
                   label={t('report.includeError')}
@@ -502,7 +580,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
                   onChange={(e) => setIncludeLlmContext(e.target.checked)}
                 />
               )}
-            </div>
+            </fieldset>
 
             {status && (
               <div className="p-3 bg-black/20 border border-white/10 rounded-sm text-xs text-text-secondary font-mono">
@@ -514,7 +592,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               <HUDButton
                 variant="primary"
                 onClick={submitToWorker}
-                disabled={!category || !description.trim() || busy || !REPORT_ENDPOINT}
+                disabled={!category || !description.trim() || busy || !REPORT_ENDPOINT || (includeScreenshot && !screenshot)}
                 title={!REPORT_ENDPOINT ? t('report.submitUnavailableHint') : undefined}
                 className="w-full"
               >
@@ -541,6 +619,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
             <HUDButton
               variant="ghost"
               onClick={onClose}
+              disabled={busy}
               className="w-full"
             >
               {t('report.close')}
