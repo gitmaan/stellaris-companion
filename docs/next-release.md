@@ -94,5 +94,6 @@ Keep the remaining checks current. Do not describe Cygnus support as complete un
 
 - [x] Verify shared two-call recovery, provider-aware budgets, saved partial-answer metadata, retry request IDs, and preservation of complete Chronicle content with local regression tests. See [Provider response completion](provider-completion.md).
 - [x] Verify long Chinese answers, scrolling, resize, exact Copy output, and app text size in local Electron at simulated 100%, 125%, and 150% display scaling.
-- [ ] Run the Windows Actions localization/completion journeys on the integrated changes, then check a packaged Windows build with native display scaling and the affected content/provider.
+- [x] Run the Windows Actions localization/completion journeys on the completion PR and the feedback capture journeys on the feedback PR.
+- [ ] Check a packaged Windows build with both changes, native display scaling, and the affected content/provider. Deploy the feedback worker update before shipping the desktop diagnostics changes.
 - [ ] Compare the affected answer's copied text with visible content and use an opted-in unobscured screenshot to confirm whether the original reports are resolved. Keep both issues open pending that evidence or reporter confirmation.

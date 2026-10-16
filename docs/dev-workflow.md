@@ -118,13 +118,14 @@ pyinstaller --clean stellaris-backend.spec
 
 ## Gemini generation limits
 
-`GeminiAdvisorGenerator.generate` owns recovery for both Advisor and Chronicle.
-Keep this policy in one place; Chronicle must not wrap native Gemini in another
-retry loop. SDK transport retries are disabled for these calls.
+The native Gemini and compatible-provider adapters own recovery for both Advisor
+and Chronicle. Chronicle must not wrap these adapters in another retry loop.
+SDK transport retries are disabled for native Gemini calls. The shipped native
+Gemini models use these application budgets:
 
 | Generation | Initial output ceiling | Ceiling after `MAX_TOKENS` |
 | --- | ---: | ---: |
-| Advisor | 4,096 | 8,192 |
+| Advisor | 8,192 | 16,384 |
 | Chronicle | 8,192 | 16,384 |
 
 These are ceilings, not target response lengths. Each answer or Chronicle piece
@@ -133,6 +134,11 @@ fallback. A Chronicle refresh may generate several pieces. Only a
 confirmed `MAX_TOKENS` finish increases the ceiling; empty or invalid JSON gets
 one repair at the same ceiling. Other provider failures stop immediately unless
 the existing quota fallback is available within the two-request allowance.
+
+Unknown Gemini models retain a 4,096-token allowance. Compatible endpoints use
+their own conservative model and endpoint policy; see [Provider response
+completion](provider-completion.md) for those budgets and the saved partial-answer
+behavior. A provider context-window error never triggers a larger output request.
 
 Gemini 3 Chronicle generation uses low thinking; Flash-Lite retains its default.
 Advisor thinking retains its default. Automatic routing uses these priority lists:
