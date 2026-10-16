@@ -201,7 +201,9 @@
       "blockedLink": "Blocked non-http(s) link",
       "routingNotice": "Routing via {{model}}.",
       "routingVia": "ROUTING VIA {{model}}",
-      "modelReadout": "MODEL: {{model}}"
+      "modelReadout": "MODEL: {{model}}",
+      "incomplete": "The provider reached its response limit. This answer is incomplete. Retry, or ask a narrower question.",
+      "retryIncomplete": "Retry response"
     },
     "errors": {
       "briefingNotReady": "The advisor is still analyzing your save file. Please try again in {{seconds}} seconds.",

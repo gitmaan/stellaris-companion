@@ -89,6 +89,17 @@ export interface ConversationsResponse { conversations: AdvisorConversation[] }
 export interface ConversationResponse { conversation: AdvisorConversation; turns: AdvisorTurn[]; has_more: boolean }
 export interface CreatedConversationResponse { conversation: AdvisorConversation }
 
+export interface GenerationCompletion {
+  status: 'complete' | 'truncated' | 'unknown'
+  finish_reason: string | null
+  output_limit?: number | null
+  usage?: { input_tokens: number | null; output_tokens: number | null; reasoning_tokens: number | null }
+  attempts: number
+  recovered: boolean
+  returned_text_chars?: number
+  recovery_error?: string
+}
+
 export interface ChatResponse {
   save_id?: string
   conversation_id?: string
@@ -105,6 +116,7 @@ export interface ChatResponse {
   requested_model_display?: string
   model_routing?: ModelRoutingEvent | null
   provider?: string
+  completion?: GenerationCompletion | null
 }
 
 export interface ChatRetryResponse {

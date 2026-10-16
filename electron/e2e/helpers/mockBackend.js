@@ -438,6 +438,7 @@ function createMockChronicleBackend(options = {}) {
         model: options.chatModel ?? 'mock-advisor-model',
         model_display: options.chatModel ?? 'Mock Advisor Model',
         model_routing: null,
+        completion: typeof options.chatCompletion === 'function' ? options.chatCompletion(body, chatRequests.length) : options.chatCompletion ?? null,
         provider: options.advisorProvider ?? 'gemini',
         save_id: saveId, conversation_id: id, turn_id: randomUUID(), history_saved: !options.historyUnavailable, source_hash: 'mock-source',
       }

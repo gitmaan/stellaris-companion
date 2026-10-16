@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 from urllib.parse import urlparse
 
@@ -16,6 +16,8 @@ from google.genai import types
 from pydantic import BaseModel
 
 from backend.core.model_routing import (
+    GEMINI_FLASH_LITE_MODEL,
+    GEMINI_FLASH_LITE_RESERVE_MODEL,
     GEMINI_FLASH_MODEL,
     classify_model_error,
     fallback_notice,
@@ -29,9 +31,9 @@ from backend.core.structured_output import validate_structured_response
 
 logger = logging.getLogger(__name__)
 
-# One allowance covers native Gemini recovery AND quota fallback. SDK retries are off.
-GEMINI_MAX_ATTEMPTS = 2
-GEMINI_CHRONICLE_OUTPUT_TOKENS = 8192
+# One allowance covers generation recovery, schema fallback AND quota fallback.
+# SDK retries are off. Chronicle must not wrap adapters in another retry loop.
+GENERATION_MAX_ATTEMPTS = 2
 
 ADVISOR_PROVIDER_GEMINI = "gemini"
 ADVISOR_PROVIDER_OLLAMA = "ollama"
@@ -225,6 +227,79 @@ class AdvisorGenerationResult:
     routing: dict[str, Any] | None = None
     schema_fallback_used: bool = False
     diagnostics: list[dict[str, Any]] = field(default_factory=list)
+    completion: dict[str, Any] = field(default_factory=dict)
+
+
+def generation_output_limits(
+    config: AdvisorProviderConfig, model: str, purpose: str, requested: int | None = None
+) -> tuple[int, int]:
+    """Application budgets, restricted to models/endpoints with known output support.
+
+    The shipped native Gemini models support >16K output. DeepSeek's documented
+    Chat Completions limits support 16K on current models/reasoner and 8K on the
+    legacy chat alias. Do not infer capacity from a model name on an arbitrary
+    proxy, OpenRouter route, or local server. Unknown endpoints retain 4K and can
+    retry concisely at that allowance; a context error never triggers expansion.
+    https://ai.google.dev/gemini-api/docs/models
+    https://api-docs.deepseek.com/api/create-chat-completion/
+    """
+    ceiling = 4096
+    if config.provider == ADVISOR_PROVIDER_GEMINI and model in {
+        GEMINI_FLASH_MODEL,
+        GEMINI_FLASH_LITE_MODEL,
+        GEMINI_FLASH_LITE_RESERVE_MODEL,
+    }:
+        ceiling = 16384
+    elif config.provider == ADVISOR_PROVIDER_CUSTOM and config.base_url in {
+        "https://api.deepseek.com",
+        "https://api.deepseek.com/v1",
+        "https://api.deepseek.com/beta",
+    }:
+        if model == "deepseek-chat":
+            ceiling = 8192
+        elif model in {"deepseek-reasoner", "deepseek-flash", "deepseek-v4-pro"}:
+            ceiling = 16384
+    initial = requested if requested is not None else min(8192, ceiling)
+    if purpose == "chronicle" and ceiling > 4096:
+        initial = max(initial, 8192)
+    return max(1, min(initial, ceiling)), ceiling
+
+
+def _completion_metadata(
+    call: dict[str, Any], diagnostics: list[dict[str, Any]], status: str
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "finish_reason": call.get("finish_reason"),
+        "output_limit": call.get("output_limit"),
+        "usage": {
+            "input_tokens": call.get("prompt_token_count"),
+            "output_tokens": call.get("candidates_token_count"),
+            "reasoning_tokens": call.get("thoughts_token_count"),
+        },
+        "attempts": len(diagnostics),
+        "recovered": len(diagnostics) > 1 and status == "complete",
+        "returned_text_chars": call.get("returned_text_chars"),
+    }
+
+
+def _preserve_partial(
+    partial: AdvisorGenerationResult | None,
+    error: AdvisorProviderError,
+    diagnostics: list[dict[str, Any]],
+) -> AdvisorGenerationResult:
+    error.diagnostics = diagnostics
+    if partial is None:
+        raise error
+    return replace(
+        partial,
+        diagnostics=diagnostics,
+        completion={
+            **partial.completion,
+            "attempts": len(diagnostics),
+            "recovery_error": error.code,
+        },
+    )
 
 
 class AdvisorProviderError(RuntimeError):
@@ -258,7 +333,7 @@ class AdvisorGenerator(Protocol):
         model_routing_mode: str | None = None,
         thinking_level: str = "dynamic",
         temperature: float = 1.0,
-        max_output_tokens: int = 4096,
+        max_output_tokens: int | None = None,
         purpose: str = "advisor",
         response_schema: type[BaseModel] | None = None,
         schema_name: str | None = None,
@@ -289,16 +364,14 @@ class GeminiAdvisorGenerator:
         model_routing_mode: str | None = None,
         thinking_level: str = "dynamic",
         temperature: float = 1.0,
-        max_output_tokens: int = 4096,
+        max_output_tokens: int | None = None,
         purpose: str = "advisor",
         response_schema: type[BaseModel] | None = None,
         schema_name: str | None = None,
         allow_schema_fallback: bool = True,
     ) -> AdvisorGenerationResult:
         del schema_name, allow_schema_fallback
-        if purpose == "chronicle":
-            max_output_tokens = max(max_output_tokens, GEMINI_CHRONICLE_OUTPUT_TOKENS)
-        retry_ceiling = 16384 if purpose == "chronicle" else 8192
+        requested_limit = max_output_tokens
         config_kwargs: dict[str, Any] = {
             "system_instruction": system_prompt,
             "temperature": temperature,
@@ -318,11 +391,15 @@ class GeminiAdvisorGenerator:
         diagnostics: list[dict[str, Any]] = []
         candidate_index = 0
         prompt = user_prompt
+        partial: AdvisorGenerationResult | None = None
+        expand_output = False
         last_error = AdvisorProviderError(
             "Gemini could not complete the response", code="PROVIDER_INVALID_RESPONSE"
         )
 
-        while len(diagnostics) < GEMINI_MAX_ATTEMPTS and candidate_index < len(candidate_models):
+        while len(diagnostics) < GENERATION_MAX_ATTEMPTS and candidate_index < len(
+            candidate_models
+        ):
             candidate_model = candidate_models[candidate_index]
             fallback_model = (
                 candidate_models[candidate_index + 1]
@@ -348,7 +425,12 @@ class GeminiAdvisorGenerator:
                 route_event.notice = fallback_notice(
                     route_event.attempted_model, candidate_model, reason=route_event.reason
                 )
-            cfg = types.GenerateContentConfig(**config_kwargs, max_output_tokens=max_output_tokens)
+            output_limit, ceiling = generation_output_limits(
+                self.config, candidate_model, purpose, requested_limit
+            )
+            if expand_output:
+                output_limit = min(output_limit * 2, ceiling)
+            cfg = types.GenerateContentConfig(**config_kwargs, max_output_tokens=output_limit)
             level = thinking_level
             # Lite already defaults to minimal thinking. Unknown/custom models keep their defaults.
             if (
@@ -362,7 +444,7 @@ class GeminiAdvisorGenerator:
                 cfg.thinking_config = types.ThinkingConfig(thinking_level=level)
             call = {
                 "requested_model": candidate_model,
-                "output_limit": max_output_tokens,
+                "output_limit": output_limit,
                 "thinking_level": level,
                 "attempt": len(diagnostics) + 1,
             }
@@ -373,8 +455,6 @@ class GeminiAdvisorGenerator:
                 )
             except Exception as exc:
                 code = _gemini_error_code(exc)
-                call["error_code"] = code
-                logger.info("Gemini generation: %s", json.dumps(call))
                 failure = classify_model_error(exc)
                 can_fallback = (
                     code == "PROVIDER_RATE_LIMITED"
@@ -403,6 +483,8 @@ class GeminiAdvisorGenerator:
                     code=code,
                     status_code=400 if code == "PROVIDER_CONTEXT_LIMIT" else 502,
                 )
+                call["error_code"] = code
+                logger.info("Gemini generation: %s", json.dumps(call))
                 if can_fallback:
                     continue
                 break
@@ -423,33 +505,40 @@ class GeminiAdvisorGenerator:
                 "candidates_token_count",
             ):
                 value = getattr(usage, field_name, None)
-                call[field_name] = value if isinstance(value, int) else None
+                call[field_name] = _token_count(value)
+            # A blocked response must not be surfaced, even after a usable partial.
+            if call["block_reason"] not in (None, "BLOCK_REASON_UNSPECIFIED") or call[
+                "finish_reason"
+            ] not in (None, "STOP", "MAX_TOKENS"):
+                logger.info("Gemini generation: %s", json.dumps(call))
+                raise AdvisorProviderError(
+                    "Gemini stopped without completing the response",
+                    code="PROVIDER_REQUEST_FAILED",
+                    diagnostics=diagnostics,
+                )
+            response_text = response.text or ""
+            call["returned_text_chars"] = len(response_text)
             logger.info("Gemini generation: %s", json.dumps(call))
-
-            # Never return a partial answer, even if its JSON happens to parse.
             if call["finish_reason"] == "MAX_TOKENS":
                 last_error = AdvisorProviderError(
                     "Gemini reached the response length limit. Please request a shorter response.",
                     code="PROVIDER_INVALID_RESPONSE",
                 )
-                if max_output_tokens >= retry_ceiling:
-                    break
-                max_output_tokens = min(max_output_tokens * 2, retry_ceiling)
+                if response_text.strip() and purpose == "advisor" and response_schema is None:
+                    partial = AdvisorGenerationResult(
+                        text=response_text,
+                        model=candidate_model,
+                        requested_model=requested_model,
+                        provider=self.config.provider,
+                        routing=route_event_payload(route_event),
+                        completion=_completion_metadata(call, diagnostics, "truncated"),
+                    )
+                expand_output = True
                 prompt = (
                     user_prompt
                     + "\n\nReturn a concise, complete response within the requested format."
                 )
                 continue
-            if call["finish_reason"] not in (None, "STOP") or call["block_reason"] not in (
-                None,
-                "BLOCK_REASON_UNSPECIFIED",
-            ):
-                last_error = AdvisorProviderError(
-                    "Gemini stopped without completing the response", code="PROVIDER_REQUEST_FAILED"
-                )
-                break
-
-            response_text = response.text or ""
             if not response_text.strip():
                 last_error = AdvisorProviderError(
                     "Gemini returned an empty response", code="PROVIDER_EMPTY_RESPONSE"
@@ -471,6 +560,9 @@ class GeminiAdvisorGenerator:
                         provider=self.config.provider,
                         routing=route_event_payload(route_event),
                         diagnostics=diagnostics,
+                        completion=_completion_metadata(
+                            call, diagnostics, "complete" if finish == "STOP" else "unknown"
+                        ),
                     )
             # Invalid/empty output gets one repair attempt at the SAME token allowance.
             prompt = (
@@ -478,8 +570,7 @@ class GeminiAdvisorGenerator:
                 + "\n\nReturn a non-empty, complete response in the requested format. Return only JSON when a schema is provided."
             )
 
-        last_error.diagnostics = diagnostics
-        raise last_error
+        return _preserve_partial(partial, last_error, diagnostics)
 
 
 class OpenAICompatibleAdvisorGenerator:
@@ -520,13 +611,13 @@ class OpenAICompatibleAdvisorGenerator:
         model_routing_mode: str | None = None,
         thinking_level: str = "dynamic",
         temperature: float = 1.0,
-        max_output_tokens: int = 4096,
+        max_output_tokens: int | None = None,
         purpose: str = "advisor",
         response_schema: type[BaseModel] | None = None,
         schema_name: str | None = None,
         allow_schema_fallback: bool = True,
     ) -> AdvisorGenerationResult:
-        del model_routing_mode, thinking_level, purpose
+        del model_routing_mode, thinking_level
         if not self.config.is_configured:
             raise AdvisorProviderError(
                 f"{self.config.display_name} is not fully configured",
@@ -535,6 +626,9 @@ class OpenAICompatibleAdvisorGenerator:
             )
 
         requested_model = str(model or self.config.model).strip()
+        output_limit, retry_ceiling = generation_output_limits(
+            self.config, requested_model, purpose, max_output_tokens
+        )
         effective_user_prompt = user_prompt
         if response_schema is not None:
             effective_user_prompt = _with_json_schema_instruction(
@@ -555,7 +649,7 @@ class OpenAICompatibleAdvisorGenerator:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": effective_user_prompt},
             ],
-            "max_tokens": max_output_tokens,
+            "max_tokens": output_limit,
             "stream": False,
         }
         if response_schema is None:
@@ -573,97 +667,144 @@ class OpenAICompatibleAdvisorGenerator:
                 request_body["provider"] = {"require_parameters": True}
 
         schema_fallback_used = False
-        try:
-            response = self.client.post(
-                f"{self.config.base_url}/chat/completions",
-                headers=headers,
-                json=request_body,
-            )
-            if (
-                response_schema is not None
-                and allow_schema_fallback
-                and _should_retry_without_schema(
-                    response,
-                    provider=self.config.provider,
-                )
-            ):
-                fallback_body = dict(request_body)
-                fallback_body.pop("response_format", None)
-                fallback_body.pop("provider", None)
-                schema_fallback_used = True
-                response = self.client.post(
-                    f"{self.config.base_url}/chat/completions",
-                    headers=headers,
-                    json=fallback_body,
-                )
-        except httpx.TimeoutException as exc:
-            raise AdvisorProviderError(
-                f"{self.config.display_name} timed out while generating a response",
-                code="PROVIDER_TIMEOUT",
-                status_code=504,
-            ) from exc
-        except httpx.RequestError as exc:
-            raise AdvisorProviderError(
-                f"Could not connect to {self.config.display_name} at {self.config.base_url}",
-                code="PROVIDER_UNAVAILABLE",
-                status_code=503,
-            ) from exc
-        if not response.is_success:
-            error_message = _redact_sensitive_text(
-                _compatible_error_message(response),
-                self.config.api_key,
-            )
-            if response.status_code == 413 or _is_context_limit_error(error_message):
-                raise AdvisorProviderError(
-                    f"The selected {self.config.display_name} model cannot fit the "
-                    "current campaign briefing in its context window",
-                    code="PROVIDER_CONTEXT_LIMIT",
-                    status_code=400,
-                )
-            if response.status_code in {401, 403}:
-                code = "PROVIDER_AUTH_FAILED"
-            elif response.status_code == 402:
-                code = "PROVIDER_BILLING_FAILED"
-            elif response.status_code in {408, 504}:
-                code = "PROVIDER_TIMEOUT"
-            elif response.status_code == 429:
-                code = "PROVIDER_RATE_LIMITED"
-            elif response.status_code == 404:
-                code = "PROVIDER_MODEL_NOT_FOUND"
-            elif response.status_code == 503:
-                code = "PROVIDER_UNAVAILABLE"
-            else:
-                code = "PROVIDER_REQUEST_FAILED"
-            raise AdvisorProviderError(
-                f"{self.config.display_name}: {error_message}",
-                code=code,
-                status_code=502,
-            )
-
-        try:
-            payload = response.json()
-            content = payload["choices"][0]["message"]["content"]
-            response_text = _content_to_text(content)
-        except (KeyError, IndexError, TypeError, ValueError) as exc:
-            raise AdvisorProviderError(
-                f"{self.config.display_name} returned an invalid chat response",
-                code="PROVIDER_INVALID_RESPONSE",
-            ) from exc
-
-        if not response_text:
-            raise AdvisorProviderError(
-                f"{self.config.display_name} returned an empty response",
-                code="PROVIDER_EMPTY_RESPONSE",
-            )
-
-        response_model = str(payload.get("model") or requested_model)
-        return AdvisorGenerationResult(
-            text=response_text,
-            model=response_model,
-            requested_model=requested_model,
-            provider=self.config.provider,
-            schema_fallback_used=schema_fallback_used,
+        diagnostics: list[dict[str, Any]] = []
+        partial: AdvisorGenerationResult | None = None
+        last_error = AdvisorProviderError(
+            "The provider could not complete the response", code="PROVIDER_INVALID_RESPONSE"
         )
+        for attempt in range(GENERATION_MAX_ATTEMPTS):
+            call: dict[str, Any] = {
+                "attempt": attempt + 1,
+                "requested_model": requested_model,
+                "output_limit": request_body["max_tokens"],
+            }
+            diagnostics.append(call)
+            try:
+                response = self.client.post(
+                    f"{self.config.base_url}/chat/completions", headers=headers, json=request_body
+                )
+                if not response.is_success:
+                    last_error = _compatible_http_error(response, self.config)
+                    call["error_code"] = last_error.code
+                    if (
+                        attempt + 1 < GENERATION_MAX_ATTEMPTS
+                        and "response_format" in request_body
+                        and allow_schema_fallback
+                        and last_error.code != "PROVIDER_CONTEXT_LIMIT"
+                        and _should_retry_without_schema(response, provider=self.config.provider)
+                    ):
+                        request_body.pop("response_format", None)
+                        request_body.pop("provider", None)
+                        schema_fallback_used = True
+                        continue
+                    break
+
+                payload = response.json()
+                choice = payload["choices"][0]
+                if not isinstance(choice, dict) or not isinstance(choice.get("message"), dict):
+                    raise ValueError("Invalid message")
+                response_text = _content_to_text(choice["message"].get("content"))
+                finish = choice.get("finish_reason")
+                if finish is not None and not isinstance(finish, str):
+                    raise ValueError("Invalid finish reason")
+                call["finish_reason"] = finish[:64] if finish else None
+                response_model = str(payload.get("model") or requested_model)
+                call["returned_model"] = response_model
+                call["returned_text_chars"] = len(response_text)
+                usage = payload.get("usage")
+                usage = usage if isinstance(usage, dict) else {}
+                for source, target in (
+                    ("prompt_tokens", "prompt_token_count"),
+                    ("completion_tokens", "candidates_token_count"),
+                ):
+                    call[target] = _token_count(usage.get(source))
+                details = usage.get("completion_tokens_details")
+                details = details if isinstance(details, dict) else {}
+                call["thoughts_token_count"] = _token_count(details.get("reasoning_tokens"))
+                if choice["message"].get("refusal") or finish == "content_filter":
+                    partial = None
+                    raise AdvisorProviderError(
+                        "The provider stopped without completing the response",
+                        code="PROVIDER_REQUEST_FAILED",
+                    )
+                if finish not in (None, "stop", "length"):
+                    partial = None
+                    raise AdvisorProviderError(
+                        "The provider returned an unsupported completion state",
+                        code="PROVIDER_REQUEST_FAILED",
+                    )
+                status = (
+                    "truncated"
+                    if finish == "length"
+                    else "complete"
+                    if finish == "stop"
+                    else "unknown"
+                )
+                result = AdvisorGenerationResult(
+                    text=response_text,
+                    model=response_model,
+                    requested_model=requested_model,
+                    provider=self.config.provider,
+                    schema_fallback_used=schema_fallback_used,
+                    diagnostics=diagnostics,
+                    completion=_completion_metadata(call, diagnostics, status),
+                )
+                if finish == "length":
+                    last_error = AdvisorProviderError(
+                        "The provider reached the response length limit. Please request a shorter response.",
+                        code="PROVIDER_INVALID_RESPONSE",
+                    )
+                    if response_text.strip() and purpose == "advisor" and response_schema is None:
+                        partial = result
+                    request_body["max_tokens"] = min(request_body["max_tokens"] * 2, retry_ceiling)
+                    request_body["messages"][1]["content"] = (
+                        effective_user_prompt
+                        + "\n\nReturn a shorter, complete response within the requested format."
+                    )
+                    continue
+                if not response_text.strip():
+                    raise AdvisorProviderError(
+                        f"{self.config.display_name} returned an empty response",
+                        code="PROVIDER_EMPTY_RESPONSE",
+                    )
+                if response_schema is not None:
+                    validate_structured_response(response_text, response_schema)
+                return result
+            except httpx.TimeoutException:
+                last_error = AdvisorProviderError(
+                    f"{self.config.display_name} timed out while generating a response",
+                    code="PROVIDER_TIMEOUT",
+                    status_code=504,
+                )
+                call["error_code"] = last_error.code
+                break
+            except httpx.RequestError:
+                last_error = AdvisorProviderError(
+                    f"Could not connect to {self.config.display_name}",
+                    code="PROVIDER_UNAVAILABLE",
+                    status_code=503,
+                )
+                call["error_code"] = last_error.code
+                break
+            except (AdvisorProviderError, KeyError, IndexError, TypeError, ValueError) as exc:
+                last_error = (
+                    exc
+                    if isinstance(exc, AdvisorProviderError)
+                    else AdvisorProviderError(
+                        f"{self.config.display_name} returned an invalid response",
+                        code="PROVIDER_INVALID_RESPONSE",
+                    )
+                )
+                call["error_code"] = last_error.code
+                if last_error.code not in {"PROVIDER_INVALID_RESPONSE", "PROVIDER_EMPTY_RESPONSE"}:
+                    break
+                request_body["messages"][1]["content"] = (
+                    effective_user_prompt
+                    + "\n\nReturn a non-empty, complete response. Return only JSON when a schema is provided."
+                )
+            finally:
+                logger.info("%s generation: %s", self.config.provider, json.dumps(call))
+        return _preserve_partial(partial, last_error, diagnostics)
 
 
 class ChatGPTAdvisorGenerator:
@@ -682,7 +823,7 @@ class ChatGPTAdvisorGenerator:
         model_routing_mode: str | None = None,
         thinking_level: str = "dynamic",
         temperature: float = 1.0,
-        max_output_tokens: int = 4096,
+        max_output_tokens: int | None = None,
         purpose: str = "advisor",
         response_schema: type[BaseModel] | None = None,
         schema_name: str | None = None,
@@ -766,6 +907,15 @@ class ChatGPTAdvisorGenerator:
             requested_model=payload.get("model") or requested_model,
             provider=ADVISOR_PROVIDER_CHATGPT,
             schema_fallback_used=payload.get("schemaFallbackUsed") is True,
+            # The bridge returns text only after a response.completed event.
+            # It does not expose usage/output limits; leave those unreported.
+            completion={
+                "status": "complete",
+                "finish_reason": "response.completed",
+                "attempts": 2 if payload.get("schemaFallbackUsed") is True else 1,
+                "recovered": payload.get("schemaFallbackUsed") is True,
+                "returned_text_chars": len(payload["text"]),
+            },
         )
 
 
@@ -784,6 +934,34 @@ def create_advisor_generator(
     if config.provider == ADVISOR_PROVIDER_CHATGPT:
         return ChatGPTAdvisorGenerator(config=config)
     return OpenAICompatibleAdvisorGenerator(config=config)
+
+
+def _token_count(value: Any) -> int | None:
+    return value if type(value) is int and value >= 0 else None
+
+
+def _compatible_http_error(
+    response: httpx.Response, config: AdvisorProviderConfig
+) -> AdvisorProviderError:
+    message = _redact_sensitive_text(_compatible_error_message(response), config.api_key)
+    if response.status_code == 413 or _is_context_limit_error(message):
+        return AdvisorProviderError(
+            f"The selected {config.display_name} model cannot fit the current campaign "
+            "briefing in its context window",
+            code="PROVIDER_CONTEXT_LIMIT",
+            status_code=400,
+        )
+    code = {
+        401: "PROVIDER_AUTH_FAILED",
+        403: "PROVIDER_AUTH_FAILED",
+        402: "PROVIDER_BILLING_FAILED",
+        408: "PROVIDER_TIMEOUT",
+        504: "PROVIDER_TIMEOUT",
+        429: "PROVIDER_RATE_LIMITED",
+        404: "PROVIDER_MODEL_NOT_FOUND",
+        503: "PROVIDER_UNAVAILABLE",
+    }.get(response.status_code, "PROVIDER_REQUEST_FAILED")
+    return AdvisorProviderError(f"{config.display_name}: {message}", code=code)
 
 
 def _compatible_error_message(response: httpx.Response) -> str:

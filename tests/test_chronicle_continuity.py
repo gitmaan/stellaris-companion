@@ -6,11 +6,17 @@ import json
 import threading
 from copy import deepcopy
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.api import server
-from backend.core.advisor_providers import AdvisorGenerationResult
+from backend.core.advisor_providers import (
+    AdvisorGenerationResult,
+    AdvisorProviderConfig,
+    AdvisorProviderError,
+    OpenAICompatibleAdvisorGenerator,
+)
 from backend.core.chronicle import ChronicleGenerator
 from backend.core.chronicle_store import (
     ChronicleConflict,
@@ -334,6 +340,42 @@ def test_cached_refresh_keeps_actual_writing_date_revision_and_coverage(campaign
     assert cached["coverage_date"] == generated["coverage_date"] == "2204.01.01"
     assert cached["generated_at"] == generated["generated_at"]
     assert cached["chronicle_revision"] == generated["chronicle_revision"]
+    assert db.get_cached_chronicle_for_save(SAVE) == before
+
+
+def test_truncated_refresh_never_replaces_a_complete_chronicle(campaign):
+    db, session, _, _ = campaign
+    requests = []
+
+    def handle(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": '{"sections":[{"type":"prose","text":"A complete record."}]}'
+                        },
+                        "finish_reason": "stop" if len(requests) == 1 else "length",
+                    }
+                ]
+            },
+        )
+
+    provider = OpenAICompatibleAdvisorGenerator(
+        config=AdvisorProviderConfig(
+            provider="custom", model="test", base_url="http://127.0.0.1:1234/v1"
+        ),
+        client=httpx.Client(transport=httpx.MockTransport(handle)),
+    )
+    generator = ChronicleGenerator(db, provider_generator=provider)
+    original = generator.generate_chronicle(session, force_refresh=True)
+    before = dict(db.get_cached_chronicle_for_save(SAVE))
+    assert original["current_era"]["narrative"] == "A complete record."
+    with pytest.raises(AdvisorProviderError):
+        generator.generate_chronicle(session, force_refresh=True)
+    assert len(requests) == 3  # One successful generation, then two bounded attempts.
     assert db.get_cached_chronicle_for_save(SAVE) == before
 
 

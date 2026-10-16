@@ -110,7 +110,7 @@ jobs:
           if-no-files-found: ignore
 
   desktop-e2e-windows:
-    name: Desktop E2E - Windows localization smoke
+    name: Desktop E2E - Windows localization and response completeness
     runs-on: windows-latest
 
     steps:
@@ -137,9 +137,9 @@ jobs:
         working-directory: electron
         run: npm run build:renderer
 
-      - name: Run Windows Electron localization smoke
+      - name: Run Windows Electron localization and response completeness
         working-directory: electron
-        run: npx playwright test e2e/windows-localization-smoke.spec.js
+        run: npx playwright test e2e/windows-localization-smoke.spec.js e2e/response-completeness.spec.js
         env:
           E2E_SHOW_WINDOWS: '1'
 

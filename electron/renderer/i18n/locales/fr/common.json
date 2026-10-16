@@ -68,7 +68,9 @@
       "responseTime": "Temps de réponse : {{seconds}}s",
       "routingNotice": "Routage via {{model}}.",
       "routingVia": "ROUTAGE VIA {{model}}",
-      "modelReadout": "MODÈLE : {{model}}"
+      "modelReadout": "MODÈLE : {{model}}",
+      "incomplete": "Le fournisseur a atteint sa limite de réponse. Cette réponse est incomplète. Réessayez ou posez une question plus précise.",
+      "retryIncomplete": "Réessayer la réponse"
     },
     "errors": {
       "briefingNotReady": "Le conseiller analyse encore votre sauvegarde. Reessayez dans {{seconds}} secondes.",

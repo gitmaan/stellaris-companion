@@ -200,6 +200,10 @@ class ConversationManager:
             # Boundary detection sees every turn, even when output language changes.
             if language is not None and row.get("language") != language:
                 continue
+            if (row.get("completion") or {}).get("status") == "truncated":
+                # Keep the partial in the archive, but never treat it as completed
+                # advice on follow-ups or after restarting the app.
+                continue
             history.append(
                 Turn(
                     question=str(row.get("question") or ""),

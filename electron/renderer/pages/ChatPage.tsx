@@ -78,6 +78,8 @@ interface Message {
   model?: string
   modelDisplay?: string
   modelRouting?: ChatResponse['model_routing']
+  completion?: ChatResponse['completion']
+  retryQuestion?: string
   retryRequest?: { text: string; requestId: string }
   isError?: boolean
   action?: 'settings' | 'usage'
@@ -86,7 +88,7 @@ interface Message {
 function restoreMessages(turns: AdvisorTurn[]): Message[] {
   return capMessages(turns.flatMap(turn => [
     { id: `${turn.id}-question`, role: 'user' as const, content: turn.question, timestamp: new Date(turn.created_at * 1000) },
-    { id: turn.id, role: 'assistant' as const, content: turn.answer, timestamp: new Date(turn.created_at * 1000), gameDate: turn.game_date, historySaved: true, responseTimeMs: turn.response_time_ms, model: turn.model, modelDisplay: turn.model_display, modelRouting: turn.model_routing },
+    { id: turn.id, role: 'assistant' as const, content: turn.answer, timestamp: new Date(turn.created_at * 1000), gameDate: turn.game_date, historySaved: true, responseTimeMs: turn.response_time_ms, model: turn.model, modelDisplay: turn.model_display, modelRouting: turn.model_routing, completion: turn.completion, retryQuestion: turn.completion?.status === 'truncated' ? turn.question : undefined },
   ]))
 }
 
@@ -444,6 +446,8 @@ function ChatPage({
           model: chatResponse.model,
           modelDisplay: chatResponse.model_display,
           modelRouting: chatResponse.model_routing,
+          completion: chatResponse.completion,
+          retryQuestion: chatResponse.completion?.status === 'truncated' ? text : undefined,
         }
         setMessages(prev => capMessages([...prev, assistantMessage]))
         if (retry) setConsumedDraft({ text })
@@ -502,8 +506,13 @@ function ChatPage({
     const base = messages.map((message, idx) => {
       // These actions belong to a message, not a scroll frame. Stable props let
       // ChatMessage's memo boundary skip unchanged rows in the virtual viewport.
-      const onRetry = message.retryRequest && !isLoading && !historyLoading && !viewingEarlier && advisorConfigured !== false
-        ? () => void handleSend(message.retryRequest!.text, { messageId: message.id, requestId: message.retryRequest!.requestId })
+      const onRetry = (message.retryRequest || message.retryQuestion) && !isLoading && !historyLoading && !viewingEarlier && advisorConfigured !== false
+        ? () => {
+          // A partial is a saved response: retain it and use a fresh request ID,
+          // otherwise the backend's idempotency cache would return it again.
+          if (message.retryQuestion) void handleSend(message.retryQuestion)
+          else if (message.retryRequest) void handleSend(message.retryRequest.text, { messageId: message.id, requestId: message.retryRequest.requestId })
+        }
         : undefined
       const onAction = message.action === 'settings' ? onOpenSettings : message.action === 'usage' ? () => void manageChatGPTUsage() : undefined
       const onReport = onReportLlmIssue && message.role === 'assistant' && !message.isError
@@ -535,6 +544,7 @@ function ChatPage({
             responseTimeMs={message.responseTimeMs}
             modelDisplay={message.modelDisplay}
             modelRouting={message.modelRouting}
+            completion={message.completion}
             isError={message.isError}
             actionLabel={
               message.action === 'settings'

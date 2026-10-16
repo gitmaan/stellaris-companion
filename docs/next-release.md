@@ -89,3 +89,10 @@ Keep the remaining checks current. Do not describe Cygnus support as complete un
 
 - [x] Verify local language/page chunks, initial backend-status replay, retained drafts and settings, long-chat rendering, and background chapter finalization with hidden Electron journeys. See [Frontend performance](frontend-performance.md).
 - [ ] During the next packaged release check, verify offline language switching and first-use page loading from the packaged archive on Electron 43.7.9 across supported platforms.
+
+## Pending incomplete-response validation (#71 / #72)
+
+- [x] Verify shared two-call recovery, provider-aware budgets, saved partial-answer metadata, retry request IDs, and preservation of complete Chronicle content with local regression tests. See [Provider response completion](provider-completion.md).
+- [x] Verify long Chinese answers, scrolling, resize, exact Copy output, and app text size in local Electron at simulated 100%, 125%, and 150% display scaling.
+- [ ] Run the Windows Actions localization/completion journeys on the integrated changes, then check a packaged Windows build with native display scaling and the affected content/provider.
+- [ ] Compare the affected answer's copied text with visible content and use an opted-in unobscured screenshot to confirm whether the original reports are resolved. Keep both issues open pending that evidence or reporter confirmation.
