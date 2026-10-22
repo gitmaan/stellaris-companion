@@ -1,3 +1,5 @@
-- Faster startup and more efficient rendering of long conversations.
-- Improved HUD layouts, text scaling, and keyboard interactions.
-- New transmissions appear once and remain unread while the app is hidden.
+- See when an Advisor answer is incomplete and retry it without losing the original text.
+- Get more complete long answers with provider-aware output limits and bounded recovery.
+- Keep your existing Chronicle when a new chapter cannot finish.
+- Preview, retake, or remove an unobscured screenshot before sending a bug report.
+- Include optional language, text-size, and display diagnostics to help investigate missing text.

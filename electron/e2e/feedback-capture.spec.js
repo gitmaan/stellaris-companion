@@ -3,7 +3,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { test, expect, _electron: electron } = require('@playwright/test')
 const { createMockChronicleBackend } = require('./helpers/mockBackend')
-const { getElectronLaunchArgs } = require('./helpers/electronLaunch')
+const { getElectronLaunchOptions, assertPackagedApp } = require('./helpers/electronLaunch')
 const zh = require('../renderer/i18n/locales/zh-Hans/common.json')
 
 async function withApp(run) {
@@ -13,11 +13,14 @@ async function withApp(run) {
   let app
   try {
     await fs.writeFile(path.join(profile, 'settings.json'), JSON.stringify({ language: 'zh-Hans', hasCompletedOnboarding: true }))
-    app = await electron.launch({ args: getElectronLaunchArgs(path.resolve(__dirname, '../main.js')), env: {
+    app = await electron.launch({ ...getElectronLaunchOptions(path.resolve(__dirname, '../main.js')), env: {
       ...process.env, NODE_ENV: 'test', E2E: '1', E2E_BACKEND_CONFIGURED: '1', E2E_SKIP_BACKEND_AUTOSTART: '1', E2E_FAKE_SECURE_STORAGE: '1',
       E2E_USER_DATA_DIR: profile, STELLARIS_API_PORT: String(port), STELLARIS_API_TOKEN: 'feedback-fixture',
     } })
+    await assertPackagedApp(app)
     const page = await app.firstWindow()
+    // Deny all renderer network traffic; the one feedback request below is fulfilled locally.
+    await page.route(/^https?:\/\//, route => route.abort())
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
     await page.locator('#page-chat textarea').fill('下一步应该做什么？')

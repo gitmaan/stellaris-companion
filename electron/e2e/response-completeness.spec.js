@@ -3,7 +3,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { test, expect, _electron: electron } = require('@playwright/test')
 const { createMockChronicleBackend } = require('./helpers/mockBackend')
-const { getElectronLaunchArgs } = require('./helpers/electronLaunch')
+const { getElectronLaunchOptions, assertPackagedApp } = require('./helpers/electronLaunch')
 const zh = require('../renderer/i18n/locales/zh-Hans/common.json')
 
 async function withApp(backend, run, { scale = 1, uiScale = 1 } = {}) {
@@ -12,21 +12,29 @@ async function withApp(backend, run, { scale = 1, uiScale = 1 } = {}) {
   let app
   try {
     await fs.writeFile(path.join(profile, 'settings.json'), JSON.stringify({ language: 'zh-Hans', uiScale }))
-    app = await electron.launch({
-      args: [`--force-device-scale-factor=${scale}`, ...getElectronLaunchArgs(path.resolve(__dirname, '../main.js'))],
-      env: { ...process.env, NODE_ENV: 'test', E2E: '1', E2E_ONBOARDING_COMPLETE: '1',
-        E2E_BACKEND_CONFIGURED: '1', E2E_SKIP_BACKEND_AUTOSTART: '1', E2E_FAKE_SECURE_STORAGE: '1',
-        E2E_HEALTH_CHECK_INTERVAL_MS: '200', E2E_USER_DATA_DIR: profile,
-        STELLARIS_API_PORT: String(port), STELLARIS_API_TOKEN: 'completion-test-token' },
+    const launch = async () => {
+      app = await electron.launch({
+        ...getElectronLaunchOptions(path.resolve(__dirname, '../main.js'), [`--force-device-scale-factor=${scale}`]),
+        env: { ...process.env, NODE_ENV: 'test', E2E: '1', E2E_ONBOARDING_COMPLETE: '1',
+          E2E_BACKEND_CONFIGURED: '1', E2E_SKIP_BACKEND_AUTOSTART: '1', E2E_FAKE_SECURE_STORAGE: '1',
+          E2E_HEALTH_CHECK_INTERVAL_MS: '200', E2E_USER_DATA_DIR: profile,
+          STELLARIS_API_PORT: String(port), STELLARIS_API_TOKEN: 'completion-test-token' },
+      })
+      // Exercise the real renderer/preload/main Copy path without changing the user's clipboard.
+      await app.evaluate(({ clipboard }) => {
+        clipboard.writeText = text => { globalThis.__completionCopiedText = text }
+      })
+      await assertPackagedApp(app)
+      const page = await app.firstWindow()
+      await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
+      await expect(page.locator('#page-chat textarea')).toBeEnabled()
+      return { page, app }
+    }
+    const { page } = await launch()
+    await run(page, app, async () => {
+      await app.close()
+      return launch()
     })
-    // Exercise the real renderer/preload/main Copy path without changing the user's clipboard.
-    await app.evaluate(({ clipboard }) => {
-      clipboard.writeText = text => { globalThis.__completionCopiedText = text }
-    })
-    const page = await app.firstWindow()
-    await expect(page.locator('html')).toHaveAttribute('lang', 'zh-Hans')
-    await expect(page.locator('#page-chat textarea')).toBeEnabled()
-    await run(page, app)
   } finally {
     if (app) await app.close()
     await backend.stop()
@@ -34,7 +42,7 @@ async function withApp(backend, run, { scale = 1, uiScale = 1 } = {}) {
   }
 }
 
-test('partial answers survive reload and retry with a fresh request while remaining copyable', async ({}, testInfo) => {
+test('partial answers survive app restart and retry with a fresh request while remaining copyable', async ({}, testInfo) => {
   const partial = '这是尚未完成的战略建议：先检查合金产量，然后'
   const complete = '这是完整的战略建议。检查合金产量，并在扩张之前保留能源储备。'
   let count = 0
@@ -43,12 +51,14 @@ test('partial answers survive reload and retry with a fresh request while remain
     chatCompletion: (_body, attempt) => ({ status: attempt === 1 ? 'truncated' : 'complete',
       finish_reason: attempt === 1 ? 'length' : 'stop', attempts: 2, recovered: attempt !== 1 }),
   })
-  await withApp(backend, async (page, app) => {
+  await withApp(backend, async (page, app, restart) => {
     await page.locator('#page-chat textarea').fill('请分析当前战略。')
     await page.locator('#page-chat textarea').press('Enter')
     await expect(page.getByText(partial, { exact: true })).toBeVisible()
     await expect(page.getByText(zh.chat.message.incomplete, { exact: true })).toBeVisible()
-    await page.reload()
+    const restarted = await restart()
+    page = restarted.page
+    app = restarted.app
     await expect(page.getByText(zh.chat.message.incomplete, { exact: true })).toBeVisible()
     const partialMessage = page.locator('[data-message-id]').filter({ hasText: partial })
     await partialMessage.getByRole('button', { name: zh.visualQuality.copy, exact: true }).click()

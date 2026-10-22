@@ -127,6 +127,9 @@ jobs:
           npm ci --prefix electron
           npm ci --prefix electron/renderer
 
+      - name: Install CJK fonts for native text checks
+        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+
       - name: Validate desktop app
         run: |
           npm test --prefix electron
@@ -293,6 +296,26 @@ jobs:
           RELEASE_CHANNEL: ${{ needs.setup.outputs.channel }}
         working-directory: electron
         run: npx electron-builder ${{ matrix.electron_args }} --publish "$PUBLISH_MODE" --config.publish.channel="$RELEASE_CHANNEL"
+
+      - name: Test installed Windows application
+        if: matrix.name == 'windows-x64'
+        timeout-minutes: 10
+        shell: pwsh
+        run: ./scripts/test-packaged-windows.ps1
+        env:
+          E2E_SHOW_WINDOWS: '1'
+          E2E_FEEDBACK_SUBMIT: '1'
+
+      - name: Save installed Windows test evidence
+        if: always() && matrix.name == 'windows-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-windows-proof-${{ needs.setup.outputs.version }}
+          path: |
+            electron/test-results/
+            electron/packaged-windows-proof/
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Re-package Claude Desktop MCPB release asset
         working-directory: electron
