@@ -1020,7 +1020,7 @@
     "app": "Aplicación",
     "platform": "Plataforma",
     "optional": "Información opcional (desactivada por defecto)",
-    "includeDiagnostics": "Incluir diagnósticos del juego (metadatos y cálculos de guerra limitados)",
+    "includeDiagnostics": "Incluir diagnósticos del juego y la pantalla",
     "includeLogs": "Incluir registros recientes del backend",
     "includeScreenshot": "Incluir captura de pantalla",
     "includeError": "Incluir detalles del error (mensaje y pila)",
@@ -1088,8 +1088,13 @@
         "message": "Mensaje: {{value}}",
         "model": "Modelo: {{value}}",
         "responseTime": "Tiempo de respuesta: {{value}} ms"
-      }
-    }
+      },
+      "display": "Diagnósticos de pantalla (opcionales)"
+    },
+    "screenshotPreview": "Vista previa de la captura: revisa la imagen antes de enviarla.",
+    "retakeScreenshot": "Volver a capturar",
+    "screenshotFailed": "No se pudo capturar la pantalla. Inténtalo de nuevo o desactiva la captura.",
+    "screenshotTooLarge": "La captura es demasiado grande. Reduce el tamaño de la ventana y vuelve a intentarlo."
   },
   "chatgpt": {
     "title": "Usa tu plan de ChatGPT",

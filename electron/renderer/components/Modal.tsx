@@ -11,10 +11,11 @@ interface ModalProps {
   label?: string
   placement?: 'center' | 'left' | 'right'
   className?: string
+  captureHidden?: boolean
   children: ReactNode
 }
 
-function ModalSurface({ onClose, labelledBy, label, placement = 'center', className = '', children }: Omit<ModalProps, 'open'>) {
+function ModalSurface({ onClose, labelledBy, label, placement = 'center', className = '', captureHidden = false, children }: Omit<ModalProps, 'open'>) {
   const panelRef = useRef<HTMLDivElement>(null)
   const present = useIsPresent()
   const reduceMotion = useReducedMotion()
@@ -27,7 +28,7 @@ function ModalSurface({ onClose, labelledBy, label, placement = 'center', classN
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: motionTiming.content }}
       className={`fixed inset-0 z-[9000] flex bg-black/65 backdrop-blur-sm ${placement === 'center' ? 'items-center justify-center p-4' : placement === 'left' ? 'justify-start' : 'justify-end'}`}
-      style={{ pointerEvents: present ? 'auto' : 'none' }}
+      style={{ pointerEvents: present ? 'auto' : 'none', visibility: captureHidden ? 'hidden' : undefined }}
       onMouseDown={event => { if (event.target === event.currentTarget) onClose?.() }}
     >
       <motion.div

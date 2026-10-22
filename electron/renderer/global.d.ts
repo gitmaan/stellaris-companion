@@ -293,6 +293,7 @@ declare global {
       // Feedback reporting
       getPlatformInfo: () => { platform: string; arch: string }
       captureScreenshot: () => Promise<string | null>
+      getFeedbackDisplay: () => Promise<{ windowWidth: number; windowHeight: number; zoomFactor: number; displayScaleFactor: number } | null>
       getAppVersion: () => Promise<string>
       getInstallId: () => Promise<string>
       copyToClipboard: (text: string) => Promise<{ success: boolean }>

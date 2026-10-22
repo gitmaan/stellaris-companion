@@ -1020,7 +1020,7 @@
     "app": "Application",
     "platform": "Plateforme",
     "optional": "Informations facultatives (désactivées par défaut)",
-    "includeDiagnostics": "Inclure les diagnostics de jeu (métadonnées et calculs de guerre limités)",
+    "includeDiagnostics": "Inclure les diagnostics du jeu et de l’affichage",
     "includeLogs": "Inclure les journaux récents du serveur",
     "includeScreenshot": "Inclure une capture d’écran",
     "includeError": "Inclure les détails de l’erreur (message et pile)",
@@ -1088,8 +1088,13 @@
         "message": "Message : {{value}}",
         "model": "Modèle : {{value}}",
         "responseTime": "Temps de réponse : {{value}} ms"
-      }
-    }
+      },
+      "display": "Diagnostics d’affichage (facultatifs)"
+    },
+    "screenshotPreview": "Aperçu de la capture — vérifiez l’image avant l’envoi.",
+    "retakeScreenshot": "Reprendre la capture",
+    "screenshotFailed": "Impossible de capturer l’écran. Réessayez ou désactivez l’inclusion de la capture.",
+    "screenshotTooLarge": "La capture est trop volumineuse. Réduisez la fenêtre et réessayez."
   },
   "chatgpt": {
     "title": "Utiliser votre forfait ChatGPT",

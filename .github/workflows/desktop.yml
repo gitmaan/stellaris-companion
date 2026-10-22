@@ -67,6 +67,9 @@ jobs:
   desktop-e2e:
     name: Desktop E2E - Linux
     runs-on: ubuntu-latest
+    env:
+      VITE_REPORT_ENDPOINT: https://feedback.galacticfilingcabinet.com/report
+      E2E_FEEDBACK_SUBMIT: '1'
 
     steps:
       - uses: actions/checkout@v4
@@ -115,6 +118,9 @@ jobs:
   desktop-e2e-windows:
     name: Desktop E2E - Windows regressions
     runs-on: windows-latest
+    env:
+      VITE_REPORT_ENDPOINT: https://feedback.galacticfilingcabinet.com/report
+      E2E_FEEDBACK_SUBMIT: '1'
 
     steps:
       - uses: actions/checkout@v4

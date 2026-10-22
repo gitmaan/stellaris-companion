@@ -979,7 +979,7 @@
     "app": "App",
     "platform": "Platform",
     "optional": "Optional information (off by default)",
-    "includeDiagnostics": "Include game diagnostics (metadata and limited war calculations)",
+    "includeDiagnostics": "Include game and display diagnostics",
     "includeLogs": "Include recent backend logs",
     "includeScreenshot": "Include a screenshot",
     "includeError": "Include error details (message and stack)",
@@ -1046,8 +1046,13 @@
         "message": "Message: {{value}}",
         "model": "Model: {{value}}",
         "responseTime": "Response time: {{value}} ms"
-      }
-    }
+      },
+      "display": "Display diagnostics (opt-in)"
+    },
+    "screenshotPreview": "Screenshot preview — check the image before submitting.",
+    "retakeScreenshot": "Retake screenshot",
+    "screenshotFailed": "Could not capture the screenshot. Try again, or turn off screenshot inclusion.",
+    "screenshotTooLarge": "The screenshot is too large. Reduce the window size and try again."
   },
   "recovery": {
     "title": "An error occurred",

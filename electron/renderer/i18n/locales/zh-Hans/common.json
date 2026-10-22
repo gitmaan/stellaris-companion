@@ -1010,7 +1010,7 @@
     "app": "应用",
     "platform": "平台",
     "optional": "可选信息（默认关闭）",
-    "includeDiagnostics": "包含游戏诊断信息（元数据和有限的战争计算）",
+    "includeDiagnostics": "包含游戏和显示诊断信息",
     "includeLogs": "包含近期后端日志",
     "includeScreenshot": "包含屏幕截图",
     "includeError": "包含错误详情（消息和堆栈）",
@@ -1077,8 +1077,13 @@
         "message": "消息：{{value}}",
         "model": "模型：{{value}}",
         "responseTime": "响应时间：{{value}} ms"
-      }
-    }
+      },
+      "display": "显示诊断信息（可选）"
+    },
+    "screenshotPreview": "截图预览 — 请在提交前检查图片。",
+    "retakeScreenshot": "重新截图",
+    "screenshotFailed": "无法截取屏幕。请重试，或取消包含截图。",
+    "screenshotTooLarge": "截图过大。请缩小窗口后重试。"
   },
   "chatgpt": {
     "title": "使用你的 ChatGPT 套餐",
