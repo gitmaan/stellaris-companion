@@ -3,6 +3,7 @@ const os = require('node:os')
 const path = require('node:path')
 const net = require('node:net')
 const crypto = require('node:crypto')
+const { execFileSync } = require('node:child_process')
 const { test, expect, _electron: electron } = require('@playwright/test')
 const { getElectronLaunchOptions, assertPackagedApp } = require('./helpers/electronLaunch')
 const zh = require('../renderer/i18n/locales/zh-Hans/common.json')
@@ -17,13 +18,14 @@ async function freePort() {
 }
 
 test('installed app starts its bundled backend and restores settings with offline page loading', async ({}, testInfo) => {
-  test.skip(!process.env.E2E_EXECUTABLE_PATH, 'Requires an installed release candidate')
+  test.skip(process.platform !== 'win32' || !process.env.E2E_EXECUTABLE_PATH, 'Requires an installed Windows release candidate')
   test.setTimeout(120_000)
   const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-installed-'))
   const saves = path.join(profile, 'empty-saves')
   await fs.mkdir(saves)
   const port = await freePort()
   const log = []
+  const backendProcesses = []
   const env = { ...process.env, NODE_ENV: 'test', E2E: '1', E2E_USER_DATA_DIR: profile,
     E2E_SAVE_DIR: saves, STELLARIS_API_PORT: String(port), STELLARIS_API_TOKEN: crypto.randomUUID(),
     E2E_HEALTH_CHECK_INTERVAL_MS: '200' }
@@ -42,6 +44,18 @@ test('installed app starts its bundled backend and restores settings with offlin
     await expect.poll(async () => (await page.evaluate(() => window.electronAPI.backend.health()))?.data?.status,
       { timeout: 45_000 }).toBe('ok')
     expect((await page.evaluate(() => window.electronAPI.backend.historyStorage())).ok).toBe(true)
+    // Startup stdout can precede Playwright's listener. Verify the live child
+    // executable instead, on both launches, to prove the installed backend is used.
+    const appPid = await app.evaluate(() => process.pid)
+    const expectedBackend = path.join(path.dirname(process.env.E2E_EXECUTABLE_PATH),
+      'resources', 'python-backend', 'stellaris-backend.exe').toLowerCase()
+    await expect.poll(() => {
+      const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        `Get-CimInstance Win32_Process -Filter "ParentProcessId = ${appPid}" | Where-Object { $_.Name -eq 'stellaris-backend.exe' } | Select-Object -ExpandProperty ExecutablePath | ConvertTo-Json -Compress`], { encoding: 'utf8' })
+      const paths = JSON.parse(output.trim() || '[]')
+      return (Array.isArray(paths) ? paths : [paths]).map(value => path.normalize(value).toLowerCase())
+    }).toContain(expectedBackend)
+    backendProcesses.push({ appPid, executable: expectedBackend })
     return page
   }
   async function close() {
@@ -79,8 +93,8 @@ test('installed app starts its bundled backend and restores settings with offlin
     await page.locator('button[aria-controls="page-settings"]').click()
     await expect(page.getByLabel(ja.settings.language, { exact: true })).toHaveValue('ja')
     await page.screenshot({ path: testInfo.outputPath('installed-restarted-settings.png') })
-    expect(log.join('')).toContain('python-backend')
     expect(log.join('')).not.toContain('PAGE ERROR:')
+    await testInfo.attach('installed-backend-processes', { body: JSON.stringify(backendProcesses), contentType: 'application/json' })
     await testInfo.attach('installed-runtime', { body: JSON.stringify(await app.evaluate(({ app }) => ({
       version: app.getVersion(), executable: process.execPath, resources: process.resourcesPath,
       userData: app.getPath('userData'), packaged: app.isPackaged,
