@@ -2,6 +2,12 @@
 
 This beta combines feedback screenshot improvements (#73) and bounded response completion (#74). Stable remains v1.1.0. The release body is maintained in `electron/release-notes.md`.
 
+## Candidate validation
+
+- Linux and both signed/notarized macOS builds passed in [candidate run 39710758529](https://github.com/gitmaan/stellaris-companion/actions/runs/39710758529). Release validation passed 516 backend tests, 37 Rust tests, 104 desktop tests, and 94 Electron journeys, with expected fixture/platform skips.
+- All seven installed Windows journeys passed with no skips or retries in [candidate run 39714035700](https://github.com/gitmaan/stellaris-companion/actions/runs/39714035700). The gate confirms the live bundled backend executable on both launches. The first run exposed a test-only race in capturing an early stdout line; the app payload is identical between the two runs.
+- The tested Windows candidate installer has SHA-256 `3b622bc8b1c616814cd4821588355f5baaa172bce071b36405514538a2e3cd1c`. Publication rebuilds from the final main commit and repeats the installed-app gate, so verify that run's installer hash separately.
+
 ## Release gate
 
 - Build all four platforms through a manual `electron-release.yml` run with publication disabled.
