@@ -1,3 +1,26 @@
+# Stable 1.1.1 candidate
+
+Promote the validated beta.2 app changes with a new stable version and a fresh feedback invitation. Publication is on hold until the maintainer chooses the final release-note wording; `electron/release-notes.md` currently contains a draft for unpublished package validation. Do not push `v1.1.1` before that choice.
+
+## Feedback invitation
+
+- The new `feedback-1.1.1-2026-10` ID is independent of the previous October invitation's read/dismissed state and targets exactly stable 1.1.1.
+- The invitation offers “Share feedback” at the existing feedback page with the `feedback_1_1_1_2026_10` campaign tag. It opens once after onboarding, language initialization, and native window visibility are ready; the existing Transmissions entry remains available afterward.
+- Refresh `publishedAt` immediately before final integration/publication and set `expiresAt` to exactly 30 days later. The dates in the candidate are provisional while release notes are being reviewed. Recheck the live feed after publishing.
+- The installed Windows gate now includes all four announcement journeys: the real campaign copy/link with an old campaign already dismissed, once-only behavior across restart, onboarding deferral, and hidden-window/tray refresh behavior. Test scheduling/version bounds are controlled so the UI regression remains valid after the live campaign expires; service tests separately cover release eligibility and expiry.
+- The external link is intercepted at Electron's system-browser boundary during testing. No feedback is submitted and no user's browser/profile is changed.
+
+## Validation and publication
+
+1. Validate the announcement's 30-day window, exact version bounds, new ID, and feedback destination. Run desktop checks and an unpublished four-platform release build, including all eleven installed Windows journeys.
+2. Present release-note alternatives to the maintainer after the candidate passes. Keep the release in preparation until a choice arrives.
+3. Apply the selected notes, refresh the campaign dates, complete final checks, and integrate the release preparation. Tag the verified main commit as `v1.1.1` only after the publication hold is lifted.
+4. The stable workflow publishes three `latest` feeds plus matching `beta` aliases and updates the public download site. Verify both subscriber tracks, all payload checksums, the installed Windows proof, and the live feedback invitation.
+
+The automatic checks do not establish physical monitor/GPU behavior, paid-provider gameplay, or a real updater download/install/restart. Reports #71/#72 were closed after beta.2 at the maintainer's request; follow up if reporters still see missing text.
+
+## Previous beta validation record
+
 # Beta 1.1.1-beta.2
 
 This beta combines feedback screenshot improvements (#73) and bounded response completion (#74). Stable remains v1.1.0. The release body is maintained in `electron/release-notes.md`.

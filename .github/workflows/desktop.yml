@@ -4,11 +4,13 @@ on:
   push:
     branches: [main]
     paths:
+      - 'announcements.json'
       - 'electron/**'
       - '.github/workflows/desktop.yml'
   pull_request:
     branches: [main]
     paths:
+      - 'announcements.json'
       - 'electron/**'
       - '.github/workflows/desktop.yml'
 
