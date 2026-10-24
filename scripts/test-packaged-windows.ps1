@@ -19,11 +19,16 @@ foreach ($file in @($executable, (Join-Path $installDir 'resources/app.asar'), (
    executable = $executable; installedAt = (Get-Date).ToUniversalTime().ToString('o') } |
   ConvertTo-Json | Set-Content (Join-Path $proof 'installer.json')
 $env:E2E_EXECUTABLE_PATH = $executable
+$env:E2E_SHOW_WINDOWS = '1'
 $env:PLAYWRIGHT_JSON_OUTPUT_NAME = Join-Path $proof 'results.json'
 Push-Location $desktop
 try {
-  & node node_modules/@playwright/test/cli.js test e2e/packaged-windows.spec.js e2e/response-completeness.spec.js e2e/feedback-capture.spec.js --reporter=list,json
+  & node node_modules/@playwright/test/cli.js test e2e/announcements.spec.js e2e/packaged-windows.spec.js e2e/response-completeness.spec.js e2e/feedback-capture.spec.js --reporter=list,json
   if ($LASTEXITCODE -ne 0) { throw "Installed Windows journeys failed with exit code $LASTEXITCODE." }
+  $results = Get-Content $env:PLAYWRIGHT_JSON_OUTPUT_NAME -Raw | ConvertFrom-Json
+  if ($null -eq $results.stats -or $results.stats.expected -lt 1 -or $results.stats.skipped -ne 0 -or $results.stats.unexpected -ne 0 -or $results.stats.flaky -ne 0) {
+    throw 'Every installed Windows journey must pass without skips or flaky retries.'
+  }
 } finally {
   Pop-Location
   Remove-Item Env:E2E_EXECUTABLE_PATH -ErrorAction SilentlyContinue

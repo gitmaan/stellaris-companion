@@ -1,5 +1,5 @@
-- See when an Advisor answer is incomplete and retry it without losing the original text.
-- Get more complete long answers with provider-aware output limits and bounded recovery.
-- Keep your existing Chronicle when a new chapter cannot finish.
-- Preview, retake, or remove an unobscured screenshot before sending a bug report.
-- Include optional language, text-size, and display diagnostics to help investigate missing text.
+- Faster startup and smoother navigation through long conversations.
+- Clearer text, improved layouts, and more reliable keyboard interactions.
+- More complete Advisor answers, with clear retry options when a response is cut short.
+- Existing Chronicles are preserved when a new chapter cannot finish.
+- Better bug-report screenshots and diagnostics
