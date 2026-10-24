@@ -85,7 +85,7 @@ async function readIds(page) {
   return page.evaluate(() => window.electronAPI.announcements.getReadIds())
 }
 
-test('the release feedback invitation opens once after an old campaign was dismissed and opens its link', async ({}, testInfo) => {
+test('the release feedback invitation opens once after a legacy campaign was dismissed and opens its link', async ({}, testInfo) => {
   test.setTimeout(90_000)
   const campaign = releaseFeed.announcements.find((item) => item.link?.url.startsWith('https://galacticfilingcabinet.com/feedback?'))
   test.skip(!campaign, 'No feedback campaign is configured')
@@ -97,8 +97,8 @@ test('the release feedback invitation opens once after an old campaign was dismi
   expect(item.id).not.toBe(previousId)
   const fixture = await setup({
     hasCompletedOnboarding: true,
-    announcementsReadIds: [previousId],
     announcementsDismissed: [previousId],
+    // Stable 1.1.0 stored a timestamp, not a read-ID list. Exercise its real migration.
     announcementsLastRead: Date.now(),
     announcementsCache: { fetchedAt: Date.now() - 1000, data: { version: 1, announcements: [announcement(previousId)] } },
   })
