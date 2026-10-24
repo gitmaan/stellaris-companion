@@ -2,4 +2,4 @@
 - Clearer text, improved layouts, and more reliable keyboard interactions.
 - More complete Advisor answers, with clear retry options when a response is cut short.
 - Existing Chronicles are preserved when a new chapter cannot finish.
-- Better bug-report screenshots and diagnostics, plus a feedback invitation that appears when the app is ready.
+- Better bug-report screenshots and diagnostics

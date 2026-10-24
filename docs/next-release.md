@@ -1,20 +1,20 @@
 # Stable 1.1.1 candidate
 
-Promote the validated beta.2 app changes with a new stable version and a fresh feedback invitation. Publication is on hold until the maintainer chooses the final release-note wording; `electron/release-notes.md` currently contains a draft for unpublished package validation. Do not push `v1.1.1` before that choice.
+Promote the validated beta.2 app changes with a new stable version and a fresh feedback invitation. The maintainer selected the five bullets in `electron/release-notes.md`, ending with “Better bug-report screenshots and diagnostics”. The release-note choice is complete; finish final checks and required review before integrating and publishing `v1.1.1`.
 
 ## Feedback invitation
 
 - The new `feedback-1.1.1-2026-10` ID is independent of the previous October invitation's read/dismissed state and targets exactly stable 1.1.1.
 - The invitation offers “Share feedback” at the existing feedback page with the `feedback_1_1_1_2026_10` campaign tag. It opens once after onboarding, language initialization, and native window visibility are ready; the existing Transmissions entry remains available afterward.
-- Refresh `publishedAt` immediately before final integration/publication and set `expiresAt` to exactly 30 days later. The dates in the candidate are provisional while release notes are being reviewed. Recheck the live feed after publishing.
+- The invitation window was refreshed during final release preparation to run from October 24, 2026 at 10:51:48 UTC until November 23, 2026 at 10:51:48 UTC, exactly 30 days later. Refresh again if publication is materially delayed, and recheck the live feed after publishing.
 - The installed Windows gate now includes all four announcement journeys: the real campaign copy/link with a legacy 1.1.0 profile and old campaign already dismissed, once-only behavior across restart, onboarding deferral, and hidden-window/tray refresh behavior. Test scheduling/version bounds are controlled so the UI regression remains valid after the live campaign expires; service tests separately cover release eligibility and expiry.
 - The external link is intercepted at Electron's system-browser boundary during testing. No feedback is submitted and no user's browser/profile is changed.
 
 ## Validation and publication
 
-1. Validate the announcement's 30-day window, exact version bounds, new ID, and feedback destination. Run desktop checks and an unpublished four-platform release build, including all eleven installed Windows journeys.
-2. Present release-note alternatives to the maintainer after the candidate passes. Keep the release in preparation until a choice arrives.
-3. Apply the selected notes, refresh the campaign dates, complete final checks, and integrate the release preparation. Tag the verified main commit as `v1.1.1` only after the publication hold is lifted.
+1. The [unpublished four-platform candidate](https://github.com/gitmaan/stellaris-companion/actions/runs/40076896732) passed on `816c74e`, including both signed/notarized macOS builds and all eleven installed Windows journeys with no skips or retries. The actual Windows popup screenshot, tested installer hash, update manifest, and draft notes were verified.
+2. All ten applicable candidate PR checks passed. One Linux tray test timed out while inspecting a hidden-window badge, then passed on the failed-job rerun without source changes; the same test also passed in release validation and installed Windows. The original trace and retry evidence are retained.
+3. Apply the selected notes and refreshed dates, complete final checks and required review, and integrate the release preparation. Tag the verified main commit as `v1.1.1`. The publishing workflow rebuilds all packages and repeats the installed Windows gate; verify its final installer separately.
 4. The stable workflow publishes three `latest` feeds plus matching `beta` aliases and updates the public download site. Verify both subscriber tracks, all payload checksums, the installed Windows proof, and the live feedback invitation.
 
 The automatic checks do not establish physical monitor/GPU behavior, paid-provider gameplay, or a real updater download/install/restart. Reports #71/#72 were closed after beta.2 at the maintainer's request; follow up if reporters still see missing text.
