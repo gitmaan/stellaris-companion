@@ -20,9 +20,28 @@ function feed(...announcements) {
   return { version: 1, announcements }
 }
 
-function service(store) {
-  return createAnnouncementsService({ app: { getVersion: () => '1.1.0' }, store })
+function service(store, version = '1.1.0') {
+  return createAnnouncementsService({ app: { getVersion: () => version }, store })
 }
+
+test('a release feedback campaign is offered only to its stable version during its active window', async (t) => {
+  const now = Date.now()
+  const current = announcement('release-feedback', {
+    minVersion: '1.1.1', maxVersion: '1.1.1',
+    publishedAt: new Date(now - 1000).toISOString(),
+    expiresAt: new Date(now + 30 * 86400000).toISOString(),
+  })
+  const data = feed(current,
+    { ...current, id: 'expired-feedback', expiresAt: new Date(now - 1000).toISOString() },
+    { ...current, id: 'future-feedback', publishedAt: new Date(now + 86400000).toISOString() })
+  t.mock.method(global, 'fetch', async () => ({ ok: true, json: async () => data }))
+  for (const version of ['1.1.0', '1.1.1-beta.2', '1.1.1', '1.1.2']) {
+    const store = createStore({ announcementsReadIds: ['old-feedback'], announcementsDismissed: ['old-feedback'] })
+    assert.deepEqual((await service(store, version).fetchAnnouncements(true)).map((item) => item.id), version === '1.1.1' ? [current.id] : [])
+    assert.deepEqual(getAnnouncementReadIds(store), ['old-feedback'])
+    assert.deepEqual(store.get('announcementsDismissed'), ['old-feedback'])
+  }
+})
 
 test('legacy migration preserves IDs available when the panel was read', () => {
   const lastRead = Date.parse('2020-02-01T00:00:00Z')
