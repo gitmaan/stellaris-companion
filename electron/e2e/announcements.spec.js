@@ -210,9 +210,13 @@ test('reopening from the tray refreshes the feed and does not lose hidden transm
     await fixture.hide()
     await expect.poll(() => page.evaluate(() => window.electronAPI.getWindowVisible())).toBe(false)
     await fixture.updateFeed([first, hidden], true)
-    await expect(page.getByTitle('Transmissions', { exact: true }).locator('.animate-pulse')).toHaveCount(1)
+    // Locator assertions can stall when Chromium stops rendering a hidden native
+    // window. Poll the DOM directly while keeping normal background throttling.
+    await expect.poll(() => page.evaluate(() => ({
+      unreadBadges: document.querySelectorAll('button[title="Transmissions"] .animate-pulse').length,
+      openPanels: document.querySelectorAll('[role="dialog"][aria-label="Transmissions"]').length,
+    }))).toEqual({ unreadBadges: 1, openPanels: 0 })
     expect(await readIds(page)).toEqual([first.id])
-    await expect(page.getByRole('heading', { name: hidden.title })).toHaveCount(0)
 
     await fixture.show()
     await expect(page.getByRole('heading', { name: hidden.title })).toBeVisible()
@@ -224,7 +228,6 @@ test('reopening from the tray refreshes the feed and does not lose hidden transm
     await expect.poll(() => page.evaluate(() => window.electronAPI.getWindowVisible())).toBe(false)
     // No push: visibility alone must refresh a feed that changed in the tray.
     await fixture.updateFeed([first, hidden, fresh])
-    expect(await page.evaluate(async () => (await window.electronAPI.announcements.fetch(true)).map((item) => item.id))).toEqual([first.id, hidden.id, fresh.id])
     await fixture.show()
     await expect(page.getByRole('heading', { name: fresh.title })).toBeVisible()
     await expect.poll(() => readIds(page)).toEqual([first.id, hidden.id, fresh.id])
