@@ -214,7 +214,8 @@ test('reopening from the tray refreshes the feed and does not lose hidden transm
     // window. Poll the DOM directly while keeping normal background throttling.
     await expect.poll(() => page.evaluate(() => ({
       unreadBadges: document.querySelectorAll('button[title="Transmissions"] .animate-pulse').length,
-      openPanels: document.querySelectorAll('[role="dialog"][aria-label="Transmissions"]').length,
+      // Exit animation nodes can remain mounted after the panel has closed.
+      openPanels: document.querySelectorAll('[role="dialog"][aria-label="Transmissions"]:not([aria-hidden="true"])').length,
     }))).toEqual({ unreadBadges: 1, openPanels: 0 })
     expect(await readIds(page)).toEqual([first.id])
 
