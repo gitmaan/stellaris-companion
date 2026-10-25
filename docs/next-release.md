@@ -1,3 +1,26 @@
+# Stable 1.1.1 candidate
+
+Promote the validated beta.2 app changes with a new stable version, updated Stellaris 4.5.2 Advisor guidance, and a fresh feedback invitation. The maintainer approved the five bullets in `electron/release-notes.md` plus the introductory patch-update line. PR #77 is merged; finish the final checks for PR #76 before integrating and publishing `v1.1.1`. The maintainer explicitly authorized admin merges for both PRs without a separate review on October 25.
+
+## Feedback invitation
+
+- The new `feedback-1.1.1-2026-10` ID is independent of the previous October invitation's read/dismissed state and targets exactly stable 1.1.1.
+- The invitation offers “Share feedback” at the existing feedback page with the `feedback_1_1_1_2026_10` campaign tag. It opens once after onboarding, language initialization, and native window visibility are ready; the existing Transmissions entry remains available afterward.
+- The invitation window was refreshed during final release preparation to run from `2026-10-25T03:45:28.000Z` until `2026-11-24T03:45:28.000Z`, exactly 30 days later. Refresh again if publication is materially delayed, and recheck the live feed after publishing.
+- The installed Windows gate now includes all four announcement journeys: the real campaign copy/link with a legacy 1.1.0 profile and old campaign already dismissed, once-only behavior across restart, onboarding deferral, and hidden-window/tray refresh behavior. Test scheduling/version bounds are controlled so the UI regression remains valid after the live campaign expires; service tests separately cover release eligibility and expiry.
+- The external link is intercepted at Electron's system-browser boundary during testing. No feedback is submitted and no user's browser/profile is changed.
+
+## Validation and publication
+
+1. The [combined candidate](https://github.com/gitmaan/stellaris-companion/actions/runs/40155555177) passed on `20c6b58`: 552 backend tests, 37 Rust tests, 105 desktop tests, 95 Linux Electron journeys, and all eleven installed Windows journeys, with expected optional/fixture/platform skips outside the strict Windows gate. Its installer SHA-256 is `f22dba0430a15deb66e5c5aa710ddd19613c53884c4be28e122114b87f04d9a8`; the popup screenshot, update manifest, and approved five bullets were verified.
+2. Linux and both signed/notarized macOS packages passed in [the earlier combined run](https://github.com/gitmaan/stellaris-companion/actions/runs/40152819708). Only the excluded test file changed afterward. The tray test now checks native visibility and persisted read IDs while hidden, then rendered content after reopening, avoiding reliance on background-renderer progress. The earlier Windows failures and intermediate Linux assertion are retained with the final passing evidence. Six checks against the packaged macOS backend also passed.
+3. The rebased release preparation has the same source tree as the validated candidate before the final notes/date/documentation update. Complete current-head PR checks, use the approved admin merge for PR #76, and tag the verified main commit as `v1.1.1`. The publishing workflow rebuilds all packages and repeats the installed Windows gate; verify its final installer separately.
+4. The stable workflow publishes three `latest` feeds plus matching `beta` aliases and updates the public download site. Verify both subscriber tracks, all payload checksums, the installed Windows proof, and the live feedback invitation.
+
+The automatic checks do not establish physical monitor/GPU behavior, paid-provider gameplay, or a real updater download/install/restart. Reports #71/#72 were closed after beta.2 at the maintainer's request; follow up if reporters still see missing text.
+
+## Previous beta validation record
+
 # Beta 1.1.1-beta.2
 
 This beta combines feedback screenshot improvements (#73) and bounded response completion (#74). Stable remains v1.1.0. The release body is maintained in `electron/release-notes.md`.

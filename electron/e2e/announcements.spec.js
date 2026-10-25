@@ -3,7 +3,8 @@ const os = require('node:os')
 const path = require('node:path')
 const { test, expect, _electron: electron } = require('@playwright/test')
 const { createMockChronicleBackend } = require('./helpers/mockBackend')
-const { getElectronLaunchArgs } = require('./helpers/electronLaunch')
+const { getElectronLaunchOptions, assertPackagedApp } = require('./helpers/electronLaunch')
+const releaseFeed = require('../../announcements.json')
 
 const electronDir = path.resolve(__dirname, '..')
 
@@ -27,7 +28,7 @@ async function setup(settings) {
     async launch(items) {
       if (app) await app.close()
       app = await electron.launch({
-        args: getElectronLaunchArgs(path.join(electronDir, 'main.js')),
+        ...getElectronLaunchOptions(path.join(electronDir, 'main.js')),
         env: {
           ...process.env,
           NODE_ENV: 'test', E2E: '1', E2E_SKIP_BACKEND_AUTOSTART: '1',
@@ -36,7 +37,23 @@ async function setup(settings) {
           STELLARIS_API_PORT: String(port), STELLARIS_API_TOKEN: 'fictional-transmissions-token',
         },
       })
+      await assertPackagedApp(app)
+      // Exercise the real window-open handler without launching a browser or sending feedback.
+      await app.evaluate(({ shell }) => {
+        globalThis.announcementExternalUrls = []
+        shell.openExternal = async (url) => { globalThis.announcementExternalUrls.push(url) }
+      })
       return app.firstWindow()
+    },
+    async externalUrls() {
+      return app.evaluate(() => globalThis.announcementExternalUrls)
+    },
+    async isVisible() {
+      return app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible())
+    },
+    async storedReadIds() {
+      const settings = JSON.parse(await fs.readFile(path.join(profile, 'settings.json'), 'utf8'))
+      return settings.announcementsReadIds || []
     },
     async hide() {
       await app.evaluate(async ({ BrowserWindow }) => {
@@ -74,6 +91,49 @@ async function setup(settings) {
 async function readIds(page) {
   return page.evaluate(() => window.electronAPI.announcements.getReadIds())
 }
+
+test('the release feedback invitation opens once after a legacy campaign was dismissed and opens its link', async ({}, testInfo) => {
+  test.setTimeout(90_000)
+  const campaign = releaseFeed.announcements.find((item) => item.link?.url.startsWith('https://galacticfilingcabinet.com/feedback?'))
+  test.skip(!campaign, 'No feedback campaign is configured')
+  // Use the shipping copy, ID, and destination. Isolate scheduling/version rules
+  // from this native UI journey so it remains useful after the campaign expires.
+  // The service tests cover eligibility; release preparation validates the live window.
+  const item = { ...campaign, publishedAt: '2020-01-01T00:00:00Z', expiresAt: undefined, minVersion: undefined, maxVersion: undefined }
+  const previousId = 'feedback-help-shape-what-comes-next-2026-10'
+  expect(item.id).not.toBe(previousId)
+  const fixture = await setup({
+    hasCompletedOnboarding: true,
+    announcementsDismissed: [previousId],
+    // Stable 1.1.0 stored a timestamp, not a read-ID list. Exercise its real migration.
+    announcementsLastRead: Date.now(),
+    announcementsCache: { fetchedAt: Date.now() - 1000, data: { version: 1, announcements: [announcement(previousId)] } },
+  })
+  try {
+    let page = await fixture.launch([item])
+    await expect(page.getByRole('dialog', { name: 'Transmissions', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: item.title, exact: true })).toBeVisible()
+    await expect.poll(() => readIds(page)).toEqual([previousId, item.id])
+    expect(await page.evaluate(() => window.electronAPI.announcements.getDismissed())).toEqual([previousId])
+    const link = page.getByRole('link', { name: item.link.label, exact: false })
+    await expect(link).toHaveAttribute('href', item.link.url)
+    await link.click()
+    await expect.poll(() => fixture.externalUrls()).toEqual([item.link.url])
+    await page.screenshot({ path: testInfo.outputPath('release-feedback-invitation.png'), animations: 'disabled' })
+    await testInfo.attach('release-feedback-campaign', { body: JSON.stringify(campaign, null, 2), contentType: 'application/json' })
+    await page.keyboard.press('Escape')
+
+    page = await fixture.launch([item])
+    await expect(page.getByTitle('Transmissions', { exact: true })).toBeVisible()
+    await expect.poll(() => readIds(page)).toEqual([previousId, item.id])
+    await page.waitForTimeout(500)
+    await expect(page.getByRole('heading', { name: item.title, exact: true })).toHaveCount(0)
+    await page.getByTitle('Transmissions', { exact: true }).click()
+    await expect(page.getByRole('heading', { name: item.title, exact: true })).toBeVisible()
+  } finally {
+    await fixture.dispose()
+  }
+})
 
 test('a transmission opens once across launches, and a delayed new ID still opens', async ({}, testInfo) => {
   test.setTimeout(90_000)
@@ -155,11 +215,11 @@ test('reopening from the tray refreshes the feed and does not lose hidden transm
     await expect(page.getByRole('heading', { name: first.title })).toHaveCount(0)
 
     await fixture.hide()
-    await expect.poll(() => page.evaluate(() => window.electronAPI.getWindowVisible())).toBe(false)
+    expect(await fixture.isVisible()).toBe(false)
     await fixture.updateFeed([first, hidden], true)
-    await expect(page.getByTitle('Transmissions', { exact: true }).locator('.animate-pulse')).toHaveCount(1)
-    expect(await readIds(page)).toEqual([first.id])
-    await expect(page.getByRole('heading', { name: hidden.title })).toHaveCount(0)
+    // A hidden renderer may defer all work, including Playwright evaluation.
+    // Inspect persisted state here; exercise rendered content after reopening.
+    expect(await fixture.storedReadIds()).toEqual([first.id])
 
     await fixture.show()
     await expect(page.getByRole('heading', { name: hidden.title })).toBeVisible()
@@ -168,10 +228,9 @@ test('reopening from the tray refreshes the feed and does not lose hidden transm
     await expect(page.getByRole('heading', { name: hidden.title })).toHaveCount(0)
 
     await fixture.hide()
-    await expect.poll(() => page.evaluate(() => window.electronAPI.getWindowVisible())).toBe(false)
+    expect(await fixture.isVisible()).toBe(false)
     // No push: visibility alone must refresh a feed that changed in the tray.
     await fixture.updateFeed([first, hidden, fresh])
-    expect(await page.evaluate(async () => (await window.electronAPI.announcements.fetch(true)).map((item) => item.id))).toEqual([first.id, hidden.id, fresh.id])
     await fixture.show()
     await expect(page.getByRole('heading', { name: fresh.title })).toBeVisible()
     await expect.poll(() => readIds(page)).toEqual([first.id, hidden.id, fresh.id])
