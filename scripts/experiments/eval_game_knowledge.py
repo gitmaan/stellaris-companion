@@ -46,6 +46,7 @@ DEFAULT_OPENROUTER_MODELS = [
     "openai/gpt-5.6-luna",
     "xiaomi/mimo-v2.5",
 ]
+EVAL_VERSIONS = {"pegasus": "Pegasus v4.4.6", "cygnus": "Cygnus v4.5.2"}
 
 HumanLabel = Literal["accurate", "acceptable", "concerning", "materially_incorrect"]
 
@@ -79,8 +80,12 @@ class EvalResult:
     human_rationale: str = ""
 
 
-def build_cases() -> list[EvalCase]:
+def build_cases(suite: str = "pegasus") -> list[EvalCase]:
     """Return high-value cases whose criteria are reviewed semantically by a person."""
+    if suite == "cygnus":
+        return _build_cygnus_cases()
+    if suite != "pegasus":
+        raise ValueError(f"Unknown game-knowledge suite: {suite}")
     return [
         EvalCase(
             name="population_scale",
@@ -453,6 +458,92 @@ def build_cases() -> list[EvalCase]:
     ]
 
 
+def _build_cygnus_cases() -> list[EvalCase]:
+    return [
+        EvalCase(
+            name="cygnus_conserve",
+            purpose="advisor",
+            prompt=(
+                "My Cygnus v4.5.2 Nomads are considering the Conserve approach for "
+                "Operational Reserves. Does it only reduce Bureaucrat and Researcher output, "
+                "so my other Specialists are unaffected?"
+            ),
+            review_criteria=[
+                "Identifies the Specialist-wide Job Efficiency penalty in the selected pack.",
+                "Does not invent the empire's reserve level, production, or policy choice.",
+            ],
+        ),
+        EvalCase(
+            name="cygnus_armor",
+            purpose="advisor",
+            prompt=(
+                "In Cygnus v4.5.2, should I switch all armor to same-tier shields just "
+                "because armor has double the Energy and Alloy upkeep?"
+            ),
+            review_criteria=[
+                "Rejects the stale upkeep premise using the current rule.",
+                "Does not recommend a universal loadout without opponent or campaign evidence.",
+            ],
+        ),
+        EvalCase(
+            name="cygnus_disengagement",
+            purpose="advisor",
+            prompt="Cygnus v4.5.2: why do ships disengage after 15 days without participating?",
+            review_criteria=[
+                "Retrieves and applies the earlier Cygnus combat correction.",
+                "Does not invent an explanation for an unobserved fleet event.",
+            ],
+        ),
+        EvalCase(
+            name="cygnus_branch_offices",
+            purpose="advisor",
+            prompt="Cygnus v4.5.2: how does branch office influence cost work?",
+            review_criteria=[
+                "Uses the branch-office cost rule despite the question not matching a heading.",
+                "Does not invent a target distance, current Influence, or eligibility.",
+            ],
+        ),
+        EvalCase(
+            name="cygnus_virtual_automation",
+            purpose="advisor",
+            prompt=(
+                "My Cygnus v4.5.2 Virtual empire could build a Fallen Empire building. "
+                "Should I count on it to automate my jobs?"
+            ),
+            review_criteria=[
+                "Applies the Virtual automation exception from the pack.",
+                "Does not invent a building's production numbers or availability.",
+            ],
+        ),
+        EvalCase(
+            name="cygnus_franchising",
+            purpose="advisor",
+            prompt=(
+                "I have Franchising in Cygnus v4.5.2. Can I force my neighbor to become "
+                "a subject even though they dislike me and we have no Embassy?"
+            ),
+            review_criteria=[
+                "Distinguishes proposal eligibility from diplomatic acceptance.",
+                "Does not invent the neighbor's acceptance score or military strength.",
+            ],
+        ),
+        EvalCase(
+            name="cygnus_chronicle_knights",
+            purpose="chronicle",
+            structured=True,
+            prompt=(
+                "Write one concise historical paragraph from this Cygnus v4.5.2 evidence: "
+                "the Nomadic Knights reached the Toxic God system. No settlement, victory "
+                "over the Toxic God, or detoxification is recorded."
+            ),
+            review_criteria=[
+                "Narrates arrival without inventing settlement or a completed quest.",
+                "Does not turn mechanics eligibility into an event or unlocked ability.",
+            ],
+        ),
+    ]
+
+
 def _provider_config(args: argparse.Namespace, model: str) -> AdvisorProviderConfig:
     provider = args.provider
     if provider == ADVISOR_PROVIDER_GEMINI:
@@ -473,6 +564,7 @@ def _provider_config(args: argparse.Namespace, model: str) -> AdvisorProviderCon
 
 
 def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult:
+    version = EVAL_VERSIONS[args.suite]
     config = _provider_config(args, model)
     gemini_client = genai.Client(api_key=config.api_key) if config.provider == "gemini" else None
     generator = create_advisor_generator(config=config, gemini_client=gemini_client)
@@ -495,7 +587,7 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
                 max_output_tokens=args.max_output_tokens,
                 purpose_label=f"Knowledge evaluation: {case.name}",
                 game_knowledge_context=build_game_knowledge_prompt(
-                    "Pegasus v4.4.6",
+                    version,
                     purpose="chronicle",
                     snapshots_dir=snapshots_dir,
                 ),
@@ -504,7 +596,7 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
             system_prompt = (
                 "Answer as a strategic advisor. Distinguish campaign observations from "
                 "mechanics.\n\n"
-                f"{build_game_knowledge_prompt('Pegasus v4.4.6', purpose='advisor', snapshots_dir=snapshots_dir)}"
+                f"{build_game_knowledge_prompt(version, purpose='advisor', topics=case.prompt, snapshots_dir=snapshots_dir)}"
             )
             response = generator.generate(
                 system_prompt=system_prompt,
@@ -541,6 +633,7 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--suite", choices=tuple(EVAL_VERSIONS), default="pegasus")
     parser.add_argument(
         "--provider",
         default=ADVISOR_PROVIDER_OPENROUTER,
@@ -567,7 +660,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    cases = build_cases()
+    cases = build_cases(args.suite)
     if args.case_names:
         selected = set(args.case_names)
         cases = [case for case in cases if case.name in selected]
@@ -600,7 +693,9 @@ def main() -> int:
 
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "game_version": "Pegasus v4.4.6",
+        "suite": args.suite,
+        "game_version": EVAL_VERSIONS[args.suite],
+        "advisor_knowledge_selection": "question_topics",
         "provider": args.provider,
         "models": models,
         "human_review_scale": [

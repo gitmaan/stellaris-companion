@@ -14,6 +14,7 @@ from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
 from backend.mcp.context import McpContextError, StellarisMcpContext
 from backend.mcp.server import SERVER_INSTRUCTIONS, StellarisMcpServer, build_tool_definitions
+from stellaris_companion.game_knowledge import build_game_knowledge_prompt
 
 LEAK_PATTERN = re.compile(
     r"(tech_[a-z0-9_]+|chronicle\.[a-z0-9_.-]+|mcp_writeback|create_chapter|update_chapter|save_current_era)"
@@ -240,6 +241,90 @@ def test_cached_chronicle_reads_cache_without_generation(tmp_path: Path, monkeyp
     assert payload["current_era"]["title"] == "The Wartime Balance"
     assert payload["archive_guidance"]["role"] == "archive_reader"
     assert payload["archive_guidance"]["do_not_fabricate_missing_chapters"] is True
+
+
+@pytest.mark.parametrize(
+    "version,status,loaded_through",
+    [
+        ("Cygnus v4.5.1", "partial", "4.5.1"),
+        ("Cygnus v4.5.2", "partial", "4.5.2"),
+        ("v4.6.0", "unsupported_newer", "4.5.2"),
+        ("unknown", "unavailable", None),
+    ],
+)
+def test_mcp_advisors_receive_shared_versioned_mechanics(
+    tmp_path, monkeypatch, version, status, loaded_through
+):
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    db, session_id, _ = _make_test_db(tmp_path)
+    briefing = json.loads(db.get_latest_session_briefing_json(session_id=session_id))
+    briefing["meta"]["version"] = version
+    db.update_session_latest_briefing(
+        session_id=session_id,
+        latest_briefing_json=json_dumps(briefing),
+        last_game_date="2235.04.01",
+    )
+    server = StellarisMcpServer(StellarisMcpContext(db=db))
+    question = "Why do ships disengage after 15 days?"
+
+    result = server.call_tool("get_strategy_context", {"question": question})
+
+    assert result["isError"] is False  # Also validates the published output schema.
+    payload = result["structuredContent"]
+    knowledge = payload["game_knowledge"]
+    assert knowledge["requested_version"] == version
+    assert knowledge["status"] == status
+    assert knowledge["loaded_through"] == loaded_through
+    expected = build_game_knowledge_prompt(version, purpose="advisor", topics=question)
+    assert knowledge["prompt"] == expected
+    assert result["content"][1] == {"type": "text", "text": expected}
+    assert payload["privacy"]["write_back_enabled"] is False
+    if status == "partial":
+        assert "Ships do not automatically disengage" in expected
+        assert knowledge["notes_only"] is True
+        assert "A normal Anchorage adds 5 Naval Capacity" not in expected
+    else:
+        assert "No verified mechanics pack covers" in expected
+
+
+def test_mcp_mechanics_survive_briefing_fallback_and_no_question(tmp_path, monkeypatch):
+    db, session_id, _ = _make_test_db(tmp_path)
+    briefing = json.loads(db.get_latest_session_briefing_json(session_id=session_id))
+    briefing["meta"]["version"] = "Cygnus v4.5.2"
+    db.update_session_latest_briefing(
+        session_id=session_id,
+        latest_briefing_json=json_dumps(briefing),
+        last_game_date="2235.04.01",
+    )
+    monkeypatch.setattr("backend.mcp.context.MAX_ADVISOR_BRIEFING_CHARS", 1)
+
+    result = StellarisMcpServer(StellarisMcpContext(db=db)).call_tool("get_strategy_context")
+
+    assert result["isError"] is False
+    payload = result["structuredContent"]
+    assert payload["briefing_mode"] == "focused_fallback"
+    prompt = payload["game_knowledge"]["prompt"]
+    assert prompt == build_game_knowledge_prompt("Cygnus v4.5.2", purpose="advisor")
+    assert "-50% Specialist Job Efficiency" in prompt
+    assert "Taming or slaying the Toxic God" in prompt
+    assert result["content"][1]["text"] == prompt
+
+
+def test_mcp_knowledge_can_use_model_context_version_when_meta_is_missing(tmp_path):
+    db, session_id, _ = _make_test_db(tmp_path)
+    briefing = json.loads(db.get_latest_session_briefing_json(session_id=session_id))
+    briefing["meta"].pop("version")
+    briefing["model_context"] = {"game_version": "4.5.2"}
+    db.update_session_latest_briefing(
+        session_id=session_id,
+        latest_briefing_json=json_dumps(briefing),
+        last_game_date="2235.04.01",
+    )
+
+    payload = StellarisMcpContext(db=db).get_strategy_context(question="Conserve reserves")
+
+    assert payload["game_knowledge"]["loaded_through"] == "4.5.2"
+    assert "-50% Specialist Job Efficiency" in payload["game_knowledge"]["prompt"]
 
 
 def test_chronicle_source_material_uses_chapter_event_range(tmp_path: Path) -> None:

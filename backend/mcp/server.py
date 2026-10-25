@@ -160,13 +160,35 @@ def _strategy_context_output_schema() -> dict[str, Any]:
             "briefing": {"type": "object", "additionalProperties": True},
             "briefing_note": {"type": "string"},
             "briefing_size_chars": {"type": "integer"},
+            "game_knowledge": {
+                "type": "object",
+                "description": "Shared versioned advisor mechanics and honest coverage limits.",
+                "properties": {
+                    "requested_version": {"type": "string"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["exact", "partial", "unsupported_newer", "unavailable"],
+                    },
+                    "loaded_through": {"type": ["string", "null"]},
+                    "notes_only": {"type": "boolean"},
+                    "prompt": {"type": "string"},
+                },
+                "required": [
+                    "requested_version",
+                    "status",
+                    "loaded_through",
+                    "notes_only",
+                    "prompt",
+                ],
+                "additionalProperties": False,
+            },
             "recent_events": {"type": "array", "items": _event_schema()},
             "advisor_custom_instructions": {"type": ["string", "null"]},
             "advisor_memory": {"type": ["string", "null"]},
             "response_guidance": {"type": "object", "additionalProperties": True},
             "privacy": _privacy_schema(),
         },
-        "required": ["campaign", "focus", "briefing_mode", "briefing", "privacy"],
+        "required": ["campaign", "focus", "briefing_mode", "briefing", "game_knowledge", "privacy"],
         "additionalProperties": True,
     }
 
@@ -360,7 +382,8 @@ def build_tool_definitions() -> list[dict[str, Any]]:
                 "Use this first for normal strategy questions such as economy, fleets, "
                 "diplomacy, expansion, crises, or what to do next. It returns rich "
                 "read-only campaign context from the latest local briefing, plus recent "
-                "events and advisor memory. It never calls the in-app LLM."
+                "events, advisor memory, and versioned mechanics with coverage limits. "
+                "Include the player's question to select relevant mechanics. It never calls the in-app LLM."
             ),
             "icons": [SERVER_ICON],
             "inputSchema": {
@@ -1061,8 +1084,14 @@ def _resolve_runtime_language(
 
 
 def _tool_result(payload: dict[str, Any]) -> dict[str, Any]:
+    content = [{"type": "text", "text": _tool_result_summary(payload)}]
+    knowledge = payload.get("game_knowledge")
+    if isinstance(knowledge, dict) and isinstance(knowledge.get("prompt"), str):
+        # Some clients consume only text blocks. Keep the complete rules separate
+        # from the truncated campaign summary so they get the same coverage limits.
+        content.append({"type": "text", "text": knowledge["prompt"]})
     return {
-        "content": [{"type": "text", "text": _tool_result_summary(payload)}],
+        "content": content,
         "structuredContent": payload,
         "isError": False,
     }

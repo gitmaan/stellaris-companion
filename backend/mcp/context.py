@@ -23,6 +23,7 @@ from backend.core.chronicle_store import (
 )
 from backend.core.database import GameDatabase
 from backend.core.language import language_name, normalize_language
+from stellaris_companion.game_knowledge import build_game_knowledge_prompt, load_game_knowledge
 
 DEFAULT_EVENT_LIMIT = 25
 MAX_EVENT_LIMIT = 120
@@ -252,6 +253,12 @@ class StellarisMcpContext:
         session_id = str(session["id"])
         briefing = self._load_briefing(session_id)
         resolved_focus = self._resolve_focus(question=question, focus=focus)
+        meta = briefing.get("meta") if isinstance(briefing.get("meta"), dict) else {}
+        model_context = (
+            briefing.get("model_context") if isinstance(briefing.get("model_context"), dict) else {}
+        )
+        version = str(meta.get("version") or model_context.get("game_version") or "unknown")
+        knowledge = load_game_knowledge(version)
 
         payload = {
             "campaign": self.get_active_campaign(),
@@ -260,6 +267,17 @@ class StellarisMcpContext:
             "advisor_mode": "External client should reason from this context. No in-app LLM call was made.",
             "briefing_mode": "rich",
             "briefing": self._build_advisor_briefing(briefing, resolved_focus),
+            # Keep mechanics outside briefing compaction and its size fallback: a
+            # truncated rule can reverse the meaning of a correction or qualifier.
+            "game_knowledge": {
+                "requested_version": version,
+                "status": knowledge.status,
+                "loaded_through": knowledge.loaded_through,
+                "notes_only": knowledge.notes_only,
+                "prompt": build_game_knowledge_prompt(
+                    version, purpose="advisor", topics=question.strip() or None
+                ),
+            },
             "recent_events": self.get_recent_events(limit=event_limit, notable_only=False).get(
                 "events", []
             ),
@@ -1237,6 +1255,11 @@ class StellarisMcpContext:
                 "missing_values": "Say unknown or not available rather than estimating.",
                 "distinguish_advice_from_facts": True,
                 "respect_game_version_and_dlc": True,
+                "mechanics_source": (
+                    "Use game_knowledge.prompt and its coverage limits for game rules. "
+                    "Campaign observations and active DLC still determine what applies; "
+                    "mechanics do not establish the player's current unlocks or events."
+                ),
             },
             "language_policy": self._language_guidance(),
             "advisor_memory_policy": (
