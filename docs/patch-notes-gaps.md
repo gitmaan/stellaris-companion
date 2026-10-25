@@ -21,11 +21,14 @@ patches/
   4.4.md   Stellaris 4.4 "Pegasus"
   4.5.md   Stellaris 4.5 "Cygnus" release-note coverage
   4.5.1.md Cygnus hotfix coverage
+  4.5.2.md Cygnus policy, economy, and ascension corrections
   snapshots/
     4.4.6.md compiled current-state Pegasus snapshot
 ```
 
-When Advisor or Chronicle builds a prompt, the shared resolver reads the game version from the save. For a version with a compiled snapshot, it loads that snapshot and applicable hotfix overlays. For 4.5, the Pop Group redesign makes the 4.4.6 snapshot unsafe to carry forward, so the resolver loads only the 4.5 release-note coverage and the 4.5.1 overlay when applicable. It labels this coverage partial until a full current-state snapshot has been checked against shipped 4.5 data. Unknown newer release lines receive no older mechanics pack.
+When Advisor or Chronicle builds a prompt, the shared resolver reads the game version from the save. For a version with a compiled snapshot, it loads an eligible snapshot and applicable hotfix overlays. For 4.5, the Pop Group redesign makes the 4.4.6 snapshot unsafe to carry forward, so the resolver loads only Cygnus release-note coverage through the save's version. It labels this coverage partial until a full current-state snapshot has been checked against shipped 4.5 data. Future snapshots do not relax the boundary for earlier saves. Unknown newer release lines receive no older mechanics pack.
+
+Advisor selects relevant sections using headings, bold rule labels, and body text; Chronicle receives the full pack. MCP Advisor Briefing returns the same Advisor knowledge with coverage metadata, outside briefing truncation. Explicit `supersedes-rule` comments replace individual older rules before selection; see `patches/README.md` for the authoring contract.
 
 HTML comments are stripped during loading. Markdown headers remain in the model context to group related mechanics.
 
@@ -76,7 +79,7 @@ Not everything from official patch notes belongs here. The advisor needs mechani
 
 **Tier 2 (should include):** Mechanics the advisor might reference in strategy. Colony development time, MegaCorp branch offices, trade deficit cascading, district specialization slots.
 
-**Tier 3 (skip):** Balance numbers, exploit fixes, performance changes, modding fields, UI tooltip adjustments. These don't affect the advisor's ability to give correct strategic guidance.
+**Tier 3 (usually skip):** Cosmetic changes, performance changes, modding fields, UI wording, and isolated fixes that do not change advice. Include balance numbers when they materially change a decision, such as upkeep or an economy-wide Job Efficiency penalty.
 
 ## Adding a New Patch Version
 
