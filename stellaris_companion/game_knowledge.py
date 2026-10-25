@@ -33,6 +33,94 @@ BREAKING_SNAPSHOT_BOUNDARIES = frozenset({(4, 5)})
 
 _VERSION_PATTERN = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")
 _MARKDOWN_SECTION_PATTERN = re.compile(r"(?m)^(#{1,3})\s+(.+?)\s*$")
+_SUPERSEDES_RULE_PATTERN = re.compile(r"<!--\s*supersedes-rule:\s*([^\n]+?)\s*-->")
+_RULE_PATTERN = re.compile(r"(?m)^[*-]\s+\*\*(?P<label>[^\n*]+):\*\*[^\n]*(?:\n[ \t]+[^\n]*)*")
+_SEARCH_STOP_WORDS = frozenset(
+    [
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "been",
+        "before",
+        "but",
+        "by",
+        "can",
+        "could",
+        "current",
+        "do",
+        "does",
+        "for",
+        "from",
+        "game",
+        "get",
+        "give",
+        "had",
+        "has",
+        "have",
+        "how",
+        "i",
+        "if",
+        "in",
+        "into",
+        "is",
+        "it",
+        "its",
+        "me",
+        "more",
+        "most",
+        "my",
+        "next",
+        "no",
+        "not",
+        "of",
+        "on",
+        "or",
+        "our",
+        "should",
+        "so",
+        "some",
+        "still",
+        "than",
+        "that",
+        "the",
+        "their",
+        "them",
+        "then",
+        "there",
+        "these",
+        "they",
+        "this",
+        "through",
+        "to",
+        "up",
+        "use",
+        "using",
+        "was",
+        "we",
+        "were",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "will",
+        "with",
+        "work",
+        "would",
+        "you",
+        "your",
+        "prioritize",
+        "priority",
+        "advice",
+        "explain",
+        "tell",
+    ]
+)
 _SEARCH_ALIASES: dict[str, tuple[str, ...]] = {
     "pop": ("population", "workforce", "colony"),
     "growth": ("population", "workforce", "colony"),
@@ -63,6 +151,8 @@ _SEARCH_ALIASES: dict[str, tuple[str, ...]] = {
     "astral": ("automation", "reliability", "science"),
     "rift": ("automation", "reliability", "science"),
     "automated": ("automation", "reliability"),
+    "disengage": ("disengagement", "combat"),
+    "disappear": ("disengagement", "combat"),
 }
 
 KnowledgeStatus = Literal["exact", "partial", "unsupported_newer", "unavailable"]
@@ -78,6 +168,7 @@ class GameKnowledgeContext:
     loaded_through: str | None
     status: KnowledgeStatus
     content: str | None
+    notes_only: bool = False
 
 
 def parse_version(version: str) -> tuple[int, int, int] | None:
@@ -128,21 +219,41 @@ def _load_file(version: str, directory: Path) -> str | None:
     if not path.exists():
         return None
     try:
-        return clean_knowledge_content(path.read_text(encoding="utf-8"))
+        content = path.read_text(encoding="utf-8")
+        return content if clean_knowledge_content(content) else None
     except OSError:
         return None
 
 
-def _search_terms(text: str) -> set[str]:
-    terms = set(re.findall(r"[a-z0-9]+", text.lower()))
+def _combine_knowledge(parts: list[str]) -> str | None:
+    """Apply explicit rule replacements without discarding unrelated older facts."""
+    content = ""
+    for part in parts:
+        replaced_labels = set(_SUPERSEDES_RULE_PATTERN.findall(part))
+        if replaced_labels:
+            content = _RULE_PATTERN.sub(
+                lambda match, labels=replaced_labels: "" if match["label"] in labels else match[0],
+                content,
+            )
+        content += f"\n\n{clean_knowledge_content(part)}"
+    return clean_knowledge_content(content) or None
+
+
+def _search_terms(text: str, *, expand_aliases: bool = True) -> set[str]:
+    terms = {
+        term
+        for term in re.findall(r"[^\W_]+", text.lower())
+        if term not in _SEARCH_STOP_WORDS and not term.isdigit()
+    }
     singular_terms = {
         f"{term[:-3]}y" if term.endswith("ies") else term[:-1]
         for term in terms
         if len(term) > 3 and term.endswith(("ies", "s"))
     }
     terms.update(singular_terms)
-    for term in tuple(terms):
-        terms.update(_SEARCH_ALIASES.get(term, ()))
+    if expand_aliases:
+        for term in tuple(terms):
+            terms.update(_SEARCH_ALIASES.get(term, ()))
     return terms
 
 
@@ -152,14 +263,12 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
     if not headings:
         return content
 
-    topic_terms = _search_terms(topics)
+    topic_terms = _search_terms(topics, expand_aliases=False)
+    alias_terms = _search_terms(topics) - topic_terms
     selected: set[int] = set()
-    candidates: list[tuple[int, int, int, set[str]]] = []
-    document_index = -1
+    candidates: list[tuple[int, int]] = []
 
     for index, match in enumerate(headings):
-        if match.group(1) == "#":
-            document_index += 1
         title = match.group(2).strip()
         normalized_title = title.lower()
         if (
@@ -169,22 +278,34 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
             selected.add(index)
             continue
 
-        matched_terms = topic_terms & _search_terms(title)
-        score = len(matched_terms)
-        if score:
-            candidates.append((score, document_index, index, matched_terms))
-
-    # A newer overlay with the same topic takes precedence over an older snapshot.
-    current_candidates = [
-        candidate
-        for candidate in candidates
-        if not any(
-            newer_document > candidate[1] and len(candidate[3] & newer_terms) >= 2
-            for _, newer_document, _, newer_terms in candidates
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(content)
+        body = content[match.end() : end].strip()
+        if not body:
+            continue  # Document titles are not mechanics sections.
+        title_terms = _search_terms(title, expand_aliases=False)
+        body_terms = _search_terms(body, expand_aliases=False)
+        label_terms = _search_terms(
+            " ".join(rule["label"] for rule in _RULE_PATTERN.finditer(body)),
+            expand_aliases=False,
         )
-    ]
-    current_candidates.sort(key=lambda item: (-item[0], -item[1], -item[2]))
-    selected.update(index for _, _, index, _ in current_candidates[:limit])
+        score = (
+            4 * len(topic_terms & title_terms)
+            + 3 * len(topic_terms & label_terms)
+            + len(topic_terms & body_terms)
+            + 2 * len(alias_terms & title_terms)
+            + len(alias_terms & label_terms)
+        )
+        if score:
+            candidates.append((score, index))
+
+    # Recency breaks ties; sharing a topic does not make an older section obsolete.
+    # Actual superseded rules have already been removed by _combine_knowledge.
+    candidates.sort(reverse=True)
+    if candidates:
+        # An incidental body mention should not fill a spare slot beside a strong
+        # rule/title match (e.g. Hedonists mentioning population in an ethics query).
+        minimum_score = candidates[0][0] / 4
+        selected.update(index for score, index in candidates[:limit] if score >= minimum_score)
 
     sections: list[str] = []
     for index in sorted(selected):
@@ -210,31 +331,43 @@ def load_game_knowledge(
 
     patch_versions = list_versioned_markdown(patches_dir)
     snapshot_versions = list_versioned_markdown(snapshots_dir)
-    snapshot_keys = [parse_version(item) for item in snapshot_versions]
-    newest_snapshot_key = max((key for key in snapshot_keys if key is not None), default=None)
-    # Release-note deltas for a newer game line are useful, but combining them
-    # with an older complete snapshot would reintroduce superseded mechanics.
-    notes_only_line = bool(
-        target_key[:2] in BREAKING_SNAPSHOT_BOUNDARIES
-        and (newest_snapshot_key is None or target_key[:2] > newest_snapshot_key[:2])
-        and any(
-            (key := parse_version(item)) is not None and key[:2] == target_key[:2]
-            for item in patch_versions
-        )
-    )
     known_versions = patch_versions + snapshot_versions
     known_keys = [parse_version(item) for item in known_versions]
     comparable_keys = [item for item in known_keys if item is not None]
-    newest_key = max(comparable_keys, default=None)
-
-    if newest_key is not None and target_key[:2] > newest_key[:2]:
+    known_line = any(key[:2] == target_key[:2] for key in comparable_keys)
+    earlier_key = max((key for key in comparable_keys if key <= target_key), default=None)
+    if not known_line and earlier_key is not None:
         return GameKnowledgeContext(
             version,
             target_version,
-            ".".join(str(part) for part in newest_key),
+            ".".join(str(part) for part in earlier_key),
             "unsupported_newer",
             None,
         )
+
+    # A snapshot is usable only for this save and only on this side of the latest
+    # breaking release. Future, unreadable, or empty snapshots cannot relax it.
+    boundary = max(
+        (
+            (major, minor, 0)
+            for major, minor in BREAKING_SNAPSHOT_BOUNDARIES
+            if (major, minor, 0) <= target_key
+        ),
+        default=None,
+    )
+    snapshot_key: tuple[int, int, int] | None = None
+    snapshot_content = None
+    snapshot_version = None
+    if cumulative and prefer_snapshot:
+        for candidate in reversed(snapshot_versions):
+            key = parse_version(candidate)
+            if key is None or key > target_key or (boundary is not None and key < boundary):
+                continue
+            content = _load_file(candidate, snapshots_dir)
+            if content:
+                snapshot_key, snapshot_version, snapshot_content = key, candidate, content
+                break
+    notes_only_line = boundary is not None and snapshot_key is None
 
     if not cumulative:
         content_parts: list[str] = []
@@ -256,33 +389,21 @@ def load_game_knowledge(
             target_version,
             loaded_version,
             status if content_parts else "unavailable",
-            "\n\n".join(content_parts) if content_parts else None,
+            _combine_knowledge(content_parts),
+            notes_only=notes_only_line,
         )
 
     content_parts = []
     loaded_version = None
-    snapshot_key: tuple[int, int, int] | None = None
-
-    if prefer_snapshot and not notes_only_line:
-        eligible = [
-            (parsed, snapshot_version)
-            for snapshot_version in snapshot_versions
-            if (parsed := parse_version(snapshot_version)) is not None and parsed <= target_key
-        ]
-        if eligible:
-            snapshot_key, snapshot_version = eligible[-1]
-            content = _load_file(snapshot_version, snapshots_dir)
-            if content:
-                content_parts.append(content)
-                loaded_version = snapshot_version
-            else:
-                snapshot_key = None
+    if snapshot_content:
+        content_parts.append(snapshot_content)
+        loaded_version = snapshot_version
 
     for patch_version in patch_versions:
         patch_key = parse_version(patch_version)
         if patch_key is None or patch_key > target_key:
             continue
-        if notes_only_line and patch_key[:2] != target_key[:2]:
+        if boundary is not None and patch_key < boundary:
             continue
         if snapshot_key is not None and patch_key <= snapshot_key:
             continue
@@ -297,7 +418,8 @@ def load_game_knowledge(
         target_version,
         loaded_version,
         status if content_parts else "unavailable",
-        "\n\n".join(content_parts) if content_parts else None,
+        _combine_knowledge(content_parts),
+        notes_only=notes_only_line,
     )
 
 
@@ -359,21 +481,7 @@ def build_game_knowledge_prompt(
             ]
         )
     elif knowledge_content:
-        loaded_key = parse_version(knowledge.loaded_through or "")
-        target_key = parse_version(knowledge.target_version or "")
-        notes_only = bool(
-            loaded_key is not None
-            and target_key is not None
-            and target_key[:2] in BREAKING_SNAPSHOT_BOUNDARIES
-            and loaded_key[:2] == target_key[:2]
-            and not any(
-                (key := parse_version(item)) is not None
-                and key[:2] == target_key[:2]
-                and key <= target_key
-                for item in list_versioned_markdown(snapshots_dir)
-            )
-        )
-        if notes_only:
+        if knowledge.notes_only:
             lines.extend(
                 [
                     "",
@@ -400,8 +508,9 @@ def build_game_knowledge_prompt(
         lines.extend(
             [
                 "",
-                f"Verified mechanics are available through {knowledge.loaded_through},",
-                "but no topic-specific mechanics section was needed for this request.",
+                f"Mechanics coverage is {knowledge.status}, through {knowledge.loaded_through}.",
+                "No topic-specific mechanics section matched this request; this is not proof that no rule applies.",
+                "Do not assume unlisted or older-version mechanics are verified.",
                 "Rely on supplied campaign evidence and the evidence hierarchy above.",
             ]
         )
