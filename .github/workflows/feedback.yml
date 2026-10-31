@@ -1,4 +1,4 @@
-name: Feedback service
+name: Feedback ownership
 on:
   pull_request:
     branches: [main]
@@ -9,16 +9,18 @@ on:
 jobs:
   feedback-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: workers/stellaris-feedback
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: workers/stellaris-feedback/package-lock.json
-      - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npm test -- --run
+      - name: Keep the shared service in its canonical repository
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          files = subprocess.check_output(
+              ['git', 'ls-files', 'workers/stellaris-feedback'], text=True
+          ).splitlines()
+          assert files == ['workers/stellaris-feedback/README.md'], (
+              'The feedback service is owned by gitmaan/stellaris-companion-site. '
+              'Do not restore a second deployable Worker here: it can overwrite '
+              'the private survey and website report routes.'
+          )
+          PY

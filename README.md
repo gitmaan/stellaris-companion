@@ -245,7 +245,7 @@ stellaris-companion/
 ├── electron/                     # Desktop app (React + Electron)
 ├── backend/                      # Python backend (FastAPI)
 ├── cloudflare/                   # Discord relay worker
-├── workers/stellaris-feedback/   # Optional feedback worker
+├── workers/stellaris-feedback/   # Feedback service ownership and API documentation
 ├── stellaris_companion/          # Shared Python runtime package
 ├── stellaris_save_extractor/     # Extraction logic and domains
 ├── stellaris-parser/             # Rust parser
