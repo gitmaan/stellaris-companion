@@ -12,6 +12,19 @@ The renderer is built with Vite, so the report endpoint is configured at build t
 
 See `electron/renderer/.env.example`.
 
+## Service ownership
+
+The production service is maintained and deployed only from
+[`stellaris-companion-site/workers/stellaris-feedback`](https://github.com/gitmaan/stellaris-companion-site/tree/main/workers/stellaris-feedback).
+Desktop builds submit to `https://feedback.galacticfilingcabinet.com/report`;
+the root path remains a legacy alias. Coordinate payload changes and their runtime
+tests in that repository.
+
+The same Worker also serves private website surveys at `/submit-private`, public
+website reports at `/submit-web`, and the public feedback board. Deploying a
+desktop-only copy overwrites those routes. The duplicate implementation was
+retired after issue #78; this repository must not deploy the shared service.
+
 ## Privacy (opt-in)
 
 By default, submitting a report includes only basic environment info (app version, platform, Electron version) plus the user's category/description.
