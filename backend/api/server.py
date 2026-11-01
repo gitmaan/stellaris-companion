@@ -375,6 +375,33 @@ def create_app() -> FastAPI:
             return {"enabled": False}
         return {"enabled": True, "status": ingestion.get_status()}
 
+    @app.get("/api/report-save", dependencies=[Depends(verify_token)])
+    def report_save(request: Request) -> dict[str, Any]:
+        from zipfile import BadZipFile
+
+        from backend.core.report_save import describe_report_save
+
+        ingestion = getattr(request.app.state, "ingestion", None)
+        companion = getattr(request.app.state, "companion", None)
+        if ingestion is not None:
+            status = ingestion.get_status()
+            path = status.get("current_save_path") if status.get("save_loaded") else None
+        else:
+            path = (
+                getattr(companion, "save_path", None)
+                if getattr(companion, "is_loaded", False)
+                else None
+            )
+        if not path:
+            raise HTTPException(status_code=404, detail="No save file loaded.")
+        try:
+            return describe_report_save(Path(path))
+        except (OSError, ValueError, KeyError, BadZipFile) as error:
+            raise HTTPException(
+                status_code=409,
+                detail="The save is unavailable or changing. Wait for saving to finish and try again.",
+            ) from error
+
     @app.get("/api/diagnostics", dependencies=[Depends(verify_token)])
     async def get_diagnostics(request: Request) -> dict[str, Any]:
         """Get comprehensive diagnostic info for bug reports.

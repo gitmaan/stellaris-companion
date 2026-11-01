@@ -75,6 +75,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Feedback reporting
+  reportSaves: {
+    select: () => ipcRenderer.invoke('report-saves:select'),
+    submit: input => ipcRenderer.invoke('report-saves:submit', input),
+    retry: id => ipcRenderer.invoke('report-saves:retry', id),
+    list: () => ipcRenderer.invoke('report-saves:list'),
+    remove: id => ipcRenderer.invoke('report-saves:remove', id),
+    onProgress: callback => createManagedListener('report-saves:progress', callback),
+  },
   getPlatformInfo: () => ({ platform: process.platform, arch: process.arch }),
   captureScreenshot: () => ipcRenderer.invoke('capture-screenshot'),
   getFeedbackDisplay: () => ipcRenderer.invoke('feedback:get-display'),
