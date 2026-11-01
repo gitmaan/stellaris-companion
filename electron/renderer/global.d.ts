@@ -174,6 +174,23 @@ export interface ChroniclePublicationSummary {
 }
 
 declare global {
+  type ReportSaveResult<T> = { ok: true; data: T } | { ok: false; error: string; attachmentId?: string }
+  interface ReportSavePreview {
+    selectionId: string
+    consentVersion: string
+    filename: string
+    empireName: string
+    gameDate: string
+    gameVersion: string
+    sizeBytes: number
+  }
+  interface ReportSaveReceipt {
+    id: string
+    filename: string
+    issueUrl: string | null
+    status: 'pending' | 'ready' | 'expired'
+    expiresAt: number
+  }
   interface Window {
     electronAPI?: {
       backend: {
@@ -291,6 +308,14 @@ declare global {
         }>
       }
       // Feedback reporting
+      reportSaves: {
+        select: () => Promise<ReportSaveResult<ReportSavePreview>>
+        submit: (input: { selectionId: string; consent: true; consentVersion: string; report: unknown }) => Promise<ReportSaveResult<ReportSaveReceipt>>
+        retry: (id: string) => Promise<ReportSaveResult<ReportSaveReceipt>>
+        list: () => Promise<ReportSaveResult<ReportSaveReceipt[]>>
+        remove: (id: string) => Promise<ReportSaveResult<void>>
+        onProgress: (callback: (progress: { id: string; stage: string; percent: number }) => void) => () => void
+      }
       getPlatformInfo: () => { platform: string; arch: string }
       captureScreenshot: () => Promise<string | null>
       getFeedbackDisplay: () => Promise<{ windowWidth: number; windowHeight: number; zoomFactor: number; displayScaleFactor: number } | null>

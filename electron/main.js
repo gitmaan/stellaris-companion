@@ -19,6 +19,7 @@ const net = require('net')
 const { autoUpdater } = require('electron-updater')
 
 const { createBackendClient } = require('./main/backendClient')
+const { createReportSaveService, registerReportSaveIpc } = require('./main/reportSaves')
 const { createAnnouncementsService } = require('./main/announcements')
 const { createHealthCheckManager } = require('./main/healthcheck')
 const {
@@ -1552,6 +1553,19 @@ registerBackendIpcHandlers({
 // Feedback reporting handlers
 // =============================================================================
 
+const reportSaveService = createReportSaveService({
+  directory: path.join(app.getPath('userData'), 'report-save-staging'),
+  store, getSecret, setSecret,
+  describeSave: () => callBackendApiOrThrow('/api/report-save', { timeoutMs: 10000 }),
+  notify: progress => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('report-saves:progress', progress)
+  },
+})
+registerReportSaveIpc({ ipcMain, validateSender, service: reportSaveService })
+app.whenReady().then(() => reportSaveService.list()).catch(() => {})
+const reportSaveCleanup = setInterval(() => { void reportSaveService.list().catch(() => {}) }, 15 * 60 * 1000)
+reportSaveCleanup.unref()
+
 // Screenshot capture for feedback reports
 ipcMain.handle('feedback:get-display', async (event) => {
   validateSender(event)
@@ -2017,6 +2031,7 @@ let quitCleanupStarted = false
 app.on('before-quit', (event) => {
   if (quitCleanupStarted) return
   quitCleanupStarted = true
+  clearInterval(reportSaveCleanup)
   isQuitting = true
   chatgptService.close()
   chatgptBridge.close()
