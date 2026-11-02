@@ -749,7 +749,12 @@
           "title": "Connecter votre application d’IA",
           "description": "Utilisez MCP Relay pour discuter de votre campagne dans Claude Desktop, ChatGPT pour ordinateur ou une autre application compatible. Aucune clé API requise dans Companion."
         }
-      }
+      },
+      "selectedNotListed": "Ce modèle ne figure pas dans le dernier catalogue reçu. Votre sélection est conservée. Testez le modèle avant de le remplacer.",
+      "catalogFailed": "Impossible d’actualiser le catalogue. Votre sélection est conservée ; la disponibilité n’a pas été vérifiée.",
+      "latestStableModel": "{{name}} (dernière version stable)",
+      "latestStableDetails": "Actuellement {{model}}. Suit automatiquement les versions stables de cette famille ; les tarifs peuvent changer.",
+      "geminiStableUpdates": "Gemini utilise automatiquement les derniers modèles stables Flash et Flash-Lite disponibles avec votre clé."
     }
   },
   "update": {
@@ -913,7 +918,9 @@
       "browseError": "Impossible d’ouvrir le sélecteur de dossier. Réessayez.",
       "cloudDisclosure": "Les données pertinentes de votre campagne sont envoyées à {{provider}} lors de vos demandes.",
       "foundCount_many": "{{count}} sauvegardes trouvées",
-      "openRouterSignIn": "Se connecter avec OpenRouter"
+      "openRouterSignIn": "Se connecter avec OpenRouter",
+      "loadingSettings": "Chargement de votre connexion enregistrée…",
+      "settingsLoadError": "Impossible de charger votre connexion enregistrée. Réessayez ou configurez-la plus tard pour conserver vos paramètres actuels."
     }
   },
   "advisorPanel": {

@@ -8,8 +8,29 @@ from copy import deepcopy
 from typing import Any
 
 from backend.core.json_utils import json_dumps
+from stellaris_companion.campaign_evidence import (
+    resolve_content_availability,
+    resolve_empire_identity,
+)
+from stellaris_companion.evidence_policy import build_evidence_policy
 
-MODEL_BRIEFING_SCHEMA_VERSION = 2
+MODEL_BRIEFING_SCHEMA_VERSION = 3
+
+
+def get_briefing_metadata(briefing: dict[str, Any]) -> dict[str, Any]:
+    """Recover only copied version metadata from older model-facing snapshots.
+
+    Old contexts can retain the source version after metadata compaction. Their
+    derived availability and identity are never reused. Raw evidence stays intact.
+    """
+    metadata = briefing.get("meta")
+    result = dict(metadata) if isinstance(metadata, dict) else {}
+    previous_context = briefing.get("model_context")
+    if not result.get("version") and isinstance(previous_context, dict):
+        version = previous_context.get("game_version")
+        if isinstance(version, str) and version.strip():
+            result["version"] = version
+    return result
 
 
 def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
@@ -22,7 +43,11 @@ def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
         return {}
 
     result = deepcopy(briefing)
-    meta = result.get("meta") if isinstance(result.get("meta"), dict) else {}
+    meta = get_briefing_metadata(result)
+    # This legacy field is our old set-difference heuristic, not a save observation.
+    # Preserve it in storage, but do not keep presenting a known-bad inference to models.
+    if isinstance(result.get("meta"), dict):
+        result["meta"].pop("missing_dlcs", None)
     version = str(meta.get("version") or "").strip()
     major_version = _major_version(version)
 
@@ -49,6 +74,8 @@ def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
     result["model_context"] = {
         "schema_version": MODEL_BRIEFING_SCHEMA_VERSION,
         "game_version": version or None,
+        "content_availability": resolve_content_availability(meta),
+        "empire_identity": resolve_empire_identity(result.get("identity")),
         "population": population,
         "diplomacy": {
             "ordinary_empire_country_type": "default",
@@ -87,12 +114,7 @@ def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
                 ),
             }
         },
-        "evidence": {
-            "instruction": (
-                "Treat save-derived fields as observations. Clearly label strategic forecasts "
-                "as inference and do not invent availability, costs, borders, or intentions."
-            )
-        },
+        "evidence": build_evidence_policy(),
     }
     return result
 

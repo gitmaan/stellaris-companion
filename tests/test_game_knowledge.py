@@ -9,6 +9,51 @@ from stellaris_companion.game_knowledge import (
 )
 
 
+def test_verified_identity_supplies_rules_for_generic_questions_without_crossing_versions():
+    identity = {"authority": "hive_mind", "civics": ["hive_devouring_swarm"]}
+    prompt = build_game_knowledge_prompt(
+        "Pegasus v4.4.6",
+        purpose="advisor",
+        topics="What should I prioritize?",
+        campaign_identity=identity,
+    )
+    assert "Hive Mind and Devouring Swarm" in prompt
+    assert "Army Damage is not Ship Weapons Damage" in prompt
+    assert "Colossus Project and Construction" not in prompt
+    for version in ("v4.3.5", "Cygnus v4.5.2", "unknown"):
+        prompt = build_game_knowledge_prompt(
+            version,
+            purpose="advisor",
+            topics="What should I prioritize?",
+            campaign_identity=identity,
+        )
+        assert "Army Damage is not Ship Weapons Damage" not in prompt
+
+
+def test_unknown_identity_does_not_select_standard_rules_by_substring():
+    prompt = build_game_knowledge_prompt(
+        "Pegasus v4.4.6",
+        purpose="advisor",
+        topics="What should I prioritize?",
+        campaign_identity={"civics": ["modded_rogue_servitor"]},
+    )
+    assert "Machine Intelligence Civics" not in prompt
+
+
+def test_question_priority_keeps_achievement_conditions_and_civic_context():
+    prompt = build_game_knowledge_prompt(
+        "Pegasus v4.4.6",
+        purpose="advisor",
+        topics="What does Retirement Home require?",
+        campaign_identity={"authority": "machine_intelligence", "civics": ["machine_servitor"]},
+        max_topic_sections=1,
+    )
+    assert "Machine Achievements and Eligibility" in prompt
+    assert "at least 1,000 owned organic Fallen Empire population" in prompt
+    assert "Machine Intelligence Civics" in prompt
+    assert "Colossus Project and Construction" not in prompt
+
+
 def test_patch_resources_resolve_from_pyinstaller_sibling_layout(tmp_path: Path):
     package_dir = tmp_path / "stellaris_companion"
     package_dir.mkdir()

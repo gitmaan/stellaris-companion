@@ -742,7 +742,12 @@
           "title": "Deine KI-App verbinden",
           "description": "Besprich deine Kampagne über MCP Relay in Claude Desktop, ChatGPT Desktop oder einer anderen unterstützten App. Kein API-Schlüssel in Companion nötig."
         }
-      }
+      },
+      "selectedNotListed": "Dieses Modell wurde im aktuellen Katalog nicht aufgeführt. Deine Auswahl bleibt erhalten. Prüfe das Modell, bevor du ein anderes auswählst.",
+      "catalogFailed": "Der Katalog konnte nicht aktualisiert werden. Deine Modellauswahl bleibt erhalten; die Verfügbarkeit wurde nicht geprüft.",
+      "latestStableModel": "{{name}} (neueste stabile Version)",
+      "latestStableDetails": "Derzeit {{model}}. Folgt automatisch stabilen Versionen dieser Modellfamilie; Preise können sich ändern.",
+      "geminiStableUpdates": "Gemini verwendet automatisch die neuesten stabilen Flash- und Flash-Lite-Modelle, die für deinen Schlüssel verfügbar sind."
     }
   },
   "update": {
@@ -903,7 +908,9 @@
       "chooseFolder": "Ordner wählen",
       "browseError": "Ordnerauswahl konnte nicht geöffnet werden. Versuche es erneut.",
       "cloudDisclosure": "Relevante Kampagnendaten werden bei Anfragen an {{provider}} gesendet.",
-      "openRouterSignIn": "Mit OpenRouter anmelden"
+      "openRouterSignIn": "Mit OpenRouter anmelden",
+      "loadingSettings": "Gespeicherte Verbindung wird geladen…",
+      "settingsLoadError": "Die gespeicherte Verbindung konnte nicht geladen werden. Versuche es erneut oder richte sie später ein, um deine bisherigen Einstellungen zu behalten."
     }
   },
   "advisorPanel": {

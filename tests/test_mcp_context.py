@@ -12,8 +12,10 @@ from mcp import Client
 
 from backend.core.database import GameDatabase
 from backend.core.json_utils import json_dumps
+from backend.core.model_briefing import build_model_briefing
 from backend.mcp.context import McpContextError, StellarisMcpContext
 from backend.mcp.server import SERVER_INSTRUCTIONS, StellarisMcpServer, build_tool_definitions
+from stellaris_companion.evidence_policy import build_evidence_policy
 from stellaris_companion.game_knowledge import build_game_knowledge_prompt
 
 LEAK_PATTERN = re.compile(
@@ -213,7 +215,7 @@ def test_strategy_context_is_read_only_and_does_not_require_gemini(
     assert guidance["role"] == "strategic_advisor"
     assert guidance["advisor_voice"]["persona"] == "Strategic advisor to Kilik Cooperative"
     assert guidance["presentation_contract"]["surface"] == "natural_chat"
-    assert guidance["facts_policy"]["exact_numbers_only"] is True
+    assert guidance["facts_policy"] == build_evidence_policy("advisor")
     assert guidance["naval_capacity_policy"]["current_usage_path"]
     assert guidance["tool_use_policy"]["main_tool"] == (
         "Advisor Briefing is the preferred context for strategy questions."
@@ -325,6 +327,53 @@ def test_mcp_knowledge_can_use_model_context_version_when_meta_is_missing(tmp_pa
 
     assert payload["game_knowledge"]["loaded_through"] == "4.5.2"
     assert "-50% Specialist Job Efficiency" in payload["game_knowledge"]["prompt"]
+
+
+@pytest.mark.parametrize("force_fallback", [False, True])
+def test_stored_evidence_has_identical_meaning_in_all_mcp_briefings(
+    tmp_path, monkeypatch, force_fallback
+):
+    db, session_id, _ = _make_test_db(tmp_path)
+    briefing = json.loads(db.get_latest_session_briefing_json(session_id=session_id))
+    briefing["meta"].update(
+        {
+            "version": "Cygnus v4.5.2",
+            "required_dlcs": [f"Mod Pack {n}" for n in range(20)],
+            "required_dlcs_status": "reported",
+            "missing_dlcs": ["Synthetic Dawn"],
+        }
+    )
+    briefing["identity"].update(
+        {
+            "authority": "machine_intelligence",
+            "civics": ["machine_servitor", "modded_logistics"],
+        }
+    )
+    stored = json_dumps(briefing)
+    db.update_session_latest_briefing(
+        session_id=session_id, latest_briefing_json=stored, last_game_date="2235.04.01"
+    )
+    if force_fallback:
+        monkeypatch.setattr("backend.mcp.context.MAX_ADVISOR_BRIEFING_CHARS", 1)
+    context = StellarisMcpContext(db=db)
+    advisor = context.get_strategy_context(question="Explain my economy")
+    focused = context.get_empire_briefing(sections=["economy"])
+    chronicle = context.get_chronicle_source_material(scope="latest_session")
+    expected = build_model_briefing(briefing)["model_context"]
+
+    for received in (advisor["briefing"], focused["sections"], chronicle["briefing"]):
+        assert received["model_context"] == expected
+        assert received["meta"] == {
+            key: value for key, value in briefing["meta"].items() if key != "missing_dlcs"
+        }
+        assert received["identity"] == briefing["identity"]
+    assert advisor["response_guidance"]["advisor_voice"]["empire_identity"]["civics"] == [
+        "Rogue Servitor",
+        "modded_logistics",
+    ]
+    assert chronicle["chronicle_guidance"]["facts_policy"] == build_evidence_policy("chronicle")
+    assert "never as evidence that an event occurred" in chronicle["game_knowledge"]["prompt"]
+    assert db.get_latest_session_briefing_json(session_id=session_id) == stored
 
 
 def test_chronicle_source_material_uses_chapter_event_range(tmp_path: Path) -> None:

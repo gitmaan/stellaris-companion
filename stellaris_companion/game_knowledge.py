@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from .campaign_evidence import resolve_content_availability, resolve_empire_identity
+from .evidence_policy import build_evidence_prompt
 from .paths import get_repo_root
 
 
@@ -257,7 +260,7 @@ def _search_terms(text: str, *, expand_aliases: bool = True) -> set[str]:
     return terms
 
 
-def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
+def _select_relevant_sections(content: str, topics: str, *, limit: int, identity: str = "") -> str:
     """Keep safety baselines plus the few mechanics sections relevant to a request."""
     headings = list(_MARKDOWN_SECTION_PATTERN.finditer(content))
     if not headings:
@@ -267,6 +270,8 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
     alias_terms = _search_terms(topics) - topic_terms
     selected: set[int] = set()
     candidates: list[tuple[int, int]] = []
+    identity_terms = _search_terms(identity, expand_aliases=False)
+    identity_candidates: list[tuple[int, int]] = []
 
     for index, match in enumerate(headings):
         title = match.group(2).strip()
@@ -297,6 +302,9 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
         )
         if score:
             candidates.append((score, index))
+        identity_score = 2 * len(identity_terms & title_terms) + len(identity_terms & label_terms)
+        if identity_score:
+            identity_candidates.append((identity_score, index))
 
     # Recency breaks ties; sharing a topic does not make an older section obsolete.
     # Actual superseded rules have already been removed by _combine_knowledge.
@@ -306,6 +314,10 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
         # rule/title match (e.g. Hedonists mentioning population in an ethics query).
         minimum_score = candidates[0][0] / 4
         selected.update(index for score, index in candidates[:limit] if score >= minimum_score)
+    # Preserve question priority. At most one additional identity section can
+    # supply civic mechanics for a generic question without flooding the prompt.
+    if limit > 0 and identity_candidates:
+        selected.add(max(identity_candidates)[1])
 
     sections: list[str] = []
     for index in sorted(selected):
@@ -423,11 +435,21 @@ def load_game_knowledge(
     )
 
 
+def build_content_evidence_prompt(metadata: dict) -> str:
+    """Always retain content-access evidence, independent of topic retrieval."""
+    return (
+        "[INTERNAL CONTENT EVIDENCE - not proof of current unlocks or eligibility]\n"
+        + json.dumps(resolve_content_availability(metadata), ensure_ascii=False)
+    )
+
+
 def build_game_knowledge_prompt(
     version: str,
     *,
     purpose: KnowledgePurpose,
     topics: str | None = None,
+    campaign_metadata: dict | None = None,
+    campaign_identity: dict | None = None,
     max_topic_sections: int = 3,
     patches_dir: Path = DEFAULT_PATCHES_DIR,
     snapshots_dir: Path = DEFAULT_SNAPSHOTS_DIR,
@@ -438,36 +460,26 @@ def build_game_knowledge_prompt(
         patches_dir=patches_dir,
         snapshots_dir=snapshots_dir,
     )
-    purpose_rule = (
-        "Use mechanics to explain the recorded world, never as evidence that an event "
-        "occurred. Do not add a name, identity, participant, place, action, motive, cause, "
-        "outcome, or unlocked feature unless the supplied campaign evidence supports it. "
-        "Treat 'not recorded' as a limit of the supplied record, not proof that something "
-        "never occurred."
-        if purpose == "chronicle"
-        else "Use mechanics to interpret the save and form advice, but do not invent current "
-        "resources, unlocks, settings, borders, or events, or extend a listed rule into an "
-        "unstated automatic outcome. Verify arithmetic before using a calculated value to "
-        "label the campaign state."
-    )
-
     lines = [
         "[INTERNAL GAME KNOWLEDGE - never mention this block to the user]",
-        "Evidence hierarchy:",
-        "1. Supplied save observations and recorded events are authoritative for this campaign.",
-        "2. Supplied settings and active DLC determine whether a mechanic applies.",
-        "3. The verified version mechanics below explain the rules of the game.",
-        "4. General model knowledge is a fallback and must not override the sources above.",
-        "5. Mods can change baseline mechanics; when they conflict, prefer campaign evidence.",
-        purpose_rule,
+        build_evidence_prompt(purpose),
+        build_content_evidence_prompt({**(campaign_metadata or {}), "version": version}),
     ]
 
     knowledge_content = knowledge.content
     if knowledge_content and topics is not None:
+        typed = resolve_empire_identity(campaign_identity)
+        entities = [typed["authority"], typed["origin"], *typed["civics"], *typed["ethics"]]
+        identity_names = " ".join(
+            entity["name"]
+            for entity in entities
+            if entity and entity["source"] == "verified_catalog"
+        )
         knowledge_content = _select_relevant_sections(
             knowledge_content,
             topics,
             limit=max(0, max_topic_sections),
+            identity=identity_names,
         )
 
     if knowledge_content and knowledge.status == "exact":
@@ -511,7 +523,7 @@ def build_game_knowledge_prompt(
                 f"Mechanics coverage is {knowledge.status}, through {knowledge.loaded_through}.",
                 "No topic-specific mechanics section matched this request; this is not proof that no rule applies.",
                 "Do not assume unlisted or older-version mechanics are verified.",
-                "Rely on supplied campaign evidence and the evidence hierarchy above.",
+                "Rely on supplied campaign evidence and the evidence policy above.",
             ]
         )
     else:

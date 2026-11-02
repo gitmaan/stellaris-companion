@@ -9,7 +9,8 @@ coverage when a new game version has not yet been fully audited.
 1. The app reads the Stellaris version from the save.
 2. The shared resolver selects an exact snapshot, a compatible snapshot and overlays, or a
    notes-only pack for an audited breaking release line.
-3. The Advisor selects relevant sections using headings, rule labels, and rule text. Chronicle
+3. The Advisor selects relevant sections using headings, rule labels, and rule text, plus at
+   most one additional section matching verified empire identity. Chronicle
    receives the full resolved pack. MCP Advisor Briefing returns the same Advisor prompt and
    coverage metadata, in both structured output and an untruncated text block.
 4. Unknown newer release lines do not receive older mechanics presented as current.
@@ -61,7 +62,9 @@ Before shipping, run `tests/test_game_knowledge.py` and record cross-provider re
 with an older knowledge cutoff is likely to answer confidently but incorrectly.
 
 Use `--suite cygnus` for the 4.5.2 cases and `--suite pegasus` (the default) for 4.4.6.
-Advisor evaluations use question-based selection just like the app; Chronicle evaluations use
+Use `--suite evidence` for synthetic campaign identity, eligibility, strategy, and calculation
+cases. `--repeats 2` records independent samples; `--snapshots-dir` allows controlled reference
+comparisons. Advisor evaluations use question and identity selection just like the app; Chronicle evaluations use
 the full pack. `--list` lists the selected suite without making model calls. A unit-test pass
 checks prompt assembly, not model accuracy; record provider responses and review them separately.
 

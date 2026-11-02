@@ -344,7 +344,7 @@ test('cancels browser sign-in and shows model costs before saving OpenRouter', a
     await expect(page.getByText('Account connected.', { exact: false })).toHaveCount(0)
     await page.getByRole('button', { name: 'Find models', exact: true }).click()
     const model = page.getByLabel('MODEL', { exact: true })
-    await expect(model).toHaveValue('google/gemini-3.1-flash-lite')
+    await expect(model).toHaveValue('stellaris:latest-stable/gemini-flash-lite')
     await expect(page.getByText('Lower-cost model · billed by your provider')).toBeVisible()
     await model.selectOption('anthropic/claude-sonnet-5')
     await expect(page.getByText('Paid model · billed by your provider')).toBeVisible()
@@ -361,6 +361,128 @@ test('cancels browser sign-in and shows model costs before saving OpenRouter', a
     await page.getByRole('button', { name: /Connect your AI app/ }).click()
     await expect(page.locator('#ai-app-connections')).toBeInViewport()
     await expect(page.locator('#ai-app-connections').getByText(/^Claude Desktop$/i)).toBeVisible()
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(profile, { recursive: true, force: true })
+  }
+})
+
+test('latest stable survives reload and resolves new releases without selecting previews', async () => {
+  const backend = createMockChronicleBackend()
+  const backendPort = await backend.start()
+  const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-stable-model-e2e-'))
+  const app = await launchApp(backendPort, profile)
+  try {
+    await app.evaluate(() => {
+      globalThis.__stableVersion = '5.5'
+      const realFetch = globalThis.fetch
+      globalThis.fetch = async (url, options) => {
+        if (!String(url).startsWith('https://openrouter.ai/api/v1/')) return realFetch(url, options)
+        if (String(url).includes('/models')) return Response.json({ data: [
+          { id: `anthropic/claude-sonnet-${globalThis.__stableVersion}`, name: `Claude Sonnet ${globalThis.__stableVersion}`, pricing: { prompt: '0.000003', completion: '0.000015' } },
+          { id: 'anthropic/claude-sonnet-9-preview', name: 'Claude Sonnet 9 Preview' },
+        ] })
+        globalThis.__requestedModel = JSON.parse(options.body).model
+        return Response.json({ model: globalThis.__requestedModel, choices: [{ message: { content: '{"status":"ok"}' } }] })
+      }
+    })
+    const page = await app.firstWindow()
+    await page.evaluate(() => window.electronAPI.saveSettings({ advisorProvider: 'openrouter', advisorModel: '', openRouterApiKey: 'fixture-key' }))
+    await page.getByRole('button', { name: /Config/i }).click()
+    await page.getByText('Advanced settings', { exact: true }).click()
+    await page.getByRole('button', { name: 'Refresh models', exact: true }).click()
+    const selected = page.getByLabel('MODEL', { exact: true })
+    await expect(selected).toHaveValue('stellaris:latest-stable/claude-sonnet')
+    await expect(page.getByText(/Currently Claude Sonnet 5.5.*pricing can change/)).toBeVisible()
+    await page.getByRole('button', { name: 'Check and save', exact: true }).click()
+    await expect(page.getByText('AI setup saved. Connection verified.')).toBeVisible()
+    expect(await app.evaluate(() => globalThis.__requestedModel)).toBe('anthropic/claude-sonnet-5.5')
+    expect((await page.evaluate(() => window.electronAPI.getSettings())).advisorModel).toBe('stellaris:latest-stable/claude-sonnet')
+    await app.evaluate(() => { globalThis.__stableVersion = '6' })
+    await page.reload()
+    await page.getByRole('button', { name: /Config/i }).click()
+    await page.getByText('Advanced settings', { exact: true }).click()
+    await page.getByRole('button', { name: 'Refresh models', exact: true }).click()
+    await expect(selected).toHaveValue('stellaris:latest-stable/claude-sonnet')
+    await expect(page.getByText(/Currently Claude Sonnet 6.*pricing can change/)).toBeVisible()
+    await selected.scrollIntoViewIfNeeded()
+    const artifacts = path.resolve(electronDir, '..', 'artifacts', 'model-catalog-2026-11-02')
+    await fs.mkdir(artifacts, { recursive: true })
+    await page.screenshot({ path: path.join(artifacts, 'latest-stable.png') })
+    await page.getByRole('button', { name: 'Check and save', exact: true }).click()
+    await expect(page.getByText('AI setup saved. Connection verified.')).toBeVisible()
+    expect(await app.evaluate(() => globalThis.__requestedModel)).toBe('anthropic/claude-sonnet-6')
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(profile, { recursive: true, force: true })
+  }
+})
+
+test('model discovery exposes the full catalog and preserves saved choices across missing entries and failed refreshes', async () => {
+  const backend = createMockChronicleBackend()
+  const backendPort = await backend.start()
+  const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-model-catalog-e2e-'))
+  const app = await launchApp(backendPort, profile)
+  try {
+    await app.evaluate(() => {
+      globalThis.__catalogMode = 'available'
+      globalThis.__requestedModel = null
+      const realFetch = globalThis.fetch
+      globalThis.fetch = async (url, options) => {
+        if (!String(url).startsWith('https://openrouter.ai/api/v1/')) return realFetch(url, options)
+        if (String(url).includes('/models')) {
+          if (globalThis.__catalogMode === 'failed') return Response.json({ error: { message: 'Catalog temporarily unavailable' } }, { status: 503 })
+          if (globalThis.__catalogMode === 'empty') return Response.json({ data: [] })
+          return Response.json({ data: [
+            { id: 'anthropic/claude-sonnet-5.5', name: 'Claude Sonnet 5.5' },
+            { id: 'google/gemini-3.1-flash-lite', name: 'Gemini Flash Lite' },
+            ...Array.from({ length: 210 }, (_, i) => ({ id: `provider/model-${i}`, name: `Available model ${i}` })),
+            { id: 'provider/new-option', name: 'New available option' },
+          ] })
+        }
+        globalThis.__requestedModel = JSON.parse(options.body).model
+        return Response.json({ model: 'provider/resolved-snapshot', choices: [{ message: { content: '{"status":"ok"}' } }] })
+      }
+    })
+    const page = await app.firstWindow()
+    await page.evaluate(() => window.electronAPI.saveSettings({ advisorProvider: 'openrouter', advisorModel: 'anthropic/claude-sonnet-5', openRouterApiKey: 'fixture-key' }))
+    await page.getByRole('button', { name: /Config/i }).click()
+    await page.getByText('Advanced settings', { exact: true }).click()
+    await page.getByRole('button', { name: 'Refresh models', exact: true }).click()
+    const selected = page.getByLabel('MODEL', { exact: true })
+    const notListed = page.getByText(/This model was not returned by the latest catalog/)
+    await expect(selected).toHaveValue('anthropic/claude-sonnet-5')
+    await expect(notListed).toBeVisible()
+    await expect(selected.locator('option[value="provider/model-0"]')).toHaveCount(1)
+    await selected.scrollIntoViewIfNeeded()
+    const artifacts = path.resolve(electronDir, '..', 'artifacts', 'model-catalog-2026-11-02')
+    await fs.mkdir(artifacts, { recursive: true })
+    await page.screenshot({ path: path.join(artifacts, 'settings-catalog.png') })
+    const search = page.getByLabel('SEARCH MODELS')
+    await search.fill('New available')
+    await expect(selected.locator('option[value="provider/new-option"]')).toHaveCount(1)
+    await expect(selected).toHaveValue('anthropic/claude-sonnet-5')
+    await page.getByRole('button', { name: 'SHOW RECOMMENDED', exact: true }).click()
+    await expect(selected.locator('option[value="provider/model-0"]')).toHaveCount(0)
+    await expect(selected.locator('option[value="stellaris:latest-stable/claude-sonnet"]')).toHaveCount(1)
+    await page.getByRole('button', { name: 'SHOW ALL MODELS', exact: true }).click()
+
+    await app.evaluate(() => { globalThis.__catalogMode = 'failed' })
+    await page.getByRole('button', { name: 'Refresh models', exact: true }).click()
+    await expect(page.getByText(/Could not refresh the catalog. Your model selection is unchanged/)).toBeVisible()
+    await expect(notListed).toHaveCount(0)
+    await expect(selected).toHaveValue('anthropic/claude-sonnet-5')
+
+    await app.evaluate(() => { globalThis.__catalogMode = 'empty' })
+    await page.getByRole('button', { name: 'Refresh models', exact: true }).click()
+    await expect(notListed).toBeVisible()
+    await expect(selected).toHaveValue('anthropic/claude-sonnet-5')
+    await page.getByRole('button', { name: 'Check and save', exact: true }).click()
+    await expect(page.getByText('AI setup saved. Connection verified.')).toBeVisible()
+    expect(await app.evaluate(() => globalThis.__requestedModel)).toBe('anthropic/claude-sonnet-5')
+    expect((await page.evaluate(() => window.electronAPI.getSettings())).advisorModel).toBe('anthropic/claude-sonnet-5')
   } finally {
     await app.close()
     await backend.stop()

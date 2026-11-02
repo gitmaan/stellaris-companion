@@ -49,6 +49,10 @@ def response(text="Complete answer", finish="STOP"):
 
 def generator_with(*responses):
     models = MagicMock()
+    models.list.return_value = [
+        types.Model(name=f"models/{model}", supported_actions=["generateContent"])
+        for model in (GEMINI_FLASH_MODEL, GEMINI_FLASH_LITE_MODEL, GEMINI_FLASH_LITE_RESERVE_MODEL)
+    ]
     models.generate_content.side_effect = list(responses)
     generator = GeminiAdvisorGenerator(
         config=AdvisorProviderConfig(provider="gemini", model="unused", api_key="secret-key"),
@@ -243,7 +247,7 @@ def test_conserve_falls_back_to_reserve_without_upgrading_to_flash():
         "gemini-3.1-flash-lite",
     ]
     assert result.requested_model == GEMINI_FLASH_LITE_MODEL
-    assert result.model == GEMINI_FLASH_LITE_RESERVE_MODEL
+    assert result.model == "actual-server-model"
     assert result.routing["notice"] == (
         "Gemini 3.5 Flash-Lite is at capacity. Routing via Gemini 3.1 Flash-Lite."
     )
@@ -265,7 +269,8 @@ def test_two_quota_failures_stop_now_and_next_request_can_reach_reserve():
 
     result = generator.generate(**kwargs)
     assert result.requested_model == GEMINI_FLASH_MODEL
-    assert result.model == GEMINI_FLASH_LITE_RESERVE_MODEL
+    assert result.model == "actual-server-model"
+    assert models.generate_content.call_args.kwargs["model"] == GEMINI_FLASH_LITE_RESERVE_MODEL
     assert len(result.diagnostics) == 1
     assert models.generate_content.call_count == 3
     assert "Gemini 3.1 Flash-Lite" in result.routing["notice"]
@@ -295,7 +300,7 @@ def test_skipping_cooled_models_leaves_two_attempts_for_reserve_repair():
         purpose="chronicle",
         response_schema=CurrentEraOutput,
     )
-    assert result.model == GEMINI_FLASH_LITE_RESERVE_MODEL
+    assert result.model == "actual-server-model"
     assert [c.kwargs["model"] for c in models.generate_content.call_args_list] == [
         GEMINI_FLASH_LITE_RESERVE_MODEL,
         GEMINI_FLASH_LITE_RESERVE_MODEL,
@@ -328,7 +333,8 @@ def test_exhausted_reserve_is_remembered_and_primary_recovers_after_cooldown(mon
     assert is_model_temporarily_unavailable(GEMINI_FLASH_LITE_RESERVE_MODEL)
     now = 131
     result = generator.generate(system_prompt="system", user_prompt="user")
-    assert result.model == GEMINI_FLASH_LITE_MODEL
+    assert result.model == "actual-server-model"
+    assert models.generate_content.call_args.kwargs["model"] == GEMINI_FLASH_LITE_MODEL
     assert result.routing is None
     assert models.generate_content.call_count == 3
 

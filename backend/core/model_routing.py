@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
+from stellaris_companion.model_catalog import MODEL_CATALOG, SELECTION_PREFIX
+
 GEMINI_FLASH_MODEL = "gemini-3.8-flash"
 GEMINI_FLASH_LITE_MODEL = "gemini-3.5-flash-lite"
 # Reserve only; Google currently lists May 7, 2027 as its earliest shutdown.
@@ -77,6 +79,10 @@ def display_model_name(model_id: str | None) -> str:
     if not model_id:
         return "Unknown model"
     raw = str(model_id)
+    if raw.startswith(SELECTION_PREFIX):
+        family = MODEL_CATALOG["families"].get(raw.removeprefix(SELECTION_PREFIX))
+        if family:
+            return f"{family['name']} (latest stable)"
     if raw in _MODEL_DISPLAY_NAMES:
         return _MODEL_DISPLAY_NAMES[raw]
     lowered = raw.lower()

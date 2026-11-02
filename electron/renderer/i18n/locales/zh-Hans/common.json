@@ -742,7 +742,12 @@
           "title": "连接你的 AI 应用",
           "description": "通过 MCP Relay 在 Claude Desktop、ChatGPT 桌面版或其他支持的应用中讨论战役。Companion 无需 API 密钥。"
         }
-      }
+      },
+      "selectedNotListed": "最新返回的目录中没有此模型。你的选择未更改。请在选择替代模型之前先测试当前模型。",
+      "catalogFailed": "无法刷新目录。你的模型选择未更改，尚未检查可用性。",
+      "latestStableModel": "{{name}}（最新稳定版）",
+      "latestStableDetails": "当前为 {{model}}。自动更新至此系列的稳定版本；价格可能变化。",
+      "geminiStableUpdates": "Gemini 会自动使用您的密钥可用的最新稳定版 Flash 和 Flash-Lite 模型。"
     }
   },
   "update": {
@@ -903,7 +908,9 @@
       "chooseFolder": "选择文件夹",
       "browseError": "无法打开文件夹选择器。请重试。",
       "cloudDisclosure": "提问时，相关的战役信息会发送给 {{provider}}。",
-      "openRouterSignIn": "使用 OpenRouter 登录"
+      "openRouterSignIn": "使用 OpenRouter 登录",
+      "loadingSettings": "正在加载已保存的连接…",
+      "settingsLoadError": "无法加载已保存的连接。请重试，或选择稍后设置以保留当前设置。"
     }
   },
   "advisorPanel": {

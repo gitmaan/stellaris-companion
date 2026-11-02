@@ -21,6 +21,9 @@ interface Model {
   id: string
   name: string
   recommended?: boolean
+  updatePolicy?: 'latest_stable'
+  resolvedModel?: string
+  resolvedName?: string
   contextLength?: number
   pricing?: { inputPerMillion: number; outputPerMillion: number }
 }
@@ -79,7 +82,8 @@ export function AISetupForm({
   const { t, i18n } = useTranslation()
   const [values, setValues] = useState(() => initialValues(initialSettings))
   const [models, setModels] = useState<Model[]>([])
-  const [allModels, setAllModels] = useState(false)
+  const [allModels, setAllModels] = useState(true)
+  const [catalogStatus, setCatalogStatus] = useState<'unchecked' | 'loaded' | 'failed'>('unchecked')
   const [search, setSearch] = useState('')
   const [manualKey, setManualKey] = useState(false)
   const [busy, setBusy] = useState<'models' | 'check' | 'browser' | null>(null)
@@ -120,12 +124,14 @@ export function AISetupForm({
       next.advisorBaseUrl !== undefined ||
       next.openRouterApiKey !== undefined ||
       next.customProviderApiKey !== undefined
-    )
+    ) {
       setModels([])
+      setCatalogStatus('unchecked')
+    }
     if (next.advisorProvider && next.advisorProvider !== provider) {
       next.advisorModel = ''
       next.advisorBaseUrl = ''
-      setAllModels(false)
+      setAllModels(true)
       setSearch('')
       onProviderChange?.(next.advisorProvider)
     }
@@ -163,26 +169,29 @@ export function AISetupForm({
     setBusy('models')
     setResult(null)
     setNotice('')
+    setCatalogStatus('unchecked')
     try {
       const found = await api.listModels(config(draft))
       if (!mounted.current || id !== request.current) return
       if (!found.ok) {
+        setCatalogStatus('failed')
         setResult(found)
         return
       }
       const available = found.models || []
       setModels(available)
-      // Make the low-cost default explicit before the user checks and saves it.
-      const suggested =
-        available.find((model) => model.id === 'google/gemini-3.1-flash-lite') ||
-        available.find((model) => model.recommended) ||
-        (available.length === 1 ? available[0] : null)
+      setCatalogStatus('loaded')
+      // The main process resolves the shared recommendations against this catalog.
+      const suggested = available.find((model) => model.id === found.suggestedModel)
+        || (available.length === 1 ? available[0] : null)
       if (suggested && !draft.advisorModel)
         setValues((current) => ({ ...current, advisorModel: suggested.id }))
       setNotice(available.length ? 'chooseModel' : 'noModels')
     } catch {
-      if (mounted.current && id === request.current)
+      if (mounted.current && id === request.current) {
+        setCatalogStatus('failed')
         setResult({ ok: false, errorCode: 'PROVIDER_UNAVAILABLE' })
+      }
     } finally {
       if (mounted.current && id === request.current) setBusy(null)
     }
@@ -301,7 +310,8 @@ export function AISetupForm({
   const choices = selected && !filtered.includes(selected) ? [selected, ...filtered] : filtered
   const modelOptions = [
     { value: '', label: t('settings.advisor.selectModel') },
-    ...choices.map((model) => ({ value: model.id, label: model.name })),
+    ...choices.map((model) => ({ value: model.id, label: model.updatePolicy === 'latest_stable'
+      ? t('settings.aiSetup.latestStableModel', { name: model.name }) : model.name })),
   ]
   if (values.advisorModel && !modelOptions.some((option) => option.value === values.advisorModel))
     modelOptions.push({ value: values.advisorModel, label: values.advisorModel })
@@ -340,6 +350,7 @@ export function AISetupForm({
         </p>
         {provider === 'gemini' && (
           <>
+            <p className="text-sm text-text-secondary">{t('settings.aiSetup.geminiStableUpdates')}</p>
             <HUDInput
               label={t('onboarding.ai.geminiKey')}
               type="password"
@@ -425,7 +436,7 @@ export function AISetupForm({
                 )}
               </button>
             )}
-            {(allModels || !recommended.length) && models.length > 8 && (
+            {(allModels || !recommended.length) && models.length > 0 && (
               <HUDInput
                 label={t('settings.advisor.searchModels')}
                 value={search}
@@ -439,6 +450,21 @@ export function AISetupForm({
               options={modelOptions}
               onChange={(event) => change({ advisorModel: event.target.value })}
             />
+            {selected?.updatePolicy === 'latest_stable' && (
+              <p role="status" className="text-sm text-text-secondary">
+                {t('settings.aiSetup.latestStableDetails', { model: selected.resolvedName || selected.resolvedModel })}
+              </p>
+            )}
+            {catalogStatus === 'loaded' && values.advisorModel && !selected && (
+              <p role="status" className="text-sm text-text-secondary">
+                {t('settings.aiSetup.selectedNotListed')}
+              </p>
+            )}
+            {catalogStatus === 'failed' && (
+              <p role="status" className="text-sm text-text-secondary">
+                {t('settings.aiSetup.catalogFailed')}
+              </p>
+            )}
             {selected?.pricing && (
               <p className="text-sm text-text-secondary">
                 {t(

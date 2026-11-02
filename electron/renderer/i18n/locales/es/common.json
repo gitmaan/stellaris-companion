@@ -749,7 +749,12 @@
           "title": "Conectar tu app de IA",
           "description": "Usa MCP Relay para hablar de tu campaña en Claude Desktop, ChatGPT de escritorio u otra app compatible. No necesitas una clave API en Companion."
         }
-      }
+      },
+      "selectedNotListed": "Este modelo no aparece en el último catálogo recibido. Tu selección se mantiene. Comprueba el modelo antes de elegir otro.",
+      "catalogFailed": "No se pudo actualizar el catálogo. Tu selección se mantiene; no se ha comprobado la disponibilidad.",
+      "latestStableModel": "{{name}} (última versión estable)",
+      "latestStableDetails": "Actualmente {{model}}. Se actualiza automáticamente a versiones estables de esta familia; los precios pueden cambiar.",
+      "geminiStableUpdates": "Gemini usa automáticamente los últimos modelos estables Flash y Flash-Lite disponibles para tu clave."
     }
   },
   "update": {
@@ -913,7 +918,9 @@
       "browseError": "No se pudo abrir el selector de carpetas. Inténtalo de nuevo.",
       "cloudDisclosure": "Los datos relevantes de la campaña se envían a {{provider}} cuando haces una consulta.",
       "foundCount_many": "{{count}} partidas encontradas",
-      "openRouterSignIn": "Iniciar sesión con OpenRouter"
+      "openRouterSignIn": "Iniciar sesión con OpenRouter",
+      "loadingSettings": "Cargando tu conexión guardada…",
+      "settingsLoadError": "No se pudo cargar tu conexión guardada. Inténtalo de nuevo o configúrala más tarde para conservar los ajustes actuales."
     }
   },
   "advisorPanel": {
