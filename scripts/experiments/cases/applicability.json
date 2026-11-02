@@ -1,0 +1,304 @@
+[
+  {
+    "name": "energy_runway_unknown_mode",
+    "purpose": "advisor",
+    "family": "resource_runway",
+    "split": "regression",
+    "prompt": "At this unchanged rate, when will my energy stockpile run out, and what should I investigate first?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic"}, "economy": {"resources": {"energy": {"stockpile": 1800, "net_monthly": -75}}}},
+    "review_criteria": [
+      "Calculates 24 months under the stated constant-flow assumption.",
+      "Does not invent an Operational Reserve buffer, a current deficit cause, or fleet location.",
+      "Democratic authority alone does not prove settled or Nomadic mode; useful general investigations remain possible.",
+      "Explains the result and relevant next checks naturally, without a refusal or a long mechanics lecture."
+    ],
+    "references": ["Arithmetic: 1800 / 75 = 24; missing mode and expense categories are unknown.", "patches/audits/4.4.6.md: Operational Reserves concern Nomadic systems."]
+  },
+  {
+    "name": "civic_construction_scope",
+    "purpose": "advisor",
+    "family": "machine_civic_benefits",
+    "split": "regression",
+    "prompt": "What do my civics suggest I should prioritize? Are construction discounts part of their benefits?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "machine_intelligence", "civics": ["machine_servitor", "machine_replication"]}},
+    "review_criteria": [
+      "Recognizes Rogue Servitor and Rapid Replicator; the latter gives 20% Mechanical Pop Assembly Speed, not construction discounts or speed.",
+      "Does not attribute Determined Exterminator benefits to this empire.",
+      "Gives useful priorities without inventing current Bio-Trophy numbers, buildings, economic bottlenecks or unlocks.",
+      "Machine voice can be distinctive but should not obscure the practical answer."
+    ],
+    "references": ["patches/audits/4.4.6.md: common/governments/civics/02_gestalt_civics.txt; machine_servitor and machine_replication."]
+  },
+  {
+    "name": "observed_civic_after_bad_history",
+    "purpose": "advisor",
+    "family": "identity_correction",
+    "split": "regression",
+    "prompt": "You said I cannot be a Rogue Servitor. That is what I am playing. Can we get back to planning some useful goals?",
+    "briefing": {"meta": {"version": "Cygnus v4.5.2", "missing_dlcs": ["Synthetic Dawn"]}, "identity": {"authority": "machine_intelligence", "civics": ["machine_servitor"]}},
+    "previous_turns": [{"question": "What empire am I?", "answer": "You cannot be a Rogue Servitor because you do not own Synthetic Dawn.", "game_date": "2300.01.01", "language": "en"}],
+    "review_criteria": [
+      "Accepts the observed civic and corrects the earlier denial without demanding DLC proof.",
+      "Keeps 4.5.2's partial mechanics coverage distinct from verified 4.4.6 numbers.",
+      "Offers plausible conditional goals without exact unsupported achievement requirements.",
+      "Acknowledges the correction briefly and moves on; avoid defensive or repetitive apologies."
+    ],
+    "references": ["Observed civic is positive campaign evidence; patches/4.5.md through 4.5.2.md are partial coverage."]
+  },
+  {
+    "name": "achievement_condition_and_progress",
+    "purpose": "advisor",
+    "family": "machine_achievement",
+    "split": "regression",
+    "prompt": "Is one Fallen Empire organic enough for Retirement Home? What should I check before pursuing it?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "machine_intelligence", "civics": ["machine_servitor"]}},
+    "review_criteria": [
+      "Explains the 1,000 owned organic Fallen Empire population condition with the required species flag and Rogue Servitor civic.",
+      "Does not turn Sanctuary infrastructure into the event condition or invent global Ironman/checksum requirements.",
+      "Separates the known rule from unknown population progress and platform eligibility.",
+      "Gives a practical explanation without exposing raw identifiers or drowning the answer in caveats."
+    ],
+    "references": ["patches/audits/4.4.6.md: common/achievements.txt, achievement_retirement_home; global platform eligibility is outside this event condition."]
+  },
+  {
+    "name": "nomad_comparison_from_settled_empire",
+    "purpose": "advisor",
+    "family": "nomad_comparisons",
+    "split": "development",
+    "prompt": "How does a Nomad's Operational Reserve system differ from our normal energy stockpile? I am considering a different campaign next time.",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic", "is_nomadic": false}},
+    "review_criteria": [
+      "Explains Nomadic reserves and collection rather than suppressing the topic because the current empire is settled.",
+      "If giving numbers, uses 4.4.6's one-to-one Energy/Mineral tracking and 15,000 base capacity.",
+      "Does not assign Arkships or Operational Reserves to the current empire.",
+      "Provides a readable comparison useful for deciding whether the different playstyle appeals."
+    ],
+    "references": ["patches/audits/4.4.6.md: verified reserve conversion and base capacity; the question explicitly concerns another campaign."]
+  },
+  {
+    "name": "nomad_observed_negative_income",
+    "purpose": "advisor",
+    "family": "nomad_economy",
+    "split": "development",
+    "prompt": "Our ordinary energy income is negative. Does that alone mean the economy is collapsing? What should I look at next?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic", "is_nomadic": true}, "economy": {"resources": {"energy": {"net_monthly": -40}}}},
+    "review_criteria": [
+      "Uses the explicitly observed Nomadic mode; democratic authority does not override it.",
+      "Explains that ordinary negative energy alone cannot establish a Nomad crisis; reserves, collection and contracts matter.",
+      "Does not invent current reserve capacity, reserve stage, ship counts or healthy reserves.",
+      "Offers a focused, useful next check instead of a generic settled-colony build plan."
+    ],
+    "references": ["patches/audits/4.4.6.md: Nomad reserve health; supplied mode is an explicit synthetic observation, not inferred from authority."]
+  },
+  {
+    "name": "nomad_unknown_identity_explanation",
+    "purpose": "advisor",
+    "family": "nomad_unknown_mode",
+    "split": "development",
+    "prompt": "What does the Critical stage of Operational Reserves mean, and how would I investigate it?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {}},
+    "review_criteria": [
+      "Explains the Nomadic reserve concept and the lowest 5% of current capacity threshold if giving its number.",
+      "Does not claim the player is Nomadic or currently at Critical reserves.",
+      "Answers conditionally and suggests checking the actual reserve stage and collection, without refusing the explanation.",
+      "Keeps uncertainty local to the unobserved campaign facts."
+    ],
+    "references": ["patches/audits/4.4.6.md: Critical reserve threshold; no current mode, capacity or stage was supplied."]
+  },
+  {
+    "name": "nomad_hypothetical_embarkation",
+    "purpose": "advisor",
+    "family": "nomad_planning",
+    "split": "development",
+    "prompt": "Suppose we eventually embark into Nomad life. How would you change our economic priorities? I'm asking about the plan, not whether we can do it today.",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic", "is_nomadic": false}},
+    "review_criteria": [
+      "Discusses the hypothetical change toward Arkships, collection, reserves and contracts.",
+      "Does not claim embarkation is currently unlocked or that the transformation already occurred.",
+      "Gives strategic tradeoffs useful for planning, allowing multiple reasonable priorities.",
+      "Avoids repeatedly warning that the current empire is not Nomadic after the hypothetical is clear."
+    ],
+    "references": ["patches/audits/4.4.6.md: Nomadic economic systems and embarkation; current unlock evidence is absent."]
+  },
+  {
+    "name": "machine_civic_alternatives",
+    "purpose": "advisor",
+    "family": "machine_civic_comparisons",
+    "split": "development",
+    "prompt": "For a future game, compare Rogue Servitor with Driven Assimilator and Determined Exterminator. What changes about the goals I would pursue?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "machine_intelligence", "civics": ["machine_servitor"]}},
+    "review_criteria": [
+      "Explains the requested alternatives despite only one civic being observed in the current campaign.",
+      "Does not combine incompatible civics or apply Exterminator modifiers to the current Servitor.",
+      "Explains meaningful playstyle differences rather than only listing numerical bonuses.",
+      "A natural comparison may use prose or a compact table; no prescribed format is required."
+    ],
+    "references": ["patches/audits/4.4.6.md: common/governments/civics/02_gestalt_civics.txt and civic restrictions."]
+  },
+  {
+    "name": "unknown_modded_logistics",
+    "purpose": "advisor",
+    "family": "modded_identity",
+    "split": "development",
+    "prompt": "My custom civic changes logistics. What useful advice can you give from this save, and what would you need to know to be more specific?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "modded_authority", "civics": ["modded_nomad_servitor"]}, "economy": {"resources": {"energy": {"stockpile": 900, "net_monthly": -30}}}},
+    "review_criteria": [
+      "Does not infer Nomadic mode, Rogue Servitor effects or a known civic from identifier fragments.",
+      "Can calculate 30 months at unchanged flow and offer conditional budget investigation.",
+      "Asks for a relevant civic description or tooltip only where it would resolve the unknown mechanic.",
+      "Stays helpful and conversational rather than refusing all strategy because a mod is involved."
+    ],
+    "references": ["Arithmetic: 900 / 30 = 30. The custom civic has no verified definition in this fixture."]
+  },
+  {
+    "name": "colossus_readiness_partial_evidence",
+    "purpose": "advisor",
+    "family": "colossus_unlock",
+    "split": "development",
+    "prompt": "I have Apocalypse and Titans. Can I build a Colossus now, or what else should I check?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6", "required_dlcs": ["Apocalypse"], "required_dlcs_status": "reported"}, "identity": {"authority": "democratic"}, "technology": {"researched_techs": ["tech_titans"]}},
+    "review_criteria": [
+      "Distinguishes content and Titans from the Colossus perk, project, Colossi technology and construction readiness.",
+      "Uses the verified three-prior-perks requirement and supported construction sites if explaining them.",
+      "Does not declare readiness or infer that an incomplete technology list proves absence of every other technology.",
+      "Gives an understandable next-check sequence without turning missing evidence into a blanket refusal."
+    ],
+    "references": ["patches/audits/4.4.6.md: ap_colossus, apoc.100, Colossi hull and shipyard requirements."]
+  },
+  {
+    "name": "brief_resource_target",
+    "purpose": "advisor",
+    "family": "resource_target",
+    "split": "development",
+    "prompt": "Quick calculation: at unchanged income, how long until we reach 1,740 alloys? One or two sentences is plenty.",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic"}, "economy": {"resources": {"alloys": {"stockpile": 1380, "net_monthly": 90}}}},
+    "review_criteria": [
+      "Calculates four months from (1740 - 1380) / 90.",
+      "Honors the unchanged-income assumption without inventing construction costs or reserve systems.",
+      "Answers directly instead of asking for information already supplied.",
+      "Respects the requested brevity; no unnecessary roleplay preamble or checklist."
+    ],
+    "references": ["Arithmetic: (1740 - 1380) / 90 = 4."]
+  },
+  {
+    "name": "foreign_branch_office_explanation",
+    "purpose": "advisor",
+    "family": "corporate_interactions",
+    "split": "holdout",
+    "prompt": "A corporation has a Branch Office on one of our planets. Explain how these offices fit into the economy. Does our democratic authority make that impossible?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic"}},
+    "review_criteria": [
+      "Distinguishes the foreign corporation from the democratic host; does not reject the player's report based on the player's authority.",
+      "Uses Trade for establishment if mentioning currency, and does not invent exact yields or eligibility requirements.",
+      "Explains the general interaction while keeping the specific office's owner, value and conditions unverified.",
+      "Gives a natural answer, not a lecture about internal applicability metadata."
+    ],
+    "references": ["patches/audits/4.4.6.md: Branch Office establishment uses Trade. The player reports a foreign office; the provided save does not verify its detailed state."]
+  },
+  {
+    "name": "hive_expansion_tradeoffs",
+    "purpose": "advisor",
+    "family": "hive_strategy",
+    "split": "holdout",
+    "prompt": "We want to expand quickly but avoid overstretch. How should our Devouring Swarm bonuses influence that choice?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "hive_mind", "civics": ["hive_devouring_swarm"]}, "economy": {"resources": {"alloys": {"stockpile": 800, "net_monthly": 25}}}},
+    "review_criteria": [
+      "Connects the verified expansion and ship-cost benefits to a sensible conditional strategy.",
+      "Does not turn Army Damage into ship damage, invent a firing-speed bonus or assert an inevitable enemy coalition.",
+      "Allows tradeoffs between further expansion and consolidation; does not invent targets or fleet superiority.",
+      "Hive voice should support clear advice rather than replace it with ideological rhetoric."
+    ],
+    "references": ["patches/audits/4.4.6.md: hive_devouring_swarm modifiers; Army Damage is distinct from Ship Weapons Damage."]
+  },
+  {
+    "name": "stellar_cannon_information_request",
+    "purpose": "advisor",
+    "family": "special_megastructure",
+    "split": "holdout",
+    "prompt": "I am weighing a Stellar Cannon for a later campaign. Is 10,000 Energy the minimum needed to fire, and what tradeoff should I understand?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic", "is_nomadic": false}},
+    "review_criteria": [
+      "Explains that 10,000 is the additional colony-devastation threshold, not the minimum firing cost.",
+      "Explains that a shot consumes the owner's entire Energy stockpile; does not claim a cannon currently exists or is unlocked.",
+      "Discusses the energy commitment as a strategic tradeoff without inventing current targets or damage outcomes.",
+      "Answers the explicit future-campaign question without rejecting it based on the current empire."
+    ],
+    "references": ["patches/audits/4.4.6.md: verified Stellar Cannon charge, whole-stockpile consumption and devastation threshold."]
+  },
+  {
+    "name": "unknown_version_exact_mechanic",
+    "purpose": "advisor",
+    "family": "version_uncertainty",
+    "split": "holdout",
+    "prompt": "What is the exact Energy-to-Operational-Reserves conversion in my game? If you cannot establish the number, tell me how to check it.",
+    "briefing": {"meta": {"version": "unknown"}, "identity": {"is_nomadic": true}},
+    "review_criteria": [
+      "Does not assert the 4.4.6 ratio or an older ratio as the current verified rule.",
+      "Keeps the observed Nomadic mode separate from unknown version-specific mechanics.",
+      "Suggests checking the relevant reserve tooltip and version rather than refusing all help.",
+      "States the narrow uncertainty plainly without an extended disclaimer."
+    ],
+    "references": ["The supplied version is unknown; the audit documents changes to reserve conversion between 4.4.4 and 4.4.5."]
+  },
+  {
+    "name": "peaceful_development_choices",
+    "purpose": "advisor",
+    "family": "ordinary_development",
+    "split": "holdout",
+    "prompt": "I enjoy peaceful development more than conquest. Give me a few sensible priorities for the next decade and explain the tradeoffs.",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic", "ethics": ["pacifist", "xenophile"]}, "economy": {"resources": {"alloys": {"stockpile": 1200, "net_monthly": 40}}}},
+    "review_criteria": [
+      "Offers useful conditional development choices consistent with the stated preference.",
+      "Does not invent a peaceful current state, existing federation, treaties, planets or available construction sites.",
+      "Allows different reasonable priorities; there is no single prescribed optimal strategy.",
+      "Explains tradeoffs naturally and avoids obsolete Trade Route or patrol-based Trade advice."
+    ],
+    "references": ["patches/audits/4.4.6.md: current production and Trade systems; war status, contacts and planet data are absent."]
+  },
+  {
+    "name": "neighbor_intentions_uncertain",
+    "purpose": "advisor",
+    "family": "diplomatic_forecast",
+    "split": "holdout",
+    "prompt": "I am worried about a neighbor attacking. With what you can see, how should I prepare without overreacting?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic"}},
+    "review_criteria": [
+      "Does not invent neighbor hostility, fleet movements, chokepoints, intentions or invasion timing.",
+      "Separates warning signs worth checking from facts known about this campaign.",
+      "Suggests proportionate conditional preparation rather than certainty or a complete refusal.",
+      "Sounds like a helpful advisor rather than a list of repeated unknowns."
+    ],
+    "references": ["No diplomatic, geographical or military observations are supplied. Conditional preparation is permitted; precise forecasts are unsupported."]
+  },
+  {
+    "name": "fresh_snapshot_replaces_old_warning",
+    "purpose": "advisor",
+    "family": "conversation_freshness",
+    "split": "holdout",
+    "prompt": "Do we still need emergency cuts, or can I return to my research plans?",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6", "date": "2302.01.01"}, "identity": {"authority": "democratic"}, "economy": {"resources": {"energy": {"stockpile": 2400, "net_monthly": 60}}}},
+    "previous_turns": [{"question": "Are we in financial trouble?", "answer": "At 100 Energy and a monthly deficit of 50, emergency cuts are urgent.", "game_date": "2300.01.01", "language": "en"}],
+    "review_criteria": [
+      "Uses the newer 2,400 stockpile and positive 60 monthly flow instead of repeating the old emergency warning.",
+      "Does not invent why the economy improved or assert every research expense is affordable.",
+      "Gives a useful conditional recommendation about returning to research plans.",
+      "Acknowledges the changed situation naturally without replaying the entire conversation."
+    ],
+    "references": ["The supplied 2302 snapshot supersedes the 2300 numerical warning; future research costs and other resources are unknown."]
+  },
+  {
+    "name": "player_prefers_risk_and_roleplay",
+    "purpose": "advisor",
+    "family": "player_preferences",
+    "split": "holdout",
+    "prompt": "I would rather try an interesting ambitious plan than play perfectly safely. Give me one idea in character, plus the main risk. Keep it to a short paragraph.",
+    "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "imperial", "ethics": ["militarist"]}, "economy": {"resources": {"alloys": {"stockpile": 1500, "net_monthly": 55}}}},
+    "review_criteria": [
+      "Offers a creative but conditional plan consistent with the user's appetite for risk.",
+      "Does not invent a named target, nearby weak empire, existing fleet, unlocked megastructure or guaranteed victory.",
+      "Names the main tradeoff without overriding the requested playstyle with blanket conservatism.",
+      "Uses an engaging imperial voice and a short paragraph; accuracy constraints should not flatten the personality."
+    ],
+    "references": ["Observed authority, ethics and Alloy amounts support style and resource context; no geography, fleets, technologies or targets are supplied."]
+  }
+]

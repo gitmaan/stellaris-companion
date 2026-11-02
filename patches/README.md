@@ -9,9 +9,12 @@ coverage when a new game version has not yet been fully audited.
 1. The app reads the Stellaris version from the save.
 2. The shared resolver selects an exact snapshot, a compatible snapshot and overlays, or a
    notes-only pack for an audited breaking release line.
-3. The Advisor selects relevant sections using headings, rule labels, and rule text, plus at
-   most one additional section matching verified empire identity. Chronicle
-   receives the full resolved pack. MCP Advisor Briefing returns the same Advisor prompt and
+3. Applicability annotations remove unrelated specialised rules before topic ranking.
+   Explicit questions about other empires or hypothetical builds retain conditional references.
+   The Advisor then selects sections using headings, rule labels, and rule text, plus at
+   most one additional section matching verified empire identity. In-app Chronicle uses
+   its supplied briefing for topic selection; consumers without a topic query retain the
+   full resolved pack, including scope conditions. MCP Advisor Briefing returns the same Advisor prompt and
    coverage metadata, in both structured output and an untruncated text block.
 4. Unknown newer release lines do not receive older mechanics presented as current.
 
@@ -57,6 +60,56 @@ by a maintainer for substantive correctness, allowing normal variation in wordin
 
 Source and coverage decisions for each stable snapshot live in `patches/audits/`.
 
+## Applicability annotations
+
+Keep gameplay prose in these Markdown files. `applicability.json` contains only reusable
+scope names, identity conditions and explicit topic phrases; it does not duplicate rules
+or their numerical values. Versions and source audits remain owned by the existing packs.
+
+For a section whose rules all concern the same system, put its scope after the heading:
+
+```markdown
+## Operational Reserves & Nomad Economy
+<!-- applies-to: nomadic -->
+```
+
+For a specialised rule inside a mixed section, keep the annotation on the rule's line:
+
+```markdown
+* **Branch Offices:** <!-- applies-to: corporate --> Branch Offices use Trade for establishment.
+```
+
+Inline annotations are replaced together with their rule by `supersedes-rule`; they
+cannot accidentally attach to the following rule. Use section scopes only when every
+rule belongs to that scope. Unannotated rules retain existing retrieval behavior.
+
+Scope conditions use supplied canonical authority, origin, civic membership or an explicit
+boolean `is_nomadic`. They are retrieval hints, not complete unlock or eligibility checks.
+Missing fields, malformed values, unrecognised identities and omitted civics remain unknown.
+Do not infer Nomadic mode from authority, an old origin, an identifier substring or DLC
+presence. The current extractor does not establish `is_nomadic`; without such an explicit
+observation, direct Nomadic questions still receive conditional reference material.
+
+An observed condition makes that reference eligible for ordinary topic ranking. Otherwise,
+explicit topic phrases keep it available for comparisons, plans and explanations, marked as
+conditional or about a different identity. Full-reference consumers retain conditions too.
+These notes are model context, not a required format for the player's answer.
+
+Topic matching is lexical and the maintained phrases currently use English. This is not a
+multilingual semantic search layer. Add translated names or a different retrieval strategy
+only with representative evaluation; an unmatched phrase must not be presented as proof
+that a mechanic is unavailable.
+
+Keep topic phrases specific: names and distinctive concepts such as `operational reserves`,
+not broad words such as `energy` that apply to many systems. New scopes should address a
+demonstrated ambiguity. Existing scopes can be reused with one annotation, without changing
+Python. Tests validate the registry and every shipped annotation; an unreadable registry
+omits affected scoped references rather than treating them as generally applicable.
+
+Run `tests/test_knowledge_applicability.py` alongside the existing knowledge tests. Include
+positive cases, unknown conditions and questions about other empires when adding a scope.
+Do not tighten retrieval just to remove a phrase from one previously failing answer.
+
 Before shipping, run `tests/test_game_knowledge.py` and record cross-provider responses with
 `scripts/experiments/eval_game_knowledge.py` for human review. Test stale premises that a model
 with an older knowledge cutoff is likely to answer confidently but incorrectly.
@@ -67,6 +120,52 @@ cases. `--repeats 2` records independent samples; `--snapshots-dir` allows contr
 comparisons. Advisor evaluations use question and identity selection just like the app; Chronicle evaluations use
 the full pack. `--list` lists the selected suite without making model calls. A unit-test pass
 checks prompt assembly, not model accuracy; record provider responses and review them separately.
+
+## Broader answer-quality evaluation
+
+`--suite applicability` loads data-only scenarios from
+`scripts/experiments/cases/applicability.json`. They include ordinary advice, calculations,
+identity correction, modded identities, comparisons, hypothetical choices and missing data.
+The cases carry sourced review criteria and are split into `regression`, `development` and
+`holdout` families. `--split` selects one group; `--list` never calls a provider.
+
+Freeze a candidate before running the holdout. If a holdout failure guides an implementation
+change, move that family into development and add a fresh holdout family. Avoid putting
+paraphrases of the same mechanic on both sides of the split. Review full answers, including
+secondary claims, and allow alternative valid strategies and wording.
+
+```sh
+python scripts/experiments/eval_game_knowledge.py --suite applicability \
+  --provider gemini --models MODEL_ID --repeats 2 --variant candidate \
+  --json-out tmp/candidate.json
+python -m scripts.experiments.eval_review prepare tmp/baseline.json tmp/candidate.json \
+  --out tmp/review.json
+python -m scripts.experiments.eval_review summarize tmp/review.json --key tmp/review.key.json
+```
+
+Use exact model IDs for controlled comparisons and retain the baseline's code/reference
+revision as well as its recorded requests. The normal runner exercises the production
+Advisor assembly. Change one component at a time; a different model or reference pack is
+not evidence of a retrieval-only improvement. Chronicle cases still exercise the structured
+adapter rather than the full archive assembly.
+
+The review packet hides variant names, model names and retrieved prompts; its separate key
+preserves those receipts. Ratings start blank. Attribute each review to a named human or
+model and score accuracy, grounding, usefulness and naturalness separately. A plausible but
+unverified detail is not automatically false, and a correct refusal may still be unhelpful.
+Use independent applicable references when judging correctness, not only what retrieval
+selected. The report keeps unrated answers, provider errors and repeated trials visible;
+it never promotes transport success or an unreviewed response to a semantic pass.
+
+Run inexpensive deterministic checks on every PR. Run live comparisons for relevant changes
+and newly resolved model versions, with a small human spot check of failures and a random
+sample when available. Keep automated/model review explicitly labelled. Current synthetic
+cases do not establish a production error rate or human preference, and should be expanded
+with representative, sanitised campaign fixtures as evidence accumulates.
+
+The first controlled applicability experiment is recorded in
+[`docs/campaign-evidence.md`](../docs/campaign-evidence.md#applicability-experiment-2026-11-03).
+It verified narrower retrieval but did not demonstrate better overall answer quality.
 
 Official release announcements are available from the
 [Stellaris Steam news feed](https://store.steampowered.com/news/posts/?appids=281990).

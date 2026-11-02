@@ -47,6 +47,24 @@ def test_repeated_evaluations_record_each_independent_sample(monkeypatch, tmp_pa
     assert calls == ["supported_calculation", "supported_calculation"]
     assert [row["repetition"] for row in payload["results"]] == [1, 2]
     assert all(row["human_label"] is None for row in payload["results"])
+    assert {"accuracy", "grounding", "usefulness", "naturalness"} == payload["review_rubric"].keys()
+
+
+def test_holdout_selection_is_explicit_and_does_not_make_provider_calls(monkeypatch, capsys):
+    monkeypatch.setattr(
+        evaluation,
+        "parse_args",
+        lambda: SimpleNamespace(
+            suite="applicability", repeats=1, split="holdout", case_names=None, list=True
+        ),
+    )
+    monkeypatch.setattr(
+        evaluation, "run_case", lambda *args: pytest.fail("Listing must be offline")
+    )
+    assert evaluation.main() == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines and all("\tholdout\t" in line for line in lines)
+    assert not any("energy_runway_unknown_mode" in line for line in lines)
 
 
 @pytest.mark.parametrize(

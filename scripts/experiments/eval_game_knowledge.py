@@ -37,6 +37,7 @@ from backend.core.advisor_providers import (  # noqa: E402
 )
 from backend.core.chronicle import ChronicleGenerator  # noqa: E402
 from backend.core.companion import Companion  # noqa: E402
+from scripts.experiments.eval_review import REVIEW_RUBRIC  # noqa: E402
 from stellaris_companion.game_knowledge import (  # noqa: E402
     DEFAULT_SNAPSHOTS_DIR,
     build_game_knowledge_prompt,
@@ -50,6 +51,7 @@ EVAL_VERSIONS = {
     "pegasus": "Pegasus v4.4.6",
     "cygnus": "Cygnus v4.5.2",
     "evidence": "Cygnus v4.5.2",
+    "applicability": "Pegasus v4.4.6",
 }
 
 HumanLabel = Literal["accurate", "acceptable", "concerning", "materially_incorrect"]
@@ -69,6 +71,9 @@ class EvalCase:
     structured: bool = False
     briefing: dict[str, Any] | None = None
     previous_turns: list[dict[str, Any]] | None = None
+    family: str = "legacy"
+    split: Literal["regression", "development", "holdout"] = "regression"
+    references: list[str] | None = None
 
 
 @dataclass
@@ -92,6 +97,12 @@ class EvalResult:
 
 def build_cases(suite: str = "pegasus") -> list[EvalCase]:
     """Return high-value cases whose criteria are reviewed semantically by a person."""
+    if suite == "applicability":
+        path = Path(__file__).with_name("cases") / "applicability.json"
+        cases = [EvalCase(**entry) for entry in json.loads(path.read_text(encoding="utf-8"))]
+        if len({case.name for case in cases}) != len(cases):
+            raise ValueError("Evaluation case names must be unique")
+        return cases
     if suite == "evidence":
         return _build_evidence_cases()
     if suite == "cygnus":
@@ -953,6 +964,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--case", action="append", dest="case_names")
     parser.add_argument(
+        "--split", choices=["all", "regression", "development", "holdout"], default="all"
+    )
+    parser.add_argument(
+        "--variant", default="candidate", help="Comparison label, never sent to the model"
+    )
+    parser.add_argument(
         "--json-out",
         type=Path,
         default=Path("tmp/game-knowledge-eval.json"),
@@ -967,6 +984,9 @@ def main() -> int:
         print("--repeats must be positive.", file=sys.stderr)
         return 2
     cases = build_cases(args.suite)
+    split = getattr(args, "split", "all")
+    if split != "all":
+        cases = [case for case in cases if case.split == split]
     if args.case_names:
         selected = set(args.case_names)
         cases = [case for case in cases if case.name in selected]
@@ -977,8 +997,12 @@ def main() -> int:
 
     if args.list:
         for case in cases:
-            print(f"{case.name}\t{case.purpose}")
+            print(f"{case.name}\t{case.purpose}\t{case.split}\t{case.family}")
         return 0
+
+    if not cases:
+        print("No cases match the selected suite and split.", file=sys.stderr)
+        return 2
 
     models = args.models
     if not models:
@@ -992,8 +1016,10 @@ def main() -> int:
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "suite": args.suite,
+        "variant": getattr(args, "variant", "candidate"),
+        "split": split,
         "suite_default_game_version": EVAL_VERSIONS[args.suite],
-        "advisor_knowledge_selection": "question_topics_and_verified_identity",
+        "advisor_knowledge_selection": "production_question_identity_and_applicability",
         "provider": args.provider,
         "models": models,
         "repeats": args.repeats,
@@ -1003,6 +1029,7 @@ def main() -> int:
             "concerning",
             "materially_incorrect",
         ],
+        "review_rubric": REVIEW_RUBRIC,
         "cases": [asdict(case) for case in cases],
         "results": [asdict(result) for result in results],
     }

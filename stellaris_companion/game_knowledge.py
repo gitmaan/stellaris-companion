@@ -10,6 +10,11 @@ from typing import Literal
 
 from .campaign_evidence import resolve_content_availability, resolve_empire_identity
 from .evidence_policy import build_evidence_prompt
+from .knowledge_applicability import (
+    APPLICABILITY_PATTERN,
+    KnowledgeScope,
+    load_scope_registry,
+)
 from .paths import get_repo_root
 
 
@@ -172,6 +177,7 @@ class GameKnowledgeContext:
     status: KnowledgeStatus
     content: str | None
     notes_only: bool = False
+    annotated_content: str | None = None
 
 
 def parse_version(version: str) -> tuple[int, int, int] | None:
@@ -193,9 +199,16 @@ def extract_version(version: str) -> str | None:
     return ".".join(parts)
 
 
-def clean_knowledge_content(content: str) -> str:
+def clean_knowledge_content(content: str, *, keep_applicability: bool = False) -> str:
     """Remove maintainer comments while retaining model-useful Markdown structure."""
-    cleaned = re.sub(r"<!--.*?-->", "", content, flags=re.DOTALL)
+    cleaned = re.sub(
+        r"<!--.*?-->",
+        lambda match: (
+            match[0] if keep_applicability and APPLICABILITY_PATTERN.fullmatch(match[0]) else ""
+        ),
+        content,
+        flags=re.DOTALL,
+    )
     lines = [line.rstrip() for line in cleaned.splitlines()]
     while lines and not lines[0].strip():
         lines.pop(0)
@@ -228,7 +241,7 @@ def _load_file(version: str, directory: Path) -> str | None:
         return None
 
 
-def _combine_knowledge(parts: list[str]) -> str | None:
+def _combine_knowledge(parts: list[str], *, keep_applicability: bool = False) -> str | None:
     """Apply explicit rule replacements without discarding unrelated older facts."""
     content = ""
     for part in parts:
@@ -238,8 +251,66 @@ def _combine_knowledge(parts: list[str]) -> str | None:
                 lambda match, labels=replaced_labels: "" if match["label"] in labels else match[0],
                 content,
             )
-        content += f"\n\n{clean_knowledge_content(part)}"
-    return clean_knowledge_content(content) or None
+        content += f"\n\n{clean_knowledge_content(part, keep_applicability=keep_applicability)}"
+    return clean_knowledge_content(content, keep_applicability=keep_applicability) or None
+
+
+def _apply_applicability(
+    content: str,
+    *,
+    topics: str | None,
+    identity: dict | None,
+    scopes: dict[str, KnowledgeScope],
+) -> str:
+    """Keep observed or explicitly requested scopes, with their conditions intact.
+
+    An annotation before a section's first rule scopes the section. An inline
+    annotation belongs to that rule, so replacements remove its metadata too.
+    Full-reference consumers retain all resolved scopes as conditional context.
+    """
+
+    def scope_note(name: str) -> str | None:
+        scope = scopes.get(name)
+        if scope is None:
+            return None
+        status = scope.assess(identity)
+        if topics is not None and status != "supported" and not scope.requested_by(topics):
+            return None
+        return scope.reference_note(status)
+
+    def render_section(section: str) -> str:
+        first_rule = _RULE_PATTERN.search(section)
+        intro = section[: first_rule.start()] if first_rule else section
+        section_scope = APPLICABILITY_PATTERN.search(intro)
+        if section_scope:
+            note = scope_note(section_scope[1])
+            if note is None:
+                return ""
+            section = section.replace(section_scope[0], note, 1)
+
+        def render_rule(match: re.Match) -> str:
+            annotation = APPLICABILITY_PATTERN.search(match[0])
+            if not annotation:
+                return match[0]
+            note = scope_note(annotation[1])
+            if note is None:
+                return ""
+            return match[0].replace(annotation[0], f"({note})", 1)
+
+        rendered = _RULE_PATTERN.sub(render_rule, section)
+        # Do not leave an empty scoped section competing for retrieval slots.
+        if first_rule and not _RULE_PATTERN.search(rendered):
+            return ""
+        return rendered.strip()
+
+    headings = list(_MARKDOWN_SECTION_PATTERN.finditer(content))
+    if not headings:
+        return clean_knowledge_content(render_section(content))
+    sections = [content[: headings[0].start()].strip()]
+    for index, match in enumerate(headings):
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(content)
+        sections.append(render_section(content[match.start() : end]))
+    return clean_knowledge_content("\n\n".join(section for section in sections if section))
 
 
 def _search_terms(text: str, *, expand_aliases: bool = True) -> set[str]:
@@ -396,13 +467,15 @@ def load_game_knowledge(
         status: KnowledgeStatus = (
             "exact" if loaded_version == target_version and not notes_only_line else "partial"
         )
+        annotated = _combine_knowledge(content_parts, keep_applicability=True)
         return GameKnowledgeContext(
             version,
             target_version,
             loaded_version,
             status if content_parts else "unavailable",
-            _combine_knowledge(content_parts),
+            clean_knowledge_content(annotated) if annotated else None,
             notes_only=notes_only_line,
+            annotated_content=annotated,
         )
 
     content_parts = []
@@ -425,13 +498,15 @@ def load_game_knowledge(
             loaded_version = patch_version
 
     status = "exact" if loaded_version == target_version and not notes_only_line else "partial"
+    annotated = _combine_knowledge(content_parts, keep_applicability=True)
     return GameKnowledgeContext(
         version,
         target_version,
         loaded_version,
         status if content_parts else "unavailable",
-        _combine_knowledge(content_parts),
+        clean_knowledge_content(annotated) if annotated else None,
         notes_only=notes_only_line,
+        annotated_content=annotated,
     )
 
 
@@ -467,6 +542,13 @@ def build_game_knowledge_prompt(
     ]
 
     knowledge_content = knowledge.content
+    if knowledge.annotated_content and APPLICABILITY_PATTERN.search(knowledge.annotated_content):
+        knowledge_content = _apply_applicability(
+            knowledge.annotated_content,
+            topics=topics,
+            identity=campaign_identity,
+            scopes=load_scope_registry(patches_dir / "applicability.json"),
+        )
     if knowledge_content and topics is not None:
         typed = resolve_empire_identity(campaign_identity)
         entities = [typed["authority"], typed["origin"], *typed["civics"], *typed["ethics"]]
