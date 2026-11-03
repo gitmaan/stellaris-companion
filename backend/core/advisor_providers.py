@@ -6,6 +6,7 @@ import ipaddress
 import json
 import logging
 import os
+import ssl
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
@@ -853,24 +854,31 @@ class ChatGPTAdvisorGenerator:
             body["schema"] = _portable_json_schema(response_schema)
             body["schemaName"] = _structured_schema_name(response_schema, schema_name)
             body["allowSchemaFallback"] = allow_schema_fallback
-        client = self._client or httpx.Client(
-            timeout=self.config.timeout_seconds + 10, follow_redirects=False, trust_env=False
-        )
+        client = self._client
         try:
+            if client is None:
+                # The desktop bridge is HTTP-only. Skip loading CA files, but
+                # keep TLS verification enabled so unexpected HTTPS fails closed.
+                client = httpx.Client(
+                    timeout=self.config.timeout_seconds + 10,
+                    follow_redirects=False,
+                    trust_env=False,
+                    verify=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT),
+                )
             response = client.post(
                 f"{self.config.base_url}/generate",
                 json=body,
                 headers={"Authorization": f"Bearer {self.config.api_key}"},
             )
             payload = response.json()
-        except (httpx.RequestError, ValueError) as exc:
+        except (httpx.RequestError, ValueError, OSError) as exc:
             raise AdvisorProviderError(
                 "ChatGPT is temporarily unavailable. Please try again.",
                 code="CHATGPT_UNAVAILABLE",
                 status_code=503,
             ) from exc
         finally:
-            if self._client is None:
+            if self._client is None and client is not None:
                 client.close()
         if not response.is_success:
             allowed_codes = {
