@@ -201,6 +201,10 @@ def extract_version(version: str) -> str | None:
 
 def clean_knowledge_content(content: str, *, keep_applicability: bool = False) -> str:
     """Remove maintainer comments while retaining model-useful Markdown structure."""
+    if not keep_applicability:
+        # Optional annotations must not alter even the default prompt's whitespace.
+        content = re.sub(r"(?m)^[ \t]*" + APPLICABILITY_PATTERN.pattern + r"[ \t]*\n?", "", content)
+        content = re.sub(APPLICABILITY_PATTERN.pattern + r"[ \t]*", "", content)
     cleaned = re.sub(
         r"<!--.*?-->",
         lambda match: (
@@ -355,7 +359,8 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int, identity
             continue
 
         end = headings[index + 1].start() if index + 1 < len(headings) else len(content)
-        body = content[match.end() : end].strip()
+        # Score gameplay text, never maintainer metadata or generated scope notes.
+        body = clean_knowledge_content(content[match.end() : end]).strip()
         if not body:
             continue  # Document titles are not mechanics sections.
         title_terms = _search_terms(title, expand_aliases=False)
@@ -525,6 +530,7 @@ def build_game_knowledge_prompt(
     topics: str | None = None,
     campaign_metadata: dict | None = None,
     campaign_identity: dict | None = None,
+    experimental_applicability: bool = False,
     max_topic_sections: int = 3,
     patches_dir: Path = DEFAULT_PATCHES_DIR,
     snapshots_dir: Path = DEFAULT_SNAPSHOTS_DIR,
@@ -541,14 +547,10 @@ def build_game_knowledge_prompt(
         build_content_evidence_prompt({**(campaign_metadata or {}), "version": version}),
     ]
 
-    knowledge_content = knowledge.content
-    if knowledge.annotated_content and APPLICABILITY_PATTERN.search(knowledge.annotated_content):
-        knowledge_content = _apply_applicability(
-            knowledge.annotated_content,
-            topics=topics,
-            identity=campaign_identity,
-            scopes=load_scope_registry(patches_dir / "applicability.json"),
-        )
+    # Held out of app defaults pending demonstrated answer-quality benefit.
+    knowledge_content = (
+        knowledge.annotated_content if experimental_applicability else knowledge.content
+    )
     if knowledge_content and topics is not None:
         typed = resolve_empire_identity(campaign_identity)
         entities = [typed["authority"], typed["origin"], *typed["civics"], *typed["ethics"]]
@@ -562,6 +564,20 @@ def build_game_knowledge_prompt(
             topics,
             limit=max(0, max_topic_sections),
             identity=identity_names,
+        )
+
+    # Preserve the baseline's section selection. Pruning a specialised rule must
+    # not promote a different section, and scope notes must never affect ranking.
+    if (
+        experimental_applicability
+        and knowledge_content
+        and APPLICABILITY_PATTERN.search(knowledge_content)
+    ):
+        knowledge_content = _apply_applicability(
+            knowledge_content,
+            topics=topics,
+            identity=campaign_identity,
+            scopes=load_scope_registry(patches_dir / "applicability.json"),
         )
 
     if knowledge_content and knowledge.status == "exact":

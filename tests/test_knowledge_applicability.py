@@ -2,6 +2,7 @@
 
 import json
 import re
+from functools import partial
 
 import pytest
 
@@ -16,11 +17,54 @@ from stellaris_companion.knowledge_applicability import (
     parse_scope_registry,
 )
 
+build_scoped_prompt = partial(build_game_knowledge_prompt, experimental_applicability=True)
+
+
+def test_app_defaults_keep_baseline_retrieval_and_scope_annotations_are_invisible(tmp_path):
+    snapshots = tmp_path / "snapshots"
+    snapshots.mkdir()
+    path = snapshots / "4.4.6.md"
+    plain = "# Knowledge\n\n## Economy\n\n* **Rule:** A useful economy rule.\n"
+    path.write_text(plain)
+    kwargs = dict(
+        purpose="advisor", topics="economy", patches_dir=tmp_path, snapshots_dir=snapshots
+    )
+    baseline = build_game_knowledge_prompt("4.4.6", **kwargs)
+    path.write_text(
+        plain.replace("## Economy\n", "## Economy\n<!-- applies-to: nomadic -->\n").replace(
+            "**Rule:** ", "**Rule:** <!-- applies-to: nomadic --> "
+        )
+    )
+    # Even a missing experimental registry cannot change the default output.
+    assert build_game_knowledge_prompt("4.4.6", **kwargs) == baseline
+    default = build_game_knowledge_prompt(
+        "4.4.6", purpose="advisor", topics="When will my energy stockpile run out?"
+    )
+    assert "Operational Reserves start" in default
+    assert "Scope:" not in default
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "At this unchanged rate, when will my energy stockpile run out, and what should I investigate first?",
+        "I am worried about a neighbor attacking. With what you can see, how should I prepare without overreacting?",
+        "I would rather try an interesting ambitious plan than play perfectly safely. Give me one idea in character, plus the main risk.",
+    ],
+)
+def test_experimental_pruning_never_promotes_a_different_section(question):
+    kwargs = dict(purpose="advisor", topics=question, campaign_identity={"authority": "democratic"})
+    baseline = build_game_knowledge_prompt("4.4.6", **kwargs)
+    experimental = build_scoped_prompt("4.4.6", **kwargs)
+    titles = lambda text: set(re.findall(r"^## (.+)$", text, re.MULTILINE))
+    assert titles(experimental) <= titles(baseline)
+    assert "Operational Reserves start" not in experimental
+
 
 @pytest.mark.parametrize("identity", [{}, {"authority": "democratic"}, {"is_nomadic": False}])
 @pytest.mark.parametrize("version", ["4.4.4", "4.4.5", "4.4.6", "4.5.2"])
 def test_generic_economy_does_not_borrow_unobserved_special_systems(identity, version):
-    prompt = build_game_knowledge_prompt(
+    prompt = build_scoped_prompt(
         version,
         purpose="advisor",
         topics="When will my energy stockpile run out, and what should I investigate first?",
@@ -38,7 +82,7 @@ def test_generic_economy_does_not_borrow_unobserved_special_systems(identity, ve
 
 @pytest.mark.parametrize("identity", [{}, {"authority": "democratic", "is_nomadic": False}])
 def test_comparisons_keep_special_rules_without_assigning_them_to_the_player(identity):
-    prompt = build_game_knowledge_prompt(
+    prompt = build_scoped_prompt(
         "4.4.6",
         purpose="advisor",
         topics="How do Nomad operational reserves compare with an ordinary energy stockpile?",
@@ -62,7 +106,7 @@ def test_observed_mode_supports_generic_questions_without_dlc_or_authority_guess
         {"is_nomadic": "yes"},
     ):
         assert scope.assess(identity) == "unknown"
-    prompt = build_game_knowledge_prompt(
+    prompt = build_scoped_prompt(
         "4.4.6",
         purpose="advisor",
         topics="How should I interpret negative energy income?",
@@ -77,7 +121,7 @@ def test_civic_rules_do_not_import_other_civics_but_comparisons_remain_answerabl
         "authority": "machine_intelligence",
         "civics": ["civic_machine_servitor", "machine_replication"],
     }
-    prompt = build_game_knowledge_prompt(
+    prompt = build_scoped_prompt(
         "4.4.6",
         purpose="advisor",
         topics="What do my civics imply for construction and growth?",
@@ -87,7 +131,7 @@ def test_civic_rules_do_not_import_other_civics_but_comparisons_remain_answerabl
     assert "normal start includes 2,000" in prompt
     assert "+25% Ship Weapons Damage" not in prompt
     assert "Colossus Project and Construction" not in prompt
-    comparison = build_game_knowledge_prompt(
+    comparison = build_scoped_prompt(
         "4.4.6",
         purpose="advisor",
         topics="Compare my civics with Determined Exterminator.",
@@ -102,7 +146,7 @@ def test_unknown_identifiers_do_not_become_applicability_evidence_by_name_simila
     assert scopes["rogue-servitor"].assess({"civics": ["modded_machine_servitor"]}) == "unknown"
     assert scopes["corporate"].assess({"authority": "modded_corporate"}) == "unknown"
     assert scopes["rogue-servitor"].assess({"civics": []}) == "unknown"
-    prompt = build_game_knowledge_prompt(
+    prompt = build_scoped_prompt(
         "4.4.6",
         purpose="advisor",
         topics="What should I prioritise for my economy?",
@@ -113,10 +157,10 @@ def test_unknown_identifiers_do_not_become_applicability_evidence_by_name_simila
 
 def test_mixed_sections_retain_general_rules_and_explicit_foreign_mechanics():
     kwargs = {"purpose": "advisor", "campaign_identity": {"authority": "democratic"}}
-    economy = build_game_knowledge_prompt("4.4.6", topics="Explain my trade economy.", **kwargs)
+    economy = build_scoped_prompt("4.4.6", topics="Explain my trade economy.", **kwargs)
     assert "Trade is the Galactic Market currency" in economy
     assert "Branch Offices use Trade" not in economy
-    comparison = build_game_knowledge_prompt(
+    comparison = build_scoped_prompt(
         "4.4.6", topics="How do corporate Branch Offices work?", **kwargs
     )
     assert "Branch Offices use Trade" in comparison
@@ -148,7 +192,7 @@ def test_full_reference_keeps_conditions_and_replacements_keep_metadata_attached
         "* **Conversion:** New general rule.\n"
     )
     kwargs = {"patches_dir": tmp_path, "snapshots_dir": snapshots}
-    old = build_game_knowledge_prompt("4.4.4", purpose="chronicle", **kwargs)
+    old = build_scoped_prompt("4.4.4", purpose="chronicle", **kwargs)
     assert "Old scoped rule" in old
     assert "conditional reference" in old
     for cumulative in (True, False):
@@ -156,7 +200,7 @@ def test_full_reference_keeps_conditions_and_replacements_keep_metadata_attached
         assert "New general rule" in knowledge.content
         assert "Old scoped rule" not in knowledge.content
         assert "Old continuation" not in knowledge.content
-    current = build_game_knowledge_prompt("4.4.5", purpose="advisor", topics="economy", **kwargs)
+    current = build_scoped_prompt("4.4.5", purpose="advisor", topics="economy", **kwargs)
     assert "New general rule" in current
     assert "Unrelated general rule" in current
     assert "Scope: Special civic" not in current
@@ -169,7 +213,7 @@ def test_missing_registry_omits_scoped_rules_without_breaking_general_advice(tmp
         "* **Special:** <!-- applies-to: missing --> Special rule.\n"
         "* **General:** A general economy rule.\n"
     )
-    prompt = build_game_knowledge_prompt(
+    prompt = build_scoped_prompt(
         "4.4",
         purpose="advisor",
         topics="economy",
@@ -199,7 +243,7 @@ def test_all_shipped_annotations_reference_valid_scopes_and_never_leak_comments(
         referenced.update(annotations)
     assert referenced == registry.keys()
     for version in ("4.4.4", "4.4.5", "4.4.6", "4.5.2"):
-        prompt = build_game_knowledge_prompt(version, purpose="chronicle")
+        prompt = build_scoped_prompt(version, purpose="chronicle")
         assert "applies-to" not in prompt
         assert "<!--" not in prompt
 

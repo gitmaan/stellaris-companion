@@ -848,6 +848,11 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
     companion = None
     started = time.monotonic()
     snapshots_dir = args.snapshots_dir or DEFAULT_SNAPSHOTS_DIR
+    retrieval_options = (
+        {"experimental_applicability": True}
+        if getattr(args, "experimental_applicability", False)
+        else {}
+    )
     try:
         if case.structured:
             chronicle = ChronicleGenerator(
@@ -865,6 +870,7 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
                     version,
                     purpose="chronicle",
                     snapshots_dir=snapshots_dir,
+                    **retrieval_options,
                 ),
             )
         else:
@@ -891,7 +897,11 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
             )
             with patch(
                 "backend.core.companion.build_game_knowledge_prompt",
-                partial(build_game_knowledge_prompt, snapshots_dir=snapshots_dir),
+                partial(
+                    build_game_knowledge_prompt,
+                    snapshots_dir=snapshots_dir,
+                    **retrieval_options,
+                ),
             ):
                 reply = companion.ask_precomputed_with_context(
                     question=case.prompt,
@@ -964,6 +974,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--case", action="append", dest="case_names")
     parser.add_argument(
+        "--experimental-applicability",
+        action="store_true",
+        help="Opt into pruning scoped rules after section selection; disabled in app defaults",
+    )
+    parser.add_argument(
         "--split", choices=["all", "regression", "development", "holdout"], default="all"
     )
     parser.add_argument(
@@ -1019,7 +1034,11 @@ def main() -> int:
         "variant": getattr(args, "variant", "candidate"),
         "split": split,
         "suite_default_game_version": EVAL_VERSIONS[args.suite],
-        "advisor_knowledge_selection": "production_question_identity_and_applicability",
+        "advisor_knowledge_selection": (
+            "experimental_post_selection_applicability"
+            if getattr(args, "experimental_applicability", False)
+            else "production_section_retrieval"
+        ),
         "provider": args.provider,
         "models": models,
         "repeats": args.repeats,

@@ -9,12 +9,13 @@ coverage when a new game version has not yet been fully audited.
 1. The app reads the Stellaris version from the save.
 2. The shared resolver selects an exact snapshot, a compatible snapshot and overlays, or a
    notes-only pack for an audited breaking release line.
-3. Applicability annotations remove unrelated specialised rules before topic ranking.
-   Explicit questions about other empires or hypothetical builds retain conditional references.
-   The Advisor then selects sections using headings, rule labels, and rule text, plus at
+3. The Advisor selects sections using headings, rule labels, and rule text, plus at
    most one additional section matching verified empire identity. In-app Chronicle uses
    its supplied briefing for topic selection; consumers without a topic query retain the
-   full resolved pack, including scope conditions. MCP Advisor Briefing returns the same Advisor prompt and
+   full resolved pack. Applicability filtering is experimental and disabled in app defaults.
+   When explicitly enabled for evaluation, it prunes specialised rules after selecting
+   sections, without filling the freed slots. Explicit comparisons and hypothetical builds
+   retain conditional references. MCP Advisor Briefing returns the same Advisor prompt and
    coverage metadata, in both structured output and an untruncated text block.
 4. Unknown newer release lines do not receive older mechanics presented as current.
 
@@ -62,6 +63,11 @@ Source and coverage decisions for each stable snapshot live in `patches/audits/`
 
 ## Applicability annotations
 
+Annotations are inert in the default app path and are stripped without changing the baseline
+mechanics prompt. Use `--experimental-applicability` in the evaluation runner to opt into
+filtering. Do not enable it for app consumers until repeated comparisons establish useful,
+natural and accurate advice beyond the development cases. The initial experiment did not.
+
 Keep gameplay prose in these Markdown files. `applicability.json` contains only reusable
 scope names, identity conditions and explicit topic phrases; it does not duplicate rules
 or their numerical values. Versions and source audits remain owned by the existing packs.
@@ -90,9 +96,12 @@ Do not infer Nomadic mode from authority, an old origin, an identifier substring
 presence. The current extractor does not establish `is_nomadic`; without such an explicit
 observation, direct Nomadic questions still receive conditional reference material.
 
-An observed condition makes that reference eligible for ordinary topic ranking. Otherwise,
-explicit topic phrases keep it available for comparisons, plans and explanations, marked as
-conditional or about a different identity. Full-reference consumers retain conditions too.
+Experimental filtering preserves the original topic selection, scoring only gameplay text.
+It then retains scoped rules when an observed condition supports them or explicit topic
+phrases request them for comparisons, plans and explanations. Generated scope notes are
+added afterward, marked as conditional or about a different identity where appropriate.
+No other section is promoted when a scoped section is removed. Full-reference consumers
+retain conditions when the experiment is explicitly enabled too.
 These notes are model context, not a required format for the player's answer.
 
 Topic matching is lexical and the maintained phrases currently use English. This is not a
@@ -103,8 +112,9 @@ that a mechanic is unavailable.
 Keep topic phrases specific: names and distinctive concepts such as `operational reserves`,
 not broad words such as `energy` that apply to many systems. New scopes should address a
 demonstrated ambiguity. Existing scopes can be reused with one annotation, without changing
-Python. Tests validate the registry and every shipped annotation; an unreadable registry
-omits affected scoped references rather than treating them as generally applicable.
+Python. Tests validate the registry and every shipped annotation; in experimental mode,
+an unreadable registry omits affected scoped references rather than treating them as generally
+applicable. It cannot affect the default path.
 
 Run `tests/test_knowledge_applicability.py` alongside the existing knowledge tests. Include
 positive cases, unknown conditions and questions about other empires when adding a scope.
@@ -136,7 +146,11 @@ secondary claims, and allow alternative valid strategies and wording.
 
 ```sh
 python scripts/experiments/eval_game_knowledge.py --suite applicability \
+  --provider gemini --models MODEL_ID --repeats 2 --variant baseline \
+  --json-out tmp/baseline.json
+python scripts/experiments/eval_game_knowledge.py --suite applicability \
   --provider gemini --models MODEL_ID --repeats 2 --variant candidate \
+  --experimental-applicability \
   --json-out tmp/candidate.json
 python -m scripts.experiments.eval_review prepare tmp/baseline.json tmp/candidate.json \
   --out tmp/review.json
@@ -166,6 +180,9 @@ with representative, sanitised campaign fixtures as evidence accumulates.
 The first controlled applicability experiment is recorded in
 [`docs/campaign-evidence.md`](../docs/campaign-evidence.md#applicability-experiment-2026-11-03).
 It verified narrower retrieval but did not demonstrate better overall answer quality.
+The [diagnostic rerun](../docs/campaign-evidence.md#retrieval-diagnosis-and-hold-2026-11-03)
+also found no overall usefulness benefit. App defaults retain baseline retrieval; the
+narrower post-selection experiment requires explicit opt-in.
 
 Official release announcements are available from the
 [Stellaris Steam news feed](https://store.steampowered.com/news/posts/?appids=281990).

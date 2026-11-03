@@ -259,7 +259,7 @@
     "name": "neighbor_intentions_uncertain",
     "purpose": "advisor",
     "family": "diplomatic_forecast",
-    "split": "holdout",
+    "split": "development",
     "prompt": "I am worried about a neighbor attacking. With what you can see, how should I prepare without overreacting?",
     "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "democratic"}},
     "review_criteria": [
@@ -290,7 +290,7 @@
     "name": "player_prefers_risk_and_roleplay",
     "purpose": "advisor",
     "family": "player_preferences",
-    "split": "holdout",
+    "split": "development",
     "prompt": "I would rather try an interesting ambitious plan than play perfectly safely. Give me one idea in character, plus the main risk. Keep it to a short paragraph.",
     "briefing": {"meta": {"version": "Pegasus v4.4.6"}, "identity": {"authority": "imperial", "ethics": ["militarist"]}, "economy": {"resources": {"alloys": {"stockpile": 1500, "net_monthly": 55}}}},
     "review_criteria": [
@@ -300,5 +300,61 @@
       "Uses an engaging imperial voice and a short paragraph; accuracy constraints should not flatten the personality."
     ],
     "references": ["Observed authority, ethics and Alloy amounts support style and resource context; no geography, fleets, technologies or targets are supplied."]
+  },
+  {
+    "name": "colony_growth_investment",
+    "purpose": "advisor",
+    "family": "colony_growth_choice",
+    "split": "holdout",
+    "prompt": "We are planning our next major colony investment. Does converting a world to an Ecumenopolis give better population growth than a Gaia world? Explain the tradeoff without assuming either option is unlocked.",
+    "briefing": {
+      "meta": {
+        "version": "Pegasus v4.4.6"
+      },
+      "identity": {
+        "authority": "democratic"
+      },
+      "economy": {
+        "resources": {
+          "alloys": {
+            "stockpile": 1200,
+            "net_monthly": 40
+          }
+        }
+      }
+    },
+    "review_criteria": [
+      "Gaia worlds provide 15% Pop Growth and universal habitability; Ecumenopolises have no Pop Growth bonus and instead offer industrial capacity and job density.",
+      "If discussing Arcology investment, use Alloys rather than Minerals; do not invent a current conversion cost or claim readiness from the Alloy balance.",
+      "Give a useful comparison and practical checks without assuming a suitable planet, technology, perk or construction option is observed.",
+      "Keep the explanation readable and proportionate; accept different strategic priorities."
+    ],
+    "references": [
+      "patches/audits/4.4.6.md: Gaia/Ecumenopolis growth and Arcology resource audit; no current planets or unlocks supplied."
+    ]
+  },
+  {
+    "name": "automation_scope_and_budget",
+    "purpose": "advisor",
+    "family": "automation_job_scope",
+    "split": "holdout",
+    "prompt": "I want to automate Technician jobs on just one part of a planet. Does automation follow the job type or the district, and what should I check before enabling it?",
+    "briefing": {
+      "meta": {
+        "version": "Pegasus v4.4.6"
+      },
+      "identity": {
+        "authority": "democratic"
+      }
+    },
+    "review_criteria": [
+      "Explains that automation applies planet-wide by job type, so automating Technicians is not restricted to one Generator district.",
+      "Distinguishes optional Workforce limits, automation capability and economic affordability; do not invent current automation infrastructure, job counts or surplus.",
+      "If giving worker automation upkeep, use 4 Energy per 100 automated Worker jobs, without inventing a total monthly cost.",
+      "Offer useful checks for the intended automation decision without a rigid or excessively theatrical lecture."
+    ],
+    "references": [
+      "patches/audits/4.4.6.md: verified planet-wide job automation, Workforce limits and automation upkeep."
+    ]
   }
 ]

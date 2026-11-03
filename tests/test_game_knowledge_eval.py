@@ -67,6 +67,40 @@ def test_holdout_selection_is_explicit_and_does_not_make_provider_calls(monkeypa
     assert not any("energy_runway_unknown_mode" in line for line in lines)
 
 
+@pytest.mark.parametrize("experimental", [False, True])
+def test_evaluation_only_enables_applicability_when_explicitly_requested(monkeypatch, experimental):
+    class Generator:
+        def generate(self, **kwargs):
+            return AdvisorGenerationResult(
+                text="A recorded answer.", model="test", requested_model="test", provider="custom"
+            )
+
+    monkeypatch.setattr(evaluation, "create_advisor_generator", lambda **kwargs: Generator())
+    args = SimpleNamespace(
+        suite="applicability",
+        provider="custom",
+        base_url="http://127.0.0.1:1",
+        timeout=1,
+        snapshots_dir=None,
+        max_output_tokens=100,
+        experimental_applicability=experimental,
+    )
+    case = next(
+        case
+        for case in evaluation.build_cases("applicability")
+        if case.name == "nomad_comparison_from_settled_empire"
+    )
+    result = evaluation.run_case(args, "test", case)
+    assert result.provider_error is None
+    assert (
+        "Operational Reserves track Energy and Minerals one-to-one"
+        in result.assembled_system_prompt
+    )
+    assert (
+        "Scope: Nomadic systems and interactions" in result.assembled_system_prompt
+    ) is experimental
+
+
 @pytest.mark.parametrize(
     "suite,case_name,expected,excluded",
     [
