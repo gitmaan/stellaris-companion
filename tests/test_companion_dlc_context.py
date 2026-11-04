@@ -108,12 +108,12 @@ def test_apply_precomputed_briefing_does_not_deny_unreported_content(companion):
         (
             "Pegasus v4.4.4",
             ["uses a 3:1 rule rather than one-to-one conversion"],
-            ["Operational Reserves track Energy and Minerals one-to-one"],
+            ["track Energy and Minerals one-to-one"],
         ),
         (
             "Pegasus v4.4.5",
             [
-                "Operational Reserves track Energy and Minerals one-to-one",
+                "track Energy and Minerals one-to-one",
                 "Resource Abundance slider",
             ],
             ["Automated Science Ships return normally after exploring Astral Rifts"],
@@ -121,7 +121,7 @@ def test_apply_precomputed_briefing_does_not_deny_unreported_content(companion):
         (
             "Pegasus v4.4.6",
             [
-                "Operational Reserves track Energy and Minerals one-to-one",
+                "track Energy and Minerals one-to-one",
                 "Automated Science Ships return normally after exploring Astral Rifts",
             ],
             [],

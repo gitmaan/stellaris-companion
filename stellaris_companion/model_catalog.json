@@ -2,6 +2,10 @@
   "schemaVersion": 2,
   "selectionPrefix": "stellaris:latest-stable/",
   "refreshSeconds": 3600,
+  "openai": {
+    "baseUrl": "https://api.openai.com/v1",
+    "defaultModel": "gpt-6.1-terra"
+  },
   "openrouterRecommendations": ["gemini-flash-lite", "deepseek-flash", "claude-sonnet"],
   "families": {
     "gemini-flash-lite": {

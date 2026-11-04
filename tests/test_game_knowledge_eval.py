@@ -92,10 +92,7 @@ def test_evaluation_only_enables_applicability_when_explicitly_requested(monkeyp
     )
     result = evaluation.run_case(args, "test", case)
     assert result.provider_error is None
-    assert (
-        "Operational Reserves track Energy and Minerals one-to-one"
-        in result.assembled_system_prompt
-    )
+    assert "track Energy and Minerals one-to-one" in result.assembled_system_prompt
     assert (
         "Scope: Nomadic systems and interactions" in result.assembled_system_prompt
     ) is experimental

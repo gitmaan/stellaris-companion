@@ -67,6 +67,13 @@ connection probe. Onboarding loads saved settings before discovery.
 A connection check establishes connectivity and supported response behavior; it does
 not certify factual quality.
 
+New ChatGPT connections prefer `gpt-6.1-terra` when the account offers it, with the
+previous tested models retained as fallbacks. Direct OpenAI discovery also recommends
+Terra when available. Saved and explicitly entered choices remain selected. Advisor
+uses low reasoning and Chronicle uses medium; the official Terra Chat Completions
+adapter uses its reasoning-inclusive completion allowance. See
+[provider completion behavior](provider-completion.md).
+
 ## Versioned mechanics
 
 Question-based retrieval can also include one section relevant to verified empire
@@ -248,3 +255,66 @@ Validation: 695 Python tests passed, 27 optional-fixture tests skipped; Ruff lin
 checks passed. Task-owned proof is retained in `artifacts/retrieval-diagnosis-2026-11-03/`,
 including all requests/responses, the randomized schedule, source and prompt equivalence
 receipts, frozen blinded ratings, primary-reference checks, paired summaries and test logs.
+
+## Shipping configuration accuracy pass: 2026-11-04
+
+This pass used production Advisor prompt assembly and unmodified provider settings:
+ChatGPT `gpt-6.1-terra` and Gemini automatic **conserve** routing, which resolved to
+`gemini-3.5-flash-lite`. The earlier Flash personality experiments did not establish
+the quality of that Gemini default. Pre-PR and candidate prompts used the same current
+transports and models, so this comparison measures prompt/reference changes rather
+than historical default-model differences. Experimental applicability filtering and
+experimental style prompts remained disabled.
+
+The 4.4.6 references now explain artificial Workforce, planetary automation coverage,
+naval-capacity units, Trade logistics versus ordinary ship upkeep, assembly inputs,
+organic care under Rogue Servitor, and the scope of Nomadic reserves. Selected sections
+carry their own necessary definitions. Market currency and the distinction between
+population, Workforce and filled jobs also appear in the always-included baseline,
+so unmatched or non-English questions receive those facts. These are shared mechanic
+definitions, with no question recognizers, translated keyword lists or extra model calls.
+Older versions and the partial 4.5 coverage retain their existing boundaries.
+
+The initial ten cases used two samples per provider. An original held-out Chinese case
+failed after the first corrections: all four candidate answers used obsolete market
+currency, and two also inferred employment from total Workforce. Those cases became
+regression cases before the baseline-definition change. Four additional inputs were
+frozen before that change: Spanish market spending, Japanese Workforce interpretation,
+ordinary research planning and a positive Nomadic-reserve control. They test transfer
+and controls within related domains, not entirely unseen gameplay families. No changes
+were made in response to their answers.
+
+Across three reference revisions, 176 requests completed without provider errors. The
+final configuration has 56 reviewed answers: 32 rerun original answers, all eight
+unchanged original answers reused by exact payload equivalence regardless of rating,
+and 16 fresh answers. Complete-answer ratings were frozen before revealing model and
+variant labels. A single Codex reviewer scored accuracy, grounding, usefulness and
+naturalness separately, allowing valid alternative strategies and minor variation.
+Unsupported repair costs were not called disproved; selling Energy to obtain Trade
+was not confused with treating Energy as the purchase currency.
+
+| Configuration and sample | Material errors | Useful answers |
+| --- | ---: | ---: |
+| Pre-PR prompts, original cases, Terra | 4/20 | 16/20 |
+| Final prompts, original cases, Terra | 0/20 | 20/20 |
+| Pre-PR prompts, original cases, Flash-Lite | 6/20 | 3/20 |
+| Final prompts, original cases, Flash-Lite | 2/20 | 9/20 |
+| Final prompts, fresh inputs, Terra | 0/8 | 8/8 |
+| Final prompts, fresh inputs, Flash-Lite | 2/8 | 6/8 |
+
+**The shipping configuration does not pass the accuracy gate.** Flash-Lite still
+misstates market currency in English, Chinese and both fresh Spanish answers. It also
+falls below the predeclared 80% usefulness threshold per provider. Terra's 28 final
+answers had no material errors found and were useful, with one unverified secondary
+detail. This supports the Terra path within this sample; it does not establish universal
+accuracy or justify more tuning against the same holdout. The next decision concerns
+Gemini default suitability and needs a separate representative evaluation.
+
+These synthetic, error-enriched samples and repeated model review do not estimate
+production error rates or replace human calibration. Claude and direct OpenAI Chat
+Completions were not live-tested; controlled tests cover the direct OpenAI contract.
+Chronicle remains covered by shared-policy and provider-contract tests, not this live
+Advisor sample. Local validation passed 710 Python tests (27 optional-fixture skips),
+117 desktop unit tests, five targeted desktop journeys, TypeScript/Vite and Ruff checks.
+Source hashes, frozen designs and amendments, all responses, review rationales and test
+receipts are retained in `artifacts/shipping-accuracy-2026-11-04/`.

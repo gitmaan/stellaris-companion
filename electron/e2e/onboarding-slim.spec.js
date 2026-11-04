@@ -193,6 +193,53 @@ test('local models use real discovery and verification; custom endpoints preserv
   } finally { await f.close(); await server.close() }
 })
 
+test('direct OpenAI setup discovers Terra by default and retains a later explicit choice', async () => {
+  const f = await fixture()
+  try {
+    const { page, app } = f
+    await app.evaluate(() => {
+      const originalFetch = globalThis.fetch
+      globalThis.__openaiSetupRequests = []
+      globalThis.fetch = async (url, options = {}) => {
+        if (!String(url).startsWith('https://api.openai.com/v1/')) return originalFetch(url, options)
+        if (String(url).endsWith('/models')) return Response.json({ data: [
+          { id: 'gpt-6-astra' }, { id: 'gpt-6.1-terra' }, { id: 'gpt-6-luna' },
+        ] })
+        const body = JSON.parse(options.body)
+        globalThis.__openaiSetupRequests.push(body)
+        return Response.json({ model: body.model, choices: [{ message: { content: '{"status":"ok"}' }, finish_reason: 'stop' }] })
+      }
+    })
+    await start(page)
+    await page.getByRole('button', { name: 'Custom endpoint', exact: true }).click()
+    await page.getByLabel('Server URL').fill('https://api.openai.com/v1/')
+    await expect(page.getByLabel('Model', { exact: true })).toHaveValue('')
+    await page.getByRole('button', { name: 'Connect', exact: true }).click()
+    await expect(page.getByRole('radio', { name: 'gpt-6.1-terra', exact: true })).toBeChecked()
+    await page.getByRole('button', { name: 'Refresh models', exact: true }).click()
+    await expect(page.getByRole('radio', { name: 'gpt-6.1-terra', exact: true })).toBeChecked()
+    expect(await app.evaluate(() => globalThis.__openaiSetupRequests.length)).toBe(0)
+    await page.getByRole('button', { name: 'Use this model' }).click()
+    await expect(page.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
+    let settings = await page.evaluate(() => window.electronAPI.getSettings())
+    expect(settings.advisorProvider).toBe('custom')
+    expect(settings.advisorModel).toBe('gpt-6.1-terra')
+    const request = await app.evaluate(() => globalThis.__openaiSetupRequests[0])
+    expect(request.reasoning_effort).toBe('low')
+    expect(request.max_completion_tokens).toBe(2048)
+    expect(request.max_tokens).toBeUndefined()
+
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await page.getByRole('button', { name: 'Custom endpoint', exact: true }).click()
+    await page.getByLabel('Model', { exact: true }).fill('gpt-6-luna')
+    await page.getByRole('button', { name: 'Connect', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
+    settings = await page.evaluate(() => window.electronAPI.getSettings())
+    expect(settings.advisorModel).toBe('gpt-6-luna')
+    expect(await app.evaluate(() => globalThis.__openaiSetupRequests.at(-1).model)).toBe('gpt-6-luna')
+  } finally { await f.close() }
+})
+
 test('a late cloud discovery result cannot activate a provider after skipping', async () => {
   const f = await fixture()
   try {

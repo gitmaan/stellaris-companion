@@ -303,11 +303,16 @@ async function discoverAdvisorModels({
       }
     }
 
+    const openaiDefault = selected === 'custom' && resolvedBaseUrl === modelCatalog.openai.baseUrl
+      ? models.find(model => model.id === modelCatalog.openai.defaultModel)
+      : undefined
+    if (openaiDefault) openaiDefault.recommended = true
+
     return {
       ok: true,
       models: [...latestChoices, ...models],
       // A family choice resolves only to a concrete model observed in this catalog.
-      suggestedModel: latestChoices[0]?.id || (models.length === 1 ? models[0].id : undefined),
+      suggestedModel: openaiDefault?.id || latestChoices[0]?.id || (models.length === 1 ? models[0].id : undefined),
       baseUrl: resolvedBaseUrl,
       provider: selected,
     }
@@ -436,6 +441,14 @@ async function testAdvisorModel({
     ],
     max_tokens: 512,
     stream: false,
+  }
+  // The official Terra API uses a shared reasoning/output budget. Keep local
+  // and other compatible servers on their existing Chat Completions contract.
+  if (selected === 'custom' && resolvedBaseUrl === modelCatalog.openai.baseUrl
+      && resolvedModel === modelCatalog.openai.defaultModel) {
+    delete baseBody.max_tokens
+    baseBody.max_completion_tokens = 2048
+    baseBody.reasoning_effort = 'low'
   }
   const structuredBody = {
     ...baseBody,

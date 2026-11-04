@@ -5,12 +5,14 @@ import { useChatGPT } from '../hooks/useChatGPT'
 import { HUDButton } from './hud/HUDButton'
 import { OnboardingIcon, OnboardingSpinner } from './OnboardingFrame'
 import chatgptLogo from '../assets/chatgpt-logo-white.svg'
+import modelCatalog from '../../../stellaris_companion/model_catalog.json'
 
 type View = 'choice' | 'gemini' | 'openrouter' | 'local' | 'models' | 'details' | 'custom' | 'connecting' | 'error'
 type Draft = { apiKey: string; baseUrl: string; model: string; credentialId?: string }
 type Model = { id: string; name: string; recommended?: boolean; updatePolicy?: 'latest_stable'; resolvedModel?: string; resolvedName?: string }
 const presets = { ollama: 'http://127.0.0.1:11434/v1', lm_studio: 'http://127.0.0.1:1234/v1' }
 const customUrlHint = 'http://127.0.0.1:8080/v1'
+const isOpenAI = (url: string) => url.trim().replace(/\/+$/, '') === modelCatalog.openai.baseUrl
 export const providerName = (provider: AdvisorProvider) => ({ chatgpt: 'ChatGPT', gemini: 'Gemini', openrouter: 'OpenRouter', ollama: 'Ollama', lm_studio: 'LM Studio', custom: 'Custom' })[provider]
 
 // The controller lives in the wizard, so navigating to saves and back keeps drafts.
@@ -125,12 +127,12 @@ export function useOnboardingAdvisor(onConnected: (provider: AdvisorProvider) =>
     // Do not capture an empty draft while the saved selection is still loading.
     if (settingsState !== 'ready') return
     if ((selected === 'gemini' || selected === 'openrouter') && !draft.apiKey.trim() && !storedKeys[selected] && !draft.credentialId) return
-    if (selected === 'custom' && (!draft.baseUrl.trim() || !draft.model.trim())) return
+    if (selected === 'custom' && (!draft.baseUrl.trim() || (!draft.model.trim() && !isOpenAI(draft.baseUrl)))) return
     const id = ++request.current
     returnView.current = origin; setError(''); setView('connecting')
     retry.current = () => void connect(selected, origin, draft)
     try {
-      if (selected === 'custom' || origin === 'models') {
+      if ((selected === 'custom' && origin === 'custom' && draft.model.trim()) || origin === 'models') {
         await connectModel(id, selected, draft.model.trim(), draft.baseUrl.trim()); return
       }
       setCatalogLoaded(false)
@@ -144,7 +146,7 @@ export function useOnboardingAdvisor(onConnected: (provider: AdvisorProvider) =>
       setCatalogLoaded(true)
       if (!found.length && !draft.model) { fail(id, t('onboarding.slim.noModels')); return }
       const suggested = found.find(item => item.id === result.suggestedModel)
-        || (selected !== 'openrouter' || found.length === 1 ? found[0] : undefined)
+        || ((selected !== 'openrouter' && selected !== 'custom') || found.length === 1 ? found[0] : undefined)
       const model = draft.model || suggested?.id || ''
       const baseUrl = result.baseUrl || draft.baseUrl
       setDrafts(current => ({ ...current, [selected]: { ...current[selected], model, baseUrl } }))
@@ -305,7 +307,7 @@ export function OnboardingAdvisorActions({ controller: c, onBack, onSkip }: { co
     await c.cancel(); if (c.view === 'choice') onBack()
   }
   const disabled = (c.view === 'gemini' || c.view === 'openrouter') ? !c.draft.apiKey.trim() && !c.storedKey && !c.draft.credentialId
-    : c.view === 'custom' ? !c.draft.baseUrl.trim() || !c.draft.model.trim()
+    : c.view === 'custom' ? !c.draft.baseUrl.trim() || (!c.draft.model.trim() && !isOpenAI(c.draft.baseUrl))
       : c.view === 'details' ? !c.draft.baseUrl.trim() : c.view === 'models' ? !c.draft.model : false
   const formView = ['gemini', 'openrouter', 'custom', 'details'].includes(c.view)
   let right: ReactNode

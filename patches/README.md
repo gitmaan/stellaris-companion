@@ -43,6 +43,10 @@ by a maintainer for substantive correctness, allowing normal variation in wordin
 
 - Use final Paradox release notes first, followed by shipped unmodded game data for numerical rules.
 - Keep the current stable snapshot self-contained, including foundational mechanics that remain true.
+- Keep universal resource and quantity definitions in the always-included baseline, and
+  make topic sections understandable when retrieved alone. An unmatched question must
+  retain essential meanings without requiring an English topic match. Keep those facts
+  within their verified version boundary; inclusion does not prove that a model follows them.
 - Add small overlays for hotfixes, then fold them into a fresh snapshot before history accumulates.
 - When a new release changes an underlying mechanic before shipped data can be checked, add
   source-backed release-note deltas for that release line. The resolver labels these partial

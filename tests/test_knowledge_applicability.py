@@ -71,7 +71,7 @@ def test_generic_economy_does_not_borrow_unobserved_special_systems(identity, ve
         campaign_identity=identity,
         campaign_metadata={"required_dlcs": ["Nomads"], "required_dlcs_status": "reported"},
     )
-    assert "Operational Reserves track" not in prompt
+    assert "**Reserve Conversion:**" not in prompt
     assert "Operational Reserves start" not in prompt
     assert "Conserve approach imposes" not in prompt
     assert "Arkship Capacity" not in prompt
@@ -88,7 +88,7 @@ def test_comparisons_keep_special_rules_without_assigning_them_to_the_player(ide
         topics="How do Nomad operational reserves compare with an ordinary energy stockpile?",
         campaign_identity=identity,
     )
-    assert "Operational Reserves track Energy and Minerals one-to-one" in prompt
+    assert "track Energy and Minerals one-to-one" in prompt
     assert "15,000" in prompt
     assert "Scope: Nomadic systems and interactions" in prompt
     assert "conditional reference" in prompt or "comparison or hypothetical reference" in prompt
@@ -112,7 +112,7 @@ def test_observed_mode_supports_generic_questions_without_dlc_or_authority_guess
         topics="How should I interpret negative energy income?",
         campaign_identity={"is_nomadic": True},
     )
-    assert "Operational Reserves track" in prompt
+    assert "**Reserve Conversion:**" in prompt
     assert "supported by the supplied identity" in prompt
 
 

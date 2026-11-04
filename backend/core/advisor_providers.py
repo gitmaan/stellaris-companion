@@ -29,6 +29,7 @@ from backend.core.model_routing import (
 )
 from backend.core.structured_output import validate_structured_response
 from stellaris_companion.model_catalog import (
+    MODEL_CATALOG,
     ModelCatalogCache,
     selection_family,
     stable_family_models,
@@ -235,6 +236,14 @@ class AdvisorGenerationResult:
     completion: dict[str, Any] = field(default_factory=dict)
 
 
+def _uses_openai_terra(config: AdvisorProviderConfig, model: str) -> bool:
+    return (
+        config.provider == ADVISOR_PROVIDER_CUSTOM
+        and config.base_url == MODEL_CATALOG["openai"]["baseUrl"]
+        and model == MODEL_CATALOG["openai"]["defaultModel"]
+    )
+
+
 def generation_output_limits(
     config: AdvisorProviderConfig, model: str, purpose: str, requested: int | None = None
 ) -> tuple[int, int]:
@@ -254,6 +263,9 @@ def generation_output_limits(
         GEMINI_FLASH_LITE_MODEL,
         GEMINI_FLASH_LITE_RESERVE_MODEL,
     }:
+        ceiling = 16384
+    elif _uses_openai_terra(config, model):
+        # Includes reasoning tokens; keep room for a complete Advisor/Chronicle.
         ceiling = 16384
     elif config.provider == ADVISOR_PROVIDER_CUSTOM and config.base_url in {
         "https://api.deepseek.com",
@@ -702,6 +714,8 @@ class OpenAICompatibleAdvisorGenerator:
 
         requested_model = str(model or self.config.model).strip()
         resolved_model = self._resolve_model(requested_model)
+        openai_terra = _uses_openai_terra(self.config, resolved_model)
+        token_limit_key = "max_completion_tokens" if openai_terra else "max_tokens"
         output_limit, retry_ceiling = generation_output_limits(
             self.config, resolved_model, purpose, max_output_tokens
         )
@@ -725,10 +739,12 @@ class OpenAICompatibleAdvisorGenerator:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": effective_user_prompt},
             ],
-            "max_tokens": output_limit,
+            token_limit_key: output_limit,
             "stream": False,
         }
-        if response_schema is None:
+        if openai_terra:
+            request_body["reasoning_effort"] = "medium" if purpose == "chronicle" else "low"
+        elif response_schema is None:
             request_body["temperature"] = temperature
         if response_schema is not None:
             request_body["response_format"] = {
@@ -753,7 +769,7 @@ class OpenAICompatibleAdvisorGenerator:
                 "attempt": attempt + 1,
                 "requested_model": requested_model,
                 "resolved_model": resolved_model,
-                "output_limit": request_body["max_tokens"],
+                "output_limit": request_body[token_limit_key],
             }
             diagnostics.append(call)
             try:
@@ -833,7 +849,9 @@ class OpenAICompatibleAdvisorGenerator:
                     )
                     if response_text.strip() and purpose == "advisor" and response_schema is None:
                         partial = result
-                    request_body["max_tokens"] = min(request_body["max_tokens"] * 2, retry_ceiling)
+                    request_body[token_limit_key] = min(
+                        request_body[token_limit_key] * 2, retry_ceiling
+                    )
                     request_body["messages"][1]["content"] = (
                         effective_user_prompt
                         + "\n\nReturn a shorter, complete response within the requested format."

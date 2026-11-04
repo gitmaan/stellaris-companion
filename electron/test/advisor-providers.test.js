@@ -119,6 +119,46 @@ test('OpenRouter model discovery requires a key', async () => {
   assert.match(result.error, /requires an API key/i)
 })
 
+test('official OpenAI discovery suggests Terra only when the account catalog includes it', async () => {
+  const discover = (baseUrl, ids) => discoverAdvisorModels({
+    provider: 'custom', baseUrl, apiKey: 'fixture-key',
+    fetchImpl: async () => Response.json({ data: ids.map(id => ({ id })) }),
+  })
+  const ids = ['gpt-6-astra', 'gpt-6.1-terra', 'gpt-6-luna']
+  const result = await discover('https://api.openai.com/v1/', ids)
+  assert.equal(result.suggestedModel, 'gpt-6.1-terra')
+  assert.deepEqual(result.models.map(model => model.id), ids)
+  assert.equal(result.models[1].recommended, true)
+  assert.equal((await discover('https://api.openai.com/v1', ['gpt-6-astra', 'gpt-6-luna'])).suggestedModel, undefined)
+  for (const url of ['https://proxy.example/v1', 'https://api.openai.com.example/v1', 'http://127.0.0.1:1234/v1']) {
+    const other = await discover(url, ids)
+    assert.equal(other.suggestedModel, undefined)
+    assert.equal(other.models.some(model => model.recommended), false)
+  }
+})
+
+test('official Terra connection check keeps compatible parameters across schema fallback', async () => {
+  const requests = []
+  const result = await testAdvisorModel({
+    provider: 'custom', baseUrl: 'https://api.openai.com/v1', model: 'gpt-6.1-terra', apiKey: 'fixture-key',
+    fetchImpl: async (_url, options) => {
+      const body = JSON.parse(options.body); requests.push(body)
+      if (body.response_format) return Response.json({ error: { message: 'response_format is unsupported', param: 'response_format' } }, { status: 400 })
+      return Response.json({ model: body.model, choices: [{ message: { content: '{"status":"ok"}' }, finish_reason: 'stop' }] })
+    },
+  })
+  assert.equal(result.ok, true)
+  assert.equal(result.chronicleReady, true)
+  assert.equal(requests.length, 2)
+  for (const body of requests) {
+    assert.equal(body.model, 'gpt-6.1-terra')
+    assert.equal(body.reasoning_effort, 'low')
+    assert.equal(body.max_completion_tokens, 2048)
+    assert.equal('max_tokens' in body, false)
+    assert.equal('temperature' in body, false)
+  }
+})
+
 test('catalog recommendations follow stable families and never invent absent targets', async () => {
   const ids = modelCatalog.openrouterRecommendations.map(family => modelCatalog.selectionPrefix + family)
   assert.equal(new Set(ids).size, ids.length)
