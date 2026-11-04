@@ -393,3 +393,32 @@ design and selection, all raw answers, explicit review rationales, request setti
 usage, additional source checks and summaries are retained under
 `artifacts/gemini-default-2026-11-04/`. Only this evaluation record is added to the PR;
 the software validation recorded above applies to the unchanged runtime code.
+
+## Flash default and upgrade behavior (2026-11-04)
+
+The product default now prefers the latest available stable Gemini Flash for new
+installations. Flash-Lite remains an explicit faster, quota-saving choice, and the
+existing quota fallback remains in place. Settings and setup copy explain that
+Flash can take longer and use more quota. A fallback label appears beneath an
+Advisor answer without requiring the player to open response details.
+
+This is a product decision informed by the comparison above, not a retrospective
+pass of that experiment's selection gate. Its failed gate and all recorded model
+errors remain valid. The tested short prompt layer and reasoning override were
+not adopted; the Advisor voice and disabled applicability experiment are unchanged.
+
+Before `electron-store` applies defaults, startup checks whether `settings.json`
+already exists. Existing installations retain their saved routing preference;
+legacy installations without that field retain the former Lite-first behavior.
+Aliases are normalized, explicit model IDs are untouched, and an invalid legacy
+value retains the former fallback. A fresh profile saves Flash-first immediately,
+so restarting or later choosing Lite does not repeat the migration.
+
+Local validation: 710 Python tests passed with 27 optional-fixture skips; all 128
+desktop unit tests passed with the checkout's Python environment configured. Three
+new Electron journeys verify fresh defaults, upgrade persistence, explicit model
+preservation and the visible Lite fallback. All 13 onboarding journeys passed,
+with one keyboard-focus test requiring an isolated rerun. TypeScript/Vite, scoped
+Ruff and all production locale completeness checks passed. These software checks
+do not establish model-answer accuracy; the focused campaign acceptance results
+will be recorded separately.

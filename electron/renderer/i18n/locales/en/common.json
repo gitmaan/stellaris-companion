@@ -670,18 +670,18 @@
       }
     },
     "geminiQuota": {
-      "label": "GEMINI USE",
-      "description": "Choose how to balance everyday Advisor answers and Chronicle writing.",
-      "standard": "Free-friendly",
-      "higher": "Best quality",
-      "standardTag": "STRETCHES FREE LIMITS",
-      "higherTag": "USES MORE ALLOWANCE",
-      "standardHelp": "Keeps everyday questions lighter so more of your allowance is available for Chronicle writing.",
-      "higherHelp": "Prefers the strongest available Gemini model for both Advisor and Chronicle.",
+      "label": "GEMINI MODEL",
+      "description": "Choose between advice quality and faster responses.",
+      "standard": "Flash-Lite",
+      "higher": "Flash",
+      "standardTag": "FASTER · CONSERVES QUOTA",
+      "higherTag": "RECOMMENDED FOR ADVICE",
+      "standardHelp": "Uses Flash-Lite for faster Advisor answers and preserves Flash quota for Chronicle writing.",
+      "higherHelp": "Prefers Flash for Advisor and Chronicle. Responses can take longer and use more quota; falls back to Lite when needed.",
       "showAdvanced": "Show advanced quota controls",
       "hideAdvanced": "Hide advanced quota controls",
       "optional": "OPTIONAL",
-      "aria": "Set Gemini quota mode to {{mode}}"
+      "aria": "Set Gemini model preference to {{mode}}"
     },
     "chronicleRefresh": {
       "label": "STORY UPDATES",
@@ -911,7 +911,7 @@
       "catalogFailed": "Could not refresh the catalog. Your model selection is unchanged; availability has not been checked.",
       "latestStableModel": "{{name}} (latest stable)",
       "latestStableDetails": "Currently {{model}}. Automatically follows stable releases in this family; pricing can change.",
-      "geminiStableUpdates": "Gemini automatically uses the latest stable Flash and Flash-Lite models available to your key."
+      "geminiStableUpdates": "Gemini automatically uses the latest stable Flash and Flash-Lite models available to your key. Flash is recommended for advice; choose Flash-Lite in Settings for faster responses."
     }
   },
   "update": {

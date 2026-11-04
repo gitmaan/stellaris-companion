@@ -241,7 +241,9 @@ def test_json_repair_still_works_without_a_network_retry():
 
 def test_conserve_falls_back_to_reserve_without_upgrading_to_flash():
     generator, models = generator_with(RuntimeError("429 daily quota exhausted"), response())
-    result = generator.generate(system_prompt="system", user_prompt="user")
+    result = generator.generate(
+        system_prompt="system", user_prompt="user", model_routing_mode="conserve"
+    )
     assert [c.kwargs["model"] for c in models.generate_content.call_args_list] == [
         "gemini-3.5-flash-lite",
         "gemini-3.1-flash-lite",
@@ -328,11 +330,15 @@ def test_exhausted_reserve_is_remembered_and_primary_recovers_after_cooldown(mon
     )
     for _ in range(2):
         with pytest.raises(AdvisorProviderError):
-            generator.generate(system_prompt="system", user_prompt="user")
+            generator.generate(
+                system_prompt="system", user_prompt="user", model_routing_mode="conserve"
+            )
     assert models.generate_content.call_count == 2
     assert is_model_temporarily_unavailable(GEMINI_FLASH_LITE_RESERVE_MODEL)
     now = 131
-    result = generator.generate(system_prompt="system", user_prompt="user")
+    result = generator.generate(
+        system_prompt="system", user_prompt="user", model_routing_mode="conserve"
+    )
     assert result.model == "actual-server-model"
     assert models.generate_content.call_args.kwargs["model"] == GEMINI_FLASH_LITE_MODEL
     assert result.routing is None

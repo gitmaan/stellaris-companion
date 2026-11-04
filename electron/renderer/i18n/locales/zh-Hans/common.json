@@ -605,18 +605,18 @@
       }
     },
     "geminiQuota": {
-      "label": "GEMINI 用量",
-      "description": "选择如何在 Advisor 回答和 Chronicle 写作之间分配用量。",
-      "standard": "节省配额",
-      "higher": "最高质量",
-      "standardTag": "节省免费配额",
-      "higherTag": "消耗更多配额",
-      "standardHelp": "日常问题使用较少配额，为 Chronicle 写作留出更多用量。",
-      "higherHelp": "尽可能为 Advisor 和 Chronicle 使用性能最强的 Gemini 模型。",
+      "label": "GEMINI 模型",
+      "description": "在建议质量和更快的响应之间选择。",
+      "standard": "Flash-Lite",
+      "higher": "Flash",
+      "standardTag": "响应更快 · 节省配额",
+      "higherTag": "建议咨询首选",
+      "standardHelp": "使用 Flash-Lite 加快顾问回复，并将 Flash 配额留给编年史写作。",
+      "higherHelp": "顾问和编年史优先使用 Flash。响应可能更慢，配额消耗也更多；必要时会回退到 Lite。",
       "showAdvanced": "显示高级配额控制",
       "hideAdvanced": "隐藏高级配额控制",
       "optional": "可选",
-      "aria": "将 Gemini 配额模式设置为 {{mode}}"
+      "aria": "将 Gemini 首选模型设为 {{mode}}"
     },
     "mcpRelay": {
       "loadingSummary": "检查本地 AI 应用程序连接。",
@@ -747,7 +747,7 @@
       "catalogFailed": "无法刷新目录。你的模型选择未更改，尚未检查可用性。",
       "latestStableModel": "{{name}}（最新稳定版）",
       "latestStableDetails": "当前为 {{model}}。自动更新至此系列的稳定版本；价格可能变化。",
-      "geminiStableUpdates": "Gemini 会自动使用您的密钥可用的最新稳定版 Flash 和 Flash-Lite 模型。"
+      "geminiStableUpdates": "Gemini 会自动使用你的密钥可用的最新稳定版 Flash 和 Flash-Lite。建议咨询首选 Flash；如需更快的响应，可在设置中选择 Flash-Lite。"
     }
   },
   "update": {

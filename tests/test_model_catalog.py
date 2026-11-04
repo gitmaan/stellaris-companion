@@ -175,5 +175,5 @@ def test_native_gemini_refreshes_automatic_tiers_and_keeps_explicit_selection():
     result = generator.generate(system_prompt="System", user_prompt="User")
     generator.generate(system_prompt="System", user_prompt="User", purpose="chronicle")
     generator.generate(system_prompt="System", user_prompt="User", model="gemini-3.5-flash-lite")
-    assert calls == ["gemini-4-flash-lite", "gemini-4-flash", "gemini-3.5-flash-lite"]
-    assert result.model == "gemini-4-flash-lite-001"
+    assert calls == ["gemini-4-flash", "gemini-4-flash", "gemini-3.5-flash-lite"]
+    assert result.model == "gemini-4-flash-001"
