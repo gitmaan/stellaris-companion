@@ -422,3 +422,70 @@ with one keyboard-focus test requiring an isolated rerun. TypeScript/Vite, scope
 Ruff and all production locale completeness checks passed. These software checks
 do not establish model-answer accuracy; the focused campaign acceptance results
 will be recorded separately.
+
+## Focused campaign acceptance (2026-11-04)
+
+**Recommendation: merge for a limited beta with the known accuracy limits below.**
+This is a narrower product-readiness decision than a general accuracy endorsement;
+it does not change the failed selection gate or results of the earlier 96-response
+comparison.
+
+The acceptance design was frozen before generation: six questions from three
+unaltered historical campaign snapshots (4.2.4 and 4.4.6), plus four retained
+synthetic currency, identity and eligibility regressions. Each question received
+two responses, for 20 total. Requests used the shipping Companion prompt assembly
+and native Gemini adapter at `2c056ee`, automatic Flash-first routing, dynamic
+thinking and the existing voice, without a provider prompt prefix. Runtime source
+hashes and actual SDK request hashes were retained with the private receipts.
+Raw campaign snapshots and answers are not included in this public report.
+
+The predefined limited-beta criteria were: all 20 responses complete with model
+and latency recorded; at least 16 useful answers; no demonstrated decision-changing
+error repeated within the same case and no false rejection of the observed machine
+identity; and passing software validation. Minor errors and reasonable strategic
+variation were allowed. Remaining material errors required explicit assessment.
+
+All 20 generations completed on **Gemini 3.8 Flash**, with no provider errors,
+recovery calls or model fallbacks. Mean response time was **21.11 seconds**, median
+**19.76 seconds**, and range **11.82–36.68 seconds**. The live SDK was
+`google-genai 1.57.0`.
+
+| Review dimension | Result |
+| --- | --- |
+| Useful / partial answers | 16 / 4 |
+| No demonstrated factual error | 10 |
+| Minor factual error | 5 |
+| Consequential claim not independently verifiable | 3 |
+| Demonstrated material factual error | 2 |
+
+Usefulness and accuracy were scored separately: a useful answer may still contain
+a minor error or an unsupported detail. All full answers were reviewed by one
+Codex model reviewer with individual rationales. This was not blinded human review;
+prior human preference feedback concerned earlier answers and is not counted here.
+
+Both material errors were the known obsolete market-currency advice: one of two
+food-planning answers and one of two Chinese mineral-planning answers recommended
+purchases using Energy rather than Trade. Thus **the same mechanic-level weakness
+recurred across two cases** (2/20 overall, 2/4 across those two cases), even though
+neither case failed both repetitions. Flash has not eliminated this weakness.
+The two real war-assessment answers were also only partial: they inferred actual
+battle history, readiness or exhaustion beyond what the record established.
+Those claims are unverified, not independently proved false battle events.
+
+The original DLC/identity denial did not recur. Both Colossus answers respected
+three prior perks and the project/technology sequence; both naval-headroom answers
+preserved uncertainty in the maximum; and the resource-runway calculations used
+the current snapshot. Minor mistakes remained, including a research department,
+hydroponics placement and secondary civic/project details.
+
+The pass meets the stated beta floor **narrowly**. Merge readiness rests on the
+application fixes, the explicit Flash recommendation, preserved user choices,
+visible fallback and the bounded acceptance result together—not on a claim that
+all advice is correct. No extra prompt layer, personality rewrite or reasoning
+override was adopted, and experimental applicability filtering remains disabled.
+All Python, Rust and Windows/Linux desktop CI passed on the evaluated runtime
+commit; this follow-up changes only this report.
+
+These are ten targeted scenarios, not twenty independent gameplay situations or
+a production error-rate estimate. Six use historical saves; four retain known
+regressions. Live Claude and direct OpenAI coverage was not added in this pass.
