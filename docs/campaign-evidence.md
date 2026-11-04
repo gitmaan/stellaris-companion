@@ -318,3 +318,78 @@ Advisor sample. Local validation passed 710 Python tests (27 optional-fixture sk
 117 desktop unit tests, five targeted desktop journeys, TypeScript/Vite and Ruff checks.
 Source hashes, frozen designs and amendments, all responses, review rationales and test
 receipts are retained in `artifacts/shipping-accuracy-2026-11-04/`.
+
+## Gemini default suitability: 2026-11-04
+
+A separate bounded comparison tested the native Gemini Advisor at shipping commit
+`94ce6d64b07824ba8d90a2ae775d8046155e2f16`. It compared the automatic conserve route
+(`gemini-3.5-flash-lite`, provider-default thinking), that same route with **low**
+thinking, the default route with one **79-word evidence-adherence prefix**, and the
+automatic quality-first route (`gemini-3.8-flash`, provider-default thinking).
+The prefix contained no game facts, example answers, language-specific rules or
+persona rewrite. It asked the model to prefer supplied versioned references, preserve
+units and exceptions, and distinguish verified actions from conditional plans.
+
+Production Companion assembly supplied all prompts. Model and thinking comparisons
+used identical system/user text; only the prefix arm changed the system text. The
+native adapter, temperature 1.0, 8,192-token output allowance and bounded recovery
+were unchanged. Request observations confirmed low thinking was sent and produced
+reported reasoning tokens. The catalog and resolved model IDs were checked, and the
+live run used the shipping `google-genai` 1.57.0 pin. See Google's
+[thinking defaults](https://aistudio.google.com/docs/thinking#thinking-levels) and
+[prompt guidance](https://aistudio.google.com/docs/prompting-strategies#gemini-3).
+
+Before generation, the design froze six known development cases, six fresh cases,
+four configurations and two samples per case: **96 answers**. Calls were interleaved
+in randomized repetition blocks with concurrency two. All completed in one generation
+attempt each, without transport errors, fallback models or incomplete responses.
+Fresh cases varied empire identity and language and covered French market budgeting,
+Portuguese organic care, Colossus prerequisites, Empire Focus, a dormant neighbor,
+and a changed Hive economy. They include transfer within known failure families;
+they are not six wholly unseen domains.
+
+| Configuration | Development material errors | Development useful | Fresh material errors | Fresh useful |
+| --- | ---: | ---: | ---: | ---: |
+| Flash-Lite, shipping default | 5/12 | 2/12 | 5/12 | 5/12 |
+| Flash-Lite, low thinking | 5/12 | 5/12 | 5/12 | 5/12 |
+| Flash-Lite, short evidence prefix | 4/12 | 5/12 | 3/12 | 7/12 |
+| Flash, provider defaults | 2/12 | 6/12 | 1/12 | 10/12 |
+
+The predeclared selection rule required at least 10/12 useful development answers and
+no recurring decision-changing failure. **No configuration qualified.** That decision
+was frozen before fresh generation. The fresh comparison therefore supplies diagnostic
+evidence, not independent validation of a selected replacement. No further prompt
+iterations or post-holdout winner selection were performed.
+
+The prefix did not resolve the glaring failure: both fresh French answers still used
+Energy for market purchases. Low thinking also retained this pattern. Flash handled
+the direct Spanish and French currency questions, but still used Energy-funded buying
+advice in Chinese mineral planning, English food planning and Portuguese organic care.
+Across all cases, Flash had 3/24 material errors and 16/24 useful answers, compared with
+10/24 and 7/24 for the shipping Flash-Lite route. Mean observed response time was 15.65
+seconds for Flash and 3.85 seconds for the default Flash-Lite route. These are run-specific
+observations, not a production accuracy, latency or cost guarantee.
+
+**No production prompt layer, thinking change or default-model change is justified by
+this gate. The PR's Gemini accuracy hold remains.** The experimental prefix stays in
+local evaluation artifacts; adding a production profile registry or additional inference
+pass would add maintenance without a validated fix. Shared, versioned mechanics remain
+the source of game facts. Any future provider-specific exception should be small,
+centralized, tied to a reproduced consequential failure and tested against the shared
+prompt on separate inputs before adoption.
+
+All 96 complete answers received separate accuracy, grounding, usefulness and naturalness
+ratings with configuration labels hidden. Each phase's attributed ratings were frozen
+before opening its key. Review allowed minor errors, alternative sound strategies and
+loose wording; unsupported repair costs, unknown mod effects and unverified causal links
+were distinguished from demonstrated contradictions. Installed 4.4.6 scripts supplied
+independent checks for market currency, organic care, focus progression and Colossus
+requirements. A single Codex reviewer is not independent human calibration; synthetic,
+error-enriched cases and repeated samples do not estimate production failure rates.
+This pass does not evaluate Chronicle, Claude, direct OpenAI or other Gemini deployments.
+
+The source code and user settings remained unchanged. Source/request hashes, frozen
+design and selection, all raw answers, explicit review rationales, request settings and
+usage, additional source checks and summaries are retained under
+`artifacts/gemini-default-2026-11-04/`. Only this evaluation record is added to the PR;
+the software validation recorded above applies to the unchanged runtime code.
