@@ -141,7 +141,7 @@ test('configures a compatible Advisor provider and discovers its models', async 
     const providerSelect = page.getByLabel('PROVIDER')
     await expect(providerSelect).toHaveValue('openrouter')
     await providerSelect.selectOption('custom')
-    await expect(page.getByText(/relevant parts of your campaign are sent to this provider/i)).toBeVisible()
+    await expect(page.getByText('Questions and relevant campaign context are sent to this provider. Advisor and Chronicle do not upload raw save files.', { exact: true })).toBeVisible()
 
     await page.getByPlaceholder('https://provider.example/v1').fill(
       `http://127.0.0.1:${provider.port}/v1`,
