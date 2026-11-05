@@ -833,7 +833,13 @@ class ChronicleGenerator:
 
         era_start_date = chapters_data.get("current_era_start_date")
         era_start_snapshot_id = chapters_data.get("current_era_start_snapshot_id")
-        if not era_start_date:
+        start_key = game_date_key(era_start_date)
+        current_key = game_date_key(snapshot_range.get("last_game_date"))
+        if not era_start_date or (
+            start_key is not None and current_key is not None and start_key > current_key
+        ):
+            # Empty legacy caches may retain the first captured (future) date.
+            # Existing prose ahead of this save is protected before generation.
             era_start_date = snapshot_range.get("first_game_date", "2200.01.01")
             era_start_snapshot_id = snapshot_range.get("first_snapshot_id")
 
@@ -1247,19 +1253,13 @@ class ChronicleGenerator:
         if current_year is None:
             return False, None
 
-        # Determine the era start point
-        if chapters:
-            last_chapter = chapters[-1]
-            era_start_date = last_chapter.get("end_date")
-            era_start_snapshot_id = last_chapter.get("end_snapshot_id")
-        else:
-            era_start_date = chapters_data.get("current_era_start_date")
-            era_start_snapshot_id = chapters_data.get("current_era_start_snapshot_id")
-            if not era_start_date:
-                # First chapter - get from snapshot range
-                snapshot_range = self.db.get_snapshot_range_for_save(save_id)
-                era_start_date = snapshot_range.get("first_game_date", "2200.01.01")
-                era_start_snapshot_id = snapshot_range.get("first_snapshot_id")
+        era_start_date, era_start_snapshot_id = self._get_current_era_start(
+            save_id=save_id,
+            chapters_data=chapters_data,
+            snapshot_range=self.db.get_snapshot_range_for_save(
+                save_id, upper_snapshot_id=current_snapshot_id
+            ),
+        )
 
         era_start_year = parse_year(era_start_date)
         if era_start_year is None:
@@ -1279,6 +1279,7 @@ class ChronicleGenerator:
             from_snapshot_id=era_start_snapshot_id,
             to_snapshot_id=current_snapshot_id,
         )
+        events = events_between_dates(events, era_start_date, current_date)
 
         # Special-case: get Chapter 1 on the page quickly.
         # This also has the nice UX property of shrinking the "Current Era" window,
@@ -1338,7 +1339,9 @@ class ChronicleGenerator:
             if chapters:
                 last_end = chapters[-1].get("end_date", "2200.01.01")
             else:
-                snapshot_range = self.db.get_snapshot_range_for_save(save_id)
+                snapshot_range = self.db.get_snapshot_range_for_save(
+                    save_id, upper_snapshot_id=current_snapshot_id
+                )
                 last_end = snapshot_range.get("first_game_date", "2200.01.01")
 
             last_year = parse_year(last_end)
@@ -1377,14 +1380,9 @@ class ChronicleGenerator:
         latest_snapshot_id = snapshot_range.get("last_snapshot_id")
         latest_game_date = snapshot_range.get("last_game_date")
 
-        # Determine chapter date range
-        if chapters:
-            last_chapter = chapters[-1]
-            start_date = last_chapter.get("end_date")
-            start_snapshot_id = last_chapter.get("end_snapshot_id")
-        else:
-            start_date = snapshot_range.get("first_game_date", "2200.01.01")
-            start_snapshot_id = snapshot_range.get("first_snapshot_id")
+        start_date, start_snapshot_id = self._get_current_era_start(
+            save_id=save_id, chapters_data=chapters_data, snapshot_range=snapshot_range
+        )
 
         # Find the end date based on trigger
         if trigger == "time_threshold":
@@ -1400,19 +1398,26 @@ class ChronicleGenerator:
                 game_date=target_end_date,
                 upper_snapshot_id=latest_snapshot_id,
             )
-            if snapshot_at_or_before:
+            if snapshot_at_or_before and (
+                start_snapshot_id is None
+                or int(snapshot_at_or_before["id"]) > int(start_snapshot_id)
+            ):
                 end_snapshot_id = snapshot_at_or_before.get("id")
                 end_date = snapshot_at_or_before.get("game_date") or target_end_date
             else:
-                # Sparse snapshots can leap across decades. In that case, close
-                # at the latest available snapshot rather than emitting an empty chapter.
+                # The only source before the threshold may be the starting row
+                # itself (or an earlier capture from a rolled-back timeline).
+                # Close sparse chapters at a real advancing source instead.
                 end_snapshot_id = latest_snapshot_id
                 end_date = latest_game_date or target_end_date
         else:
             # Use the triggering event's date as chapter end
             events = self.db.get_events_in_snapshot_range(
-                save_id=save_id, to_snapshot_id=latest_snapshot_id
+                save_id=save_id,
+                from_snapshot_id=start_snapshot_id,
+                to_snapshot_id=latest_snapshot_id,
             )
+            events = events_between_dates(events, start_date, latest_game_date)
             end_date = start_date
             for event in reversed(events):
                 if event.get("event_type") == trigger:
@@ -1441,6 +1446,9 @@ class ChronicleGenerator:
         if end_snapshot_id is None:
             return False
         if start_snapshot_id is not None and int(end_snapshot_id) <= int(start_snapshot_id):
+            return False
+        start_key, end_key = game_date_key(start_date), game_date_key(end_date)
+        if start_key is not None and end_key is not None and end_key < start_key:
             return False
 
         # Get events for this chapter
@@ -1672,17 +1680,13 @@ than a factual claim. When a reason is not present in the event list, leave it u
         """Generate the current era narrative (not finalized)."""
         chapters = chapters_data.get("chapters", [])
 
-        # Determine era start
-        if chapters:
-            era_start_date = chapters[-1].get("end_date")
-            era_start_snapshot_id = chapters[-1].get("end_snapshot_id")
-        else:
-            era_start_date = chapters_data.get("current_era_start_date")
-            era_start_snapshot_id = chapters_data.get("current_era_start_snapshot_id")
-            if not era_start_date:
-                snapshot_range = self.db.get_snapshot_range_for_save(save_id)
-                era_start_date = snapshot_range.get("first_game_date", "2200.01.01")
-                era_start_snapshot_id = snapshot_range.get("first_snapshot_id")
+        era_start_date, era_start_snapshot_id = self._get_current_era_start(
+            save_id=save_id,
+            chapters_data=chapters_data,
+            snapshot_range=self.db.get_snapshot_range_for_save(
+                save_id, upper_snapshot_id=current_snapshot_id
+            ),
+        )
 
         # Get events for current era
         events = self.db.get_events_in_snapshot_range(

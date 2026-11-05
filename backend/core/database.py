@@ -2252,9 +2252,11 @@ class GameDatabase:
             ).fetchone()
             return dict(row) if row else None
 
-    def get_snapshot_range_for_save(self, save_id: str) -> dict[str, Any]:
-        """Get captured snapshot boundaries, including a save loaded at an older date."""
-        return self.get_chronicle_snapshot_range(save_id)
+    def get_snapshot_range_for_save(
+        self, save_id: str, upper_snapshot_id: int | None = None
+    ) -> dict[str, Any]:
+        """Get the earliest dated source and latest captured source for a Chronicle."""
+        return self.get_chronicle_snapshot_range(save_id, upper_snapshot_id)
 
     def get_all_sessions_for_save(self, save_id: str) -> list[dict[str, Any]]:
         """Get all sessions (active and ended) for a save_id."""
@@ -2476,7 +2478,7 @@ class GameDatabase:
     def get_chronicle_snapshot_range(
         self, save_id: str, upper_snapshot_id: int | None = None
     ) -> dict[str, Any]:
-        """Dates belong to the boundary rows, including when a player rewinds time."""
+        """Keep the current capture boundary, starting at the earliest recorded game date."""
         with self._lock:
             bounds = self._conn.execute(
                 """SELECT MIN(sn.id) first_id, MAX(sn.id) last_id, COUNT(*) n
@@ -2486,17 +2488,27 @@ class GameDatabase:
             ).fetchone()
             if not bounds or not bounds["n"]:
                 return {"snapshot_count": 0}
+            # A campaign can first be observed in 2308 and then loaded in 2303.
+            # Capture order still identifies the current source, but cannot define
+            # the start of its history. Keep the date and ID from the same row.
+            first = self._conn.execute(
+                """SELECT sn.id FROM snapshots sn JOIN sessions s ON s.id=sn.session_id
+                   WHERE s.save_id=? AND sn.id<=? AND NULLIF(sn.game_date, '') IS NOT NULL
+                   ORDER BY sn.game_date ASC, sn.id ASC LIMIT 1""",
+                (save_id, bounds["last_id"]),
+            ).fetchone()
+            first_id = first["id"] if first else bounds["first_id"]
             dates = {
                 row["id"]: row["game_date"]
                 for row in self._conn.execute(
                     "SELECT id, game_date FROM snapshots WHERE id IN (?,?)",
-                    (bounds["first_id"], bounds["last_id"]),
+                    (first_id, bounds["last_id"]),
                 ).fetchall()
             }
             return {
-                "first_snapshot_id": bounds["first_id"],
+                "first_snapshot_id": first_id,
                 "last_snapshot_id": bounds["last_id"],
-                "first_game_date": dates.get(bounds["first_id"]),
+                "first_game_date": dates.get(first_id),
                 "last_game_date": dates.get(bounds["last_id"]),
                 "snapshot_count": bounds["n"],
             }
