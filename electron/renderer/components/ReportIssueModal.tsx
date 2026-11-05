@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import Modal from './Modal'
+import ReportSaveAttachments from './ReportSaveAttachments'
 import { HUDButton } from './hud/HUDButton'
 import { HUDSelect, HUDCheckbox } from './hud/HUDForm'
 import { HUDTextArea } from './hud/HUDInput'
@@ -71,6 +72,10 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
   const [category, setCategory] = useState(prefill?.category || '')
   const [description, setDescription] = useState('')
   const [context, setContext] = useState<ReportContext | null>(null)
+  const [selectedSave, setSelectedSave] = useState<ReportSavePreview | null>(null)
+  const [includeSave, setIncludeSave] = useState(false)
+  const [saveRevision, setSaveRevision] = useState(0)
+  const [submitted, setSubmitted] = useState(false)
 
   // Opt-in toggles (default off)
   const [includeDiagnostics, setIncludeDiagnostics] = useState(false)
@@ -110,6 +115,9 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
     setIncludeScreenshot(false)
     setIncludeErrorContext(false)
     setIncludeLlmContext(false)
+    setSelectedSave(null)
+    setIncludeSave(false)
+    setSubmitted(false)
     setStatus(null)
   }, [isOpen, prefill])
 
@@ -364,7 +372,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
   }
 
   async function submitToWorker() {
-    if (!category || !description.trim() || busy || (includeScreenshot && !screenshot)) return
+    if (!category || !description.trim() || busy || submitted || (includeScreenshot && !screenshot)) return
     if (!REPORT_ENDPOINT) {
       setStatus(t('report.submitUnavailable'))
       return
@@ -427,6 +435,21 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
           backend_log_tail: includeBackendLogs ? backendLogTail : undefined,
           screenshot: includeScreenshot ? screenshot : undefined,
         },
+      }
+
+      if (includeSave && selectedSave) {
+        if (!window.electronAPI?.reportSaves) throw new Error(t('report.saves.failed'))
+        const result = await window.electronAPI.reportSaves.submit({ selectionId: selectedSave.selectionId, consent: true, consentVersion: selectedSave.consentVersion, report: payload })
+        setSaveRevision(value => value + 1)
+        setIncludeSave(false)
+        setSelectedSave(null)
+        if (!result.ok) {
+          if (result.attachmentId) setSubmitted(true)
+          throw new Error(result.error)
+        }
+        setSubmitted(true)
+        setStatus(t('report.saves.uploaded'))
+        return
       }
 
       const res = await fetch(REPORT_ENDPOINT, {
@@ -506,6 +529,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
                 ...CATEGORIES.map(cat => ({ value: cat, label: t(`report.categories.${cat}`) })),
               ]}
               value={category}
+              disabled={busy || submitted}
               onChange={(e) => setCategory(e.target.value)}
             />
 
@@ -514,6 +538,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
                 {t('report.description')}
               </span>
               <HUDTextArea
+                disabled={busy || submitted}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t('report.descriptionPlaceholder')}
@@ -534,7 +559,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               </div>
             )}
 
-            <fieldset disabled={busy} className="space-y-3">
+            <fieldset disabled={busy || submitted} className="space-y-3">
               <span className="font-display text-[10px] tracking-widest text-text-secondary uppercase pl-1">
                 {t('report.optional')}
               </span>
@@ -582,6 +607,8 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               )}
             </fieldset>
 
+            {isOpen && <ReportSaveAttachments selected={selectedSave} onSelect={setSelectedSave} consent={includeSave} onConsent={setIncludeSave} busy={busy} submitted={submitted} refresh={saveRevision} onBusy={setBusy} onStatus={setStatus} />}
+
             {status && (
               <div className="p-3 bg-black/20 border border-white/10 rounded-sm text-xs text-text-secondary font-mono">
                 {status}
@@ -592,7 +619,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               <HUDButton
                 variant="primary"
                 onClick={submitToWorker}
-                disabled={!category || !description.trim() || busy || !REPORT_ENDPOINT || (includeScreenshot && !screenshot)}
+                disabled={!category || !description.trim() || busy || submitted || !REPORT_ENDPOINT || (includeScreenshot && !screenshot)}
                 title={!REPORT_ENDPOINT ? t('report.submitUnavailableHint') : undefined}
                 className="w-full"
               >
