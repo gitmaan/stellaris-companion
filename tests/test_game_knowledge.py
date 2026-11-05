@@ -265,9 +265,10 @@ def test_topic_focused_prompt_does_not_misreport_available_older_coverage():
         topics="What should I prioritize next?",
     )
 
-    assert "Mechanics coverage is exact, through 4.3.5" in prompt
-    assert "No topic-specific mechanics section matched" in prompt
-    assert "not proof that no rule applies" in prompt
+    assert "Verified mechanics for Cetus v4.3.5" in prompt
+    assert "## Critical 4.x Baseline" in prompt
+    assert "Trade is the Galactic Market currency" in prompt
+    assert "No topic-specific mechanics section matched" not in prompt
     assert "No verified mechanics pack covers" not in prompt
 
 
