@@ -13,11 +13,13 @@ import json
 import os
 import sys
 import time
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
-from typing import Literal
-from unittest.mock import MagicMock
+from typing import Any, Literal
+from unittest.mock import MagicMock, patch
 
 from google import genai
 from pydantic import BaseModel, Field
@@ -34,19 +36,23 @@ from backend.core.advisor_providers import (  # noqa: E402
     create_advisor_generator,
 )
 from backend.core.chronicle import ChronicleGenerator  # noqa: E402
+from backend.core.companion import Companion  # noqa: E402
+from scripts.experiments.eval_review import REVIEW_RUBRIC  # noqa: E402
 from stellaris_companion.game_knowledge import (  # noqa: E402
     DEFAULT_SNAPSHOTS_DIR,
     build_game_knowledge_prompt,
 )
+from stellaris_companion.model_catalog import MODEL_CATALOG, SELECTION_PREFIX  # noqa: E402
 
 DEFAULT_OPENROUTER_MODELS = [
-    "deepseek/deepseek-v4-flash",
-    "anthropic/claude-sonnet-5",
-    "google/gemini-3.1-flash-lite",
-    "openai/gpt-5.6-luna",
-    "xiaomi/mimo-v2.5",
+    SELECTION_PREFIX + family for family in MODEL_CATALOG["openrouterRecommendations"]
 ]
-EVAL_VERSIONS = {"pegasus": "Pegasus v4.4.6", "cygnus": "Cygnus v4.5.2"}
+EVAL_VERSIONS = {
+    "pegasus": "Pegasus v4.4.6",
+    "cygnus": "Cygnus v4.5.2",
+    "evidence": "Cygnus v4.5.2",
+    "applicability": "Pegasus v4.4.6",
+}
 
 HumanLabel = Literal["accurate", "acceptable", "concerning", "materially_incorrect"]
 
@@ -63,12 +69,18 @@ class EvalCase:
     prompt: str
     review_criteria: list[str]
     structured: bool = False
+    briefing: dict[str, Any] | None = None
+    previous_turns: list[dict[str, Any]] | None = None
+    family: str = "legacy"
+    split: Literal["regression", "development", "holdout"] = "regression"
+    references: list[str] | None = None
 
 
 @dataclass
 class EvalResult:
     case: str
     purpose: str
+    game_version: str
     provider: str
     requested_model: str
     final_model: str | None
@@ -76,12 +88,23 @@ class EvalResult:
     response: str | None
     provider_error: str | None
     schema_fallback_used: bool
+    assembled_system_prompt: str | None = None
+    assembled_user_prompt: str | None = None
     human_label: HumanLabel | None = None
     human_rationale: str = ""
+    repetition: int = 1
 
 
 def build_cases(suite: str = "pegasus") -> list[EvalCase]:
     """Return high-value cases whose criteria are reviewed semantically by a person."""
+    if suite == "applicability":
+        path = Path(__file__).with_name("cases") / "applicability.json"
+        cases = [EvalCase(**entry) for entry in json.loads(path.read_text(encoding="utf-8"))]
+        if len({case.name for case in cases}) != len(cases):
+            raise ValueError("Evaluation case names must be unique")
+        return cases
+    if suite == "evidence":
+        return _build_evidence_cases()
     if suite == "cygnus":
         return _build_cygnus_cases()
     if suite != "pegasus":
@@ -544,6 +567,255 @@ def _build_cygnus_cases() -> list[EvalCase]:
     ]
 
 
+def _build_evidence_cases() -> list[EvalCase]:
+    """Exercise evidence boundaries through real prompt assembly, not answer matching."""
+    return [
+        EvalCase(
+            name="observed_servitor_with_legacy_dlc_inference",
+            purpose="advisor",
+            prompt="I am a Rogue Servitor. What kinds of goals can I pursue, including achievements?",
+            briefing={
+                "meta": {
+                    "version": "Cygnus v4.5.2",
+                    "date": "2300.01.01",
+                    "missing_dlcs": ["Synthetic Dawn"],
+                },
+                "identity": {
+                    "empire_name": "Omniplex",
+                    "authority": "machine_intelligence",
+                    "civics": ["machine_servitor", "machine_replication"],
+                },
+            },
+            previous_turns=[
+                {
+                    "question": "What empire am I?",
+                    "answer": "You cannot be a Rogue Servitor because Synthetic Dawn is missing.",
+                    "game_date": "2300.01.01",
+                    "language": "en",
+                }
+            ],
+            review_criteria=[
+                "Recognizes Rogue Servitor as the observed civic, distinct from Machine Intelligence authority.",
+                "Corrects the earlier advisor claim and does not require a separate Synthetic Dawn purchase.",
+                "Offers useful supported goals without inventing achievement names or claiming verified eligibility.",
+            ],
+        ),
+        EvalCase(
+            name="observed_hive_with_unreported_pack",
+            purpose="advisor",
+            prompt="Can you advise my Devouring Swarm on expansion, or am I missing Utopia?",
+            briefing={
+                "meta": {"version": "Cygnus v4.5.2"},
+                "identity": {"authority": "hive_mind", "civics": ["hive_devouring_swarm"]},
+            },
+            review_criteria=[
+                "Accepts the observed Hive Mind and Devouring Swarm civic.",
+                "Does not infer missing ownership from absent DLC evidence.",
+                "Provides conditional strategic advice without inventing neighbors or resources.",
+            ],
+        ),
+        EvalCase(
+            name="available_content_is_not_unlocked",
+            purpose="advisor",
+            prompt="Can I build a Colossus right now?",
+            briefing={
+                "meta": {"required_dlcs": ["Apocalypse"], "required_dlcs_status": "reported"},
+                "identity": {"authority": "democratic"},
+            },
+            review_criteria=[
+                "Distinguishes reported content from current unlocks and construction prerequisites.",
+                "Does not claim eligibility or ineligibility without the missing evidence.",
+                "Explains what to check while remaining helpful.",
+            ],
+        ),
+        EvalCase(
+            name="unknown_mod_identity",
+            purpose="advisor",
+            prompt="My custom civic gives me unusual logistics. What can you tell from the save?",
+            briefing={
+                "meta": {"version": "unknown"},
+                "identity": {"authority": "modded_authority", "civics": ["modded_logistics"]},
+            },
+            review_criteria=[
+                "Preserves uncertainty about modded identity and rules.",
+                "Does not invent a standard civic equivalent or say the civic cannot exist.",
+            ],
+        ),
+        EvalCase(
+            name="supported_calculation",
+            purpose="advisor",
+            prompt="Ignoring changes to income or spending, how many months to reach 1600 alloys?",
+            briefing={
+                "meta": {},
+                "economy": {"resources": {"alloys": {"stockpile": 1000, "net_monthly": 100}}},
+            },
+            review_criteria=[
+                "Calculates six months from the supplied values.",
+                "Labels the constant-income assumption rather than refusing because six is absent from JSON.",
+            ],
+        ),
+        EvalCase(
+            name="historical_version_not_current_entitlement",
+            purpose="advisor",
+            prompt="Does this old save prove I can play a machine empire?",
+            briefing={
+                "meta": {
+                    "version": "v4.3.5",
+                    "required_dlcs": [],
+                    "required_dlcs_status": "reported",
+                },
+                "identity": {"authority": "democratic"},
+            },
+            review_criteria=[
+                "Does not apply the later base-game integration to an older campaign version.",
+                "Does not assert an unobserved machine identity or definite player entitlement.",
+            ],
+        ),
+        EvalCase(
+            name="machine_identity_guides_generic_strategy",
+            purpose="advisor",
+            prompt="What do my civics suggest I should prioritize? Are construction discounts part of their benefits?",
+            briefing={
+                "meta": {"version": "Pegasus v4.4.6"},
+                "identity": {
+                    "authority": "machine_intelligence",
+                    "civics": ["machine_servitor", "machine_replication"],
+                },
+            },
+            review_criteria=[
+                "Uses the observed Rogue Servitor and Rapid Replicator civics to give useful priorities.",
+                "Correctly attributes +20% mechanical assembly speed to Rapid Replicator, not a construction discount.",
+                "Distinguishes starting Bio-Trophies and sanctuary access from current population or buildings.",
+            ],
+        ),
+        EvalCase(
+            name="swarm_identity_guides_generic_strategy",
+            purpose="advisor",
+            prompt="How do my government bonuses affect expansion and combat? Can I rely on trade agreements?",
+            briefing={
+                "meta": {"version": "Pegasus v4.4.6"},
+                "identity": {"authority": "hive_mind", "civics": ["hive_devouring_swarm"]},
+            },
+            review_criteria=[
+                "Explains Devouring Swarm's cheaper expansion/ship construction and limits on ordinary diplomacy.",
+                "Does not conflate its Army Damage bonus with a Ship Weapons Damage or Ship Build Speed bonus.",
+                "Does not invent neighbors, current fleet superiority, alliances, or certain attack outcomes.",
+            ],
+        ),
+        EvalCase(
+            name="retirement_home_condition",
+            purpose="advisor",
+            prompt="Is adopting one Fallen Empire organic enough for Retirement Home? What should I check?",
+            briefing={
+                "meta": {"version": "Pegasus v4.4.6"},
+                "identity": {"authority": "machine_intelligence", "civics": ["machine_servitor"]},
+            },
+            review_criteria=[
+                "Uses the verified threshold of at least 1,000 owned organic Fallen Empire population with the appropriate species flag.",
+                "Does not claim a Sanctuary building or one old-scale Pop is the achievement condition.",
+                "Separates the event condition from unknown campaign progress and platform eligibility; invents no global Ironman/cloud rule.",
+            ],
+        ),
+        EvalCase(
+            name="assimilator_achievement_scope",
+            purpose="advisor",
+            prompt="Could Distinctiveness Added be a sensible goal for me? What condition does it actually check?",
+            briefing={
+                "meta": {"version": "Pegasus v4.4.6"},
+                "identity": {
+                    "authority": "machine_intelligence",
+                    "civics": ["machine_assimilator"],
+                },
+            },
+            review_criteria=[
+                "Recognizes Driven Assimilator and the event condition of more than four Cybernetic species.",
+                "Does not present it as a Servitor objective or infer species progress from the civic alone.",
+                "Keeps global achievement eligibility unknown.",
+            ],
+        ),
+        EvalCase(
+            name="colossus_verified_checklist",
+            purpose="advisor",
+            prompt="I have Apocalypse. A friend says Zero-Point Power and two earlier perks are enough for Colossus Project. Is that right, and where would I build it?",
+            briefing={
+                "meta": {
+                    "version": "Pegasus v4.4.6",
+                    "required_dlcs": ["Apocalypse"],
+                    "required_dlcs_status": "reported",
+                },
+                "identity": {"authority": "democratic"},
+            },
+            review_criteria=[
+                "Corrects the perk requirement to Titans and at least three prior ascension perks.",
+                "Separates perk, special project completion, Colossi technology, and build readiness.",
+                "Uses Capital Assembly Yards at a Citadel or an applicable alternative; does not require the obsolete building name universally.",
+                "Does not conclude construction is currently possible from Apocalypse alone.",
+            ],
+        ),
+        EvalCase(
+            name="declining_resource_runway",
+            purpose="advisor",
+            prompt="At this unchanged rate, when will my energy stockpile run out, and what should I investigate first?",
+            briefing={
+                "meta": {"version": "Pegasus v4.4.6"},
+                "identity": {"authority": "democratic"},
+                "economy": {"resources": {"energy": {"stockpile": 1800, "net_monthly": -75}}},
+            },
+            review_criteria=[
+                "Calculates 24 months under the constant-flow assumption.",
+                "Gives useful conditional investigation priorities without inventing the cause of the deficit.",
+                "Does not refuse to calculate or treat Energy as Galactic Market currency.",
+            ],
+        ),
+        EvalCase(
+            name="ordinary_democratic_strategy",
+            purpose="advisor",
+            prompt="I prefer peaceful development. What are three useful priorities for the next decade with the information you have?",
+            briefing={
+                "meta": {"version": "Pegasus v4.4.6"},
+                "identity": {"authority": "democratic", "ethics": ["pacifist", "xenophile"]},
+                "economy": {"resources": {"alloys": {"stockpile": 1200, "net_monthly": 40}}},
+            },
+            review_criteria=[
+                "Offers actionable conditional development priorities consistent with the observed empire and preference.",
+                "Does not invent treaties, neighbors, colonies, war status, or available construction sites.",
+                "Avoids obsolete Trade Routes/patrol mechanics and does not become a blanket refusal.",
+            ],
+        ),
+        EvalCase(
+            name="unknown_neighbor_intentions",
+            purpose="advisor",
+            prompt="Will my neighbor invade soon? What can I do to prepare?",
+            briefing={
+                "meta": {"version": "unknown"},
+                "identity": {"authority": "democratic"},
+            },
+            review_criteria=[
+                "Does not invent neighbor identity, hostility, fleet movements, timing, or attack probability.",
+                "Explains missing warning indicators and gives useful conditional preparation advice.",
+            ],
+        ),
+    ]
+
+
+class _RecordingGenerator:
+    """Keep the exact production prompts alongside each synthetic evaluation answer."""
+
+    def __init__(self, generator: Any, max_output_tokens: int):
+        self.generator = generator
+        self.max_output_tokens = max_output_tokens
+        self.system_prompt: str | None = None
+        self.user_prompt: str | None = None
+        self.response: Any = None
+
+    def generate(self, **kwargs: Any) -> Any:
+        self.system_prompt = kwargs["system_prompt"]
+        self.user_prompt = kwargs["user_prompt"]
+        kwargs["max_output_tokens"] = self.max_output_tokens
+        self.response = self.generator.generate(**kwargs)
+        return self.response
+
+
 def _provider_config(args: argparse.Namespace, model: str) -> AdvisorProviderConfig:
     provider = args.provider
     if provider == ADVISOR_PROVIDER_GEMINI:
@@ -564,21 +836,29 @@ def _provider_config(args: argparse.Namespace, model: str) -> AdvisorProviderCon
 
 
 def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult:
-    version = EVAL_VERSIONS[args.suite]
+    metadata = (case.briefing or {}).get("meta", {})
+    version = str(metadata.get("version") or EVAL_VERSIONS[args.suite])
     config = _provider_config(args, model)
     gemini_client = genai.Client(api_key=config.api_key) if config.provider == "gemini" else None
     generator = create_advisor_generator(config=config, gemini_client=gemini_client)
     if generator is None:
         raise RuntimeError(f"{config.display_name} is not configured")
 
+    recorder = _RecordingGenerator(generator, args.max_output_tokens)
+    companion = None
     started = time.monotonic()
     snapshots_dir = args.snapshots_dir or DEFAULT_SNAPSHOTS_DIR
+    retrieval_options = (
+        {"experimental_applicability": True}
+        if getattr(args, "experimental_applicability", False)
+        else {}
+    )
     try:
         if case.structured:
             chronicle = ChronicleGenerator(
                 db=MagicMock(),
                 provider_config=config,
-                provider_generator=generator,
+                provider_generator=recorder,
             )
             _, response = chronicle._generate_structured_content(  # type: ignore[attr-defined]
                 contents=case.prompt,
@@ -590,25 +870,53 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
                     version,
                     purpose="chronicle",
                     snapshots_dir=snapshots_dir,
+                    **retrieval_options,
                 ),
             )
         else:
-            system_prompt = (
-                "Answer as a strategic advisor. Distinguish campaign observations from "
-                "mechanics.\n\n"
-                f"{build_game_knowledge_prompt(version, purpose='advisor', topics=case.prompt, snapshots_dir=snapshots_dir)}"
+            briefing = deepcopy(case.briefing) if case.briefing is not None else {}
+            briefing.setdefault("meta", {}).setdefault("version", version)
+            meta = briefing["meta"]
+            companion = Companion(
+                save_path=None,
+                auto_precompute=False,
+                advisor_provider=config.provider,
+                advisor_model=config.model,
+                advisor_base_url=config.base_url,
+                advisor_api_key=config.api_key,
+                api_key=config.api_key if config.provider == "gemini" else None,
+                advisor_generator=recorder,
             )
-            response = generator.generate(
-                system_prompt=system_prompt,
-                user_prompt=case.prompt,
-                model=model,
-                temperature=0.7,
-                max_output_tokens=args.max_output_tokens,
-                purpose="advisor",
+            companion.apply_precomputed_briefing(
+                save_path=None,
+                briefing_json=json.dumps(briefing),
+                game_date=meta.get("date"),
+                identity=briefing.get("identity") or {},
+                situation=briefing.get("situation") or {},
+                metadata=meta,
             )
+            with patch(
+                "backend.core.companion.build_game_knowledge_prompt",
+                partial(
+                    build_game_knowledge_prompt,
+                    snapshots_dir=snapshots_dir,
+                    **retrieval_options,
+                ),
+            ):
+                reply = companion.ask_precomputed_with_context(
+                    question=case.prompt,
+                    session_key=f"evaluation:{case.name}",
+                    model_name=model,
+                    restored_turns=case.previous_turns,
+                    persist_memory=False,
+                )
+            if reply.stats.get("error"):
+                raise RuntimeError(reply.stats["error"])
+            response = recorder.response
         return EvalResult(
             case=case.name,
             purpose=case.purpose,
+            game_version=version,
             provider=config.provider,
             requested_model=model,
             final_model=response.model,
@@ -616,11 +924,14 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
             response=response.text,
             provider_error=None,
             schema_fallback_used=response.schema_fallback_used,
+            assembled_system_prompt=recorder.system_prompt,
+            assembled_user_prompt=recorder.user_prompt,
         )
     except Exception as exc:
         return EvalResult(
             case=case.name,
             purpose=case.purpose,
+            game_version=version,
             provider=config.provider,
             requested_model=model,
             final_model=None,
@@ -628,7 +939,17 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
             response=None,
             provider_error=str(exc),
             schema_fallback_used=False,
+            assembled_system_prompt=recorder.system_prompt,
+            assembled_user_prompt=recorder.user_prompt,
         )
+    finally:
+        close = getattr(generator, "close", None)
+        if callable(close):
+            close()
+        if companion is not None and companion.client is not None:
+            companion.client.close()
+        if gemini_client is not None:
+            gemini_client.close()
 
 
 def parse_args() -> argparse.Namespace:
@@ -648,7 +969,21 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--max-output-tokens", type=int, default=1200)
+    parser.add_argument(
+        "--repeats", type=int, default=1, help="Independent samples per model and case"
+    )
     parser.add_argument("--case", action="append", dest="case_names")
+    parser.add_argument(
+        "--experimental-applicability",
+        action="store_true",
+        help="Opt into pruning scoped rules after section selection; disabled in app defaults",
+    )
+    parser.add_argument(
+        "--split", choices=["all", "regression", "development", "holdout"], default="all"
+    )
+    parser.add_argument(
+        "--variant", default="candidate", help="Comparison label, never sent to the model"
+    )
     parser.add_argument(
         "--json-out",
         type=Path,
@@ -660,7 +995,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if args.repeats < 1:
+        print("--repeats must be positive.", file=sys.stderr)
+        return 2
     cases = build_cases(args.suite)
+    split = getattr(args, "split", "all")
+    if split != "all":
+        cases = [case for case in cases if case.split == split]
     if args.case_names:
         selected = set(args.case_names)
         cases = [case for case in cases if case.name in selected]
@@ -671,8 +1012,12 @@ def main() -> int:
 
     if args.list:
         for case in cases:
-            print(f"{case.name}\t{case.purpose}")
+            print(f"{case.name}\t{case.purpose}\t{case.split}\t{case.family}")
         return 0
+
+    if not cases:
+        print("No cases match the selected suite and split.", file=sys.stderr)
+        return 2
 
     models = args.models
     if not models:
@@ -683,32 +1028,42 @@ def main() -> int:
             return 2
 
     results: list[EvalResult] = []
-    for model in models:
-        print(f"\n## {model}")
-        for case in cases:
-            result = run_case(args, model, case)
-            results.append(result)
-            status = "ERROR" if result.provider_error else "RECORDED"
-            print(f"{status:8} {case.name:28} {result.elapsed_seconds:7.2f}s")
-
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "suite": args.suite,
-        "game_version": EVAL_VERSIONS[args.suite],
-        "advisor_knowledge_selection": "question_topics",
+        "variant": getattr(args, "variant", "candidate"),
+        "split": split,
+        "suite_default_game_version": EVAL_VERSIONS[args.suite],
+        "advisor_knowledge_selection": (
+            "experimental_post_selection_applicability"
+            if getattr(args, "experimental_applicability", False)
+            else "production_section_retrieval"
+        ),
         "provider": args.provider,
         "models": models,
+        "repeats": args.repeats,
         "human_review_scale": [
             "accurate",
             "acceptable",
             "concerning",
             "materially_incorrect",
         ],
+        "review_rubric": REVIEW_RUBRIC,
         "cases": [asdict(case) for case in cases],
         "results": [asdict(result) for result in results],
     }
     args.json_out.parent.mkdir(parents=True, exist_ok=True)
-    args.json_out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    for repetition in range(1, args.repeats + 1):
+        for model in models:
+            print(f"\n## {model}, repetition {repetition}", flush=True)
+            for case in cases:
+                result = run_case(args, model, case)
+                result.repetition = repetition
+                results.append(result)
+                status = "ERROR" if result.provider_error else "RECORDED"
+                print(f"{status:8} {case.name:28} {result.elapsed_seconds:7.2f}s", flush=True)
+                payload["results"] = [asdict(item) for item in results]
+                args.json_out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"\nRaw responses saved to {args.json_out}")
     print("Semantic labels are intentionally blank pending human review.")
     return 1 if any(result.provider_error for result in results) else 0

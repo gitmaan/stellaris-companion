@@ -612,18 +612,18 @@
       }
     },
     "geminiQuota": {
-      "label": "USO DE GEMINI",
-      "description": "Elija cómo equilibrar las respuestas diarias del Asesor y la redacción de Crónicas.",
-      "standard": "Libre-amigable",
-      "higher": "La mejor calidad",
-      "standardTag": "ESTIRA LOS LÍMITES LIBRES",
-      "higherTag": "UTILIZA MÁS ASIGNACIÓN",
-      "standardHelp": "Mantiene las preguntas cotidianas más livianas para que una mayor parte de su asignación esté disponible para escribir Crónicas.",
-      "higherHelp": "Prefiere el modelo Gemini más potente disponible tanto para Advisor como para Chronicle.",
+      "label": "MODELO GEMINI",
+      "description": "Elige entre calidad del consejo y respuestas más rápidas.",
+      "standard": "Flash-Lite",
+      "higher": "Flash",
+      "standardTag": "MÁS RÁPIDO · AHORRA CUOTA",
+      "higherTag": "RECOMENDADO PARA CONSEJOS",
+      "standardHelp": "Usa Flash-Lite para respuestas más rápidas del asesor y reserva la cuota de Flash para la crónica.",
+      "higherHelp": "Prefiere Flash para el asesor y la crónica. Las respuestas pueden tardar más y consumir más cuota; cambia a Lite cuando es necesario.",
       "showAdvanced": "Mostrar controles de cuota avanzados",
       "hideAdvanced": "Ocultar controles de cuota avanzados",
       "optional": "OPCIONAL",
-      "aria": "Establezca el modo de cuota Gemini en {{mode}}"
+      "aria": "Establecer la preferencia de modelo Gemini en {{mode}}"
     },
     "mcpRelay": {
       "loadingSummary": "Comprobando la conexión de la aplicación AI local.",
@@ -749,7 +749,12 @@
           "title": "Conectar tu app de IA",
           "description": "Usa MCP Relay para hablar de tu campaña en Claude Desktop, ChatGPT de escritorio u otra app compatible. No necesitas una clave API en Companion."
         }
-      }
+      },
+      "selectedNotListed": "Este modelo no aparece en el último catálogo recibido. Tu selección se mantiene. Comprueba el modelo antes de elegir otro.",
+      "catalogFailed": "No se pudo actualizar el catálogo. Tu selección se mantiene; no se ha comprobado la disponibilidad.",
+      "latestStableModel": "{{name}} (última versión estable)",
+      "latestStableDetails": "Actualmente {{model}}. Se actualiza automáticamente a versiones estables de esta familia; los precios pueden cambiar.",
+      "geminiStableUpdates": "Gemini usa automáticamente los últimos modelos estables Flash y Flash-Lite disponibles para tu clave. Se recomienda Flash para consejos; elige Flash-Lite en Ajustes para respuestas más rápidas."
     }
   },
   "update": {
@@ -913,7 +918,9 @@
       "browseError": "No se pudo abrir el selector de carpetas. Inténtalo de nuevo.",
       "cloudDisclosure": "Los datos relevantes de la campaña se envían a {{provider}} cuando haces una consulta.",
       "foundCount_many": "{{count}} partidas encontradas",
-      "openRouterSignIn": "Iniciar sesión con OpenRouter"
+      "openRouterSignIn": "Iniciar sesión con OpenRouter",
+      "loadingSettings": "Cargando tu conexión guardada…",
+      "settingsLoadError": "No se pudo cargar tu conexión guardada. Inténtalo de nuevo o configúrala más tarde para conservar los ajustes actuales."
     }
   },
   "advisorPanel": {

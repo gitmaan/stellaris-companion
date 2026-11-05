@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from .campaign_evidence import resolve_content_availability, resolve_empire_identity
+from .evidence_policy import build_evidence_prompt
+from .knowledge_applicability import (
+    APPLICABILITY_PATTERN,
+    KnowledgeScope,
+    load_scope_registry,
+)
 from .paths import get_repo_root
 
 
@@ -169,6 +177,7 @@ class GameKnowledgeContext:
     status: KnowledgeStatus
     content: str | None
     notes_only: bool = False
+    annotated_content: str | None = None
 
 
 def parse_version(version: str) -> tuple[int, int, int] | None:
@@ -190,9 +199,20 @@ def extract_version(version: str) -> str | None:
     return ".".join(parts)
 
 
-def clean_knowledge_content(content: str) -> str:
+def clean_knowledge_content(content: str, *, keep_applicability: bool = False) -> str:
     """Remove maintainer comments while retaining model-useful Markdown structure."""
-    cleaned = re.sub(r"<!--.*?-->", "", content, flags=re.DOTALL)
+    if not keep_applicability:
+        # Optional annotations must not alter even the default prompt's whitespace.
+        content = re.sub(r"(?m)^[ \t]*" + APPLICABILITY_PATTERN.pattern + r"[ \t]*\n?", "", content)
+        content = re.sub(APPLICABILITY_PATTERN.pattern + r"[ \t]*", "", content)
+    cleaned = re.sub(
+        r"<!--.*?-->",
+        lambda match: (
+            match[0] if keep_applicability and APPLICABILITY_PATTERN.fullmatch(match[0]) else ""
+        ),
+        content,
+        flags=re.DOTALL,
+    )
     lines = [line.rstrip() for line in cleaned.splitlines()]
     while lines and not lines[0].strip():
         lines.pop(0)
@@ -225,7 +245,7 @@ def _load_file(version: str, directory: Path) -> str | None:
         return None
 
 
-def _combine_knowledge(parts: list[str]) -> str | None:
+def _combine_knowledge(parts: list[str], *, keep_applicability: bool = False) -> str | None:
     """Apply explicit rule replacements without discarding unrelated older facts."""
     content = ""
     for part in parts:
@@ -235,8 +255,66 @@ def _combine_knowledge(parts: list[str]) -> str | None:
                 lambda match, labels=replaced_labels: "" if match["label"] in labels else match[0],
                 content,
             )
-        content += f"\n\n{clean_knowledge_content(part)}"
-    return clean_knowledge_content(content) or None
+        content += f"\n\n{clean_knowledge_content(part, keep_applicability=keep_applicability)}"
+    return clean_knowledge_content(content, keep_applicability=keep_applicability) or None
+
+
+def _apply_applicability(
+    content: str,
+    *,
+    topics: str | None,
+    identity: dict | None,
+    scopes: dict[str, KnowledgeScope],
+) -> str:
+    """Keep observed or explicitly requested scopes, with their conditions intact.
+
+    An annotation before a section's first rule scopes the section. An inline
+    annotation belongs to that rule, so replacements remove its metadata too.
+    Full-reference consumers retain all resolved scopes as conditional context.
+    """
+
+    def scope_note(name: str) -> str | None:
+        scope = scopes.get(name)
+        if scope is None:
+            return None
+        status = scope.assess(identity)
+        if topics is not None and status != "supported" and not scope.requested_by(topics):
+            return None
+        return scope.reference_note(status)
+
+    def render_section(section: str) -> str:
+        first_rule = _RULE_PATTERN.search(section)
+        intro = section[: first_rule.start()] if first_rule else section
+        section_scope = APPLICABILITY_PATTERN.search(intro)
+        if section_scope:
+            note = scope_note(section_scope[1])
+            if note is None:
+                return ""
+            section = section.replace(section_scope[0], note, 1)
+
+        def render_rule(match: re.Match) -> str:
+            annotation = APPLICABILITY_PATTERN.search(match[0])
+            if not annotation:
+                return match[0]
+            note = scope_note(annotation[1])
+            if note is None:
+                return ""
+            return match[0].replace(annotation[0], f"({note})", 1)
+
+        rendered = _RULE_PATTERN.sub(render_rule, section)
+        # Do not leave an empty scoped section competing for retrieval slots.
+        if first_rule and not _RULE_PATTERN.search(rendered):
+            return ""
+        return rendered.strip()
+
+    headings = list(_MARKDOWN_SECTION_PATTERN.finditer(content))
+    if not headings:
+        return clean_knowledge_content(render_section(content))
+    sections = [content[: headings[0].start()].strip()]
+    for index, match in enumerate(headings):
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(content)
+        sections.append(render_section(content[match.start() : end]))
+    return clean_knowledge_content("\n\n".join(section for section in sections if section))
 
 
 def _search_terms(text: str, *, expand_aliases: bool = True) -> set[str]:
@@ -257,7 +335,7 @@ def _search_terms(text: str, *, expand_aliases: bool = True) -> set[str]:
     return terms
 
 
-def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
+def _select_relevant_sections(content: str, topics: str, *, limit: int, identity: str = "") -> str:
     """Keep safety baselines plus the few mechanics sections relevant to a request."""
     headings = list(_MARKDOWN_SECTION_PATTERN.finditer(content))
     if not headings:
@@ -267,6 +345,8 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
     alias_terms = _search_terms(topics) - topic_terms
     selected: set[int] = set()
     candidates: list[tuple[int, int]] = []
+    identity_terms = _search_terms(identity, expand_aliases=False)
+    identity_candidates: list[tuple[int, int]] = []
 
     for index, match in enumerate(headings):
         title = match.group(2).strip()
@@ -279,7 +359,8 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
             continue
 
         end = headings[index + 1].start() if index + 1 < len(headings) else len(content)
-        body = content[match.end() : end].strip()
+        # Score gameplay text, never maintainer metadata or generated scope notes.
+        body = clean_knowledge_content(content[match.end() : end]).strip()
         if not body:
             continue  # Document titles are not mechanics sections.
         title_terms = _search_terms(title, expand_aliases=False)
@@ -297,6 +378,9 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
         )
         if score:
             candidates.append((score, index))
+        identity_score = 2 * len(identity_terms & title_terms) + len(identity_terms & label_terms)
+        if identity_score:
+            identity_candidates.append((identity_score, index))
 
     # Recency breaks ties; sharing a topic does not make an older section obsolete.
     # Actual superseded rules have already been removed by _combine_knowledge.
@@ -306,6 +390,10 @@ def _select_relevant_sections(content: str, topics: str, *, limit: int) -> str:
         # rule/title match (e.g. Hedonists mentioning population in an ethics query).
         minimum_score = candidates[0][0] / 4
         selected.update(index for score, index in candidates[:limit] if score >= minimum_score)
+    # Preserve question priority. At most one additional identity section can
+    # supply civic mechanics for a generic question without flooding the prompt.
+    if limit > 0 and identity_candidates:
+        selected.add(max(identity_candidates)[1])
 
     sections: list[str] = []
     for index in sorted(selected):
@@ -384,13 +472,15 @@ def load_game_knowledge(
         status: KnowledgeStatus = (
             "exact" if loaded_version == target_version and not notes_only_line else "partial"
         )
+        annotated = _combine_knowledge(content_parts, keep_applicability=True)
         return GameKnowledgeContext(
             version,
             target_version,
             loaded_version,
             status if content_parts else "unavailable",
-            _combine_knowledge(content_parts),
+            clean_knowledge_content(annotated) if annotated else None,
             notes_only=notes_only_line,
+            annotated_content=annotated,
         )
 
     content_parts = []
@@ -413,13 +503,23 @@ def load_game_knowledge(
             loaded_version = patch_version
 
     status = "exact" if loaded_version == target_version and not notes_only_line else "partial"
+    annotated = _combine_knowledge(content_parts, keep_applicability=True)
     return GameKnowledgeContext(
         version,
         target_version,
         loaded_version,
         status if content_parts else "unavailable",
-        _combine_knowledge(content_parts),
+        clean_knowledge_content(annotated) if annotated else None,
         notes_only=notes_only_line,
+        annotated_content=annotated,
+    )
+
+
+def build_content_evidence_prompt(metadata: dict) -> str:
+    """Always retain content-access evidence, independent of topic retrieval."""
+    return (
+        "[INTERNAL CONTENT EVIDENCE - not proof of current unlocks or eligibility]\n"
+        + json.dumps(resolve_content_availability(metadata), ensure_ascii=False)
     )
 
 
@@ -428,6 +528,9 @@ def build_game_knowledge_prompt(
     *,
     purpose: KnowledgePurpose,
     topics: str | None = None,
+    campaign_metadata: dict | None = None,
+    campaign_identity: dict | None = None,
+    experimental_applicability: bool = False,
     max_topic_sections: int = 3,
     patches_dir: Path = DEFAULT_PATCHES_DIR,
     snapshots_dir: Path = DEFAULT_SNAPSHOTS_DIR,
@@ -438,36 +541,43 @@ def build_game_knowledge_prompt(
         patches_dir=patches_dir,
         snapshots_dir=snapshots_dir,
     )
-    purpose_rule = (
-        "Use mechanics to explain the recorded world, never as evidence that an event "
-        "occurred. Do not add a name, identity, participant, place, action, motive, cause, "
-        "outcome, or unlocked feature unless the supplied campaign evidence supports it. "
-        "Treat 'not recorded' as a limit of the supplied record, not proof that something "
-        "never occurred."
-        if purpose == "chronicle"
-        else "Use mechanics to interpret the save and form advice, but do not invent current "
-        "resources, unlocks, settings, borders, or events, or extend a listed rule into an "
-        "unstated automatic outcome. Verify arithmetic before using a calculated value to "
-        "label the campaign state."
-    )
-
     lines = [
         "[INTERNAL GAME KNOWLEDGE - never mention this block to the user]",
-        "Evidence hierarchy:",
-        "1. Supplied save observations and recorded events are authoritative for this campaign.",
-        "2. Supplied settings and active DLC determine whether a mechanic applies.",
-        "3. The verified version mechanics below explain the rules of the game.",
-        "4. General model knowledge is a fallback and must not override the sources above.",
-        "5. Mods can change baseline mechanics; when they conflict, prefer campaign evidence.",
-        purpose_rule,
+        build_evidence_prompt(purpose),
+        build_content_evidence_prompt({**(campaign_metadata or {}), "version": version}),
     ]
 
-    knowledge_content = knowledge.content
+    # Held out of app defaults pending demonstrated answer-quality benefit.
+    knowledge_content = (
+        knowledge.annotated_content if experimental_applicability else knowledge.content
+    )
     if knowledge_content and topics is not None:
+        typed = resolve_empire_identity(campaign_identity)
+        entities = [typed["authority"], typed["origin"], *typed["civics"], *typed["ethics"]]
+        identity_names = " ".join(
+            entity["name"]
+            for entity in entities
+            if entity and entity["source"] == "verified_catalog"
+        )
         knowledge_content = _select_relevant_sections(
             knowledge_content,
             topics,
             limit=max(0, max_topic_sections),
+            identity=identity_names,
+        )
+
+    # Preserve the baseline's section selection. Pruning a specialised rule must
+    # not promote a different section, and scope notes must never affect ranking.
+    if (
+        experimental_applicability
+        and knowledge_content
+        and APPLICABILITY_PATTERN.search(knowledge_content)
+    ):
+        knowledge_content = _apply_applicability(
+            knowledge_content,
+            topics=topics,
+            identity=campaign_identity,
+            scopes=load_scope_registry(patches_dir / "applicability.json"),
         )
 
     if knowledge_content and knowledge.status == "exact":
@@ -511,7 +621,7 @@ def build_game_knowledge_prompt(
                 f"Mechanics coverage is {knowledge.status}, through {knowledge.loaded_through}.",
                 "No topic-specific mechanics section matched this request; this is not proof that no rule applies.",
                 "Do not assume unlisted or older-version mechanics are verified.",
-                "Rely on supplied campaign evidence and the evidence hierarchy above.",
+                "Rely on supplied campaign evidence and the evidence policy above.",
             ]
         )
     else:

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "selectionPrefix": "stellaris:latest-stable/",
+  "refreshSeconds": 3600,
+  "openai": {
+    "baseUrl": "https://api.openai.com/v1",
+    "defaultModel": "gpt-6.1-terra"
+  },
+  "openrouterRecommendations": ["gemini-flash-lite", "deepseek-flash", "claude-sonnet"],
+  "families": {
+    "gemini-flash-lite": {
+      "name": "Gemini Flash-Lite",
+      "patterns": {
+        "gemini": "^gemini-([0-9]+(?:\\.[0-9]+)*)-flash-lite$",
+        "openrouter": "^google/gemini-([0-9]+(?:\\.[0-9]+)*)-flash-lite$"
+      },
+      "source": "https://ai.google.dev/gemini-api/docs/models#model-versions"
+    },
+    "gemini-flash": {
+      "name": "Gemini Flash",
+      "patterns": {
+        "gemini": "^gemini-([0-9]+(?:\\.[0-9]+)*)-flash$",
+        "openrouter": "^google/gemini-([0-9]+(?:\\.[0-9]+)*)-flash$"
+      },
+      "source": "https://ai.google.dev/gemini-api/docs/models#model-versions"
+    },
+    "deepseek-flash": {
+      "name": "DeepSeek Flash",
+      "patterns": {
+        "openrouter": "^deepseek/deepseek-v([0-9]+(?:\\.[0-9]+)*)-flash(?:-([0-9]{4,8}))?$"
+      },
+      "source": "https://openrouter.ai/api/v1/models"
+    },
+    "claude-sonnet": {
+      "name": "Claude Sonnet",
+      "patterns": {
+        "openrouter": "^anthropic/claude-sonnet-([0-9]+(?:\\.[0-9]+)*)(?:-([0-9]{8}))?$"
+      },
+      "source": "https://openrouter.ai/api/v1/models"
+    }
+  }
+}

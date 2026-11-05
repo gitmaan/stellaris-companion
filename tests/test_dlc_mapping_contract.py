@@ -1,33 +1,23 @@
-"""Contract tests to keep DLC metadata and prompt mapping in sync."""
+"""Contracts between save DLC evidence and version-aware content interpretation."""
 
 from __future__ import annotations
 
-from stellaris_companion.personality import _DLC_KEY_FEATURES
+import pytest
+
+from stellaris_companion.campaign_evidence import (
+    BASE_GAME_DLC_INTEGRATIONS,
+    resolve_content_availability,
+)
 from stellaris_save_extractor.metadata import KNOWN_MAJOR_DLCS
 
-# Free/non-mechanics entries we intentionally track as "known" but do not
-# need negative-feature prompt mappings for strategic advice.
-UNMAPPED_ALLOWED_DLCS = {
-    "Anniversary Portraits",
-    "Horizon Signal",
-}
+
+def test_base_game_integrations_are_known_packs() -> None:
+    assert set(BASE_GAME_DLC_INTEGRATIONS).issubset(KNOWN_MAJOR_DLCS)
 
 
-def test_all_mapped_dlcs_exist_in_known_set() -> None:
-    assert set(_DLC_KEY_FEATURES).issubset(KNOWN_MAJOR_DLCS)
-
-
-def test_known_mechanics_dlcs_have_prompt_mappings() -> None:
-    expected_mapped = set(KNOWN_MAJOR_DLCS) - UNMAPPED_ALLOWED_DLCS
-    actual_mapped = set(_DLC_KEY_FEATURES)
-
-    assert actual_mapped == expected_mapped, (
-        f"Missing mappings: {sorted(expected_mapped - actual_mapped)}; "
-        f"Unexpected mappings: {sorted(actual_mapped - expected_mapped)}"
-    )
-
-
-def test_mapped_dlc_feature_descriptions_are_non_empty() -> None:
-    for dlc_name, features in _DLC_KEY_FEATURES.items():
-        assert isinstance(features, str)
-        assert features.strip(), f"{dlc_name} has an empty feature mapping"
+@pytest.mark.parametrize("pack", sorted(KNOWN_MAJOR_DLCS))
+def test_reported_pack_is_retained_without_negative_feature_inference(pack: str) -> None:
+    result = resolve_content_availability({"version": "4.3.5", "required_dlcs": [pack]})
+    assert result["reported_dlcs"] == [pack]
+    assert result["base_game_dlcs"] == []
+    assert result["unreported_dlc_status"] == "unknown"

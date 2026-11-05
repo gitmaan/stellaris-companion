@@ -1,0 +1,55 @@
+{
+  "format_version": 1,
+  "scopes": {
+    "nomadic": {
+      "label": "Nomadic systems and interactions",
+      "identity": {"is_nomadic": true},
+      "topics": ["nomad", "nomadic", "arkship", "waystation", "wayline", "operational reserves", "logistic ship", "conserve", "embark", "contract", "stellar engine", "stellar ignition", "forever cruise", "voidfarer", "heirs of the khan", "sacred path", "void reaver", "deep sleep"]
+    },
+    "rogue-servitor": {
+      "label": "Rogue Servitor civic",
+      "identity": {"civics": ["machine_servitor"]},
+      "topics": ["rogue servitor", "bio trophy", "bio trophies", "organic sanctuary", "retirement home"]
+    },
+    "rapid-replicator": {
+      "label": "Rapid Replicator civic",
+      "identity": {"civics": ["machine_replication"]},
+      "topics": ["rapid replicator", "mechanical assembly", "assembly speed"]
+    },
+    "driven-assimilator": {
+      "label": "Driven Assimilator civic",
+      "identity": {"civics": ["machine_assimilator"]},
+      "topics": ["driven assimilator", "distinctiveness added", "cybernetic species"]
+    },
+    "determined-exterminator": {
+      "label": "Determined Exterminator civic",
+      "identity": {"civics": ["machine_terminator"]},
+      "topics": ["determined exterminator"]
+    },
+    "devouring-swarm": {
+      "label": "Devouring Swarm civic",
+      "identity": {"civics": ["hive_devouring_swarm"]},
+      "topics": ["devouring swarm", "swarm diplomacy", "hunger casus belli"]
+    },
+    "corporate": {
+      "label": "Corporate authority",
+      "identity": {"authority": "corporate"},
+      "topics": ["corporate", "megacorp", "branch office"]
+    },
+    "stellar-cannon": {
+      "label": "Stellar Cannon mechanics, with Nomads content active",
+      "identity": {},
+      "topics": ["stellar cannon"]
+    },
+    "defender-ambition": {
+      "label": "Defender of the Galaxy Ambition, with Nomads content active",
+      "identity": {},
+      "topics": ["defender of the galaxy", "paladin", "abdicating custodianship"]
+    },
+    "colossus": {
+      "label": "Colossus unlock and construction requirements",
+      "identity": {},
+      "topics": ["colossus", "colossi", "world cracker", "planet killer"]
+    }
+  }
+}

@@ -50,6 +50,7 @@ from backend.core.model_routing import display_model_name, normalize_model_routi
 from backend.core.structured_output import (
     validate_structured_response as _validate_structured_response,
 )
+from stellaris_companion.campaign_evidence import resolve_empire_identity
 from stellaris_companion.game_knowledge import build_game_knowledge_prompt
 
 logger = logging.getLogger(__name__)
@@ -328,10 +329,17 @@ def _chronicle_game_knowledge(briefing: dict[str, Any]) -> str:
         briefing.get("model_context") if isinstance(briefing.get("model_context"), dict) else {}
     )
     version = str(meta.get("version") or model_context.get("game_version") or "unknown")
-    return build_game_knowledge_prompt(
+    knowledge = build_game_knowledge_prompt(
         version,
         purpose="chronicle",
         topics=json_dumps(briefing),
+        campaign_metadata=meta,
+        campaign_identity=briefing.get("identity"),
+    )
+    return (
+        knowledge
+        + "\n\nObserved empire identity:\n"
+        + json_dumps(resolve_empire_identity(briefing.get("identity") or {}))
     )
 
 

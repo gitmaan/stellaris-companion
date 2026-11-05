@@ -195,6 +195,12 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
             )}
         </div>
 
+        {!isUser && !isError && routingNotice && (
+          <p role="status" className="mt-2 text-xs text-accent-yellow" title={routingNotice}>
+            {t('chat.message.routingNotice', { model: finalModelDisplay || 'Gemini Flash-Lite' })}
+          </p>
+        )}
+
         {completion?.status === 'truncated' && (
           <div className="mt-3 border-t border-accent-yellow/30 pt-3 text-sm text-accent-yellow" data-completion-status="truncated">
             <p role="status">{t('chat.message.incomplete')}</p>

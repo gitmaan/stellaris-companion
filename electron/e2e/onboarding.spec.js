@@ -69,15 +69,20 @@ test('guides first-time players through a visual AI choice without forcing setup
         if (!String(url).startsWith('https://generativelanguage.googleapis.com/')) return realFetch(url, options)
         if (String(url).includes(':generateContent')) {
           globalThis.__onboardingProbeCount++
+          globalThis.__onboardingProbeUrl = String(url)
           return Response.json({ candidates: [{ content: { parts: [{ text: '{"status":"ok"}' }] } }] })
         }
-        return Response.json({ models: [{ name: 'models/fixture-text', supportedGenerationMethods: ['generateContent'] }] })
+        return Response.json({ models: [
+          { name: 'models/gemini-4-flash-lite', supportedGenerationMethods: ['generateContent'] },
+          { name: 'models/gemini-9-flash-lite-preview', supportedGenerationMethods: ['generateContent'] },
+        ] })
       }
     })
     await dialog.getByLabel('API key', { exact: true }).fill('onboarding-test-key')
     await dialog.getByRole('button', { name: 'Connect Gemini', exact: true }).click()
     await expect(dialog.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
     expect(await app.evaluate(() => globalThis.__onboardingProbeCount)).toBe(1)
+    expect(await app.evaluate(() => globalThis.__onboardingProbeUrl)).toContain('/gemini-4-flash-lite:generateContent')
     await dialog.getByRole('button', { name: 'Set up later', exact: true }).click()
     await expect(dialog).not.toBeVisible()
     await expect.poll(() => page.evaluate(() => window.electronAPI.onboarding.getStatus())).toBe(true)

@@ -73,12 +73,13 @@ def test_apply_precomputed_briefing_uses_metadata_for_dlc_prompt_context(compani
 
     assert companion.metadata.get("required_dlcs") == ["Utopia", "Overlord"]
     assert companion.metadata.get("missing_dlcs") == ["Nemesis"]
-    assert "[INTERNAL CONTEXT - never mention this to the user]" in companion.system_prompt
-    assert "Active DLCs: Utopia, Overlord" in companion.system_prompt
-    assert "Nemesis (MISSING" in companion.system_prompt
+    content = json.loads(companion.system_prompt.rsplit("\n", 1)[1])
+    assert content["reported_dlcs"] == ["Utopia", "Overlord"]
+    assert content["unreported_dlc_status"] == "unknown"
+    assert "MISSING" not in companion.system_prompt
 
 
-def test_apply_precomputed_briefing_lists_nomads_unavailable_features(companion):
+def test_apply_precomputed_briefing_does_not_deny_unreported_content(companion):
     metadata = {
         "version": "Pegasus v4.4.3",
         "required_dlcs": ["Utopia"],
@@ -95,10 +96,10 @@ def test_apply_precomputed_briefing_lists_nomads_unavailable_features(companion)
         metadata=metadata,
     )
 
-    assert "Nomads (MISSING" in companion.system_prompt
-    assert "unavailable: Nomadic Empires and Arkships" in companion.system_prompt
-    assert "Waystations and Waylines" in companion.system_prompt
-    assert "Operational Reserves" in companion.system_prompt
+    content = json.loads(companion.system_prompt.rsplit("\n", 1)[1])
+    assert content["unreported_dlc_status"] == "unknown"
+    assert "Nomads" not in companion.system_prompt
+    assert "do NOT exist" not in companion.system_prompt
 
 
 @pytest.mark.parametrize(
@@ -107,12 +108,12 @@ def test_apply_precomputed_briefing_lists_nomads_unavailable_features(companion)
         (
             "Pegasus v4.4.4",
             ["uses a 3:1 rule rather than one-to-one conversion"],
-            ["Operational Reserves track Energy and Minerals one-to-one"],
+            ["track Energy and Minerals one-to-one"],
         ),
         (
             "Pegasus v4.4.5",
             [
-                "Operational Reserves track Energy and Minerals one-to-one",
+                "track Energy and Minerals one-to-one",
                 "Resource Abundance slider",
             ],
             ["Automated Science Ships return normally after exploring Astral Rifts"],
@@ -120,7 +121,7 @@ def test_apply_precomputed_briefing_lists_nomads_unavailable_features(companion)
         (
             "Pegasus v4.4.6",
             [
-                "Operational Reserves track Energy and Minerals one-to-one",
+                "track Energy and Minerals one-to-one",
                 "Automated Science Ships return normally after exploring Astral Rifts",
             ],
             [],
@@ -156,7 +157,7 @@ def test_advisor_prompt_uses_exact_pegasus_patch_overlays(companion, version, in
     assert "Mods can change baseline mechanics" in knowledge_prompt
 
 
-def test_build_game_context_prefers_metadata_missing_dlcs_without_extractor(companion):
+def test_build_game_context_ignores_legacy_missing_dlc_inference(companion):
     companion.metadata = {
         "version": "Corvus v4.2.4",
         "required_dlcs": ["Utopia"],
@@ -168,14 +169,16 @@ def test_build_game_context_prefers_metadata_missing_dlcs_without_extractor(comp
 
     assert ctx is not None
     assert ctx["required_dlcs"] == ["Utopia"]
-    assert ctx["missing_dlcs"] == ["Apocalypse"]
+    assert "missing_dlcs" not in ctx
 
 
-def test_build_game_context_falls_back_to_extractor_missing_dlcs(companion):
+def test_build_game_context_does_not_reintroduce_negative_extractor_inferences(companion):
     class _DummyExtractor:
         @staticmethod
         def get_missing_dlcs():
-            return ["First Contact"]
+            raise AssertionError(
+                "A legacy negative inference must not be used as campaign evidence"
+            )
 
     companion.metadata = {
         "version": "Corvus v4.2.4",
@@ -187,10 +190,10 @@ def test_build_game_context_falls_back_to_extractor_missing_dlcs(companion):
 
     assert ctx is not None
     assert ctx["required_dlcs"] == ["Utopia", "Overlord"]
-    assert ctx["missing_dlcs"] == ["First Contact"]
+    assert "missing_dlcs" not in ctx
 
 
-def test_personality_prompt_clarifies_naval_capacity_used_is_not_cap_limit(companion):
+def test_production_prompt_preserves_naval_capacity_claim_safety(companion):
     metadata = {
         "version": "Corvus v4.2.4",
         "required_dlcs": ["Utopia"],
@@ -207,13 +210,22 @@ def test_personality_prompt_clarifies_naval_capacity_used_is_not_cap_limit(compa
         metadata=metadata,
     )
 
-    assert "military.naval_capacity.used" in companion.system_prompt
-    assert "not the naval cap ceiling" in companion.system_prompt
-    assert "safe_to_claim_over_cap" in companion.system_prompt
-    assert "derived estimate" in companion.system_prompt
-    assert "definitive yes/no" in companion.system_prompt
-    assert "lead with uncertainty first" in companion.system_prompt
-    assert "derived_status" in companion.system_prompt
+    captured = {}
+
+    def generate(*, model, contents, config):
+        captured["system"] = config.system_instruction
+        return SimpleNamespace(text="A cautious assessment.")
+
+    companion.client.models.generate_content = generate
+    companion.ask_precomputed(question="Summarize our position.", session_key="claim-safety")
+    prompt = captured["system"]
+    assert "military.naval_capacity.used" in prompt
+    assert "not the naval cap ceiling" in prompt
+    assert "safe_to_claim_over_cap" in prompt
+    assert "derived estimate" in prompt
+    assert "definitive yes/no" in prompt
+    assert "lead with uncertainty first" in prompt
+    assert "derived_status" in prompt
 
 
 def test_naval_cap_policy_block_returns_estimated_status_for_uncertain_cap(companion):
@@ -345,11 +357,11 @@ def test_ask_precomputed_injects_policy_block_but_uses_normal_advisor_path(compa
     )
 
     assert answer == "President, our naval ledgers remain estimates rather than certainties."
-    assert captured["model"] == "gemini-3.5-flash-lite"
+    assert captured["model"] == "gemini-3.8-flash"
     assert "NAVAL CAPACITY RESPONSE POLICY:" in captured["system_instruction"]
     assert "Response state: estimated." in captured["system_instruction"]
     assert "cannot confirm whether the empire is over naval cap" in captured["system_instruction"]
-    assert companion.get_call_stats()["model"] == "gemini-3.5-flash-lite"
+    assert companion.get_call_stats()["model"] == "gemini-3.8-flash"
     assert companion.get_call_stats()["tools_used"] == ["ask_precomputed_no_tools"]
 
 

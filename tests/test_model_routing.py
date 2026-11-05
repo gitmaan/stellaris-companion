@@ -28,8 +28,9 @@ def test_quality_first_routes_flash_then_lite_then_reserve():
     ]
 
 
-def test_default_routes_like_standard_quota():
+def test_default_prefers_flash_with_lite_quota_fallback():
     assert route_models_for(mode=None, purpose="advisor") == [
+        GEMINI_FLASH_MODEL,
         GEMINI_FLASH_LITE_MODEL,
         GEMINI_FLASH_LITE_RESERVE_MODEL,
     ]

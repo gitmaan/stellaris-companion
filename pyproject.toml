@@ -70,6 +70,9 @@ exclude = [
     "workers*",
 ]
 
+[tool.setuptools.package-data]
+stellaris_companion = ["model_catalog.json"]
+
 # =============================================================================
 # Ruff - Fast Python linter and formatter
 # =============================================================================

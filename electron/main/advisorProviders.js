@@ -1,4 +1,5 @@
 const net = require('node:net')
+const { modelCatalog, selectionFamily, stableFamilyModels } = require('./modelCatalog')
 
 const ADVISOR_PROVIDER_VALUES = ['gemini', 'chatgpt', 'ollama', 'lm_studio', 'openrouter', 'custom']
 const DEFAULT_ADVISOR_PROVIDER = 'gemini'
@@ -20,12 +21,6 @@ const ADVISOR_PROVIDER_PRESETS = {
     requiresApiKey: true,
   },
 }
-
-const OPENROUTER_RECOMMENDED_MODEL_IDS = new Set([
-  'google/gemini-3.1-flash-lite',
-  'deepseek/deepseek-v4-flash',
-  'anthropic/claude-sonnet-5',
-])
 
 function normalizeAdvisorProvider(rawValue) {
   if (typeof rawValue !== 'string') return DEFAULT_ADVISOR_PROVIDER
@@ -198,12 +193,13 @@ async function discoverAdvisorModels({
         signal: controller.signal, redirect: 'error',
       })
       const payload = await readJsonResponse(response)
-      if (!response.ok) return { ok: false, error: providerHttpError(selected, response, payload, apiKey) }
+      if (!response.ok) return providerFailure(selected, response, payload, apiKey)
       if (!Array.isArray(payload?.models)) return { ok: false, error: 'Gemini returned an invalid model catalog.' }
       const models = payload.models.filter(entry => typeof entry?.name === 'string' && Array.isArray(entry.supportedGenerationMethods) && entry.supportedGenerationMethods.includes('generateContent'))
         .map(entry => ({ id: String(entry.name).replace(/^models\//, ''), name: entry.displayName || entry.name, contextLength: entry.inputTokenLimit }))
       if (!models.length) return { ok: false, error: 'No Gemini text models are available for this key.' }
-      return { ok: true, models, baseUrl: '', provider: selected }
+      return { ok: true, models, baseUrl: '', provider: selected,
+        suggestedModel: stableFamilyModels(payload.models, 'gemini', 'gemini-flash-lite')[0]?.id }
     } catch {
       return { ok: false, error: 'Could not connect to Gemini. Check your API key and connection.' }
     } finally { clearTimeout(timer) }
@@ -245,6 +241,13 @@ async function discoverAdvisorModels({
       return providerFailure(selected, response, payload, apiKey)
     }
 
+    if (!Array.isArray(payload?.data) && !Array.isArray(payload?.models)) {
+      return {
+        ok: false,
+        error: `${getAdvisorProviderLabel(selected)} returned an invalid model catalog.`,
+        errorCode: 'PROVIDER_INVALID_RESPONSE',
+      }
+    }
     const entries = Array.isArray(payload?.data)
       ? payload.data
       : Array.isArray(payload?.models)
@@ -264,10 +267,11 @@ async function discoverAdvisorModels({
         continue
       }
       seen.add(id)
+      const contextLength = Number(entry?.context_length || entry?.context_window || 0)
       const modelEntry = {
         id,
         name: String(entry?.name || entry?.display_name || id),
-        contextLength: Number(entry?.context_length || entry?.context_window || 0) || undefined,
+        contextLength: Number.isFinite(contextLength) && contextLength > 0 ? contextLength : undefined,
       }
       const inputPrice = entry?.pricing?.prompt == null || entry.pricing.prompt === '' ? NaN : Number(entry.pricing.prompt)
       const outputPrice = entry?.pricing?.completion == null || entry.pricing.completion === '' ? NaN : Number(entry.pricing.completion)
@@ -278,15 +282,37 @@ async function discoverAdvisorModels({
         modelEntry.supportedParameters = entry.supported_parameters.map(String)
       }
       if (outputModalities.length) modelEntry.outputModalities = outputModalities
-      if (selected === 'openrouter' && OPENROUTER_RECOMMENDED_MODEL_IDS.has(id)) {
-        modelEntry.recommended = true
-      }
       models.push(modelEntry)
     }
 
+    const latestChoices = []
+    if (selected === 'openrouter') {
+      for (const family of modelCatalog.openrouterRecommendations) {
+        const current = stableFamilyModels(entries, selected, family)[0]
+        const concrete = current && models.find(model => model.id === current.id)
+        if (!concrete) continue
+        latestChoices.push({
+          ...concrete,
+          id: modelCatalog.selectionPrefix + family,
+          name: modelCatalog.families[family].name,
+          recommended: true,
+          updatePolicy: 'latest_stable',
+          resolvedModel: concrete.id,
+          resolvedName: concrete.name,
+        })
+      }
+    }
+
+    const openaiDefault = selected === 'custom' && resolvedBaseUrl === modelCatalog.openai.baseUrl
+      ? models.find(model => model.id === modelCatalog.openai.defaultModel)
+      : undefined
+    if (openaiDefault) openaiDefault.recommended = true
+
     return {
       ok: true,
-      models,
+      models: [...latestChoices, ...models],
+      // A family choice resolves only to a concrete model observed in this catalog.
+      suggestedModel: openaiDefault?.id || latestChoices[0]?.id || (models.length === 1 ? models[0].id : undefined),
       baseUrl: resolvedBaseUrl,
       provider: selected,
     }
@@ -310,15 +336,17 @@ async function testGeminiConnection({ apiKey, timeoutMs, fetchImpl }) {
   }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
-  // Matches the default Advisor route in backend/core/model_routing.py.
-  const model = 'gemini-3.5-flash-lite'
   try {
+    const catalog = await discoverAdvisorModels({ provider: 'gemini', apiKey, timeoutMs, fetchImpl })
+    if (!catalog.ok) return catalog
+    const model = catalog.suggestedModel
+    if (!model) return { ok: false, errorCode: 'PROVIDER_MODEL_NOT_FOUND', error: 'No stable Gemini Flash-Lite model is available.' }
     const response = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey.trim() },
       body: JSON.stringify({
         contents: [{ parts: [{ text: 'Return only a JSON object with status set to ok.' }] }],
-        generationConfig: { maxOutputTokens: 512, responseMimeType: 'application/json', thinkingConfig: { thinkingLevel: 'MINIMAL' } },
+        generationConfig: { maxOutputTokens: 512, responseMimeType: 'application/json' },
       }),
       signal: controller.signal,
       redirect: 'error',
@@ -371,6 +399,19 @@ async function testAdvisorModel({
     return { ok: false, error: 'Choose or enter a model before testing it.' }
   }
 
+  let resolvedModel = selectedModel
+  try {
+    const family = selectionFamily(selectedModel, selected)
+    if (family) {
+      const catalog = await discoverAdvisorModels({ provider: selected, baseUrl: resolvedBaseUrl, apiKey, timeoutMs, fetchImpl })
+      if (!catalog.ok) return catalog
+      resolvedModel = catalog.models.find(item => item.id === selectedModel)?.resolvedModel
+      if (!resolvedModel) return { ok: false, errorCode: 'PROVIDER_MODEL_NOT_FOUND', error: 'No stable model is available in the selected family.' }
+    }
+  } catch (error) {
+    return { ok: false, errorCode: 'PROVIDER_MODEL_NOT_FOUND', error: error.message }
+  }
+
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   const headers = buildProviderHeaders(selected, apiKey, { contentType: true })
@@ -383,7 +424,7 @@ async function testAdvisorModel({
     required: ['status'],
   }
   const baseBody = {
-    model: selectedModel,
+    model: resolvedModel,
     messages: [
       {
         role: 'system',
@@ -400,6 +441,14 @@ async function testAdvisorModel({
     ],
     max_tokens: 512,
     stream: false,
+  }
+  // The official Terra API uses a shared reasoning/output budget. Keep local
+  // and other compatible servers on their existing Chat Completions contract.
+  if (selected === 'custom' && resolvedBaseUrl === modelCatalog.openai.baseUrl
+      && resolvedModel === modelCatalog.openai.defaultModel) {
+    delete baseBody.max_tokens
+    baseBody.max_completion_tokens = 2048
+    baseBody.reasoning_effort = 'low'
   }
   const structuredBody = {
     ...baseBody,
@@ -543,7 +592,6 @@ function shouldRetryWithoutSchema(selected, response, payload) {
 module.exports = {
   ADVISOR_PROVIDER_VALUES,
   ADVISOR_PROVIDER_PRESETS,
-  OPENROUTER_RECOMMENDED_MODEL_IDS,
   DEFAULT_ADVISOR_PROVIDER,
   isLocalOrPrivateHost,
   normalizeAdvisorProvider,

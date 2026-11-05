@@ -605,18 +605,18 @@
       }
     },
     "geminiQuota": {
-      "label": "GEMINI の利用枠",
-      "description": "Advisor の日常的な回答と年代記の執筆で、利用枠の使い方を選びます。",
-      "standard": "利用枠を節約",
-      "higher": "最高品質",
-      "standardTag": "無料枠を節約",
-      "higherTag": "利用枠を多く消費",
-      "standardHelp": "日常的な質問で使う枠を抑え、年代記の執筆に回します。",
-      "higherHelp": "Advisor と年代記の両方で、利用可能な高性能の Gemini モデルを優先します。",
+      "label": "GEMINIモデル",
+      "description": "助言の質と応答の速さから選択します。",
+      "standard": "Flash-Lite",
+      "higher": "Flash",
+      "standardTag": "高速・割り当てを節約",
+      "higherTag": "助言におすすめ",
+      "standardHelp": "アドバイザーには高速なFlash-Liteを使い、Flashの割り当てを年代記の執筆用に残します。",
+      "higherHelp": "アドバイザーと年代記にFlashを優先します。応答に時間がかかり、割り当ての消費が増える場合があります。必要に応じてLiteに切り替えます。",
       "showAdvanced": "Show advanced quota controls",
       "hideAdvanced": "Hide advanced quota controls",
       "optional": "オプション",
-      "aria": "Gemini クォータ モードを {{mode}} に設定します"
+      "aria": "Geminiの優先モデルを{{mode}}に設定"
     },
     "mcpRelay": {
       "loadingSummary": "ローカル AI アプリの接続を確認しています。",
@@ -742,7 +742,12 @@
           "title": "お使いのAIアプリを接続",
           "description": "MCP RelayでClaude Desktop、ChatGPTデスクトップなどの対応アプリにキャンペーンを接続します。CompanionにAPIキーは不要です。"
         }
-      }
+      },
+      "selectedNotListed": "このモデルは最新のカタログに含まれていませんでした。選択は変更されていません。別のモデルを選ぶ前に、現在のモデルをテストしてください。",
+      "catalogFailed": "カタログを更新できませんでした。モデルの選択は変更されていません。利用可能かどうかは未確認です。",
+      "latestStableModel": "{{name}}（最新の安定版）",
+      "latestStableDetails": "現在は {{model}} です。このモデル系統の安定版に自動更新されます。料金が変わる場合があります。",
+      "geminiStableUpdates": "Geminiは、キーで利用できる最新の安定版FlashとFlash-Liteを自動的に使用します。助言にはFlashがおすすめです。速い応答を希望する場合は設定でFlash-Liteを選択してください。"
     }
   },
   "update": {
@@ -903,7 +908,9 @@
       "chooseFolder": "フォルダーを選択",
       "browseError": "フォルダー選択画面を開けませんでした。再試行してください。",
       "cloudDisclosure": "質問すると、関連するキャンペーン情報が {{provider}} に送信されます。",
-      "openRouterSignIn": "OpenRouterでログイン"
+      "openRouterSignIn": "OpenRouterでログイン",
+      "loadingSettings": "保存された接続を読み込んでいます…",
+      "settingsLoadError": "保存された接続を読み込めませんでした。再試行するか、現在の設定を保持するには後で設定してください。"
     }
   },
   "advisorPanel": {

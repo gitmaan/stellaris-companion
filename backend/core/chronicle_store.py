@@ -80,7 +80,17 @@ def compact_chronicle_context(briefing: dict[str, Any]) -> dict[str, Any]:
         briefing.get("identity"),
         ("empire_name", "ethics", "authority", "civics", "origin", "is_machine", "is_hive_mind"),
     )
-    meta = fields(briefing.get("meta"), ("date", "version", "empire_name"))
+    raw_identity = briefing.get("identity")
+    if isinstance(raw_identity, dict):
+        for key in ("ethics", "civics"):
+            if isinstance(raw_identity.get(key), list):
+                identity[key] = deepcopy(raw_identity[key])
+    meta = fields(briefing.get("meta"), ("date", "version", "empire_name", "required_dlcs_status"))
+    raw_meta = briefing.get("meta")
+    if isinstance(raw_meta, dict) and "required_dlcs" in raw_meta:
+        # A truncated list would change the evidence. Preserve the reported field
+        # verbatim, including invalid/legacy values for the read-time resolver.
+        meta["required_dlcs"] = deepcopy(raw_meta["required_dlcs"])
     if not identity.get("empire_name") and meta.get("empire_name"):
         identity["empire_name"] = meta["empire_name"]
     diplomacy = briefing.get("diplomacy") or {}

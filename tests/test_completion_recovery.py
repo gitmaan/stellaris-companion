@@ -103,6 +103,69 @@ def test_exhausted_recovery_preserves_useful_advisor_text(last):
     assert result.completion["recovered"] is False
 
 
+@pytest.mark.parametrize(("purpose", "effort"), [("advisor", "low"), ("chronicle", "medium")])
+def test_official_terra_uses_reasoning_budget_and_recovers_with_the_same_contract(purpose, effort):
+    generator, requests = generator_with(
+        reply("partial", "length"),
+        reply(VALID_JSON),
+        model="gpt-6.1-terra",
+        url="https://api.openai.com/v1",
+    )
+    result = generator.generate(
+        system_prompt="system",
+        user_prompt="question",
+        purpose=purpose,
+        response_schema=CurrentEraOutput if purpose == "chronicle" else None,
+    )
+    assert result.completion["status"] == "complete"
+    assert result.completion["output_limit"] == 16384
+    assert [request["max_completion_tokens"] for request in requests] == [8192, 16384]
+    for request in requests:
+        assert request["model"] == "gpt-6.1-terra"
+        assert request["reasoning_effort"] == effort
+        assert "temperature" not in request and "max_tokens" not in request
+
+
+def test_terra_schema_fallback_preserves_reasoning_and_token_parameters():
+    generator, requests = generator_with(
+        httpx.Response(400, json={"error": {"message": "response_format is unsupported"}}),
+        reply(VALID_JSON),
+        model="gpt-6.1-terra",
+        url="https://api.openai.com/v1",
+    )
+    result = generator.generate(
+        system_prompt="system",
+        user_prompt="history",
+        purpose="chronicle",
+        response_schema=CurrentEraOutput,
+    )
+    assert result.schema_fallback_used is True
+    assert len(requests) == 2
+    assert "response_format" in requests[0] and "response_format" not in requests[1]
+    for request in requests:
+        assert request["reasoning_effort"] == "medium"
+        assert request["max_completion_tokens"] == 8192
+        assert "temperature" not in request and "max_tokens" not in request
+
+
+@pytest.mark.parametrize(
+    ("model", "url"),
+    [
+        ("gpt-6.1-terra", "https://proxy.example/v1"),
+        ("gpt-6.1-terra", "https://api.openai.com.example/v1"),
+        ("gpt-6.1-terra", "http://127.0.0.1:1234/v1"),
+        ("existing-model", "https://api.openai.com/v1"),
+    ],
+)
+def test_terra_compatibility_does_not_change_other_models_or_endpoints(model, url):
+    generator, requests = generator_with(reply(), model=model, url=url)
+    generator.generate(system_prompt="system", user_prompt="question")
+    assert requests[0]["max_tokens"] == 4096
+    assert requests[0]["temperature"] == 1
+    assert "max_completion_tokens" not in requests[0]
+    assert "reasoning_effort" not in requests[0]
+
+
 @pytest.mark.parametrize(
     "first",
     [

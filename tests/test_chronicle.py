@@ -913,6 +913,7 @@ class TestGenerateChronicleCurrentEraPolicy:
         generator._should_finalize_chapter = MagicMock(return_value=(False, None))
         generator._count_pending_chapters = MagicMock(return_value=0)
         client = MagicMock()
+        client.models.list.side_effect = RuntimeError("Catalog temporarily unavailable")
         client.models.generate_content.return_value = MagicMock(text='{"sections":[')
         generator._client = client
 
@@ -1461,6 +1462,7 @@ class TestCurrentEraFallbackModel:
     def test_falls_back_to_flash_lite_for_current_era(self, generator):
         """Current-era generation should route via Flash-Lite after Flash quota failure."""
         mock_client = MagicMock()
+        mock_client.models.list.side_effect = RuntimeError("Catalog temporarily unavailable")
         mock_client.models.generate_content.side_effect = [
             RuntimeError("quota"),
             MagicMock(

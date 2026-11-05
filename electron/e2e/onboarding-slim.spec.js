@@ -193,6 +193,53 @@ test('local models use real discovery and verification; custom endpoints preserv
   } finally { await f.close(); await server.close() }
 })
 
+test('direct OpenAI setup discovers Terra by default and retains a later explicit choice', async () => {
+  const f = await fixture()
+  try {
+    const { page, app } = f
+    await app.evaluate(() => {
+      const originalFetch = globalThis.fetch
+      globalThis.__openaiSetupRequests = []
+      globalThis.fetch = async (url, options = {}) => {
+        if (!String(url).startsWith('https://api.openai.com/v1/')) return originalFetch(url, options)
+        if (String(url).endsWith('/models')) return Response.json({ data: [
+          { id: 'gpt-6-astra' }, { id: 'gpt-6.1-terra' }, { id: 'gpt-6-luna' },
+        ] })
+        const body = JSON.parse(options.body)
+        globalThis.__openaiSetupRequests.push(body)
+        return Response.json({ model: body.model, choices: [{ message: { content: '{"status":"ok"}' }, finish_reason: 'stop' }] })
+      }
+    })
+    await start(page)
+    await page.getByRole('button', { name: 'Custom endpoint', exact: true }).click()
+    await page.getByLabel('Server URL').fill('https://api.openai.com/v1/')
+    await expect(page.getByLabel('Model', { exact: true })).toHaveValue('')
+    await page.getByRole('button', { name: 'Connect', exact: true }).click()
+    await expect(page.getByRole('radio', { name: 'gpt-6.1-terra', exact: true })).toBeChecked()
+    await page.getByRole('button', { name: 'Refresh models', exact: true }).click()
+    await expect(page.getByRole('radio', { name: 'gpt-6.1-terra', exact: true })).toBeChecked()
+    expect(await app.evaluate(() => globalThis.__openaiSetupRequests.length)).toBe(0)
+    await page.getByRole('button', { name: 'Use this model' }).click()
+    await expect(page.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
+    let settings = await page.evaluate(() => window.electronAPI.getSettings())
+    expect(settings.advisorProvider).toBe('custom')
+    expect(settings.advisorModel).toBe('gpt-6.1-terra')
+    const request = await app.evaluate(() => globalThis.__openaiSetupRequests[0])
+    expect(request.reasoning_effort).toBe('low')
+    expect(request.max_completion_tokens).toBe(2048)
+    expect(request.max_tokens).toBeUndefined()
+
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
+    await page.getByRole('button', { name: 'Custom endpoint', exact: true }).click()
+    await page.getByLabel('Model', { exact: true }).fill('gpt-6-luna')
+    await page.getByRole('button', { name: 'Connect', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
+    settings = await page.evaluate(() => window.electronAPI.getSettings())
+    expect(settings.advisorModel).toBe('gpt-6-luna')
+    expect(await app.evaluate(() => globalThis.__openaiSetupRequests.at(-1).model)).toBe('gpt-6-luna')
+  } finally { await f.close() }
+})
+
 test('a late cloud discovery result cannot activate a provider after skipping', async () => {
   const f = await fixture()
   try {
@@ -280,7 +327,7 @@ test('OpenRouter can recover by choosing another model, and Gemini saves only af
     await app.evaluate(({ ipcMain }) => {
       ipcMain.removeHandler('advisor-provider:list-models')
       ipcMain.handle('advisor-provider:list-models', (_event, config) => config.apiKey === 'valid-fixture-key'
-        ? { ok: true, models: [{ id: 'limited-model', name: 'Limited model', recommended: true }, { id: 'compatible-model', name: 'Compatible model' }] }
+        ? { ok: true, suggestedModel: 'limited-model', models: [{ id: 'limited-model', name: 'Limited model', recommended: true }, { id: 'compatible-model', name: 'Compatible model' }] }
         : { ok: false, error: 'Invalid key' })
       ipcMain.removeHandler('advisor-provider:test-model')
       ipcMain.handle('advisor-provider:test-model', (_event, config) => ({ ok: true, chronicleReady: config.provider === 'gemini' || config.model === 'compatible-model', model: config.model }))
@@ -288,6 +335,9 @@ test('OpenRouter can recover by choosing another model, and Gemini saves only af
     await start(page); await page.getByRole('button', { name: /OpenRouter API key/ }).click()
     await page.getByLabel('API key', { exact: true }).fill('valid-fixture-key')
     await page.getByRole('button', { name: 'Connect OpenRouter', exact: true }).click()
+    await expect(page.getByRole('radio', { name: 'Limited model' })).toBeChecked()
+    await expect(page.getByRole('radio', { name: 'Compatible model' })).toBeVisible()
+    await page.getByRole('button', { name: 'Use this model' }).click()
     await expect(page.getByRole('alert')).toHaveText('This model could not produce the structured response Chronicle needs. Choose another model.')
     await page.getByRole('button', { name: 'Choose a model.', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Connect OpenRouter' })).toBeVisible()
@@ -307,6 +357,105 @@ test('OpenRouter can recover by choosing another model, and Gemini saves only af
     await expect(page.getByRole('dialog')).toHaveCount(0)
   } finally { await f.close() }
 })
+
+test('OpenRouter onboarding preserves an unlisted saved alias through discovery and a resolved-model probe', async () => {
+  const f = await fixture({ settings: { advisorProvider: 'openrouter', advisorModel: 'provider/saved-alias' } })
+  try {
+    const { page, app } = f
+    await app.evaluate(({ ipcMain }) => {
+      globalThis.__testedModel = null
+      ipcMain.removeHandler('advisor-provider:list-models')
+      ipcMain.handle('advisor-provider:list-models', () => ({ ok: true, suggestedModel: 'anthropic/claude-sonnet-5.5', models: [
+        { id: 'anthropic/claude-sonnet-5.5', name: 'Claude Sonnet 5.5', recommended: true },
+        { id: 'provider/new-option', name: 'New available option' },
+      ] }))
+      ipcMain.removeHandler('advisor-provider:test-model')
+      ipcMain.handle('advisor-provider:test-model', (_event, config) => {
+        globalThis.__testedModel = config.model
+        return { ok: true, chronicleReady: true, model: 'provider/resolved-snapshot' }
+      })
+    })
+    await start(page)
+    await page.getByRole('button', { name: /OpenRouter API key/ }).click()
+    await page.getByLabel('API key', { exact: true }).fill('fixture-key')
+    await page.getByRole('button', { name: 'Connect OpenRouter', exact: true }).click()
+    await expect(page.getByRole('radio', { name: 'provider/saved-alias', exact: true })).toBeChecked()
+    await expect(page.getByText(/This model was not returned by the latest catalog/)).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'New available option' })).toBeVisible()
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(800, 600))
+    await expect(page.getByRole('button', { name: 'Use this model' })).toBeInViewport()
+    await shot(page, '20-model-catalog.png')
+    await page.getByLabel('SEARCH MODELS').fill('New available')
+    await expect(page.getByRole('radio', { name: 'New available option' })).toBeVisible()
+    await expect(page.getByRole('radio', { name: 'Claude Sonnet 5.5' })).toHaveCount(0)
+    await expect(page.getByRole('radio', { name: 'provider/saved-alias', exact: true })).toBeChecked()
+    await page.getByRole('button', { name: 'Use this model' }).click()
+    await expect(page.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
+    expect(await app.evaluate(() => globalThis.__testedModel)).toBe('provider/saved-alias')
+    expect((await page.evaluate(() => window.electronAPI.getSettings())).advisorModel).toBe('provider/saved-alias')
+  } finally { await f.close() }
+})
+
+for (const bootstrap of ['delayed', 'failed']) {
+  test(`onboarding waits for ${bootstrap} saved settings before selecting or testing a model`, async () => {
+    const f = await fixture({ settings: { advisorProvider: 'openrouter', advisorModel: 'provider/saved-alias' } })
+    try {
+      const { page, app } = f
+      const savedSettings = await page.evaluate(() => window.electronAPI.getSettings())
+      await app.evaluate(({ ipcMain }, { bootstrap, savedSettings }) => {
+        let reads = 0
+        globalThis.__settingsMode = bootstrap
+        globalThis.__pendingSettings = []
+        globalThis.__catalogCalls = 0
+        globalThis.__testedModels = []
+        ipcMain.removeHandler('load-settings')
+        ipcMain.handle('load-settings', () => {
+          // The first read initializes the app's language. Subsequent reads
+          // include the onboarding controller's own persisted connection.
+          if (++reads === 1 || globalThis.__settingsMode === 'ready') return savedSettings
+          if (globalThis.__settingsMode === 'failed') throw new Error('Synthetic settings read failure')
+          return new Promise(resolve => globalThis.__pendingSettings.push(() => resolve(savedSettings)))
+        })
+        ipcMain.removeHandler('advisor-provider:list-models')
+        ipcMain.handle('advisor-provider:list-models', () => {
+          globalThis.__catalogCalls++
+          return { ok: true, suggestedModel: 'provider/new-default', models: [
+            { id: 'provider/new-default', name: 'New default', recommended: true },
+          ] }
+        })
+        ipcMain.removeHandler('advisor-provider:test-model')
+        ipcMain.handle('advisor-provider:test-model', (_event, config) => {
+          globalThis.__testedModels.push(config.model)
+          return { ok: true, chronicleReady: true, model: 'provider/resolved-snapshot' }
+        })
+      }, { bootstrap, savedSettings })
+      await page.reload()
+      await start(page)
+      if (bootstrap === 'delayed') {
+        await expect(page.getByText('Loading your saved connection…', { exact: true })).toBeVisible()
+      } else {
+        await expect(page.getByRole('alert')).toHaveText('Could not load your saved connection. Try again, or set up later to keep your current settings.')
+      }
+      await expect(page.getByRole('button', { name: /OpenRouter API key/ })).toHaveCount(0)
+      expect(await app.evaluate(() => globalThis.__catalogCalls)).toBe(0)
+      expect(await app.evaluate(() => globalThis.__testedModels)).toEqual([])
+      expect(JSON.parse(await fs.readFile(path.join(f.profile, 'settings.json'), 'utf8')).advisorModel).toBe('provider/saved-alias')
+      await app.evaluate(() => {
+        globalThis.__settingsMode = 'ready'
+        for (const resolve of globalThis.__pendingSettings) resolve()
+      })
+      if (bootstrap === 'failed') await page.getByRole('button', { name: 'Try again', exact: true }).click()
+      await page.getByRole('button', { name: /OpenRouter API key/ }).click()
+      await page.getByLabel('API key', { exact: true }).fill('fixture-key')
+      await page.getByRole('button', { name: 'Connect OpenRouter', exact: true }).click()
+      await expect(page.getByRole('radio', { name: 'provider/saved-alias', exact: true })).toBeChecked()
+      await page.getByRole('button', { name: 'Use this model' }).click()
+      await expect(page.getByRole('heading', { name: 'Find your saves' })).toBeVisible()
+      expect(await app.evaluate(() => globalThis.__testedModels)).toEqual(['provider/saved-alias'])
+      expect(JSON.parse(await fs.readFile(path.join(f.profile, 'settings.json'), 'utf8')).advisorModel).toBe('provider/saved-alias')
+    } finally { await f.close() }
+  })
+}
 
 test('OpenRouter browser credentials stay opaque and late sign-in cannot save after cancellation', async () => {
   const f = await fixture()

@@ -626,4 +626,4 @@ def test_gemini_default_reports_actionable_errors(error, expected_code):
     with pytest.raises(AdvisorProviderError) as result:
         generator.generate(system_prompt="system", user_prompt="user")
     assert result.value.code == expected_code
-    assert attempts == ["gemini-3.5-flash-lite"]
+    assert attempts == ["gemini-3.8-flash"]

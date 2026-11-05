@@ -25,7 +25,7 @@ async function fixture(options = {}) {
   await page.getByRole('button', { name: /^ChatGPT/ }).click()
   await page.getByRole('button', { name: 'Continue with ChatGPT', exact: true }).click()
   await page.getByRole('dialog', { name: 'Using your ChatGPT plan' }).getByRole('button', { name: 'Got it' }).click()
-  await expect(picker(page)).toHaveValue('gpt-5.6-terra')
+  await expect(picker(page)).toHaveValue('gpt-6.1-terra')
   return { app, page, backend, userData, close: async () => {
     await app.close(); await backend.stop(); await fs.rm(userData, { recursive: true, force: true })
   } }
@@ -40,7 +40,7 @@ test('shared picker switches in place, retains provider drafts and conversation,
   const { page, app } = f
   try {
     await expect(picker(page).locator('option')).toHaveText([
-      'GPT-5.6-Terra · Recommended', 'GPT-5.6-Luna · Lower usage', 'GPT-6-Astra', 'GPT-5.6-Sol',
+      'GPT-6.1-Terra · Recommended', 'GPT-5.6-Luna · Lower usage', 'GPT-6-Astra', 'GPT-5.6-Sol',
     ])
     await expect(picker(page).locator('optgroup')).toHaveAttribute('label', 'More models')
     await expect(page.getByText('Advisor and Chronicle are ready to use your ChatGPT plan.', { exact: true })).not.toBeVisible()
@@ -69,8 +69,8 @@ test('shared picker switches in place, retains provider drafts and conversation,
     await expect(picker(page)).toHaveValue('gpt-6-astra')
     expect((await page.evaluate(() => window.electronAPI.getSettings())).advisorModel).toBe('gpt-6-astra')
     await expect(page.getByText('UNSAVED CHANGES', { exact: true })).toHaveCount(0)
-    await picker(page).selectOption('gpt-5.6-terra')
-    await expect(picker(page)).toHaveValue('gpt-5.6-terra')
+    await picker(page).selectOption('gpt-6.1-terra')
+    await expect(picker(page)).toHaveValue('gpt-6.1-terra')
     await page.getByTestId('chatgpt-connection').scrollIntoViewIfNeeded()
     await expect(page.getByText('Model updated', { exact: true })).toHaveCount(0)
     await shot(page, '02-settings.png')
@@ -91,13 +91,13 @@ test('model saves show success only when persisted, and a failed selection retai
     await expect(page.getByText('Model updated', { exact: true })).toBeVisible()
     await expect(picker(page)).toBeEnabled()
     await app.evaluate(() => { globalThis.__chatgptFailCatalog = true })
-    await picker(page).selectOption('gpt-5.6-terra')
+    await picker(page).selectOption('gpt-6.1-terra')
     await expect(page.getByRole('alert').getByText('ChatGPT is temporarily unavailable.', { exact: false })).toBeVisible()
     await expect(picker(page)).toHaveValue('gpt-5.6-luna')
     expect((await page.evaluate(() => window.electronAPI.getSettings())).advisorModel).toBe('gpt-5.6-luna')
     await app.evaluate(() => { globalThis.__chatgptFailCatalog = false })
-    await picker(page).selectOption('gpt-5.6-terra')
-    await expect(picker(page)).toHaveValue('gpt-5.6-terra')
+    await picker(page).selectOption('gpt-6.1-terra')
+    await expect(picker(page)).toHaveValue('gpt-6.1-terra')
   } finally { await f.close() }
 })
 

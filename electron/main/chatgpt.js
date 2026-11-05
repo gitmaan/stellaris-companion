@@ -1,13 +1,14 @@
 // ChatGPT plan usage for the open-source desktop app. Credentials stay here.
 const crypto = require('node:crypto')
 const http = require('node:http')
+const { modelCatalog } = require('./modelCatalog')
 
 const AUTH_ORIGIN = 'https://auth.openai.com'
 const RESOURCE = 'https://api.openai.com/v1'
 const SCOPES = 'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct'
 const SECRET_KEY = 'secrets.chatgpt-accounts'
 // Prefer balanced models for new accounts while preserving saved selections.
-const TESTED_MODEL_PREFERENCE = ['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol']
+const TESTED_MODEL_PREFERENCE = [modelCatalog.openai.defaultModel, 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol']
 const preferredModel = models => TESTED_MODEL_PREFERENCE.map(id => models.find(model => model.id === id)).find(Boolean) || models[0]
 const MESSAGES = {
   CHATGPT_CANCELLED: 'Sign-in cancelled. You can try again whenever you’re ready.',

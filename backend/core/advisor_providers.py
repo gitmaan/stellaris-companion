@@ -29,6 +29,12 @@ from backend.core.model_routing import (
     route_models_for,
 )
 from backend.core.structured_output import validate_structured_response
+from stellaris_companion.model_catalog import (
+    MODEL_CATALOG,
+    ModelCatalogCache,
+    selection_family,
+    stable_family_models,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +237,14 @@ class AdvisorGenerationResult:
     completion: dict[str, Any] = field(default_factory=dict)
 
 
+def _uses_openai_terra(config: AdvisorProviderConfig, model: str) -> bool:
+    return (
+        config.provider == ADVISOR_PROVIDER_CUSTOM
+        and config.base_url == MODEL_CATALOG["openai"]["baseUrl"]
+        and model == MODEL_CATALOG["openai"]["defaultModel"]
+    )
+
+
 def generation_output_limits(
     config: AdvisorProviderConfig, model: str, purpose: str, requested: int | None = None
 ) -> tuple[int, int]:
@@ -250,6 +264,9 @@ def generation_output_limits(
         GEMINI_FLASH_LITE_MODEL,
         GEMINI_FLASH_LITE_RESERVE_MODEL,
     }:
+        ceiling = 16384
+    elif _uses_openai_terra(config, model):
+        # Includes reasoning tokens; keep room for a complete Advisor/Chronicle.
         ceiling = 16384
     elif config.provider == ADVISOR_PROVIDER_CUSTOM and config.base_url in {
         "https://api.deepseek.com",
@@ -350,6 +367,38 @@ class GeminiAdvisorGenerator:
     def __init__(self, *, config: AdvisorProviderConfig, client: Any):
         self.config = config
         self.client = client
+        self._catalog = ModelCatalogCache()
+
+    def _default_models(self, mode: str | None, purpose: str) -> list[str]:
+        fallback = route_models_for(mode=mode, purpose=purpose)
+
+        def load() -> list[dict[str, Any]]:
+            return [
+                model.model_dump(exclude_none=True)
+                for model in self.client.models.list(
+                    config={"page_size": 1000, "http_options": {"timeout": 10000}}
+                )
+            ]
+
+        try:
+            entries = self._catalog.get(load)
+        except Exception:
+            # Catalog outages must not break the existing built-in route. These
+            # shipped stable IDs are a fallback, never a preview/latest alias.
+            return fallback
+        lite = [
+            entry["id"] for entry in stable_family_models(entries, "gemini", "gemini-flash-lite")
+        ][:2]
+        flash = [entry["id"] for entry in stable_family_models(entries, "gemini", "gemini-flash")][
+            :1
+        ]
+        models = lite if fallback[0] == GEMINI_FLASH_LITE_MODEL else [*flash, *lite]
+        if not models:
+            raise AdvisorProviderError(
+                "No stable Gemini Flash or Flash-Lite model is available for this key.",
+                code="PROVIDER_MODEL_NOT_FOUND",
+            )
+        return models
 
     def close(self) -> None:
         close = getattr(self.client, "close", None)
@@ -382,11 +431,10 @@ class GeminiAdvisorGenerator:
             config_kwargs.update(
                 response_mime_type="application/json", response_schema=response_schema
             )
-        candidate_models = route_models_for(
-            mode=model_routing_mode,
-            purpose=purpose,
-            explicit_model=str(model or "").strip() or None,
-        ) or [self.config.model]
+        explicit = str(model or "").strip()
+        candidate_models = (
+            [explicit] if explicit else self._default_models(model_routing_mode, purpose)
+        )
         requested_model = candidate_models[0]
         route_event = None
         diagnostics: list[dict[str, Any]] = []
@@ -528,7 +576,7 @@ class GeminiAdvisorGenerator:
                 if response_text.strip() and purpose == "advisor" and response_schema is None:
                     partial = AdvisorGenerationResult(
                         text=response_text,
-                        model=candidate_model,
+                        model=call["returned_model"] or candidate_model,
                         requested_model=requested_model,
                         provider=self.config.provider,
                         routing=route_event_payload(route_event),
@@ -556,7 +604,7 @@ class GeminiAdvisorGenerator:
                 else:
                     return AdvisorGenerationResult(
                         text=response_text,
-                        model=candidate_model,
+                        model=call["returned_model"] or candidate_model,
                         requested_model=requested_model,
                         provider=self.config.provider,
                         routing=route_event_payload(route_event),
@@ -586,6 +634,45 @@ class OpenAICompatibleAdvisorGenerator:
         self.config = config
         self._client = client
         self._owns_client = client is None
+        self._catalog = ModelCatalogCache()
+
+    def _resolve_model(self, requested_model: str) -> str:
+        try:
+            family = selection_family(requested_model, self.config.provider)
+        except ValueError as exc:
+            raise AdvisorProviderError(
+                str(exc), code="PROVIDER_MODEL_NOT_FOUND", status_code=400
+            ) from exc
+        if family is None:
+            return requested_model
+
+        def load() -> list[dict[str, Any]]:
+            response = self.client.get(
+                f"{self.config.base_url}/models",
+                headers={"Authorization": f"Bearer {self.config.api_key}"},
+                timeout=10.0,
+            )
+            if not response.is_success:
+                raise _compatible_http_error(response, self.config)
+            return response.json().get("data")
+
+        try:
+            entries = self._catalog.get(load)
+        except AdvisorProviderError:
+            raise
+        except Exception as exc:
+            raise AdvisorProviderError(
+                "Could not refresh the model catalog. Try again or choose a specific model version.",
+                code="PROVIDER_UNAVAILABLE",
+            ) from exc
+        candidates = stable_family_models(entries, self.config.provider, family)
+        if not candidates:
+            raise AdvisorProviderError(
+                "No stable model is available in the selected family. Choose a different model.",
+                code="PROVIDER_MODEL_NOT_FOUND",
+                status_code=400,
+            )
+        return candidates[0]["id"]
 
     @property
     def client(self) -> httpx.Client:
@@ -627,8 +714,11 @@ class OpenAICompatibleAdvisorGenerator:
             )
 
         requested_model = str(model or self.config.model).strip()
+        resolved_model = self._resolve_model(requested_model)
+        openai_terra = _uses_openai_terra(self.config, resolved_model)
+        token_limit_key = "max_completion_tokens" if openai_terra else "max_tokens"
         output_limit, retry_ceiling = generation_output_limits(
-            self.config, requested_model, purpose, max_output_tokens
+            self.config, resolved_model, purpose, max_output_tokens
         )
         effective_user_prompt = user_prompt
         if response_schema is not None:
@@ -645,15 +735,17 @@ class OpenAICompatibleAdvisorGenerator:
             headers["X-OpenRouter-Title"] = "Stellaris Companion"
 
         request_body: dict[str, Any] = {
-            "model": requested_model,
+            "model": resolved_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": effective_user_prompt},
             ],
-            "max_tokens": output_limit,
+            token_limit_key: output_limit,
             "stream": False,
         }
-        if response_schema is None:
+        if openai_terra:
+            request_body["reasoning_effort"] = "medium" if purpose == "chronicle" else "low"
+        elif response_schema is None:
             request_body["temperature"] = temperature
         if response_schema is not None:
             request_body["response_format"] = {
@@ -677,7 +769,8 @@ class OpenAICompatibleAdvisorGenerator:
             call: dict[str, Any] = {
                 "attempt": attempt + 1,
                 "requested_model": requested_model,
-                "output_limit": request_body["max_tokens"],
+                "resolved_model": resolved_model,
+                "output_limit": request_body[token_limit_key],
             }
             diagnostics.append(call)
             try:
@@ -709,7 +802,7 @@ class OpenAICompatibleAdvisorGenerator:
                 if finish is not None and not isinstance(finish, str):
                     raise ValueError("Invalid finish reason")
                 call["finish_reason"] = finish[:64] if finish else None
-                response_model = str(payload.get("model") or requested_model)
+                response_model = str(payload.get("model") or resolved_model)
                 call["returned_model"] = response_model
                 call["returned_text_chars"] = len(response_text)
                 usage = payload.get("usage")
@@ -757,7 +850,9 @@ class OpenAICompatibleAdvisorGenerator:
                     )
                     if response_text.strip() and purpose == "advisor" and response_schema is None:
                         partial = result
-                    request_body["max_tokens"] = min(request_body["max_tokens"] * 2, retry_ceiling)
+                    request_body[token_limit_key] = min(
+                        request_body[token_limit_key] * 2, retry_ceiling
+                    )
                     request_body["messages"][1]["content"] = (
                         effective_user_prompt
                         + "\n\nReturn a shorter, complete response within the requested format."

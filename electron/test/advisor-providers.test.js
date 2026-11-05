@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
+const { modelCatalog } = require('../main/modelCatalog')
 
 const {
   discoverAdvisorModels,
@@ -96,16 +97,13 @@ test('OpenRouter discovery recommends verified text models and omits non-chat en
   })
 
   assert.equal(result.ok, true)
-  assert.deepEqual(result.models, [
-    {
-      id: 'google/gemini-3.1-flash-lite',
-      name: 'google/gemini-3.1-flash-lite',
-      contextLength: undefined,
-      supportedParameters: ['response_format'],
-      outputModalities: ['text'],
-      recommended: true,
-    },
-  ])
+  assert.equal(result.models.length, 2)
+  assert.equal(result.models[0].id, 'stellaris:latest-stable/gemini-flash-lite')
+  assert.equal(result.models[0].resolvedModel, 'google/gemini-3.1-flash-lite')
+  assert.equal(result.models[0].recommended, true)
+  assert.equal(result.models[0].updatePolicy, 'latest_stable')
+  assert.deepEqual(result.models[0].supportedParameters, ['response_format'])
+  assert.equal(result.models[1].id, 'google/gemini-3.1-flash-lite')
 })
 
 test('OpenRouter model discovery requires a key', async () => {
@@ -119,6 +117,98 @@ test('OpenRouter model discovery requires a key', async () => {
 
   assert.equal(result.ok, false)
   assert.match(result.error, /requires an API key/i)
+})
+
+test('official OpenAI discovery suggests Terra only when the account catalog includes it', async () => {
+  const discover = (baseUrl, ids) => discoverAdvisorModels({
+    provider: 'custom', baseUrl, apiKey: 'fixture-key',
+    fetchImpl: async () => Response.json({ data: ids.map(id => ({ id })) }),
+  })
+  const ids = ['gpt-6-astra', 'gpt-6.1-terra', 'gpt-6-luna']
+  const result = await discover('https://api.openai.com/v1/', ids)
+  assert.equal(result.suggestedModel, 'gpt-6.1-terra')
+  assert.deepEqual(result.models.map(model => model.id), ids)
+  assert.equal(result.models[1].recommended, true)
+  assert.equal((await discover('https://api.openai.com/v1', ['gpt-6-astra', 'gpt-6-luna'])).suggestedModel, undefined)
+  for (const url of ['https://proxy.example/v1', 'https://api.openai.com.example/v1', 'http://127.0.0.1:1234/v1']) {
+    const other = await discover(url, ids)
+    assert.equal(other.suggestedModel, undefined)
+    assert.equal(other.models.some(model => model.recommended), false)
+  }
+})
+
+test('official Terra connection check keeps compatible parameters across schema fallback', async () => {
+  const requests = []
+  const result = await testAdvisorModel({
+    provider: 'custom', baseUrl: 'https://api.openai.com/v1', model: 'gpt-6.1-terra', apiKey: 'fixture-key',
+    fetchImpl: async (_url, options) => {
+      const body = JSON.parse(options.body); requests.push(body)
+      if (body.response_format) return Response.json({ error: { message: 'response_format is unsupported', param: 'response_format' } }, { status: 400 })
+      return Response.json({ model: body.model, choices: [{ message: { content: '{"status":"ok"}' }, finish_reason: 'stop' }] })
+    },
+  })
+  assert.equal(result.ok, true)
+  assert.equal(result.chronicleReady, true)
+  assert.equal(requests.length, 2)
+  for (const body of requests) {
+    assert.equal(body.model, 'gpt-6.1-terra')
+    assert.equal(body.reasoning_effort, 'low')
+    assert.equal(body.max_completion_tokens, 2048)
+    assert.equal('max_tokens' in body, false)
+    assert.equal('temperature' in body, false)
+  }
+})
+
+test('catalog recommendations follow stable families and never invent absent targets', async () => {
+  const ids = modelCatalog.openrouterRecommendations.map(family => modelCatalog.selectionPrefix + family)
+  assert.equal(new Set(ids).size, ids.length)
+  const discover = data => discoverAdvisorModels({
+    provider: 'openrouter', apiKey: 'fixture-key',
+    fetchImpl: async () => Response.json({ data }),
+  })
+  const result = await discover([
+    { id: 'anthropic/claude-sonnet-5.5' }, { id: 'provider/new-option' },
+    { id: 'google/gemini-3.5-flash-lite' }, { id: 'anthropic/claude-sonnet-5' },
+    { id: 'anthropic/claude-sonnet-6-preview' },
+  ])
+  assert.equal(result.suggestedModel, ids[0])
+  assert.equal(result.models.find(model => model.id === ids[2]).resolvedModel, 'anthropic/claude-sonnet-5.5')
+  assert.equal(result.models.find(model => model.id === 'anthropic/claude-sonnet-5').recommended, undefined)
+  assert.equal(result.models.find(model => model.id === 'provider/new-option').recommended, undefined)
+  assert.equal(result.models.some(model => model.id === ids[1]), false)
+  const unreviewed = await discover([{ id: 'provider/a' }, { id: 'provider/b' }])
+  assert.equal(unreviewed.suggestedModel, undefined)
+  assert.equal(unreviewed.models.length, 2)
+})
+
+test('missing capability metadata remains selectable while explicitly non-text models are excluded', async () => {
+  const result = await discoverAdvisorModels({
+    provider: 'custom', baseUrl: 'http://127.0.0.1:8080/v1',
+    fetchImpl: async () => Response.json({ data: [
+      { id: 'no-metadata' },
+      { id: 'invalid-context', context_length: -1, supported_parameters: [] },
+      { id: 'text-model', architecture: { output_modalities: ['text'] } },
+      { id: 'image-model', architecture: { output_modalities: ['image'] } },
+    ] }),
+  })
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.models.map(model => model.id), ['no-metadata', 'invalid-context', 'text-model'])
+  assert.equal(result.models[0].contextLength, undefined)
+  assert.equal(result.models[0].supportedParameters, undefined)
+  assert.equal(result.models[1].contextLength, undefined)
+})
+
+test('a malformed catalog is a failed refresh, distinct from a valid empty catalog', async () => {
+  const discover = payload => discoverAdvisorModels({
+    provider: 'openrouter', apiKey: 'fixture-key',
+    fetchImpl: async () => Response.json(payload),
+  })
+  assert.equal((await discover({ message: 'temporarily unavailable' })).ok, false)
+  assert.equal((await discover({ data: null })).errorCode, 'PROVIDER_INVALID_RESPONSE')
+  const empty = await discover({ data: [] })
+  assert.equal(empty.ok, true)
+  assert.deepEqual(empty.models, [])
+  assert.equal(empty.suggestedModel, undefined)
 })
 
 test('model discovery redacts an echoed API key from provider errors', async () => {
@@ -319,6 +409,7 @@ test('OpenRouter model test retries route-specific HTTP 404 without schema param
 
 test('Gemini check uses the default model and verifies an actual structured answer', async () => {
   const result = await testAdvisorModel({ provider: 'gemini', apiKey: 'secret', fetchImpl: async (url, options) => {
+    if (url.includes('?pageSize=')) return Response.json({ models: [{ name: 'models/gemini-3.5-flash-lite', supportedGenerationMethods: ['generateContent'] }] })
     assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent')
     assert.equal(options.headers['x-goog-api-key'], 'secret')
     const body = JSON.parse(options.body)
@@ -340,7 +431,7 @@ test('Gemini connection errors distinguish missing models, authentication, and b
 
 test('empty model responses never pass the setup check', async () => {
   for (const provider of ['gemini', 'ollama']) {
-    const result = await testAdvisorModel({ provider, apiKey: 'secret', model: 'model', fetchImpl: async () => ({ ok: true, text: async () => '{}' }) })
+    const result = await testAdvisorModel({ provider, apiKey: 'secret', model: 'model', fetchImpl: async url => url.includes('?pageSize=') ? Response.json({ models: [{ name: 'models/gemini-3.5-flash-lite', supportedGenerationMethods: ['generateContent'] }] }) : ({ ok: true, text: async () => '{}' }) })
     assert.equal(result.ok, false)
     assert.equal(result.errorCode, 'PROVIDER_EMPTY_RESPONSE')
   }
