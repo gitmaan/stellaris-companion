@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+from contextlib import closing
 from copy import deepcopy
 
 import httpx
@@ -599,6 +600,126 @@ def test_snapshot_range_dates_belong_to_captured_rows_on_rewind(campaign):
     bounds = db.get_snapshot_range_for_save(SAVE)
     assert bounds["first_snapshot_id"] == first
     assert bounds["last_snapshot_id"] == rewound and bounds["last_game_date"] == "2201.01.01"
+
+
+@pytest.mark.parametrize("empty_cached_start", [False, True])
+def test_chronicle_can_start_after_loading_a_save_before_first_capture(
+    tmp_path, monkeypatch, empty_cached_start
+):
+    with closing(GameDatabase(tmp_path / "rewound.db")) as db:
+        session = db.get_or_create_active_session(save_id=SAVE, empire_name="Dated Union")
+        future = snapshot(db, session, "2308.04.01")
+        event(db, session, future, "2308.04.01", "Future branch fact")
+        if empty_cached_start:
+            db.upsert_chronicle_by_save_id(
+                save_id=SAVE,
+                session_id=session,
+                language="en",
+                chronicle_text="",
+                chapters_json=json.dumps(
+                    {
+                        "chapters": [],
+                        "current_era_start_date": "2308.04.01",
+                        "current_era_start_snapshot_id": future,
+                    }
+                ),
+                event_count=0,
+                snapshot_count=1,
+            )
+        first = snapshot(db, session, "2303.04.01")
+        latest = snapshot(db, session, "2304.04.01")
+        event(db, session, latest, "2304.04.01", "Earlier branch fact")
+        generator = ChronicleGenerator(db)
+        prompts = []
+
+        def generate(**kwargs):
+            prompts.append(kwargs["contents"])
+            return fake_structured(**kwargs)
+
+        monkeypatch.setattr(generator, "_generate_structured_content", generate)
+        result = generator.generate_chronicle(session, force_refresh=True)
+        assert result["current_era"] is not None
+        assert result["coverage_date"] == "2304.04.01"
+        assert len(prompts) == 1
+        assert "Earlier branch fact" in prompts[0] and "Future branch fact" not in prompts[0]
+        bounds = db.get_chronicle_snapshot_range(SAVE, upper_snapshot_id=latest)
+        assert bounds["first_snapshot_id"] == first
+        assert bounds["first_game_date"] == "2303.04.01"
+        assert bounds["last_snapshot_id"] == latest
+        assert bounds["snapshot_count"] == 3
+        original = db.get_chronicle_snapshot_range(SAVE, upper_snapshot_id=future)
+        assert original["first_snapshot_id"] == original["last_snapshot_id"] == future
+
+
+@pytest.mark.parametrize("capture_future_first", [False, True])
+def test_sparse_snapshots_finalize_at_real_boundaries_without_getting_stuck(
+    tmp_path, monkeypatch, capture_future_first
+):
+    with closing(GameDatabase(tmp_path / "sparse.db")) as db:
+        session = db.get_or_create_active_session(save_id=SAVE, empire_name="Dated Union")
+        if capture_future_first:
+            future = snapshot(db, session, "2350.04.01", neighbor="Future empire")
+            event(db, session, future, "2350.04.01", "Future branch fact")
+        first = snapshot(db, session, "2303.04.01")
+        latest = snapshot(db, session, "2310.04.01", neighbor="Current empire")
+        for index in range(10):
+            event(db, session, latest, "2310.04.01", f"Recorded fact {index}")
+        generator = ChronicleGenerator(db)
+        prompts = []
+
+        def generate(**kwargs):
+            prompts.append(kwargs["contents"])
+            return fake_structured(**kwargs)
+
+        monkeypatch.setattr(generator, "_generate_structured_content", generate)
+        result = generator.generate_chronicle(session, force_refresh=True)
+        assert len(result["chapters"]) == 1
+        chapter = result["chapters"][0]
+        assert (chapter["start_date"], chapter["end_date"]) == ("2303.04.01", "2310.04.01")
+        assert (chapter["start_snapshot_id"], chapter["end_snapshot_id"]) == (first, latest)
+        stored = load_chapters_data(db.get_chronicle_by_save_id(SAVE))
+        assert stored["chapters"][0]["source_bundle"]["coverage_date"] == "2310.04.01"
+        assert result["pending_chapters"] == 0
+        assert len(prompts) == 1
+        assert "Recorded fact 9" in prompts[0] and "Future branch fact" not in prompts[0]
+        assert "Current empire" in prompts[0] and "Future empire" not in prompts[0]
+        repeat = generator.generate_chronicle(session, force_refresh=True)
+        assert repeat["chronicle_revision"] == result["chronicle_revision"]
+        assert len(prompts) == 1
+
+        # The same sparse-boundary rule applies to later, thirty-year chapters.
+        last = snapshot(db, session, "2345.04.01", neighbor="Later empire")
+        event(db, session, last, "2345.04.01", "Later chapter fact")
+        later = generator.generate_chronicle(session, force_refresh=True)
+        assert len(later["chapters"]) == 2
+        assert later["chapters"][0] == chapter
+        assert later["chapters"][1]["end_snapshot_id"] == last
+        assert later["chapters"][1]["end_date"] == "2345.04.01"
+        assert later["pending_chapters"] == 0
+        assert len(prompts) == 2
+
+
+def test_future_events_do_not_satisfy_first_chapter_threshold(campaign, monkeypatch):
+    db, session, _, _ = campaign
+    future = snapshot(db, session, "2220.01.01")
+    for index in range(10):
+        event(db, session, future, "2220.01.01", f"Future branch fact {index}")
+    earlier = snapshot(db, session, "2206.01.01")
+    event(db, session, earlier, "2206.01.01", "Earlier branch fact")
+    generator = ChronicleGenerator(db)
+    prompts = []
+
+    def generate(**kwargs):
+        prompts.append(kwargs["contents"])
+        return fake_structured(**kwargs)
+
+    monkeypatch.setattr(generator, "_generate_structured_content", generate)
+    result = generator.generate_chronicle(session, force_refresh=True)
+    assert result["chapters"] == []
+    assert result["pending_chapters"] == 0
+    assert result["current_era"] is not None
+    assert len(prompts) == 1
+    assert "Earlier branch fact" in prompts[0] and "Future branch fact" not in prompts[0]
 
 
 def test_mcp_archive_undo_cannot_erase_a_later_native_chapter_edit(campaign):
