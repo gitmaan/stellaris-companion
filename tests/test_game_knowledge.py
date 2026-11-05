@@ -9,6 +9,92 @@ from stellaris_companion.game_knowledge import (
 )
 
 
+def test_verified_identity_supplies_rules_for_generic_questions_without_crossing_versions():
+    identity = {"authority": "hive_mind", "civics": ["hive_devouring_swarm"]}
+    prompt = build_game_knowledge_prompt(
+        "Pegasus v4.4.6",
+        purpose="advisor",
+        topics="What should I prioritize?",
+        campaign_identity=identity,
+    )
+    assert "Hive Mind and Devouring Swarm" in prompt
+    assert "Army Damage is not Ship Weapons Damage" in prompt
+    assert "Colossus Project and Construction" not in prompt
+    for version in ("v4.3.5", "Cygnus v4.5.2", "unknown"):
+        prompt = build_game_knowledge_prompt(
+            version,
+            purpose="advisor",
+            topics="What should I prioritize?",
+            campaign_identity=identity,
+        )
+        assert "Army Damage is not Ship Weapons Damage" not in prompt
+
+
+def test_unknown_identity_does_not_select_standard_rules_by_substring():
+    prompt = build_game_knowledge_prompt(
+        "Pegasus v4.4.6",
+        purpose="advisor",
+        topics="What should I prioritize?",
+        campaign_identity={"civics": ["modded_rogue_servitor"]},
+    )
+    assert "Machine Intelligence Civics" not in prompt
+
+
+@pytest.mark.parametrize("topic", ["", "이 수치로 무엇을 알 수 있나요?", "Explain this proposal."])
+def test_unmatched_questions_keep_foundational_currency_and_quantity_meaning(topic):
+    prompt = build_game_knowledge_prompt(
+        "4.4.6", purpose="advisor", topics=topic, max_topic_sections=0
+    )
+    assert "## Critical 4.x Baseline" in prompt
+    assert "Trade is the Galactic Market currency" in prompt
+    assert "available Workforce, job capacity, and filled jobs are distinct" in prompt
+    assert "## Economy, Trade & Empire Size" not in prompt
+    assert "## Population, Workforce & Colonies" not in prompt
+
+
+@pytest.mark.parametrize(
+    ("topic", "section", "required_context"),
+    [
+        ("naval capacity and fleets", "Naval Capacity & Fleets", "paid in Trade"),
+        ("automation reliability", "Automation & Reliability", "artificial Workforce"),
+        ("population workforce", "Population, Workforce & Colonies", "artificial Workforce"),
+        ("machine intelligence civics", "Machine Intelligence Civics", "consume Alloys"),
+        ("Rogue Servitor organic care", "Machine Intelligence Civics", "consume Consumer Goods"),
+    ],
+)
+def test_single_section_retrieval_retains_resource_and_workforce_meaning(
+    topic, section, required_context
+):
+    prompt = build_game_knowledge_prompt(
+        "4.4.6", purpose="advisor", topics=topic, max_topic_sections=1
+    )
+
+    assert f"## {section}" in prompt
+    assert "## Economy, Trade & Empire Size" not in prompt
+    assert required_context in prompt
+    if section == "Naval Capacity & Fleets":
+        assert "not a count of ships" in prompt
+    # A self-contained Pegasus rule must still respect the breaking-version boundary.
+    newer = build_game_knowledge_prompt(
+        "4.5.2", purpose="advisor", topics=topic, max_topic_sections=1
+    )
+    assert required_context not in newer
+
+
+def test_question_priority_keeps_achievement_conditions_and_civic_context():
+    prompt = build_game_knowledge_prompt(
+        "Pegasus v4.4.6",
+        purpose="advisor",
+        topics="What does Retirement Home require?",
+        campaign_identity={"authority": "machine_intelligence", "civics": ["machine_servitor"]},
+        max_topic_sections=1,
+    )
+    assert "Machine Achievements and Eligibility" in prompt
+    assert "at least 1,000 owned organic Fallen Empire population" in prompt
+    assert "Machine Intelligence Civics" in prompt
+    assert "Colossus Project and Construction" not in prompt
+
+
 def test_patch_resources_resolve_from_pyinstaller_sibling_layout(tmp_path: Path):
     package_dir = tmp_path / "stellaris_companion"
     package_dir.mkdir()

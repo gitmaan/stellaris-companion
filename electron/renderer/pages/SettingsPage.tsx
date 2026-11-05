@@ -91,7 +91,7 @@ function formatBytes(bytes: number | null | undefined): string {
 
 type GeminiQuotaMode = 'standard' | 'higher'
 
-const GEMINI_QUOTA_MODES: GeminiQuotaMode[] = ['standard', 'higher']
+const GEMINI_QUOTA_MODES: GeminiQuotaMode[] = ['higher', 'standard']
 
 function quotaModeToRoutingMode(mode: GeminiQuotaMode): ModelRoutingMode {
   return mode === 'higher' ? 'quality_first' : 'conserve'

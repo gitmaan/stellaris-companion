@@ -220,6 +220,8 @@ class BriefingMixin:
                 "empire_name": player_clean.get("empire_name") or meta.get("name"),
                 "date": player_clean.get("date") or meta.get("date"),
                 "version": meta.get("version"),
+                "required_dlcs": meta.get("required_dlcs", []),
+                "required_dlcs_status": meta.get("required_dlcs_status", "not_recorded"),
                 "player_id": player_clean.get("player_id"),
                 "campaign_id": self._extract_campaign_id(),
             },

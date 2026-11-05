@@ -49,13 +49,14 @@ from backend.core.advisor_providers import (
 from backend.core.conversation import ConversationManager
 from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
-from backend.core.model_briefing import build_model_briefing_json
+from backend.core.model_briefing import build_model_briefing_json, get_briefing_metadata
 from backend.core.model_routing import (
     GEMINI_FLASH_MODEL,
     display_model_name,
     normalize_model_routing_mode,
 )
 from backend.core.utils import compute_save_hash_from_briefing
+from stellaris_companion.evidence_policy import NAVAL_CAPACITY_RULES, build_evidence_prompt
 from stellaris_companion.game_knowledge import build_game_knowledge_prompt
 from stellaris_companion.personality import build_optimized_prompt
 from stellaris_save_extractor import SaveExtractor
@@ -86,28 +87,12 @@ class AdvisorReply:
     stats: dict[str, Any]
 
 
-# Fallback system prompt (used if personality generation fails)
-FALLBACK_SYSTEM_PROMPT = """You are a Stellaris strategic advisor.
-
-Your role:
-- Answer questions about the game state using the data provided
-- Provide strategic analysis and advice
-- Be conversational and helpful, like a trusted advisor
-- Be a strategic ADVISOR, not a reporter - interpret facts, identify problems, suggest solutions
-
-FACTUAL ACCURACY CONTRACT:
-- ALL numbers (military power, resources, populations, dates) MUST come from the provided game state
-- If a specific value is not in the data, say "unknown" or "I don't have that information" - NEVER estimate or guess
-- You may provide strategic advice and opinions, but clearly distinguish them from facts
-- When quoting numbers, use the exact values from the data
-- `military.naval_capacity.used` is current usage, not the naval cap ceiling.
-- Use `military.naval_capacity.analysis.limit` only when `safe_to_claim_limit` is true.
-- Only say the empire is over/under/at naval cap when `safe_to_claim_over_cap` is true.
-- Only say an over-cap upkeep penalty applies when `safe_to_claim_penalty` is true.
-- If only `derived_limit` is present and confidence is `estimated`, describe it explicitly as a derived estimate, not a confirmed cap.
-- If `safe_to_claim_over_cap` is false, do not answer a naval-cap question with a definitive yes/no and do not use phrases like "definitely", "clearly", or "almost certainly" about cap status.
-- If `safe_to_claim_over_cap` is false, lead with uncertainty first and only mention `derived_limit` as supporting context.
-- If `safe_to_claim_over_cap` is false, do not present `derived_status` or `derived_over_by` as the empire's current naval-cap status."""
+# Fallback voice uses the same factual policy as every other advisor persona.
+FALLBACK_SYSTEM_PROMPT = (
+    "You are a Stellaris strategic advisor. Be conversational and helpful. "
+    "Interpret evidence, identify problems and recommend next actions.\n\n"
+    + build_evidence_prompt("advisor")
+)
 
 
 class Companion:
@@ -320,42 +305,19 @@ class Companion:
             close()
 
     def _build_game_context(self) -> dict | None:
-        """Build game context dict for version/DLC awareness.
-
-        Returns:
-            Dict with version, required_dlcs, and missing_dlcs, or None if unavailable
-        """
+        """Return reported evidence without converting absent fields into negative facts."""
         metadata = self.metadata if isinstance(self.metadata, dict) else {}
         if not metadata and self.extractor:
             try:
-                # Fallback for ingestion flows where metadata may not be populated yet.
                 metadata = self.extractor.get_metadata() or {}
             except Exception:
                 metadata = {}
-
-        if not metadata:
+        if not isinstance(metadata, dict) or not metadata:
             return None
-
-        version = metadata.get("version")
-        required_dlcs = metadata.get("required_dlcs", [])
-        if not isinstance(required_dlcs, list):
-            required_dlcs = []
-
-        missing_dlcs = metadata.get("missing_dlcs", [])
-        if not isinstance(missing_dlcs, list):
-            missing_dlcs = []
-
-        # Compute missing DLCs from extractor only when metadata does not already provide it.
-        if not missing_dlcs and self.extractor and hasattr(self.extractor, "get_missing_dlcs"):
-            try:
-                missing_dlcs = self.extractor.get_missing_dlcs()
-            except Exception:
-                pass  # Fall back to empty list
-
         return {
-            "version": version,
-            "required_dlcs": required_dlcs,
-            "missing_dlcs": missing_dlcs,
+            key: metadata[key]
+            for key in ("version", "required_dlcs", "required_dlcs_status")
+            if key in metadata
         }
 
     def _build_advisor_game_knowledge(self, question: str) -> str:
@@ -367,6 +329,8 @@ class Companion:
             str(game_context["version"]),
             purpose="advisor",
             topics=question,
+            campaign_metadata=game_context,
+            campaign_identity=self.identity,
         )
 
     @property
@@ -1010,7 +974,7 @@ class Companion:
             briefing_json = self._complete_briefing_json
             game_date = self._briefing_game_date
             save_path = self._briefing_save_path or self.save_path
-            system_prompt = self.system_prompt
+            custom_instructions = self.custom_instructions
             data_note = None if self._briefing_ready.is_set() else "cached"
         if not briefing_json:
             briefing_json, game_date, data_note = self._get_best_briefing_json()
@@ -1019,9 +983,19 @@ class Companion:
                 "Briefing not ready yet", code="BRIEFING_NOT_READY", status_code=503
             )
         parsed = json.loads(briefing_json)
-        meta = parsed.get("meta", {}) if isinstance(parsed, dict) else {}
-        meta = meta if isinstance(meta, dict) else {}
+        meta = get_briefing_metadata(parsed) if isinstance(parsed, dict) else {}
         game_date = str(meta.get("date") or game_date) if meta.get("date") or game_date else None
+        # Rebuild derived context from this exact receipt, not mutable live metadata
+        # or a previously cached missing-DLC interpretation.
+        identity = parsed.get("identity") if isinstance(parsed, dict) else None
+        situation = parsed.get("situation") if isinstance(parsed, dict) else None
+        system_prompt = build_optimized_prompt(
+            identity if isinstance(identity, dict) else {},
+            situation if isinstance(situation, dict) else {},
+            meta,
+            custom_instructions=custom_instructions,
+            include_game_knowledge=False,
+        )
         actual_save_id = save_id
         if meta.get("campaign_id") or (save_path and (meta.get("empire_name") or meta.get("name"))):
             actual_save_id = compute_save_id(
@@ -1137,27 +1111,23 @@ class Companion:
             f"{source.system_prompt}\n\n"
             f"{build_language_policy(output_language)}\n\n"
             "ASK MODE (NO TOOLS):\n"
-            "- You are given the complete current game state as JSON in the user message.\n"
+            "- You are given a dated, partial campaign snapshot as JSON in the user message.\n"
             "- Treat model_context as the semantic contract for interpreting that JSON.\n"
             "- Do NOT call tools or ask to call tools.\n"
-            "- ALL numbers and factual claims must come from the JSON.\n"
             "- Current EMPIRE STATE overrides SAVE MEMORY and prior Advisor claims.\n"
-            "- If a value is missing, say so in the requested language and suggest what to check in-game.\n"
+            "- If evidence is missing, limit that claim and explain what can still be answered.\n"
             "- Be a strategic ADVISOR: interpret, prioritize, and recommend next actions.\n"
         )
         parsed_briefing = json.loads(briefing_json)
-        captured_meta = parsed_briefing.get("meta", {})
-        game_knowledge_prompt = (
-            build_game_knowledge_prompt(
-                str(captured_meta["version"]),
-                purpose="advisor",
-                topics=cleaned_question,
-            )
-            if isinstance(captured_meta, dict) and captured_meta.get("version")
-            else ""
+        captured_meta = get_briefing_metadata(parsed_briefing)
+        ask_system_prompt += "\n" + build_game_knowledge_prompt(
+            str(captured_meta.get("version") or "unknown"),
+            purpose="advisor",
+            topics=cleaned_question,
+            campaign_metadata=captured_meta,
+            campaign_identity=parsed_briefing.get("identity"),
         )
-        if game_knowledge_prompt:
-            ask_system_prompt += f"\n{game_knowledge_prompt}\n"
+        ask_system_prompt += "\n\n" + NAVAL_CAPACITY_RULES + "\n"
         naval_cap_policy_block = self._build_naval_capacity_policy_block(
             question=cleaned_question,
             briefing_json=model_briefing_json,

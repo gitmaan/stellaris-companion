@@ -11,9 +11,12 @@ On explicit `MAX_TOKENS` / `length`, the second attempt asks for a concise, comp
 | Native shipped Gemini models (3.8 Flash, 3.5 Flash-Lite, 3.1 Flash-Lite) | 8,192 | 16,384 |
 | Official DeepSeek `deepseek-flash`, `deepseek-v4-pro`, legacy `deepseek-reasoner` | 8,192 | 16,384 |
 | Official legacy DeepSeek `deepseek-chat` | 8,192 | 8,192 |
+| Official OpenAI `gpt-6.1-terra` | 8,192 | 16,384 |
 | Other models, OpenRouter routes, proxies, or local servers | 4,096 | 4,096 |
 
 DeepSeek recognition requires the exact HTTPS official base URL, `/v1`, or `/beta`, as well as the model ID. A matching model name on another endpoint does not establish its capacity. These are application limits, not promises about remaining context or model availability. Consult the [Gemini model catalog](https://ai.google.dev/gemini-api/docs/models) and [DeepSeek API contract](https://api-docs.deepseek.com/api/create-chat-completion/) when extending the policy. Context-window errors must never trigger a larger output request. Schema-only repairs keep the same allowance.
+
+New ChatGPT connections prefer `gpt-6.1-terra` when it appears in the account catalog, retaining the previous tested fallbacks when unavailable. Direct OpenAI setup at `https://api.openai.com/v1` also recommends Terra after discovery; saved or explicitly entered models remain selected. The API connection check and generation adapter use `max_completion_tokens` for this model, including reasoning tokens, and omit sampling temperature. Advisor uses low reasoning and Chronicle uses medium on both connection paths. Other compatible endpoints retain their existing request contract. See the [Terra model documentation](https://developers.openai.com/api/docs/models/gpt-6.1-terra) and [migration guidance](https://developers.openai.com/api/docs/guides/latest-model/gpt-6-astra.md#migration-quickstart).
 
 If both attempts fail to finish, useful unstructured Advisor text is returned as `truncated`. The UI displays a localized notice and retry action, including after reopening a saved conversation. Retrying preserves the old partial answer and sends a new request ID; replaying the previous ID intentionally returns its saved partial. Partial answers stay in the readable archive but are excluded from subsequent completed-turn prompt history. There is no automatic continuation or text stitching.
 

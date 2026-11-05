@@ -263,8 +263,12 @@ declare global {
             supportedParameters?: string[]
             outputModalities?: string[]
             recommended?: boolean
+            updatePolicy?: 'latest_stable'
+            resolvedModel?: string
+            resolvedName?: string
             pricing?: { inputPerMillion: number; outputPerMillion: number }
           }>
+          suggestedModel?: string
           baseUrl?: string
           provider?: string
           error?: string

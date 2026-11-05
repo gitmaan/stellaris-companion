@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
+from stellaris_companion.campaign_evidence import resolve_content_availability
+
 # All known major Stellaris DLCs (for detecting what's missing)
 # Updated for Stellaris 4.x - add new DLCs as they release
 KNOWN_MAJOR_DLCS = {
@@ -69,7 +71,9 @@ class MetadataMixin:
                     result[key] = value
 
         # Parse required_dlcs block
-        result["required_dlcs"] = self._parse_required_dlcs()
+        result["required_dlcs"], result["required_dlcs_status"] = (
+            self._parse_required_dlcs_evidence()
+        )
 
         return result
 
@@ -85,23 +89,34 @@ class MetadataMixin:
         Returns:
             List of DLC names (strings)
         """
-        dlcs = []
+        return self._parse_required_dlcs_evidence()[0]
+
+    def _parse_required_dlcs_evidence(self) -> tuple[list[str], str]:
+        """Distinguish a reported empty list from missing or malformed metadata."""
         meta = getattr(self, "_meta", None) or ""
+        # Ignore comments without stripping a # inside a quoted name.
+        meta = re.sub(r'("(?:\\.|[^"\\])*")|#[^\n]*', lambda m: m.group(1) or "", meta)
+        if not re.search(r"\brequired_dlcs\s*=", meta):
+            return [], "not_recorded"
 
-        # Find the required_dlcs block
-        match = re.search(r"required_dlcs\s*=\s*\{([^}]*)\}", meta, re.DOTALL)
-        if match:
-            block = match.group(1)
-            # Extract quoted strings
-            dlcs = re.findall(r'"([^"]+)"', block)
-
-        return dlcs
+        match = re.search(r"\brequired_dlcs\s*=\s*\{([^{}]*)\}", meta, re.DOTALL)
+        if not match:
+            return [], "invalid"
+        block = match.group(1)
+        dlcs = re.findall(r'"([^"\n]+)"', block)
+        residue = re.sub(r'"([^"\n]+)"', "", block)
+        if residue.strip() or any(not name.strip() for name in dlcs):
+            return [], "invalid"
+        return dlcs, "reported"
 
     def get_missing_dlcs(self) -> list[str]:
-        """Get list of major DLCs not active in this save.
+        """Return known standalone packs not reported by this save (legacy API).
 
-        Returns:
-            List of DLC names not in required_dlcs
+        Absence from the save's requirement list is not proof that a feature is
+        unavailable. Unknown/malformed evidence yields no negative inference.
         """
-        active = set(self.get_metadata().get("required_dlcs", []))
-        return sorted(KNOWN_MAJOR_DLCS - active)
+        content = resolve_content_availability(self.get_metadata())
+        if content["dlc_evidence_status"] != "reported":
+            return []
+        indicated = set(content["reported_dlcs"]) | set(content["base_game_dlcs"])
+        return sorted(KNOWN_MAJOR_DLCS - indicated)

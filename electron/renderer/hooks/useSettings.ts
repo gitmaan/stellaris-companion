@@ -8,7 +8,7 @@ export type ChronicleRefreshMode = (typeof CHRONICLE_REFRESH_MODE_VALUES)[number
 export const DEFAULT_CHRONICLE_REFRESH_MODE: ChronicleRefreshMode = 'balanced'
 export const MODEL_ROUTING_MODE_VALUES = ['quality_first', 'conserve'] as const
 export type ModelRoutingMode = (typeof MODEL_ROUTING_MODE_VALUES)[number]
-export const DEFAULT_MODEL_ROUTING_MODE: ModelRoutingMode = 'conserve'
+export const DEFAULT_MODEL_ROUTING_MODE: ModelRoutingMode = 'quality_first'
 export const UPDATE_CHANNEL_VALUES = ['stable', 'beta'] as const
 export type UpdateChannel = (typeof UPDATE_CHANNEL_VALUES)[number]
 export const DEFAULT_UPDATE_CHANNEL: UpdateChannel = 'stable'
@@ -66,9 +66,9 @@ export function normalizeChronicleRefreshMode(rawValue: unknown): ChronicleRefre
 
 export function normalizeModelRoutingMode(rawValue: unknown): ModelRoutingMode {
   if (typeof rawValue !== 'string') return DEFAULT_MODEL_ROUTING_MODE
-  const normalized = rawValue.replace(/-/g, '_')
-  if (normalized === 'auto' || normalized === 'flash_first') return 'quality_first'
-  if (normalized === 'quota_saver' || normalized === 'lite_first' || normalized === 'flash_lite_first') return 'conserve'
+  const normalized = rawValue.trim().toLowerCase().replace(/-/g, '_')
+  if (normalized === 'auto' || normalized === 'quality' || normalized === 'flash_first') return 'quality_first'
+  if (normalized === 'quota_saver' || normalized === 'free_tier' || normalized === 'lite_first' || normalized === 'flash_lite_first') return 'conserve'
   return (MODEL_ROUTING_MODE_VALUES as readonly string[]).includes(normalized)
     ? normalized as ModelRoutingMode
     : DEFAULT_MODEL_ROUTING_MODE

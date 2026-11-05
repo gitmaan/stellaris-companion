@@ -7,6 +7,7 @@ import json
 import re
 import uuid
 from contextlib import contextmanager
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,9 @@ from backend.core.chronicle_store import (
 )
 from backend.core.database import GameDatabase
 from backend.core.language import language_name, normalize_language
+from backend.core.model_briefing import build_model_briefing, get_briefing_metadata
+from stellaris_companion.campaign_evidence import resolve_empire_identity
+from stellaris_companion.evidence_policy import EvidencePurpose, build_evidence_policy
 from stellaris_companion.game_knowledge import build_game_knowledge_prompt, load_game_knowledge
 
 DEFAULT_EVENT_LIMIT = 25
@@ -253,13 +257,6 @@ class StellarisMcpContext:
         session_id = str(session["id"])
         briefing = self._load_briefing(session_id)
         resolved_focus = self._resolve_focus(question=question, focus=focus)
-        meta = briefing.get("meta") if isinstance(briefing.get("meta"), dict) else {}
-        model_context = (
-            briefing.get("model_context") if isinstance(briefing.get("model_context"), dict) else {}
-        )
-        version = str(meta.get("version") or model_context.get("game_version") or "unknown")
-        knowledge = load_game_knowledge(version)
-
         payload = {
             "campaign": self.get_active_campaign(),
             "question": question,
@@ -269,15 +266,9 @@ class StellarisMcpContext:
             "briefing": self._build_advisor_briefing(briefing, resolved_focus),
             # Keep mechanics outside briefing compaction and its size fallback: a
             # truncated rule can reverse the meaning of a correction or qualifier.
-            "game_knowledge": {
-                "requested_version": version,
-                "status": knowledge.status,
-                "loaded_through": knowledge.loaded_through,
-                "notes_only": knowledge.notes_only,
-                "prompt": build_game_knowledge_prompt(
-                    version, purpose="advisor", topics=question.strip() or None
-                ),
-            },
+            "game_knowledge": self._game_knowledge(
+                briefing, purpose="advisor", topics=question.strip() or None
+            ),
             "recent_events": self.get_recent_events(limit=event_limit, notable_only=False).get(
                 "events", []
             ),
@@ -317,12 +308,22 @@ class StellarisMcpContext:
     ) -> dict[str, Any]:
         session = self._require_current_session()
         briefing = self._load_briefing(str(session["id"]))
-        selected_sections = [str(s) for s in sections or FOCUS_SECTIONS["general"]]
+        selected_sections = list(
+            dict.fromkeys(
+                [
+                    "meta",
+                    "identity",
+                    "model_context",
+                    *(str(s) for s in sections or FOCUS_SECTIONS["general"]),
+                ]
+            )
+        )
         detail = "full" if str(max_detail).lower() == "full" else "compact"
         return {
             "campaign": self.get_active_campaign(),
             "sections": {
-                key: _compact_value(
+                key: _compact_briefing_section(
+                    key,
                     briefing.get(key),
                     max_depth=5 if detail == "full" else 3,
                     max_list_items=25 if detail == "full" else MAX_LIST_ITEMS_COMPACT,
@@ -488,6 +489,7 @@ class StellarisMcpContext:
             )
         else:
             briefing = self._load_briefing(str(session["id"]))
+        briefing = build_model_briefing(briefing)
         return {
             "campaign": self.get_active_campaign(),
             "campaign_ref": _campaign_ref(save_id),
@@ -496,6 +498,7 @@ class StellarisMcpContext:
             "events": [_event_payload(row) for row in events],
             "truncated": truncated,
             "briefing": self._select_briefing_sections(briefing, "chronicle"),
+            "game_knowledge": self._game_knowledge(briefing, purpose="chronicle"),
             "chronicle_custom_instructions": self.db.get_chronicle_custom_instructions(save_id),
             "chronicle_guidance": self._chronicle_source_guidance(briefing, event_range),
             "save_affordance": self._chronicle_save_affordance(),
@@ -1187,7 +1190,28 @@ class StellarisMcpContext:
         if not raw:
             raw = self.db.get_latest_snapshot_full_briefing_json(session_id=session_id)
         parsed = _parse_json_object(raw)
-        return parsed
+        return build_model_briefing(parsed)
+
+    @staticmethod
+    def _game_knowledge(
+        briefing: dict[str, Any], *, purpose: EvidencePurpose, topics: str | None = None
+    ) -> dict[str, Any]:
+        meta = get_briefing_metadata(briefing)
+        version = str(meta.get("version") or "unknown")
+        knowledge = load_game_knowledge(version)
+        return {
+            "requested_version": version,
+            "status": knowledge.status,
+            "loaded_through": knowledge.loaded_through,
+            "notes_only": knowledge.notes_only,
+            "prompt": build_game_knowledge_prompt(
+                version,
+                purpose=purpose,
+                topics=topics,
+                campaign_metadata=meta,
+                campaign_identity=briefing.get("identity"),
+            ),
+        }
 
     def _get_advisor_custom(self, session_id: str) -> str | None:
         return self.db.get_session_advisor_custom(session_id=session_id)
@@ -1213,17 +1237,23 @@ class StellarisMcpContext:
         return "general"
 
     def _select_briefing_sections(self, briefing: dict[str, Any], focus: str) -> dict[str, Any]:
-        sections = ["meta", "identity", *FOCUS_SECTIONS.get(focus, FOCUS_SECTIONS["general"])]
+        sections = [
+            "meta",
+            "identity",
+            "model_context",
+            *FOCUS_SECTIONS.get(focus, FOCUS_SECTIONS["general"]),
+        ]
         selected: dict[str, Any] = {}
         for section in dict.fromkeys(sections):
             if section in briefing:
-                selected[section] = _compact_value(briefing.get(section))
+                selected[section] = _compact_briefing_section(section, briefing.get(section))
         return _drop_empty(selected)
 
     def _build_advisor_briefing(self, briefing: dict[str, Any], focus: str) -> dict[str, Any]:
         prioritized_sections = [
             "meta",
             "identity",
+            "model_context",
             *FOCUS_SECTIONS.get(focus, []),
             *ADVISOR_BRIEFING_SECTIONS,
             *briefing.keys(),
@@ -1231,7 +1261,7 @@ class StellarisMcpContext:
         selected: dict[str, Any] = {}
         for section in dict.fromkeys(prioritized_sections):
             if section in briefing:
-                selected[section] = _compact_value(briefing.get(section))
+                selected[section] = _compact_briefing_section(section, briefing.get(section))
         return _drop_empty(selected)
 
     def _advisor_response_guidance(self, briefing: dict[str, Any]) -> dict[str, Any]:
@@ -1249,18 +1279,7 @@ class StellarisMcpContext:
                 "trade-offs, risks, or what to check in-game",
             ],
             "presentation_contract": self._presentation_contract(kind="advisor"),
-            "facts_policy": {
-                "use_only_provided_context": True,
-                "exact_numbers_only": True,
-                "missing_values": "Say unknown or not available rather than estimating.",
-                "distinguish_advice_from_facts": True,
-                "respect_game_version_and_dlc": True,
-                "mechanics_source": (
-                    "Use game_knowledge.prompt and its coverage limits for game rules. "
-                    "Campaign observations and active DLC still determine what applies; "
-                    "mechanics do not establish the player's current unlocks or events."
-                ),
-            },
+            "facts_policy": build_evidence_policy("advisor"),
             "language_policy": self._language_guidance(),
             "advisor_memory_policy": (
                 "Use advisor_memory as prior player intent or preference, not as evidence about "
@@ -1288,8 +1307,7 @@ class StellarisMcpContext:
             or briefing.get("empire_name")
             or "the empire"
         )
-        ethics = identity.get("ethics") if isinstance(identity.get("ethics"), list) else []
-        civics = identity.get("civics") if isinstance(identity.get("civics"), list) else []
+        typed_identity = resolve_empire_identity(identity)
 
         if identity.get("is_machine"):
             voice = "Use precise, analytical machine-intelligence language while still giving direct strategic advice."
@@ -1307,8 +1325,10 @@ class StellarisMcpContext:
                 "voice": voice,
                 "empire_identity": {
                     "name": empire_name,
-                    "ethics": [_display_identifier(str(item)) for item in ethics],
-                    "civics": [_display_identifier(str(item)) for item in civics],
+                    "ethics": [item["name"] for item in typed_identity["ethics"]],
+                    "civics": [item["name"] for item in typed_identity["civics"]],
+                    "authority": (typed_identity["authority"] or {}).get("name"),
+                    "origin": (typed_identity["origin"] or {}).get("name"),
                     "at_war": situation.get("at_war"),
                     "game_phase": _display_identifier(str(situation.get("game_phase")))
                     if situation.get("game_phase")
@@ -1386,6 +1406,7 @@ class StellarisMcpContext:
                 "Chronicle custom instructions as source material."
             ),
             "do_not_fabricate_events": True,
+            "facts_policy": build_evidence_policy("chronicle"),
             "voice_guidance": self._chronicle_voice_guidance(briefing),
             "presentation_contract": self._presentation_contract(kind="chronicle"),
             "style_rules": [
@@ -1674,6 +1695,14 @@ def _assemble_chronicle_text(
         lines.append(str(current_era.get("narrative") or ""))
 
     return "\n".join(lines)
+
+
+def _compact_briefing_section(section: str, value: Any, **limits: Any) -> Any:
+    # Truncating evidence or humanizing canonical IDs changes their meaning.
+    # Keep the small interpretation contract and its source fields intact.
+    if section in {"meta", "identity", "model_context"}:
+        return deepcopy(value)
+    return _compact_value(value, **limits)
 
 
 def _compact_value(

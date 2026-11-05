@@ -96,16 +96,16 @@ test('cancel closes the callback and keeps an existing account selected', async 
 })
 
 test('first-use defaults to tested Terra while catalog order and saved choices are preserved', async () => {
-  const models = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-6.1-sol']
+  const models = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra']
   const h = harness({ fetch: request => request.url.endsWith('/models') ? Response.json({
     models: models.map(slug => ({ slug, display_name: slug, visibility: 'list', context_window: 272000 })),
   }) : null })
   try {
     await h.signIn()
-    assert.equal(h.service.status().model, 'gpt-5.6-terra')
-    assert.equal(h.service.status().recommendedModel, 'gpt-5.6-terra')
+    assert.equal(h.service.status().model, 'gpt-6.1-terra')
+    assert.equal(h.service.status().recommendedModel, 'gpt-6.1-terra')
     assert.deepEqual(h.service.status().models.map(model => model.id), models)
-    for (const selected of ['gpt-5.6-luna', 'gpt-6-astra']) {
+    for (const selected of ['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-6-astra']) {
       await h.service.selectModel(selected); await h.service.listModels()
       assert.equal(h.service.status().model, selected)
     }
@@ -114,11 +114,24 @@ test('first-use defaults to tested Terra while catalog order and saved choices a
   } finally { h.service.close() }
 })
 
+test('Terra recommendation falls back only to models available to the account', async () => {
+  for (const models of [['gpt-6-astra', 'gpt-5.6-terra'], ['account-model']]) {
+    const h = harness({ fetch: request => request.url.endsWith('/models') ? Response.json({
+      models: models.map(slug => ({ slug, visibility: 'list', context_window: 272000 })),
+    }) : null })
+    try {
+      await h.signIn()
+      assert.equal(h.service.status().model, models.at(-1))
+      assert.equal(h.service.status().recommendedModel, models.at(-1))
+    } finally { h.service.close() }
+  }
+})
+
 test('purpose selects tested reasoning effort and schema fallback preserves it', async () => {
   let failSchema = false
   const h = harness({ fetch: request => {
     if (request.url.endsWith('/models')) return Response.json({ models: [
-      { slug: 'gpt-5.6-terra', visibility: 'list', context_window: 272000 },
+      { slug: 'gpt-6.1-terra', visibility: 'list', context_window: 1050000 },
     ] })
     if (failSchema && request.url.endsWith('/responses') && JSON.parse(request.body).text) {
       return Response.json({ error: { param: 'text.format' } }, { status: 400 })
@@ -132,7 +145,7 @@ test('purpose selects tested reasoning effort and schema fallback preserves it',
     const answer = await h.service.generate({ instructions: 'Chronicle', input: 'Events', purpose: 'chronicle', schema: { type: 'object' } })
     assert.equal(answer.schemaFallbackUsed, true)
     assert.equal(JSON.parse(h.calls.at(-1).body).reasoning.effort, 'medium')
-    assert.equal(JSON.parse(h.calls.at(-1).body).model, 'gpt-5.6-terra')
+    assert.equal(JSON.parse(h.calls.at(-1).body).model, 'gpt-6.1-terra')
   } finally { h.service.close() }
 })
 

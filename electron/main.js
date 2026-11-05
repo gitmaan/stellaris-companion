@@ -14,7 +14,7 @@ const path = require('path')
 const { spawn } = require('child_process')
 const crypto = require('crypto')
 const { pathToFileURL, fileURLToPath } = require('url')
-const Store = require('electron-store')
+const { createSettingsStore, normalizeModelRoutingMode, DEFAULT_MODEL_ROUTING_MODE } = require('./main/settingsStore')
 const net = require('net')
 const { autoUpdater } = require('electron-updater')
 
@@ -150,8 +150,8 @@ const SECRET_STORE_KEYS = {
 }
 
 // Initialize electron-store for non-secret settings
-const store = new Store({
-  name: 'settings',
+const store = createSettingsStore({
+  cwd: app.getPath('userData'),
   defaults: {
     // Save directory (folder) containing Stellaris "save games".
     // NOTE: Legacy key was `savePath` (directory), which is migrated on startup.
@@ -168,7 +168,6 @@ const store = new Store({
     uiScale: 1,
     uiTheme: 'stellaris-cyan',
     chronicleRefreshMode: 'balanced',
-    modelRoutingMode: 'conserve',
     language: 'system',
     resolvedLanguage: 'en',
     hasCompletedOnboarding: false,
@@ -250,8 +249,6 @@ const UI_THEME_PRESETS = ['stellaris-cyan', 'tactica-green', 'command-amber']
 const DEFAULT_UI_THEME = 'stellaris-cyan'
 const CHRONICLE_REFRESH_MODE_PRESETS = ['balanced', 'enhanced', 'manual']
 const DEFAULT_CHRONICLE_REFRESH_MODE = 'balanced'
-const MODEL_ROUTING_MODE_PRESETS = ['quality_first', 'conserve']
-const DEFAULT_MODEL_ROUTING_MODE = 'conserve'
 
 // Discord configuration (DISC-007)
 // These are set via environment or will use defaults for development
@@ -807,16 +804,6 @@ function getChronicleRefreshModeSetting() {
   return normalizeChronicleRefreshMode(
     store.get('chronicleRefreshMode', DEFAULT_CHRONICLE_REFRESH_MODE),
   )
-}
-
-function normalizeModelRoutingMode(rawValue) {
-  if (typeof rawValue !== 'string') return DEFAULT_MODEL_ROUTING_MODE
-  const normalized = rawValue.replace(/-/g, '_')
-  if (normalized === 'auto' || normalized === 'flash_first') return 'quality_first'
-  if (normalized === 'quota_saver' || normalized === 'lite_first' || normalized === 'flash_lite_first') return 'conserve'
-  return MODEL_ROUTING_MODE_PRESETS.includes(normalized)
-    ? normalized
-    : DEFAULT_MODEL_ROUTING_MODE
 }
 
 function getModelRoutingModeSetting() {

@@ -612,18 +612,18 @@
       }
     },
     "geminiQuota": {
-      "label": "UTILISATION DE GEMINI",
-      "description": "Choisissez comment équilibrer les réponses quotidiennes des conseillers et l'écriture des chroniques.",
-      "standard": "Free-friendly",
-      "higher": "Meilleure qualité",
-      "standardTag": "ÉTIRE LES LIMITES LIBRES",
-      "higherTag": "UTILISE PLUS D'ALLOCATION",
-      "standardHelp": "Permet de garder les questions quotidiennes plus légères afin qu'une plus grande partie de votre allocation soit disponible pour la rédaction de Chronicle.",
-      "higherHelp": "Privilégie le modèle Gemini le plus performant disponible pour le conseiller et la Chronique.",
+      "label": "MODÈLE GEMINI",
+      "description": "Choisissez entre qualité des conseils et rapidité des réponses.",
+      "standard": "Flash-Lite",
+      "higher": "Flash",
+      "standardTag": "PLUS RAPIDE · ÉCONOMISE LE QUOTA",
+      "higherTag": "RECOMMANDÉ POUR LES CONSEILS",
+      "standardHelp": "Utilise Flash-Lite pour accélérer les réponses du conseiller et réserver le quota Flash à la chronique.",
+      "higherHelp": "Privilégie Flash pour le conseiller et la chronique. Les réponses peuvent prendre plus de temps et consommer davantage de quota ; passe à Lite si nécessaire.",
       "showAdvanced": "Afficher les contrôles de quotas avancés",
       "hideAdvanced": "Masquer les contrôles de quotas avancés",
       "optional": "FACULTATIF",
-      "aria": "Définir le mode de quota Gemini sur {{mode}}"
+      "aria": "Définir la préférence de modèle Gemini sur {{mode}}"
     },
     "mcpRelay": {
       "loadingSummary": "Vérification de la connexion de l'application IA locale.",
@@ -749,7 +749,12 @@
           "title": "Connecter votre application d’IA",
           "description": "Utilisez MCP Relay pour discuter de votre campagne dans Claude Desktop, ChatGPT pour ordinateur ou une autre application compatible. Aucune clé API requise dans Companion."
         }
-      }
+      },
+      "selectedNotListed": "Ce modèle ne figure pas dans le dernier catalogue reçu. Votre sélection est conservée. Testez le modèle avant de le remplacer.",
+      "catalogFailed": "Impossible d’actualiser le catalogue. Votre sélection est conservée ; la disponibilité n’a pas été vérifiée.",
+      "latestStableModel": "{{name}} (dernière version stable)",
+      "latestStableDetails": "Actuellement {{model}}. Suit automatiquement les versions stables de cette famille ; les tarifs peuvent changer.",
+      "geminiStableUpdates": "Gemini utilise automatiquement les derniers modèles stables Flash et Flash-Lite disponibles pour votre clé. Flash est recommandé pour les conseils ; choisissez Flash-Lite dans les paramètres pour des réponses plus rapides."
     }
   },
   "update": {
@@ -913,7 +918,9 @@
       "browseError": "Impossible d’ouvrir le sélecteur de dossier. Réessayez.",
       "cloudDisclosure": "Les données pertinentes de votre campagne sont envoyées à {{provider}} lors de vos demandes.",
       "foundCount_many": "{{count}} sauvegardes trouvées",
-      "openRouterSignIn": "Se connecter avec OpenRouter"
+      "openRouterSignIn": "Se connecter avec OpenRouter",
+      "loadingSettings": "Chargement de votre connexion enregistrée…",
+      "settingsLoadError": "Impossible de charger votre connexion enregistrée. Réessayez ou configurez-la plus tard pour conserver vos paramètres actuels."
     }
   },
   "advisorPanel": {
