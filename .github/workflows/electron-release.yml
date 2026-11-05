@@ -245,6 +245,25 @@ jobs:
         shell: bash
         run: bash scripts/ci-smoke-check.sh "${{ matrix.name }}"
 
+      - name: Verify bundled ChatGPT bridge with normal and missing CA files
+        shell: bash
+        run: |
+          BACKEND="dist-python/stellaris-backend/stellaris-backend"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then BACKEND="${BACKEND}.exe"; fi
+          PARSER=$(find bin -maxdepth 1 -type f -name 'stellaris-parser*' -print -quit)
+          "$PYTHON_BIN" scripts/qa/packaged_chatgpt_smoke.py \
+            --backend "$BACKEND" --parser "$PARSER" \
+            --output electron/packaged-bridge-proof
+
+      - name: Save bundled ChatGPT bridge evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-bridge-proof-${{ matrix.name }}-${{ needs.setup.outputs.version }}
+          path: electron/packaged-bridge-proof/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Import code signing certificate
         if: startsWith(matrix.name, 'mac')
         env:

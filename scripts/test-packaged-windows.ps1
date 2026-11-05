@@ -21,6 +21,11 @@ foreach ($file in @($executable, (Join-Path $installDir 'resources/app.asar'), (
 $env:E2E_EXECUTABLE_PATH = $executable
 $env:E2E_SHOW_WINDOWS = '1'
 $env:PLAYWRIGHT_JSON_OUTPUT_NAME = Join-Path $proof 'results.json'
+& python (Join-Path $repo 'scripts/qa/packaged_chatgpt_smoke.py') `
+  --backend (Join-Path $installDir 'resources/python-backend/stellaris-backend.exe') `
+  --parser (Join-Path $installDir 'resources/rust-parser/stellaris-parser.exe') `
+  --output (Join-Path $proof 'chatgpt-bridge')
+if ($LASTEXITCODE -ne 0) { throw "Installed ChatGPT bridge smoke failed with exit code $LASTEXITCODE." }
 Push-Location $desktop
 try {
   & node node_modules/@playwright/test/cli.js test e2e/announcements.spec.js e2e/packaged-windows.spec.js e2e/response-completeness.spec.js e2e/feedback-capture.spec.js --reporter=list,json

@@ -1,3 +1,29 @@
+# Beta 1.1.2-beta.1 candidate
+
+This beta combines the ChatGPT local-bridge repair, campaign identity/DLC evidence
+and stable-model improvements, and the older-version Trade foundation correction.
+Stable remains 1.1.1. Private save sharing is deferred until its service rollout;
+the economic-account experiment is excluded because answer-quality acceptance failed.
+
+## Release validation
+
+- Complete combined Python, Rust, desktop, localization and renderer checks.
+- Build all four platforms with publication disabled and inspect their artifacts.
+- Exercise the actual bundled backend against an isolated synthetic ChatGPT bridge
+  with its normal CA file and with that file temporarily absent. Restore the file
+  before packaging; repeat against the installed Windows application.
+- Verify macOS signing/notarization, package versions, update manifests and hashes.
+- Merge only after the candidate checks pass, then tag the verified main commit.
+  The tag workflow repeats validation and installer checks before publication.
+- Verify final beta assets and feeds, while stable release/feed remains 1.1.1.
+
+The bridge check uses synthetic replies and no external model credentials. It
+proves packaged transport behavior, not the precise cause on the reporting PC.
+Advisor evaluation supports a limited beta, not general accuracy certification;
+Nomad economics and Chronicle date issue #83 remain unresolved.
+
+## Earlier release records
+
 # Stable 1.1.1 candidate
 
 Promote the validated beta.2 app changes with a new stable version, updated Stellaris 4.5.2 Advisor guidance, and a fresh feedback invitation. The maintainer approved the five bullets in `electron/release-notes.md` plus the introductory patch-update line. PR #77 is merged; finish the final checks for PR #76 before integrating and publishing `v1.1.1`. The maintainer explicitly authorized admin merges for both PRs without a separate review on October 25.
