@@ -1,3 +1,31 @@
+# Beta 1.1.2-beta.2 candidate
+
+This beta adds the Chronicle rewind and
+abandoned-timeline fixes (#83), typed Advisor errors with privacy-safe references
+(#86), identity names generated from game localisation (#81 follow-up), and the
+consented private save attachments from #82. Stable remains 1.1.1.
+
+## Release validation
+
+- Complete combined Python, Rust, desktop, localization and renderer checks. The
+  local combined branch passed 848 backend tests (27 optional-fixture skips),
+  134 desktop unit tests and the 10 Advisor provider Electron journeys.
+- Build all four platforms with publication disabled and inspect their artifacts.
+- Confirm the packaged backend loads `stellaris_companion/identity_catalog.json`
+  (a missing file degrades silently to raw identifiers, so check a real lookup).
+- Repeat the packaged ChatGPT bridge checks from beta.1, and confirm an injected
+  internal failure shows the localized message, its reference and REPORT.
+- Verify macOS signing/notarization, package versions, update manifests and hashes.
+- Merge only after the candidate checks pass, then tag the verified main commit.
+- Verify final beta assets and feeds, while stable release/feed remains 1.1.1.
+
+Not claimed: Nomad economics (#79), the reporter's exact #86 cause, and #83
+reporter confirmation. A save written during a brief look at an old save turns the
+return into one coarse diff; see `docs/features/campaign-continuity.md`. Cygnus
+4.5 identity IDs stay raw until the catalog is regenerated from a 4.5 install.
+
+## Earlier release records
+
 # Beta 1.1.2-beta.1 candidate
 
 This beta combines the ChatGPT local-bridge repair, campaign identity/DLC evidence

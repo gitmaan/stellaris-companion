@@ -1,5 +1,5 @@
-- Restore ChatGPT requests affected by a missing local certificate file.
-- Improve recognition of your empire’s civics and DLC when giving campaign advice.
-- Keep essential Trade and market-currency guidance available for older supported game versions.
-- Recommend Gemini Flash for new setups, preserve existing model choices, and show when an answer uses a fallback model.
-- Discover current stable models and offer newer supported choices during setup.
+
+- Keep your Chronicle accurate after loading an older save, without events from the timeline you abandoned.
+- Recognize every standard civic, origin and authority by its in-game name when giving campaign advice.
+- Show a short reference code when the Advisor hits an unexpected error, and let you report that message directly.
+- Optionally attach your current save privately to a bug report so we can reproduce it; copies are deleted after 90 days.
