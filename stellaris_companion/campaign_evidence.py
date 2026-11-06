@@ -2,13 +2,19 @@
 
 The save's DLC list reports requirements, not a complete feature or entitlement
 inventory. Identity identifiers are observations; names only explain those IDs.
-These functions perform no I/O and can also interpret older stored briefings.
+These functions perform no I/O (the bundled name catalog loads once at import)
+and can also interpret older stored briefings.
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import re
+from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Paradox's 4.3.6 release (2026-05-11) integrated all three packs into the base game.
 # https://store.steampowered.com/news/posts/?appids=281990&enddate=1778509430&feed=steam_community_announcements
@@ -21,63 +27,36 @@ BASE_GAME_DLC_INTEGRATIONS = {
 _VERSION_PATTERN = re.compile(r"(?<![\w.])v?(\d+)\.(\d+)(?:\.(\d+))?(?![.\d])", re.I)
 _DLC_STATUS_VALUES = frozenset({"reported", "not_recorded", "invalid"})
 
-# Names verified against shipped Pegasus v4.4.6 English localisation:
-# main_2_l_english.yml (authorities/civics), main_1_l_english.yml (ethics),
-# federations_l_english.yml (origins). This is a name catalog, not a rules catalog.
-# Unknown/modded identifiers deliberately keep their identifier as the display.
-_IDENTITY_NAMES = {
-    "authority": {
-        "democratic": "Democratic",
-        "oligarchic": "Oligarchic",
-        "dictatorial": "Dictatorial",
-        "imperial": "Imperial",
-        "corporate": "Corporate",
-        "hive_mind": "Hive Mind",
-        "machine_intelligence": "Machine Intelligence",
-    },
-    "civic": {
-        "machine_servitor": "Rogue Servitor",
-        "machine_terminator": "Determined Exterminator",
-        "machine_assimilator": "Driven Assimilator",
-        "machine_replication": "Rapid Replicator",
-        "machine_builder": "Constructobot",
-        "machine_warbots": "Warbots",
-        "machine_maintenance_protocols": "Maintenance Protocols",
-        "hive_devouring_swarm": "Devouring Swarm",
-        "hive_devouring_swarm_lithoid": "Terravore",
-        "hive_ascetic": "Ascetic",
-        "hive_one_mind": "One Mind",
-        "hive_subspace_ephapse": "Subspace Ephapse",
-        "meritocracy": "Meritocracy",
-        "citizen_service": "Citizen Service",
-        "technocracy": "Technocracy",
-        "inwards_perfection": "Inward Perfection",
-        "fanatic_purifiers": "Fanatic Purifiers",
-    },
-    "ethic": {
-        "authoritarian": "Authoritarian",
-        "fanatic_authoritarian": "Fanatic Authoritarian",
-        "egalitarian": "Egalitarian",
-        "fanatic_egalitarian": "Fanatic Egalitarian",
-        "xenophobe": "Xenophobe",
-        "fanatic_xenophobe": "Fanatic Xenophobe",
-        "xenophile": "Xenophile",
-        "fanatic_xenophile": "Fanatic Xenophile",
-        "militarist": "Militarist",
-        "fanatic_militarist": "Fanatic Militarist",
-        "pacifist": "Pacifist",
-        "fanatic_pacifist": "Fanatic Pacifist",
-        "spiritualist": "Spiritualist",
-        "fanatic_spiritualist": "Fanatic Spiritualist",
-        "materialist": "Materialist",
-        "fanatic_materialist": "Fanatic Materialist",
-        "gestalt_consciousness": "Gestalt Consciousness",
-    },
-    "origin": {
-        "default": "Prosperous Unification",
-        "remnants": "Remnants",
-    },
-}
+# Display names generated from shipped game files by
+# scripts/generate_identity_catalog.py; the JSON records its source game version.
+# This is a name catalog, not a rules catalog: it says what an ID is called in the
+# English UI, not whether it is playable, compatible, or still exists in the game.
+# Unknown, modded, or newer-than-catalog identifiers deliberately keep their
+# identifier as the display.
+IDENTITY_CATALOG_PATH = Path(__file__).with_name("identity_catalog.json")
+_IDENTITY_KINDS = ("authority", "civic", "ethic", "origin")
+
+
+def _load_identity_catalog(path: Path = IDENTITY_CATALOG_PATH) -> tuple[str | None, dict]:
+    """Load ``kind -> {id: name}`` maps, degrading to raw identifiers if unreadable."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        names = {
+            kind: {
+                str(identifier): name
+                for identifier, name in data[kind].items()
+                if isinstance(name, str) and name
+            }
+            for kind in _IDENTITY_KINDS
+        }
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        logger.exception("Identity name catalog unavailable at %s", path)
+        return None, {kind: {} for kind in _IDENTITY_KINDS}
+    version = data.get("game_version")
+    return (version if isinstance(version, str) else None), names
+
+
+IDENTITY_CATALOG_GAME_VERSION, _IDENTITY_NAMES = _load_identity_catalog()
 _IDENTITY_PREFIXES = {
     "authority": "auth_",
     "civic": "civic_",
@@ -135,7 +114,9 @@ def resolve_empire_identity(identity: dict[str, Any] | None) -> dict[str, Any]:
 
     A civic remains a civic even when its name describes an empire archetype. The
     caller's raw fields are never changed. Both save keys and legacy prefix-stripped
-    IDs resolve to the same canonical ID for each kind.
+    IDs resolve to the same canonical ID for each kind. Names come from a name
+    catalog generated from one game version's files, not a rules catalog; IDs it
+    does not know (mods, newer releases) keep their identifier as the name.
     """
     raw = identity if isinstance(identity, dict) else {}
 
