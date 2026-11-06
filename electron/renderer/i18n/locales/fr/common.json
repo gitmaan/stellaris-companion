@@ -86,7 +86,9 @@
       "providerContextLimit": "La fenêtre de contexte est trop petite pour ce briefing de campagne. Augmentez le contexte du fournisseur à au moins 32K ou choisissez un modèle avec un contexte plus large.",
       "providerInvalidResponse": "{{provider}} a renvoyé une réponse incomplète ou illisible. Veuillez réessayer.",
       "providerEmptyResponse": "{{provider}} a renvoyé une réponse vide. Réessayez ou choisissez un autre modèle.",
-      "providerRequestFailed": "{{provider}} n’a pas pu répondre. Vérifiez la connexion dans la configuration IA, puis réessayez."
+      "providerRequestFailed": "{{provider}} n’a pas pu répondre. Vérifiez la connexion dans la configuration IA, puis réessayez.",
+      "advisorInternal": "Le Conseiller a rencontré une erreur interne inattendue. Réessayez. Si cela se reproduit, signalez ce message afin que nous puissions le retracer.",
+      "reference": "Référence : {{reference}}"
     },
     "newChat": "Nouveau chat",
     "welcome": {

@@ -17,6 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from backend.core.advisor_providers import AdvisorProviderError
 from backend.core.companion import DEFAULT_ADVISOR_MODEL, Companion
 from backend.core.json_utils import json_dumps
 from stellaris_companion.rust_bridge import session
@@ -223,11 +224,17 @@ def build_companion(save_path: Path, api_key: str, briefing: dict[str, Any]) -> 
 
 def run_case(companion: Companion, case: EvalCase, model: str) -> CaseResult:
     session_key = f"eval::{model}::{case.name}::{int(time.time() * 1000)}"
-    answer, elapsed = companion.ask_precomputed(
-        question=case.question,
-        session_key=session_key,
-        model_name=model,
-    )
+    started = time.time()
+    try:
+        answer, elapsed = companion.ask_precomputed(
+            question=case.question,
+            session_key=session_key,
+            model_name=model,
+        )
+    except AdvisorProviderError as exc:
+        # Failures are typed now; keep this report's "Error:" accounting.
+        cause = exc.__cause__ if exc.code == "ADVISOR_INTERNAL_ERROR" and exc.__cause__ else exc
+        answer, elapsed = f"Error: {cause}", time.time() - started
     stats = companion.get_call_stats()
     issues = evaluate_answer(case, answer)
     return CaseResult(

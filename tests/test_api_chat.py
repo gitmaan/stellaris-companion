@@ -239,3 +239,31 @@ def test_api_chat_generates_through_compatible_provider(monkeypatch):
     assert request_body["model"] == "local/strategist"
     assert "What should I prioritize?" in request_body["messages"][1]["content"]
     assert '"alloys"' in request_body["messages"][1]["content"]
+
+
+def test_api_chat_includes_local_failure_reference(monkeypatch):
+    app, companion = _make_app(monkeypatch)
+
+    def fail_internally(**kwargs):
+        raise AdvisorProviderError(
+            "The Advisor hit an unexpected internal error. Please try again.",
+            code="ADVISOR_INTERNAL_ERROR",
+            status_code=500,
+            reference="FileNotFoundError errno=2 @ advisor_providers.py:870 generate",
+        )
+
+    companion.ask_precomputed = fail_internally
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/chat",
+            headers=_auth_headers(),
+            json={"message": "Test question", "session_key": "chat-123"},
+        )
+
+    assert resp.status_code == 500
+    assert resp.json()["detail"] == {
+        "error": "The Advisor hit an unexpected internal error. Please try again.",
+        "code": "ADVISOR_INTERNAL_ERROR",
+        "reference": "FileNotFoundError errno=2 @ advisor_providers.py:870 generate",
+    }

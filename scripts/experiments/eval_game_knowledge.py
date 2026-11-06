@@ -937,7 +937,12 @@ def run_case(args: argparse.Namespace, model: str, case: EvalCase) -> EvalResult
             final_model=None,
             elapsed_seconds=round(time.monotonic() - started, 3),
             response=None,
-            provider_error=str(exc),
+            # Local evals record the underlying failure, not the user-facing wrapper.
+            provider_error=str(
+                exc.__cause__
+                if getattr(exc, "code", None) == "ADVISOR_INTERNAL_ERROR" and exc.__cause__
+                else exc
+            ),
             schema_fallback_used=False,
             assembled_system_prompt=recorder.system_prompt,
             assembled_user_prompt=recorder.user_prompt,

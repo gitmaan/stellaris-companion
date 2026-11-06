@@ -192,6 +192,41 @@ test('configures a compatible Advisor provider and discovers its models', async 
   }
 })
 
+test('shows a reportable reference for unexpected local Advisor failures', async () => {
+  const backend = createMockChronicleBackend({
+    advisorProvider: 'chatgpt',
+    chatError: {
+      status: 500,
+      code: 'ADVISOR_INTERNAL_ERROR',
+      error: 'The Advisor hit an unexpected internal error. Please try again.',
+      reference: 'FileNotFoundError errno=2 @ advisor_providers.py:870 generate',
+    },
+  })
+  const backendPort = await backend.start()
+  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-internal-error-e2e-'))
+  const app = await launchApp(backendPort, userDataDir)
+
+  try {
+    const page = await app.firstWindow()
+    await page.waitForLoadState('domcontentloaded')
+
+    const chatInput = page.getByPlaceholder('HOW CAN WE HELP?')
+    await expect(chatInput).toBeEnabled()
+    await chatInput.fill('Continue the story with our new empire.')
+    await page.getByRole('button', { name: 'SEND' }).click()
+
+    await expect(page.getByText(/unexpected internal error/i)).toBeVisible()
+    await expect(page.getByText('Reference: FileNotFoundError errno=2 @ advisor_providers.py:870 generate')).toBeVisible()
+    await expect(page.getByText(/No such file or directory/i)).toHaveCount(0)
+    // #86 was diagnosable only because the raw error was reportable; keep that path.
+    await expect(page.getByRole('button', { name: 'REPORT', exact: true })).toBeVisible()
+  } finally {
+    await app.close()
+    await backend.stop()
+    await fs.rm(userDataDir, { recursive: true, force: true })
+  }
+})
+
 test('turns provider failures into actionable Chat recovery', async () => {
   const backend = createMockChronicleBackend({
     advisorProvider: 'ollama',
