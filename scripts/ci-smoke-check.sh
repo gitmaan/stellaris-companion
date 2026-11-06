@@ -41,6 +41,21 @@ else
   BACKEND_EXE="dist-python/stellaris-backend/stellaris-backend"
 fi
 
+# Identity names: a missing catalog silently degrades to raw IDs, so check the
+# file sits where campaign_evidence.py looks for it and resolves a known civic.
+CATALOG=""
+for candidate in dist-python/stellaris-backend/_internal/stellaris_companion/identity_catalog.json \
+                 dist-python/stellaris-backend/stellaris_companion/identity_catalog.json; do
+  if [[ -f "${candidate}" ]]; then CATALOG="${candidate}"; break; fi
+done
+[[ -n "${CATALOG}" ]] || die "missing bundled identity catalog (stellaris_companion/identity_catalog.json)"
+"${PYTHON_BIN}" - "${CATALOG}" <<'PY' || die "bundled identity catalog does not resolve machine_servitor"
+import json, sys
+civics = json.load(open(sys.argv[1], encoding="utf-8"))["civic"]
+assert civics.get("machine_servitor") == "Rogue Servitor", civics.get("machine_servitor")
+print(f"identity catalog ok: {sys.argv[1]} ({len(civics)} civics)")
+PY
+
 "${PYTHON_BIN}" scripts/smoke_mcp_stdio.py "${BACKEND_EXE}" || die "bundled backend did not pass MCP stdio smoke test"
 "${PYTHON_BIN}" scripts/smoke_electron_backend_boot.py "${BACKEND_EXE}" || die "bundled backend did not pass Electron boot smoke test"
 
