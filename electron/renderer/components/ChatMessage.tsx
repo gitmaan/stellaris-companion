@@ -218,6 +218,17 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(function ChatMe
           </button>
         )}
         {isError && onRetry && <button type="button" onClick={onRetry} className="mt-3 px-3 py-1.5 text-sm text-accent-cyan border border-accent-cyan/40 rounded">{t('visualQuality.retry')}</button>}
+        {/* Only referenced local failures are reportable from an error; see ChatPage. */}
+        {isError && onReport && (
+          <button
+            type="button"
+            onClick={onReport}
+            className="ml-3 mt-3 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-text-muted transition-colors hover:text-accent-cyan"
+            title={t('chat.message.reportTitle')}
+          >
+            {t('chat.message.report')}
+          </button>
+        )}
 
         {/* Response actions and optional technical details */}
         {!isUser && !isError && (

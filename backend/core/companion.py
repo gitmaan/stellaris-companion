@@ -47,6 +47,7 @@ from backend.core.advisor_providers import (
     create_advisor_generator,
 )
 from backend.core.conversation import ConversationManager
+from backend.core.error_reference import error_reference, local_failure_cause
 from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
 from backend.core.model_briefing import build_model_briefing_json, get_briefing_metadata
@@ -1229,8 +1230,22 @@ class Companion:
             self._call_local.stats = stats
             self._last_call_stats = stats
             if isinstance(e, AdvisorProviderError):
+                cause = local_failure_cause(e)
+                if cause is not None and not e.reference:
+                    e.reference = error_reference(cause)
+                    logger.warning("Advisor provider error %s caused by [%s]", e.code, e.reference)
                 raise
-            return AdvisorReply(f"Error: {str(e)}", elapsed, source, stats)
+            # Never return a raw exception as Advisor prose: it reads as an answer,
+            # hides the type and location, and can expose local paths (#86).
+            reference = error_reference(e)
+            logger.exception("Advisor request failed [%s]", reference)
+            raise AdvisorProviderError(
+                "The Advisor hit an unexpected internal error. Please try again.",
+                code="ADVISOR_INTERNAL_ERROR",
+                status_code=500,
+                diagnostics=stats["diagnostics"],
+                reference=reference,
+            ) from e
 
     def get_status_data(self) -> dict:
         """Get raw status data for embedding without LLM processing.
