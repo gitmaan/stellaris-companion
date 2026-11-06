@@ -1210,5 +1210,22 @@
     "jumpToSection": "Aller à la section…",
     "settingsSaveHelp": "Les préférences d’affichage et les changements de dossier sont enregistrés immédiatement. Les champs de texte dotés d’un bouton Appliquer ou Enregistrer sont enregistrés quand vous appuyez dessus.",
     "nextQuestion": "Rédigez votre prochaine question pendant que le conseiller répond…"
+  },
+  "story": {
+    "title": "Continuité du récit",
+    "offer": "Poursuivre un récit antérieur ?",
+    "explanation": "Un autre empire a été enregistré dans cette galaxie. Vous pouvez poursuivre son récit tout en gardant les données de jeu de chaque empire séparées.",
+    "predecessor": "Empire précédent",
+    "continue": "Poursuivre le récit",
+    "separate": "Garder séparés",
+    "connected": "Le récit de {{empire}} se poursuit.",
+    "readEarlier": "Précédemment dans ce récit",
+    "archiveNote": "Les chapitres précédents et les conversations récentes sont conservés tels qu’ils étaient au changement de perspective. Ils décrivent l’empire précédent, pas votre état actuel.",
+    "noEarlierProse": "Aucun texte antérieur avec une période vérifiée n’est disponible dans cette langue. L’archive originale reste intacte.",
+    "discussions": "Conversations précédentes récentes",
+    "disconnect": "Dissocier le récit",
+    "rewound": "Cette sauvegarde revient avant le changement de perspective. Le récit précédent reste conservé et ne sera pas automatiquement rattaché à cette chronologie.",
+    "changed": "La campagne ou le récit a changé. Vérifiez le choix actuel et réessayez.",
+    "resetRequired": "Cette chronique appartient à une continuation antérieure. Son texte est conservé. Utilisez Gérer les campagnes → Réinitialiser la chronique pour écrire dans cette chronologie."
   }
 }

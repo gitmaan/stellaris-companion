@@ -232,7 +232,7 @@ def test_upgrade_from_v085_schema_creates_backup_and_preserves_cache_bytes(tmp_p
     upgraded = GameDatabase(path)
     backup_path = tmp_path / "history.db.pre-v10.backup"
 
-    assert upgraded.get_schema_version() == 11
+    assert upgraded.get_schema_version() == 12
     assert backup_path.exists()
     assert _cache_rows(upgraded) == before
     with sqlite3.connect(backup_path) as backup:

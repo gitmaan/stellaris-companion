@@ -4,6 +4,7 @@ import Modal from '../components/Modal'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useReadingAnchor } from '../hooks/useReadingAnchor'
 import { useTranslation } from 'react-i18next'
+import StoryContinuityPanel from '../components/StoryContinuityPanel'
 import type { TFunction } from 'i18next'
 import ChronicleChapterList from '../components/ChronicleChapterList'
 import ChatGPTUsage from '../components/ChatGPTUsage'
@@ -1126,6 +1127,8 @@ function ChroniclePage({
           </div>}
           <div ref={scrollContainerRef} data-chronicle-scroll className="chronicle-reader flex-1 min-h-0 overflow-y-auto p-3 lg:p-6" style={{ overflowAnchor: 'none' }}>
           <div className="relative">
+            <StoryContinuityPanel saveId={selectedSaveId} isActive={isActive} />
+            {chronicle?.story_reset_required && <p role="status" className="mb-4 rounded border border-accent-yellow/20 p-3 text-xs text-text-secondary">{t('story.resetRequired')}</p>}
             {storyAfterLoadedSave && <p role="status" className="mb-4 rounded border border-accent-yellow/20 bg-accent-yellow/5 px-4 py-3 text-xs text-text-secondary">{t('continuity.earlierSave')}</p>}
             {chronicleConfigured === false && (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border border-accent-yellow/40 bg-accent-yellow/5 px-4 py-3">

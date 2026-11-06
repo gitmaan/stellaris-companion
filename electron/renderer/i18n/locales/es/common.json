@@ -1210,5 +1210,22 @@
     "jumpToSection": "Ir a la sección…",
     "settingsSaveHelp": "Las preferencias de visualización y los cambios de carpeta se guardan inmediatamente. Los campos de texto con un botón Aplicar o Guardar se guardan al pulsarlo.",
     "nextQuestion": "Escribe tu próxima pregunta mientras responde el asesor…"
+  },
+  "story": {
+    "title": "Continuidad de la historia",
+    "offer": "¿Continuar una historia anterior?",
+    "explanation": "Se ha registrado otro imperio en esta galaxia. Puedes continuar su historia manteniendo separados los datos de juego de cada imperio.",
+    "predecessor": "Imperio anterior",
+    "continue": "Continuar historia",
+    "separate": "Mantener separados",
+    "connected": "La historia continúa desde {{empire}}.",
+    "readEarlier": "Anteriormente en esta historia",
+    "archiveNote": "Los capítulos anteriores y las conversaciones recientes se conservan tal como estaban al cambiar de perspectiva. Describen al imperio anterior, no tu estado actual.",
+    "noEarlierProse": "No hay texto anterior con un periodo verificado en este idioma. El archivo original permanece intacto.",
+    "discussions": "Conversaciones anteriores recientes",
+    "disconnect": "Desvincular historia",
+    "rewound": "Esta partida retrocedió a antes del cambio de perspectiva. La historia anterior se conserva y no se volverá a vincular automáticamente a esta línea temporal.",
+    "changed": "La campaña o la historia ha cambiado. Revisa la opción actual e inténtalo de nuevo.",
+    "resetRequired": "Esta crónica pertenece a una continuación anterior. Su texto se conserva. Usa Gestionar campañas → Reiniciar crónica para escribir en esta línea temporal."
   }
 }

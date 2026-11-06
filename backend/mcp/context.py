@@ -25,6 +25,12 @@ from backend.core.chronicle_store import (
 from backend.core.database import GameDatabase
 from backend.core.language import language_name, normalize_language
 from backend.core.model_briefing import build_model_briefing, get_briefing_metadata
+from backend.core.story_continuity import (
+    NO_STORY,
+    StoryContinuity,
+    archive_needs_story_reset,
+    story_prompt,
+)
 from stellaris_companion.campaign_evidence import resolve_empire_identity
 from stellaris_companion.evidence_policy import EvidencePurpose, build_evidence_policy
 from stellaris_companion.game_knowledge import build_game_knowledge_prompt, load_game_knowledge
@@ -273,6 +279,9 @@ class StellarisMcpContext:
                 "events", []
             ),
             "advisor_custom_instructions": self._get_advisor_custom(session_id),
+            "story_context": story_prompt(
+                StoryContinuity(self.db).context(save_id, language=self.language)
+            ),
             "advisor_memory": (
                 sanitize_advisor_memory(
                     self.db.get_advisor_memory_summary(save_id, language=self.language)
@@ -363,7 +372,7 @@ class StellarisMcpContext:
             cached = self.db.get_cached_chronicle(str(session["id"]), language=self.language)
 
         if not cached:
-            empty_revision = _chronicle_revision(DEFAULT_CHAPTERS_DATA)
+            empty_revision = self._story_archive_revision(save_id, DEFAULT_CHAPTERS_DATA)
             return {
                 "campaign": self.get_active_campaign(),
                 "campaign_ref": _campaign_ref(save_id),
@@ -372,6 +381,9 @@ class StellarisMcpContext:
                 "chapters": [],
                 "current_era": None,
                 "chronicle": "",
+                "story_history": StoryContinuity(self.db).context(save_id, language=self.language)[
+                    "parts"
+                ],
                 "message": "No cached Chronicle is available yet. Open/generate Chronicle in the Electron app first, or use source material to write in the MCP client.",
                 "archive_guidance": self._chronicle_archive_guidance(cached=False),
                 "save_affordance": self._chronicle_save_affordance(),
@@ -392,7 +404,7 @@ class StellarisMcpContext:
         return {
             "campaign": self.get_active_campaign(),
             "campaign_ref": _campaign_ref(save_id),
-            "chronicle_revision": _chronicle_revision(chapters_data),
+            "chronicle_revision": self._story_archive_revision(save_id, chapters_data),
             "cached": True,
             "language": cached.get("language") or self.language,
             "generated_at": cached_chronicle_response(cached)["generated_at"],
@@ -402,6 +414,9 @@ class StellarisMcpContext:
             "chapters": [_chapter_payload(ch) for ch in chapters],
             "current_era": _current_era_payload(current_era),
             "chronicle": cached.get("chronicle_text") or "",
+            "story_history": StoryContinuity(self.db).context(save_id, language=self.language)[
+                "parts"
+            ],
             "chronicle_custom_instructions": cached.get("chronicle_custom_instructions"),
             "archive_guidance": self._chronicle_archive_guidance(cached=True),
             "save_affordance": self._chronicle_save_affordance(),
@@ -493,7 +508,14 @@ class StellarisMcpContext:
         return {
             "campaign": self.get_active_campaign(),
             "campaign_ref": _campaign_ref(save_id),
-            "chronicle_revision": _chronicle_revision(chapters_data or DEFAULT_CHAPTERS_DATA),
+            "chronicle_revision": self._story_archive_revision(
+                save_id, chapters_data or DEFAULT_CHAPTERS_DATA
+            ),
+            "story_context": (
+                source.get("story_context", "")
+                if event_range.get("scope") == "chapter"
+                else story_prompt(StoryContinuity(self.db).context(save_id, language=self.language))
+            ),
             "event_range": event_range,
             "events": [_event_payload(row) for row in events],
             "truncated": truncated,
@@ -530,12 +552,17 @@ class StellarisMcpContext:
         with self._chronicle_write_state(
             campaign_ref=campaign_ref,
             expected_revision=expected_revision,
+            extend_story=True,
         ) as state:
             session = state["session"]
             save_id = state["save_id"]
             chapters_data = state["chapters_data"]
             snapshot_range = state["snapshot_range"]
             before = _json_clone(chapters_data)
+            chapters_data.update(
+                story_revision=state["story"]["revision"],
+                story_linked=bool(state["story"]["parts"]),
+            )
             era_start_date = (
                 start_date
                 or chapters_data.get("current_era_start_date")
@@ -766,12 +793,17 @@ class StellarisMcpContext:
         with self._chronicle_write_state(
             campaign_ref=campaign_ref,
             expected_revision=expected_revision,
+            extend_story=True,
         ) as state:
             session = state["session"]
             save_id = state["save_id"]
             chapters_data = state["chapters_data"]
             chapters = self._ensure_chapters(chapters_data)
             before = _json_clone(chapters_data)
+            chapters_data.update(
+                story_revision=state["story"]["revision"],
+                story_linked=bool(state["story"]["parts"]),
+            )
             snapshot_range = state["snapshot_range"]
             previous_chapter = chapters[-1] if chapters else None
             next_number = (
@@ -962,7 +994,17 @@ class StellarisMcpContext:
             "cached": cached,
             "chapters_data": chapters_data,
             "snapshot_range": snapshot_range,
+            "story": StoryContinuity(self.db).context(save_id, language=self.language),
         }
+
+    def _story_archive_revision(self, save_id: str, data: dict[str, Any]) -> str:
+        revision = _chronicle_revision(data)
+        story_revision = StoryContinuity(self.db).context(save_id, language=self.language)[
+            "revision"
+        ]
+        if story_revision == NO_STORY:
+            return revision
+        return shared_chronicle_revision({"archive": revision, "story": story_revision})
 
     @contextmanager
     def _chronicle_write_state(
@@ -971,6 +1013,7 @@ class StellarisMcpContext:
         campaign_ref: str,
         expected_revision: str,
         require_cached: bool = False,
+        extend_story: bool = False,
     ):
         """Yield Chronicle state while holding an atomic compare-and-swap transaction."""
         supplied_campaign = str(campaign_ref or "").strip()
@@ -990,13 +1033,19 @@ class StellarisMcpContext:
                     "Read the Chronicle source material again before saving."
                 )
 
-            current_revision = _chronicle_revision(state["chapters_data"])
+            current_revision = self._story_archive_revision(
+                state["save_id"], state["chapters_data"]
+            )
             if supplied_revision != current_revision:
                 raise McpContextError(
                     "The Chronicle changed after this draft was prepared. Read the Chronicle "
                     f"again and reconcile the newer version (current revision: {current_revision})."
                 )
-            state["base_revision"] = current_revision
+            if extend_story and archive_needs_story_reset(state["chapters_data"], state["story"]):
+                raise McpContextError(
+                    "This Chronicle belongs to an earlier story continuation. Preserve it and ask the player to reset it in the app before extending this timeline."
+                )
+            state["base_revision"] = _chronicle_revision(state["chapters_data"])
             yield state
 
     def _persist_chronicle_state(
@@ -1034,7 +1083,7 @@ class StellarisMcpContext:
             )
         except ChronicleConflict as exc:
             raise McpContextError(str(exc)) from exc
-        return shared_chronicle_revision(load_chapters_data(saved))
+        return self._story_archive_revision(save_id, load_chapters_data(saved))
 
     def _validate_chronicle_text(self, value: str, *, field_name: str) -> None:
         if not value:
@@ -1171,7 +1220,8 @@ class StellarisMcpContext:
             LEFT JOIN playthrough_metadata pm ON pm.save_id = s.save_id
             WHERE pm.trashed_at IS NULL
             GROUP BY s.id
-            ORDER BY (s.ended_at IS NULL) DESC, COALESCE(s.last_updated_at, s.started_at) DESC
+            ORDER BY (s.ended_at IS NULL) DESC, COALESCE(s.last_updated_at, s.started_at) DESC,
+                     MAX(snap.id) DESC, s.rowid DESC
             LIMIT 1;
             """
         ).fetchone()

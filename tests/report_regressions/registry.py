@@ -38,6 +38,34 @@ class Report:
 
 
 REPORTS: dict[int, Report] = {
+    95: Report(
+        summary="Chronicle and Advisor lose the story when the player changes empire.",
+        root_cause=(
+            "Empire keys correctly include the player country, but no explicit narrative "
+            "ancestry connected different countries in the same galaxy."
+        ),
+        fixed_by=("codex/issue-95-story-continuation",),
+        layer="ingestion identity + story continuity + native Advisor/Chronicle + MCP",
+        cases=(
+            Case(
+                f"{_HERE}/test_report_story.py"
+                "::test_issue_95_country_change_continues_story_with_separate_empire_evidence",
+                "new",
+                True,
+                note="Fails when source identity registration is disabled before ingestion.",
+            ),
+            Case(
+                "tests/test_story_continuity.py"
+                "::test_rewind_detaches_ancestry_even_after_dates_catch_up",
+                "referenced",
+            ),
+            Case(
+                "tests/test_api_story_continuity.py"
+                "::test_api_choice_keeps_current_identity_and_previous_chat_separate",
+                "referenced",
+            ),
+        ),
+    ),
     11: Report(
         summary="Advisor thinks I lost battles I won (allied battles counted as mine).",
         root_cause=(

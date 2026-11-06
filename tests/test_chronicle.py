@@ -126,6 +126,7 @@ class TestSelectEventsForPrompt:
     def generator(self):
         """Create a ChronicleGenerator with mocked database."""
         mock_db = MagicMock()
+        mock_db.execute.return_value.fetchone.return_value = None  # No story continuation.
         return ChronicleGenerator(db=mock_db, api_key="fake-key")
 
     def test_empty_events_returns_empty_list(self, generator):
@@ -312,6 +313,7 @@ class TestShouldFinalizeChapter:
     def generator(self):
         """Create a ChronicleGenerator with mocked database."""
         mock_db = MagicMock()
+        mock_db.execute.return_value.fetchone.return_value = None  # No story continuation.
         # Default mock returns for snapshot range
         mock_db.get_snapshot_range_for_save.return_value = {
             "first_game_date": "2200.01.01",
@@ -542,6 +544,7 @@ class TestFinalizeChapter:
     def generator(self):
         """Create a ChronicleGenerator with mocked database."""
         mock_db = MagicMock()
+        mock_db.execute.return_value.fetchone.return_value = None  # No story continuation.
         mock_db.get_snapshot_range_for_save.return_value = {
             "first_game_date": "2200.01.01",
             "first_snapshot_id": 1,
@@ -624,6 +627,7 @@ class TestGenerateChronicleChapterOnly:
     def generator(self):
         """Create a ChronicleGenerator with mocked database."""
         mock_db = MagicMock()
+        mock_db.execute.return_value.fetchone.return_value = None  # No story continuation.
         mock_db.get_save_id_for_session.return_value = "save-1"
         mock_db.get_chronicle_custom_instructions.return_value = None
         mock_db.get_snapshot_range_for_save.return_value = {
@@ -826,6 +830,7 @@ class TestGenerateChronicleCurrentEraPolicy:
     def generator(self):
         """Create a ChronicleGenerator with mocked database."""
         mock_db = MagicMock()
+        mock_db.execute.return_value.fetchone.return_value = None  # No story continuation.
         mock_db.get_save_id_for_session.return_value = "save-1"
         mock_db.get_chronicle_custom_instructions.return_value = None
         mock_db.get_snapshot_range_for_save.return_value = {
@@ -1453,6 +1458,7 @@ class TestCurrentEraFallbackModel:
     def generator(self):
         clear_model_state()
         mock_db = MagicMock()
+        mock_db.execute.return_value.fetchone.return_value = None  # No story continuation.
         mock_db.get_events_in_snapshot_range.return_value = [
             {"event_type": "war_started", "summary": "War begun", "game_date": "2205.01.01"}
         ]

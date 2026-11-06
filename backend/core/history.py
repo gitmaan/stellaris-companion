@@ -355,6 +355,10 @@ def record_snapshot_from_briefing(
         last_game_date=metrics.get("game_date"),
     )
 
+    from backend.core.story_continuity import register_campaign_source
+
+    register_campaign_source(db, db.get_save_id_for_session(session_id), briefing)
+
     full_json = (
         briefing_json if isinstance(briefing_json, str) and briefing_json else json_dumps(briefing)
     )
@@ -443,6 +447,10 @@ def record_snapshot_from_companion(
         empire_name=metrics.get("empire_name"),
         last_game_date=metrics.get("game_date"),
     )
+
+    from backend.core.story_continuity import register_campaign_source
+
+    register_campaign_source(db, db.get_save_id_for_session(session_id), briefing_for_storage)
 
     full_json = json_dumps(briefing_for_storage)
     inserted, snapshot_id = db.insert_snapshot_if_new(
