@@ -368,23 +368,30 @@ class StoryContinuity:
     def capture_advisor_context(
         self, save_id: str, *, source_hash: str, game_date: str | None, language: str
     ) -> tuple[dict[str, Any], int | None]:
-        """Bind memory to the same immutable briefing receipt as the native Advisor."""
+        """Bind memory to the same immutable briefing receipt as the native Advisor.
+
+        The loaded briefing can be newer than the last stored snapshot, e.g. when
+        persisting a snapshot failed. That only matters when earlier-empire context
+        would be added; otherwise the reply proceeds without a snapshot binding.
+        """
         with self.db._lock:
             bounds = self.db.get_snapshot_range_for_save(save_id)
             snapshot_id = bounds.get("last_snapshot_id")
-            if snapshot_id is not None:
-                row = self.db.get_snapshot_row(snapshot_id)
-                briefing = (
-                    self.db.get_latest_session_briefing_json(session_id=row["session_id"]) or ""
+            context = self.context(save_id, snapshot_id=snapshot_id, language=language)
+            if snapshot_id is None:
+                return context, None
+            row = self.db.get_snapshot_row(snapshot_id)
+            briefing = self.db.get_latest_session_briefing_json(session_id=row["session_id"]) or ""
+            if (
+                row.get("game_date") == game_date
+                and hashlib.sha256(briefing.encode()).hexdigest() == source_hash
+            ):
+                return context, snapshot_id
+            if context["parts"]:
+                raise ChronicleConflict(
+                    "The loaded source changed while preparing story context. Try again."
                 )
-                if (
-                    row.get("game_date") != game_date
-                    or hashlib.sha256(briefing.encode()).hexdigest() != source_hash
-                ):
-                    raise ChronicleConflict(
-                        "The loaded source changed while preparing story context. Try again."
-                    )
-            return self.context(save_id, snapshot_id=snapshot_id, language=language), snapshot_id
+            return context, None
 
 
 def archive_needs_story_reset(data: dict[str, Any], context: dict[str, Any]) -> bool:

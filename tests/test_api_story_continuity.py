@@ -154,3 +154,40 @@ def test_advisor_rewind_catchup_keeps_old_turn_readable_but_out_of_live_prompt(
     finally:
         companion.close()
         db.close()
+
+
+def _unsaved_newer(saved, date):
+    """The loaded briefing moved on, but persisting its snapshot failed."""
+    briefing = saved[3]
+    return (*saved[:3], {**briefing, "meta": {**briefing["meta"], "date": date}})
+
+
+def test_plain_campaign_still_answers_when_newest_snapshot_was_not_saved(monkeypatch, tmp_path):
+    app, db, companion, _ = make_app(monkeypatch, tmp_path)
+    try:
+        saved = capture(db, 0, "2300.01.01")
+        activate_story(companion, tmp_path, _unsaved_newer(saved, "2300.02.01"))
+        with TestClient(app) as client:
+            reply = ask(client, saved[0], new_conversation(client, saved[0]))
+            assert reply.status_code == 200, reply.text
+            assert reply.json()["snapshot_id"] is None
+    finally:
+        companion.close()
+        db.close()
+
+
+def test_continued_story_rejects_a_briefing_newer_than_its_snapshot(monkeypatch, tmp_path):
+    app, db, companion, _ = make_app(monkeypatch, tmp_path)
+    try:
+        old = capture(db, 0, "2300.01.01")
+        cache(db, old)
+        child = capture(db, 7, "2301.01.01")
+        continue_from(db, child, old)
+        activate_story(companion, tmp_path, _unsaved_newer(child, "2301.02.01"))
+        with TestClient(app) as client:
+            reply = ask(client, child[0], new_conversation(client, child[0]))
+            assert reply.status_code == 409, reply.text
+            assert reply.json()["detail"]["code"] == "STORY_CHANGED"
+    finally:
+        companion.close()
+        db.close()
