@@ -86,7 +86,8 @@ comment written for them, in their language.
    reopen. Release PRs may use `Fixes #N` for issues that ship in that release.
 
 Before closing a user-reported misreading (the Advisor or Chronicle got campaign
-facts wrong), add a synthetic case to `tests/report_regressions/`. Fixes that
+facts wrong), add a synthetic case to
+[`tests/report_regressions/`](tests/report_regressions/README.md). Fixes that
 were never guarded have come back (#11 returned as #44).
 
 Close duplicates with a link to the issue that tracks the problem. If a report
