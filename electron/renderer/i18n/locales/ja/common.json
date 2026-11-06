@@ -86,7 +86,9 @@
       "providerContextLimit": "アクティブなコンテキスト ウィンドウは、このキャンペーン ブリーフィングに適合しません。プロバイダーのコンテキスト設定を少なくとも 32K に増やすか、より大きなコンテキスト モデルを選択してください。",
       "providerInvalidResponse": "{{provider}} からの応答が不完全、または読み取れませんでした。もう一度お試しください。",
       "providerEmptyResponse": "{{provider}} は空の応答を返しました。もう一度試すか、別のモデルを選択してください。",
-      "providerRequestFailed": "{{provider}} から回答を取得できませんでした。AI 設定で接続を確認し、再試行してください。"
+      "providerRequestFailed": "{{provider}} から回答を取得できませんでした。AI 設定で接続を確認し、再試行してください。",
+      "advisorInternal": "アドバイザーで予期しない内部エラーが発生しました。もう一度お試しください。繰り返し発生する場合は、追跡できるようこのメッセージを報告してください。",
+      "reference": "参照: {{reference}}"
     },
     "newChat": "新しいチャット",
     "welcome": {

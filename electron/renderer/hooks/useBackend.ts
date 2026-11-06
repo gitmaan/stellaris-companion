@@ -8,6 +8,12 @@ import type { ChronicleRefreshMode, ModelRoutingMode } from './useSettings'
 // API Response Types (match backend/api/server.py)
 // ============================================
 
+function getErrorReference(details: unknown): string | null {
+  if (!details || typeof details !== 'object') return null
+  const reference = (details as { reference?: unknown }).reference
+  return typeof reference === 'string' && reference.trim() ? reference.slice(0, 160) : null
+}
+
 export type BackendIpcResponse<T> =
   | { ok: true; data: T }
   | {
@@ -442,6 +448,8 @@ export interface UseBackendResult<T> {
   loading: boolean
   error: string | null
   errorCode?: string | null
+  /** Privacy-safe fingerprint of a local backend failure, safe to show and report. */
+  errorReference?: string | null
   retryAfterMs?: number | null
   httpStatus?: number | null
 }
@@ -509,6 +517,7 @@ export function useBackend() {
           loading: false,
           error: response.error,
           errorCode: response.code ?? null,
+          errorReference: getErrorReference(response.details),
           retryAfterMs: response.retry_after_ms ?? null,
           httpStatus: response.http_status ?? null,
         }

@@ -330,11 +330,14 @@ class AdvisorProviderError(RuntimeError):
         code: str,
         status_code: int = 502,
         diagnostics: list[dict[str, Any]] | None = None,
+        reference: str | None = None,
     ):
         super().__init__(message)
         self.code = code
         self.status_code = status_code
         self.diagnostics = diagnostics or []
+        # Privacy-safe fingerprint of a local cause (see backend.core.error_reference).
+        self.reference = reference
 
 
 class AdvisorGenerator(Protocol):

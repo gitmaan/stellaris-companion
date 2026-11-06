@@ -82,6 +82,7 @@ interface Message {
   retryQuestion?: string
   retryRequest?: { text: string; requestId: string }
   isError?: boolean
+  errorReference?: string
   action?: 'settings' | 'usage'
 }
 
@@ -147,6 +148,7 @@ function getProviderErrorMessage({
     content: String(t(`chatgpt.errors.${code}`, { defaultValue: t('chatgpt.errors.CHATGPT_UNAVAILABLE') })),
     action: code === 'CHATGPT_LIMIT' ? 'usage' : ['CHATGPT_RECONNECT', 'CHATGPT_PERMISSION', 'CHATGPT_MODEL', 'CHATGPT_INELIGIBLE'].includes(code) ? 'settings' : undefined,
   }
+  if (code === 'ADVISOR_INTERNAL_ERROR') return { content: String(t('chat.errors.advisorInternal')) }
   const providerName = getAdvisorProviderName(provider)
   const providerErrorKeys: Record<string, string> = {
     ADVISOR_PROVIDER_NOT_CONFIGURED: 'providerNotConfigured',
@@ -414,12 +416,16 @@ function ChatPage({
         if (result.errorCode === 'ADVISOR_PROVIDER_NOT_CONFIGURED') {
           setAdvisorConfigured(false)
         }
+        const errorReference = result.errorReference || undefined
         const errorMessage: Message = {
           id: `error-${Date.now()}`,
           role: 'assistant',
-          content: providerError.content,
+          content: errorReference
+            ? `${providerError.content}\n\n${t('chat.errors.reference', { reference: errorReference })}`
+            : providerError.content,
           timestamp: new Date(),
           isError: true,
+          errorReference,
           retryRequest: { text, requestId },
           action: providerError.action,
         }
@@ -515,7 +521,8 @@ function ChatPage({
         }
         : undefined
       const onAction = message.action === 'settings' ? onOpenSettings : message.action === 'usage' ? () => void manageChatGPTUsage() : undefined
-      const onReport = onReportLlmIssue && message.role === 'assistant' && !message.isError
+      // Local failures with a reference stay reportable: the reference is the diagnosis.
+      const onReport = onReportLlmIssue && message.role === 'assistant' && (!message.isError || Boolean(message.errorReference))
         ? () => {
           const lastPrompt = [...messages.slice(0, idx)].reverse().find(m => m.role === 'user')?.content
           onReportLlmIssue({
