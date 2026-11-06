@@ -86,7 +86,9 @@
       "providerContextLimit": "战役上下文窗口无法容纳此战役简报。将提供程序的上下文设置增加到至少 32K，或选择更大的上下文模型。",
       "providerInvalidResponse": "{{provider}} 返回了不完整或无法读取的回复。请重试。",
       "providerEmptyResponse": "{{provider}} 返回空响应。再试一次或选择其他型号。",
-      "providerRequestFailed": "{{provider}} 无法回复。请在 AI 设置中检查连接后重试。"
+      "providerRequestFailed": "{{provider}} 无法回复。请在 AI 设置中检查连接后重试。",
+      "advisorInternal": "顾问遇到意外的内部错误。请重试。如果问题持续出现，请报告此消息，以便我们追踪原因。",
+      "reference": "参考：{{reference}}"
     },
     "newChat": "新聊天",
     "welcome": {

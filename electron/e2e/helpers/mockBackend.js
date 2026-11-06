@@ -423,6 +423,7 @@ function createMockChronicleBackend(options = {}) {
           detail: {
             error: options.chatError.error ?? 'Provider request failed',
             code: options.chatError.code ?? 'PROVIDER_REQUEST_FAILED',
+            ...(options.chatError.reference ? { reference: options.chatError.reference } : {}),
           },
         })
         return

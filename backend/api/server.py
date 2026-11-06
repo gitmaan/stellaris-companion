@@ -922,9 +922,10 @@ def create_app() -> FastAPI:
                     )
                     call_stats = companion.get_call_stats()
             except AdvisorProviderError as exc:
-                raise HTTPException(
-                    status_code=exc.status_code, detail={"error": str(exc), "code": exc.code}
-                ) from exc
+                detail = {"error": str(exc), "code": exc.code}
+                if getattr(exc, "reference", None):
+                    detail["reference"] = exc.reference
+                raise HTTPException(status_code=exc.status_code, detail=detail) from exc
 
             result = {
                 "text": response_text,

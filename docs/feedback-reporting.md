@@ -46,3 +46,14 @@ Recommended label flow:
 1. Report arrives as a GitHub issue labeled `user-report` plus category/platform/version labels.
 2. Maintainer reviews and adds label `jules` when ready for automatic fixing.
 3. Jules creates a PR for review and merge.
+
+## Error references
+
+Unexpected Advisor failures are typed (`ADVISOR_INTERNAL_ERROR`) instead of being
+returned as answer text. The chat shows a localized message plus a reference such
+as `FileNotFoundError errno=2 @ advisor_providers.py:870 generate`, and the message
+stays reportable. Provider errors caused by a local `OSError` (for example a missing
+certificate file) carry the same kind of reference. A reference holds only the
+exception type, errno and innermost application frame, never the exception message
+or a path, so it is safe in a report without the backend-log opt-in. The full
+traceback is written to the local backend log. See `backend/core/error_reference.py`.
