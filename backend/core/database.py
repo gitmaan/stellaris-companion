@@ -25,6 +25,7 @@ from backend.core.chronicle_store import (
     ChronicleConflict,
     assemble_chronicle,
     chronicle_revision,
+    game_date_key,
     load_chapters_data,
 )
 from backend.core.events import compute_events
@@ -43,6 +44,37 @@ DEFAULT_KEEP_FULL_BRIEFINGS_RECENT = 0
 @dataclass(frozen=True)
 class DatabaseConfig:
     path: Path
+
+
+def _live_timeline(rows: Iterable[Any]) -> list[tuple[int, tuple[int, int, int]]]:
+    """Return dated captures still on the played timeline, in capture order.
+
+    Loading an older save starts a new branch: every capture dated after it is
+    superseded. Dates along the returned path never decrease.
+    """
+    path: list[tuple[int, tuple[int, int, int]]] = []
+    for row in rows:
+        key = game_date_key(row["game_date"])
+        if key is None:
+            continue
+        while path and path[-1][1] > key:
+            path.pop()
+        path.append((int(row["id"]), key))
+    return path
+
+
+def _event_snapshot_ids(event: dict[str, Any]) -> set[int]:
+    try:
+        data = json.loads(event.get("data_json") or "{}")
+    except (TypeError, ValueError):
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    ids = set()
+    for key in ("from_snapshot_id", "to_snapshot_id"):
+        with contextlib.suppress(KeyError, TypeError, ValueError):
+            ids.add(int(data[key]))
+    return ids
 
 
 def resolve_db_path(db_path: str | Path | None = None) -> Path:
@@ -1046,6 +1078,37 @@ class GameDatabase:
             ).fetchone()
             return dict(row) if row else None
 
+    def get_snapshot_timeline(
+        self,
+        *,
+        save_id: str | None = None,
+        session_id: str | None = None,
+        upper_snapshot_id: int | None = None,
+    ) -> tuple[list[tuple[int, tuple[int, int, int]]], set[int]]:
+        """Return the live timeline as of a capture, and the dated captures it superseded."""
+        if session_id is not None:
+            scope, params = "sn.session_id = ?", [session_id]
+        else:
+            scope, params = "s.save_id = ?", [save_id]
+        with self._lock:
+            rows = self._conn.execute(
+                f"""
+                SELECT sn.id, sn.game_date
+                FROM snapshots sn JOIN sessions s ON s.id = sn.session_id
+                WHERE {scope} AND (? IS NULL OR sn.id <= ?)
+                ORDER BY sn.id ASC;
+                """,
+                (*params, upper_snapshot_id, upper_snapshot_id),
+            ).fetchall()
+        path = _live_timeline(rows)
+        live = {snapshot_id for snapshot_id, _ in path}
+        superseded = {
+            int(row["id"])
+            for row in rows
+            if int(row["id"]) not in live and game_date_key(row["game_date"]) is not None
+        }
+        return path, superseded
+
     def get_previous_snapshot_id(self, *, session_id: str, before_snapshot_id: int) -> int | None:
         with self._lock:
             row = self._conn.execute(
@@ -1101,11 +1164,20 @@ class GameDatabase:
     ) -> int:
         """Compute and store events for a newly inserted snapshot.
 
-        Uses the previous snapshot in the same session as the baseline.
+        The baseline is the previous snapshot on this capture's timeline in the
+        same session. After loading an older save, that is the latest capture at
+        or before its date, never the abandoned future captured just before it.
         """
-        prev_id = self.get_previous_snapshot_id(
-            session_id=session_id, before_snapshot_id=int(snapshot_id)
+        path, _ = self.get_snapshot_timeline(
+            session_id=session_id, upper_snapshot_id=int(snapshot_id)
         )
+        if path and path[-1][0] == int(snapshot_id):
+            prev_id = path[-2][0] if len(path) > 1 else None
+        else:
+            # Undated captures have no timeline position; keep capture order.
+            prev_id = self.get_previous_snapshot_id(
+                session_id=session_id, before_snapshot_id=int(snapshot_id)
+            )
         if prev_id is None:
             return 0
 
@@ -2152,7 +2224,28 @@ class GameDatabase:
         (recorded by event computation). For backwards compatibility with older
         rows missing snapshot linkage, fall back to `captured_at` bounds derived
         from the snapshot rows.
+
+        Events attached to a timeline the player abandoned by loading an older
+        save (as seen at `to_snapshot_id`) are excluded, including legacy events
+        that were diffed against it.
         """
+        _, superseded = self.get_snapshot_timeline(
+            save_id=save_id, upper_snapshot_id=to_snapshot_id
+        )
+        events = self._get_events_in_snapshot_id_range(
+            save_id=save_id, from_snapshot_id=from_snapshot_id, to_snapshot_id=to_snapshot_id
+        )
+        if not superseded:
+            return events
+        return [event for event in events if not _event_snapshot_ids(event) & superseded]
+
+    def _get_events_in_snapshot_id_range(
+        self,
+        *,
+        save_id: str,
+        from_snapshot_id: int | None,
+        to_snapshot_id: int | None,
+    ) -> list[dict[str, Any]]:
         with self._lock:
             if from_snapshot_id is None and to_snapshot_id is None:
                 return self.get_all_events_by_save_id(save_id=save_id)
@@ -2234,21 +2327,18 @@ class GameDatabase:
         game_date: str,
         upper_snapshot_id: int | None = None,
     ) -> dict[str, Any] | None:
-        """Get the latest snapshot for save_id with game_date <= target."""
+        """Get the latest snapshot on the live timeline with game_date <= target."""
+        target = game_date_key(game_date)
+        if target is None:
+            return None
+        path, _ = self.get_snapshot_timeline(save_id=save_id, upper_snapshot_id=upper_snapshot_id)
+        eligible = [snapshot_id for snapshot_id, key in path if key <= target]
+        if not eligible:
+            return None
         with self._lock:
             row = self._conn.execute(
-                """
-                SELECT snap.id, snap.game_date, snap.captured_at
-                FROM snapshots snap
-                JOIN sessions s ON snap.session_id = s.id
-                WHERE s.save_id = ?
-                  AND snap.game_date IS NOT NULL
-                  AND snap.game_date <= ?
-                  AND (? IS NULL OR snap.id <= ?)
-                ORDER BY snap.game_date DESC, snap.captured_at DESC, snap.id DESC
-                LIMIT 1;
-                """,
-                (save_id, game_date, upper_snapshot_id, upper_snapshot_id),
+                "SELECT id, game_date, captured_at FROM snapshots WHERE id = ?",
+                (eligible[-1],),
             ).fetchone()
             return dict(row) if row else None
 

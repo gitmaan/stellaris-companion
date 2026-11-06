@@ -27,6 +27,7 @@ from backend.core.chronicle_store import (
     load_chapters_data,
 )
 from backend.core.database import GameDatabase
+from backend.core.history import record_snapshot_from_briefing
 from backend.mcp.context import McpContextError, StellarisMcpContext
 
 SAVE = "continuity-save"
@@ -720,6 +721,139 @@ def test_future_events_do_not_satisfy_first_chapter_threshold(campaign, monkeypa
     assert result["current_era"] is not None
     assert len(prompts) == 1
     assert "Earlier branch fact" in prompts[0] and "Future branch fact" not in prompts[0]
+
+
+def ingest(db, date, *, techs, colonies, wars=()):
+    """Record a capture through the real ingestion path, including event diffing."""
+    value = briefing(date)
+    value["meta"].update(campaign_id="timeline-campaign", player_id=0)
+    value["technology"] = {"tech_count": techs}
+    value["territory"] = {"colonies": {"total_count": colonies}}
+    value["history"] = {"wars": {"count": len(wars), "wars": list(wars)}}
+    inserted, snapshot_id, session = record_snapshot_from_briefing(
+        db=db, save_path=None, save_hash=f"timeline-{date}", briefing=value
+    )
+    assert inserted
+    return session, snapshot_id
+
+
+def events_at(db, session, snapshot_id):
+    return [
+        (row["event_type"], json.loads(row["data_json"]).get("from_snapshot_id"))
+        for row in db.get_recent_events(session_id=session, limit=100)
+        if json.loads(row["data_json"]).get("to_snapshot_id") == snapshot_id
+    ]
+
+
+def recording_generator(db, prompts):
+    generator = ChronicleGenerator(db)
+
+    def generate(**kwargs):
+        prompts.append(kwargs["contents"])
+        return fake_structured(**kwargs)
+
+    generator._generate_structured_content = generate
+    return generator
+
+
+def test_loaded_older_save_is_diffed_against_its_own_past(tmp_path):
+    with closing(GameDatabase(tmp_path / "rewind-diff.db")) as db:
+        session, past = ingest(db, "2303.04.01", techs=10, colonies=3)
+        _, future = ingest(db, "2308.04.01", techs=20, colonies=5, wars=["Great War"])
+        assert {kind for kind, _ in events_at(db, session, future)} == {
+            "tech_completed",
+            "colony_count_change",
+            "war_started",
+        }
+        _, rewound = ingest(db, "2304.04.01", techs=12, colonies=3)
+        # Loading 2304 must not read as losing the 2308 colonies, war and research.
+        assert events_at(db, session, rewound) == [("tech_completed", past)]
+
+        prompts = []
+        result = recording_generator(db, prompts).generate_chronicle(session, force_refresh=True)
+        assert result["current_era"] is not None and len(prompts) == 1
+        assert "War ended" not in prompts[0] and "5 → 3" not in prompts[0]
+        assert "10 → 12" in prompts[0]
+
+
+def test_save_loaded_before_first_capture_records_no_regression_events(tmp_path):
+    with closing(GameDatabase(tmp_path / "rewind-first.db")) as db:
+        session, _ = ingest(db, "2308.04.01", techs=20, colonies=5, wars=["Great War"])
+        _, rewound = ingest(db, "2303.04.01", techs=10, colonies=3)
+        _, latest = ingest(db, "2304.04.01", techs=12, colonies=4)
+        assert events_at(db, session, rewound) == []
+        assert {kind for kind, _ in events_at(db, session, latest)} == {
+            "tech_completed",
+            "colony_count_change",
+        }
+        assert all(source == rewound for _, source in events_at(db, session, latest))
+
+
+def test_abandoned_timeline_does_not_leak_into_current_era(tmp_path):
+    with closing(GameDatabase(tmp_path / "branches.db")) as db:
+        session = db.get_or_create_active_session(save_id=SAVE, empire_name="Dated Union")
+        snapshot(db, session, "2303.01.01")
+        abandoned = snapshot(db, session, "2310.01.01", neighbor="Abandoned empire")
+        event(db, session, abandoned, "2310.01.01", "Abandoned branch fact")
+        reloaded = snapshot(db, session, "2305.01.01")
+        event(db, session, reloaded, "2305.01.01", "Reloaded branch fact")
+        # Databases written before this fix diffed the reload against the abandoned future.
+        db.insert_events(
+            session_id=session,
+            captured_at=float(reloaded),
+            game_date="2305.01.01",
+            events=[
+                {
+                    "event_type": "war_ended",
+                    "summary": "Legacy rewind regression",
+                    "data": {"from_snapshot_id": abandoned, "to_snapshot_id": reloaded},
+                }
+            ],
+        )
+        latest = snapshot(db, session, "2312.01.01", neighbor="Live empire")
+        event(db, session, latest, "2312.01.01", "Continued branch fact")
+
+        prompts = []
+        result = recording_generator(db, prompts).generate_chronicle(session, force_refresh=True)
+        assert result["chapters"] == [] and result["current_era"] is not None
+        assert len(prompts) == 1
+        assert "Reloaded branch fact" in prompts[0] and "Continued branch fact" in prompts[0]
+        assert "Abandoned branch fact" not in prompts[0]
+        assert "Legacy rewind regression" not in prompts[0]
+        assert "Abandoned empire" not in prompts[0]
+
+        live = db.get_events_in_snapshot_range(save_id=SAVE, to_snapshot_id=latest)
+        assert [row["summary"] for row in live] == [
+            "Reloaded branch fact",
+            "Continued branch fact",
+        ]
+        # History written while the abandoned branch was live stays citeable.
+        then = db.get_events_in_snapshot_range(save_id=SAVE, to_snapshot_id=abandoned)
+        assert [row["summary"] for row in then] == ["Abandoned branch fact"]
+
+
+def test_chapter_boundary_is_never_taken_from_an_abandoned_timeline(tmp_path):
+    with closing(GameDatabase(tmp_path / "branch-chapter.db")) as db:
+        session = db.get_or_create_active_session(save_id=SAVE, empire_name="Dated Union")
+        first = snapshot(db, session, "2300.01.01")
+        abandoned = snapshot(db, session, "2304.01.01", neighbor="Abandoned empire")
+        for index in range(10):
+            event(db, session, abandoned, "2304.01.01", f"Abandoned branch fact {index}")
+        reloaded = snapshot(db, session, "2301.01.01")
+        event(db, session, reloaded, "2301.01.01", "Reloaded branch fact")
+        latest = snapshot(db, session, "2310.01.01", neighbor="Live empire")
+        for index in range(10):
+            event(db, session, latest, "2310.01.01", f"Live branch fact {index}")
+
+        prompts = []
+        result = recording_generator(db, prompts).generate_chronicle(session, force_refresh=True)
+        chapter = result["chapters"][0]
+        assert chapter["start_snapshot_id"] == first
+        assert chapter["end_snapshot_id"] in {reloaded, latest}
+        assert chapter["end_snapshot_id"] != abandoned
+        assert prompts and all("Abandoned branch fact" not in prompt for prompt in prompts)
+        assert all("Abandoned empire" not in prompt for prompt in prompts)
+        assert any("Reloaded branch fact" in prompt for prompt in prompts)
 
 
 def test_mcp_archive_undo_cannot_erase_a_later_native_chapter_edit(campaign):

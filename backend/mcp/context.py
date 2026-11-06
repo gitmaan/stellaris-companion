@@ -463,7 +463,7 @@ class StellarisMcpContext:
             )
             event_range = {"scope": "latest_session"}
         elif normalized_scope == "full_summary":
-            events = self.db.get_all_events_by_save_id(save_id=save_id)
+            events = self.db.get_events_in_snapshot_range(save_id=save_id)
             event_range = {"scope": "full_summary"}
         else:
             start_snapshot_id = self._current_era_start_snapshot_id(chapters_data)
