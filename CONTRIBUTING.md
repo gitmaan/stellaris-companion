@@ -45,10 +45,6 @@ pytest tests/
 pytest tests/test_signals.py -v
 ```
 
-When you fix a user-reported misreading, add its synthetic regression case to
-[`tests/report_regressions/`](tests/report_regressions/README.md) before closing
-the issue.
-
 ## Code Style
 
 - Format Python code with `ruff format`
