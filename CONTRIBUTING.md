@@ -68,3 +68,27 @@ Use conventional commit format:
 3. Ensure tests pass and Rust parser builds
 4. Confirm the change aligns with current priorities (DLC/platform/stability)
 5. Submit a PR with a clear description
+
+## Issue Lifecycle
+
+Reporters only see what happens on their issue, so each state change gets a
+comment written for them, in their language.
+
+1. **Investigating.** Use `Related to #N` in PRs that help but don't fully fix
+   the report. If the reporter could attach a save or diagnostics, ask for it.
+2. **Fixed on `main`.** Comment with what changed and that it ships in the next
+   release. Use `Related to #N` in the PR, not `Fixes #N`: GitHub closes the
+   issue at merge, before any user can get the fix.
+3. **Shipped in a beta.** Add the `fixed-in-beta` label and comment with the
+   release link and how to opt in (Config → More Settings → Update Track → Beta).
+   Ask the reporter to confirm.
+4. **Shipped in stable.** Close with the stable release link and an invitation to
+   reopen. Release PRs may use `Fixes #N` for issues that ship in that release.
+
+Before closing a user-reported misreading (the Advisor or Chronicle got campaign
+facts wrong), add a synthetic case to
+[`tests/report_regressions/`](tests/report_regressions/README.md). Fixes that
+were never guarded have come back (#11 returned as #44).
+
+Close duplicates with a link to the issue that tracks the problem. If a report
+contains a separate request, open an issue for it and link it.

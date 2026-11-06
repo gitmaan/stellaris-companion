@@ -2,7 +2,9 @@
 [What does this PR do?]
 
 ## Related issue
-Fixes #[issue number] (if applicable)
+Related to #[issue number] (if applicable). Use `Fixes #N` only in a release PR that ships the fix; see the issue lifecycle in CONTRIBUTING.md.
+
+- [ ] User-reported misreading: a synthetic case was added to `tests/report_regressions/`
 
 ## Priority alignment
 - [ ] This PR aligns with current priorities: DLC coverage/correctness, Windows/Linux reliability, or stability of existing features
