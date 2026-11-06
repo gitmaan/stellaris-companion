@@ -86,7 +86,9 @@
       "providerContextLimit": "A janela de contexto ativa não cabe neste briefing de campanha. Aumente a configuração de contexto do provedor para pelo menos 32K ou escolha um modelo de contexto maior.",
       "providerInvalidResponse": "{{provider}} retornou uma resposta incompleta ou ilegível. Tente novamente.",
       "providerEmptyResponse": "{{provider}} retornou uma resposta vazia. Tente novamente ou escolha outro modelo.",
-      "providerRequestFailed": "{{provider}} não conseguiu responder. Verifique a conexão em Configuração de IA e tente novamente."
+      "providerRequestFailed": "{{provider}} não conseguiu responder. Verifique a conexão em Configuração de IA e tente novamente.",
+      "advisorInternal": "O Conselheiro encontrou um erro interno inesperado. Tente novamente. Se continuar acontecendo, relate esta mensagem para que possamos rastreá-la.",
+      "reference": "Referência: {{reference}}"
     },
     "newChat": "Novo chat",
     "welcome": {

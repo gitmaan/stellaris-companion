@@ -28,8 +28,16 @@ Utopia, Synthetic Dawn, and Humanoids became base-game content in **4.3.6**. The
 applies that boundary to the reported campaign version; it does not apply it to older
 or unknown versions. The source is the
 [official Stellaris 4.3.6 announcement](https://store.steampowered.com/news/posts/?appids=281990&enddate=1778509430&feed=steam_community_announcements).
-Names in the small identity catalog were checked against shipped English game
-localization. A Rogue Servitor is a civic under Machine Intelligence authority.
+`stellaris_companion/identity_catalog.json` maps every authority, civic, origin, and
+ethic ID defined in the shipped game files to its English display name. It is generated
+by `scripts/generate_identity_catalog.py --game-dir <Stellaris install>` and records the
+source game version (currently Pegasus 4.4.6). It includes non-playable entries (fallen
+empire, enclave, nomadic, pre-FTL) and `swap_type` display variants such as Terravore,
+because names say what an ID is called, not whether a player may pick it. IDs without
+an English name in that version, modded IDs, and IDs added after it (such as Cygnus
+4.5.x content, until the catalog is regenerated from a 4.5 install) keep the raw
+identifier with `source: "raw_identifier"`. A Rogue Servitor (`civic_machine_servitor`)
+is a civic under Machine Intelligence authority.
 
 Legacy empty DLC arrays are ambiguous because older extraction used an empty array
 for both absence and an explicitly empty block. They remain unknown unless the source

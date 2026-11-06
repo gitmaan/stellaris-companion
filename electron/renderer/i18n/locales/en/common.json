@@ -221,7 +221,9 @@
       "providerContextLimit": "The active context window cannot fit this campaign briefing. Increase the provider's context setting to at least 32K, or choose a larger-context model.",
       "providerInvalidResponse": "{{provider}} returned an incomplete or unreadable response. Please try again.",
       "providerEmptyResponse": "{{provider}} returned an empty response. Try again or choose another model.",
-      "providerRequestFailed": "{{provider}} could not reply. Open AI setup and check the connection, then try again."
+      "providerRequestFailed": "{{provider}} could not reply. Open AI setup and check the connection, then try again.",
+      "advisorInternal": "The Advisor hit an unexpected internal error. Please try again. If it keeps happening, report this message so we can trace it.",
+      "reference": "Reference: {{reference}}"
     },
     "providerSetup": {
       "title": "ADVISOR CONNECTION REQUIRED",
