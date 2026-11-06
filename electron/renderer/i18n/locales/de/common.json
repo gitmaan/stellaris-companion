@@ -86,7 +86,9 @@
       "providerContextLimit": "Das aktive Kontextfenster passt nicht zu diesem Kampagnenbriefing. Erhöhen Sie die Kontexteinstellung des Anbieters auf mindestens 32K oder wählen Sie ein Modell mit größerem Kontext.",
       "providerInvalidResponse": "{{provider}} hat eine unvollständige oder unlesbare Antwort zurückgegeben. Bitte versuche es erneut.",
       "providerEmptyResponse": "{{provider}} hat eine leere Antwort zurückgegeben. Versuchen Sie es erneut oder wählen Sie ein anderes Modell.",
-      "providerRequestFailed": "{{provider}} konnte nicht antworten. In der KI-Einrichtung die Verbindung prüfen und erneut versuchen."
+      "providerRequestFailed": "{{provider}} konnte nicht antworten. In der KI-Einrichtung die Verbindung prüfen und erneut versuchen.",
+      "advisorInternal": "Beim Berater ist ein unerwarteter interner Fehler aufgetreten. Bitte erneut versuchen. Falls es wieder passiert, diese Nachricht melden, damit wir sie nachverfolgen können.",
+      "reference": "Referenz: {{reference}}"
     },
     "newChat": "Neuer Chat",
     "welcome": {

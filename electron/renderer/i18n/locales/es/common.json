@@ -86,7 +86,9 @@
       "providerContextLimit": "La ventana de contexto activo no puede ajustarse a este informe de campaña. Aumente la configuración de contexto del proveedor a al menos 32K o elija un modelo de contexto más grande.",
       "providerInvalidResponse": "{{provider}} devolvió una respuesta incompleta o ilegible. Inténtalo de nuevo.",
       "providerEmptyResponse": "{{provider}} devolvió una respuesta vacía. Inténtalo de nuevo o elige otro modelo.",
-      "providerRequestFailed": "{{provider}} no pudo responder. Comprueba la conexión en Configuración de IA e inténtalo de nuevo."
+      "providerRequestFailed": "{{provider}} no pudo responder. Comprueba la conexión en Configuración de IA e inténtalo de nuevo.",
+      "advisorInternal": "El Asesor tuvo un error interno inesperado. Inténtalo de nuevo. Si vuelve a ocurrir, informa de este mensaje para que podamos rastrearlo.",
+      "reference": "Referencia: {{reference}}"
     },
     "newChat": "Nuevo chat",
     "welcome": {
