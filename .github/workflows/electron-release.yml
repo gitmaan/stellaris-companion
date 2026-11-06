@@ -138,6 +138,10 @@ jobs:
         env:
           E2E_NO_SANDBOX: '1'
           E2E_SHOW_WINDOWS: '1'
+          # Same as Desktop CI: report submission is disabled without an endpoint.
+          # Tests block all outbound requests, so nothing reaches the service.
+          VITE_REPORT_ENDPOINT: ${{ vars.VITE_REPORT_ENDPOINT }}
+          E2E_FEEDBACK_SUBMIT: '1'
 
   release:
     needs: [setup, release_checks]
