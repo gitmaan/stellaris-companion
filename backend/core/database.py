@@ -77,6 +77,10 @@ def _event_snapshot_ids(event: dict[str, Any]) -> set[int]:
     return ids
 
 
+def _on_live_timeline(event: dict[str, Any], superseded: set[int]) -> bool:
+    return not (superseded and _event_snapshot_ids(event) & superseded)
+
+
 def resolve_db_path(db_path: str | Path | None = None) -> Path:
     """Resolve the DB path from explicit arg or environment default."""
     if db_path is None:
@@ -1254,19 +1258,26 @@ class GameDatabase:
             return str(row["id"]) if row else None
 
     def get_recent_events(self, *, session_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Most recent events on the session's live timeline (see get_snapshot_timeline)."""
         lim = max(1, min(int(limit), 100))
+        _, superseded = self.get_snapshot_timeline(session_id=session_id)
+        events: list[dict[str, Any]] = []
         with self._lock:
             rows = self._conn.execute(
                 """
                 SELECT id, captured_at, game_date, event_type, summary, data_json
                 FROM events
                 WHERE session_id = ?
-                ORDER BY captured_at DESC, id DESC
-                LIMIT ?;
+                ORDER BY captured_at DESC, id DESC;
                 """,
-                (session_id, lim),
-            ).fetchall()
-            return [dict(r) for r in rows]
+                (session_id,),
+            )
+            for row in rows:
+                if _on_live_timeline(event := dict(row), superseded):
+                    events.append(event)
+                    if len(events) >= lim:
+                        break
+        return events
 
     def get_first_last_snapshot_rows(
         self, *, session_id: str
@@ -1834,7 +1845,8 @@ class GameDatabase:
                 """,
                 (session_id,),
             ).fetchall()
-            return [dict(r) for r in rows]
+        _, superseded = self.get_snapshot_timeline(session_id=session_id)
+        return [event for row in rows if _on_live_timeline(event := dict(row), superseded)]
 
     def get_cached_chronicle(
         self, session_id: str, *, language: str = "en"
@@ -2235,9 +2247,7 @@ class GameDatabase:
         events = self._get_events_in_snapshot_id_range(
             save_id=save_id, from_snapshot_id=from_snapshot_id, to_snapshot_id=to_snapshot_id
         )
-        if not superseded:
-            return events
-        return [event for event in events if not _event_snapshot_ids(event) & superseded]
+        return [event for event in events if _on_live_timeline(event, superseded)]
 
     def _get_events_in_snapshot_id_range(
         self,

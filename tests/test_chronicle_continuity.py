@@ -856,6 +856,70 @@ def test_chapter_boundary_is_never_taken_from_an_abandoned_timeline(tmp_path):
         assert any("Reloaded branch fact" in prompt for prompt in prompts)
 
 
+def test_advisor_and_mcp_event_readers_skip_abandoned_timeline_rows(tmp_path):
+    with closing(GameDatabase(tmp_path / "branch-readers.db")) as db:
+        session = db.get_or_create_active_session(save_id=SAVE, empire_name="Dated Union")
+        snapshot(db, session, "2303.01.01")
+        abandoned = snapshot(db, session, "2310.01.01")
+        event(db, session, abandoned, "2310.01.01", "Abandoned branch fact")
+        reloaded = snapshot(db, session, "2305.01.01")
+        event(db, session, reloaded, "2305.01.01", "Reloaded branch fact")
+        # Stored before the ingestion fix: the reload diffed against the abandoned future.
+        db.insert_events(
+            session_id=session,
+            captured_at=float(reloaded),
+            game_date="2305.01.01",
+            events=[
+                {
+                    "event_type": "war_ended",
+                    "summary": "Legacy rewind regression",
+                    "data": {"from_snapshot_id": abandoned, "to_snapshot_id": reloaded},
+                }
+            ],
+        )
+
+        def summaries(rows):
+            return {row["summary"] for row in rows}
+
+        assert summaries(db.get_recent_events(session_id=session, limit=1)) == {
+            "Reloaded branch fact"
+        }
+        assert summaries(db.get_recent_events(session_id=session)) == {"Reloaded branch fact"}
+        assert summaries(db.get_all_events(session_id=session)) == {"Reloaded branch fact"}
+        context = StellarisMcpContext(db=db)
+        assert summaries(context.get_recent_events(limit=10)["events"]) == {"Reloaded branch fact"}
+        for scope in ("latest_session", "full_summary", "current_era"):
+            source = context.get_chronicle_source_material(scope=scope)
+            assert summaries(source["events"]) == {"Reloaded branch fact"}, scope
+
+
+def test_brief_look_at_an_old_save_supersedes_the_captures_it_skipped(tmp_path):
+    """Pins a known limitation: a written save during a brief look at an old save
+    starts a new branch, so returning to the latest save is one coarse diff."""
+    with closing(GameDatabase(tmp_path / "peek.db")) as db:
+        session, start = ingest(db, "2250.01.01", techs=10, colonies=3)
+        _, middle = ingest(db, "2270.01.01", techs=20, colonies=5, wars=["Middle War"])
+        _, tip = ingest(db, "2300.01.01", techs=30, colonies=8)
+        _, peek = ingest(db, "2250.06.01", techs=10, colonies=3)
+        _, returned = ingest(db, "2300.02.01", techs=30, colonies=8)
+        _, latest = ingest(db, "2301.01.01", techs=31, colonies=8)
+
+        path, superseded = db.get_snapshot_timeline(save_id=db.get_save_id_for_session(session))
+        assert [snapshot_id for snapshot_id, _ in path] == [start, peek, returned, latest]
+        assert superseded == {middle, tip}
+        assert events_at(db, session, peek) == []
+        assert sorted(events_at(db, session, returned)) == [
+            ("colony_count_change", peek),
+            ("tech_completed", peek),
+        ]
+        recent = db.get_recent_events(session_id=session, limit=100)
+        assert {json.loads(row["data_json"])["to_snapshot_id"] for row in recent} == {
+            returned,
+            latest,
+        }
+        assert not any("Middle War" in row["summary"] for row in recent)
+
+
 def test_mcp_archive_undo_cannot_erase_a_later_native_chapter_edit(campaign):
     db, session, first, latest = campaign
     seed(db, session, first, latest)
