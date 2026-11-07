@@ -792,3 +792,41 @@ class TestComputeEvents:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def _nomad_state(stage, *, energy, minerals, nomadic=True):
+    state = {"economy": {"net_monthly": {"energy": energy, "minerals": minerals}}}
+    if nomadic:
+        state["nomad"] = {"is_nomadic": True, "operational_reserves": {"stage": stage}}
+    return state
+
+
+def test_nomad_reserve_stage_replaces_pooled_resource_swings():
+    events = compute_events(
+        prev=_nomad_state("high", energy=40.0, minerals=-10.0),
+        curr=_nomad_state("critical", energy=-80.0, minerals=150.0),
+        from_snapshot_id=1,
+        to_snapshot_id=2,
+    )
+    assert [event.event_type for event in events] == ["operational_reserves_stage_change"]
+    assert events[0].summary == "Operational Reserves: high → critical"
+
+
+def test_first_nomad_snapshot_after_an_older_state_reports_no_swing():
+    events = compute_events(
+        prev=_nomad_state(None, energy=40.0, minerals=-10.0, nomadic=False),
+        curr=_nomad_state("medium", energy=-80.0, minerals=150.0),
+        from_snapshot_id=1,
+        to_snapshot_id=2,
+    )
+    assert events == []
+
+
+def test_settled_empires_still_report_energy_and_mineral_swings():
+    events = compute_events(
+        prev=_nomad_state(None, energy=40.0, minerals=-10.0, nomadic=False),
+        curr=_nomad_state(None, energy=-80.0, minerals=150.0, nomadic=False),
+        from_snapshot_id=1,
+        to_snapshot_id=2,
+    )
+    assert {event.event_type for event in events} == {"energy_net_change", "minerals_net_change"}

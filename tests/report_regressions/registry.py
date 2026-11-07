@@ -56,6 +56,13 @@ REPORTS: dict[int, Report] = {
                 "Synthetic layout from real 4.4 save structures; no real Nomad save checked yet.",
             ),
             Case(
+                f"{_HERE}/test_report_nomads.py"
+                "::test_issue_79_history_reports_reserve_stages_not_resource_swings",
+                "new",
+                True,
+                "Campaign history: reserve stages replace pooled Energy/Mineral swings.",
+            ),
+            Case(
                 "tests/test_game_knowledge.py"
                 "::test_nomad_identity_brings_reserves_rules_to_generic_questions",
                 "referenced",

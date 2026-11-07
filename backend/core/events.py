@@ -73,6 +73,19 @@ def _sign_changed(before: float | int | None, after: float | int | None) -> bool
     return (before >= 0 > after) or (before < 0 <= after)
 
 
+def _is_nomadic(briefing: dict[str, Any]) -> bool:
+    nomad = briefing.get("nomad")
+    return isinstance(nomad, dict) and nomad.get("is_nomadic") is True
+
+
+def _reserves_stage(briefing: dict[str, Any]) -> str | None:
+    if not _is_nomadic(briefing):
+        return None
+    reserves = briefing["nomad"].get("operational_reserves")
+    stage = reserves.get("stage") if isinstance(reserves, dict) else None
+    return stage if isinstance(stage, str) and stage else None
+
+
 def _normalize_federation(briefing: dict[str, Any]) -> str | None:
     dip = briefing.get("diplomacy", {}) if isinstance(briefing, dict) else {}
     fed = dip.get("federation")
@@ -357,10 +370,35 @@ def compute_events(
             )
         )
 
+    # Nomads pool Energy and Minerals as Operational Reserves, and their monthly
+    # lines swing with lump-sum harvesting and collection. Report reserve stages
+    # instead of treating those swings as economic change.
+    nomadic = _is_nomadic(prev) or _is_nomadic(curr)
+    prev_stage, curr_stage = _reserves_stage(prev), _reserves_stage(curr)
+    if prev_stage and curr_stage and prev_stage != curr_stage:
+        events.append(
+            DetectedEvent(
+                event_type="operational_reserves_stage_change",
+                summary=f"Operational Reserves: {prev_stage} → {curr_stage}",
+                data={
+                    "metric": "operational_reserves_stage",
+                    "before": prev_stage,
+                    "after": curr_stage,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
+            )
+        )
+
     # Energy net change
     prev_energy = safe_float(prev.get("economy", {}).get("net_monthly", {}).get("energy"))
     curr_energy = safe_float(curr.get("economy", {}).get("net_monthly", {}).get("energy"))
-    if prev_energy is not None and curr_energy is not None and prev_energy != curr_energy:
+    if (
+        not nomadic
+        and prev_energy is not None
+        and curr_energy is not None
+        and prev_energy != curr_energy
+    ):
         delta = curr_energy - prev_energy
         pct = _pct_change(prev_energy, curr_energy)
         if _sign_changed(prev_energy, curr_energy) or abs(delta) >= max(
@@ -413,6 +451,8 @@ def compute_events(
         ("food", "Food net", 5.0),
         ("minerals", "Minerals net", 20.0),
     ]:
+        if nomadic and key == "minerals":
+            continue
         prev_val = safe_float(prev.get("economy", {}).get("net_monthly", {}).get(key))
         curr_val = safe_float(curr.get("economy", {}).get("net_monthly", {}).get(key))
         if prev_val is None or curr_val is None or prev_val == curr_val:
