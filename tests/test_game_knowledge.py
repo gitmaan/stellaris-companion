@@ -496,3 +496,18 @@ def test_headingless_hotfix_body_is_searchable(tmp_path):
     )
 
     assert "Ships stay engaged" in prompt
+
+
+def test_nomad_identity_brings_reserves_rules_to_generic_questions():
+    def sections(identity):
+        prompt = build_game_knowledge_prompt(
+            "4.4.6",
+            purpose="advisor",
+            topics="What should I build next?",
+            campaign_identity=identity,
+        )
+        return "## Operational Reserves & Nomad Economy" in prompt
+
+    assert sections({"is_nomadic": True})
+    assert not sections({"is_nomadic": False})
+    assert not sections({})

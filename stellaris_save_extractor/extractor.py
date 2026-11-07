@@ -18,6 +18,7 @@ from .leaders import LeadersMixin
 from .leviathans import LeviathansMixin
 from .metadata import MetadataMixin
 from .military import MilitaryMixin
+from .nomads import NomadsMixin
 from .planets import PlanetsMixin
 from .player import PlayerMixin
 from .politics import PoliticsMixin
@@ -38,6 +39,7 @@ class SaveExtractor(
     LeadersMixin,
     TechnologyMixin,
     EconomyMixin,
+    NomadsMixin,
     DiplomacyMixin,
     PoliticsMixin,
     PlanetsMixin,

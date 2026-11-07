@@ -140,6 +140,10 @@ class BriefingMixin:
         identity = self.get_empire_identity()
         identity["active_policies"] = self.get_active_policies()
         resources = self.get_resources()
+        nomad = self.get_nomad_economy()
+        if nomad.get("is_nomadic") is not None:
+            # Knowledge applicability keys Nomad rules on this flag.
+            identity["is_nomadic"] = nomad["is_nomadic"]
 
         # Pre-warm the player country content cache for methods that still use regex
         # This saves ~0.45s as many methods share this data
@@ -288,6 +292,7 @@ class BriefingMixin:
                 "relics": relics,
             },
             "strategic_geography": strategic_geography,
+            **({"nomad": nomad} if nomad.get("is_nomadic") else {}),
         }
 
     def _build_situation_from_data(

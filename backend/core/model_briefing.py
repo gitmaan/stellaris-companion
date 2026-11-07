@@ -116,7 +116,64 @@ def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
         },
         "evidence": build_evidence_policy(),
     }
+    nomad = result.get("nomad")
+    if isinstance(nomad, dict) and nomad.get("is_nomadic") is True:
+        result["model_context"]["nomad_economy"] = _nomad_economy_rules(version)
     return result
+
+
+def _nomad_economy_rules(version: str) -> dict[str, str]:
+    """Rules for reading a Nomad empire's economy, regardless of the question asked."""
+    parsed = _version_tuple(version)
+    if parsed is not None and parsed >= (4, 4, 5):
+        pool = (
+            "Energy Credits and Minerals are pooled as Operational Reserves "
+            "(nomad.operational_reserves.current); one point equals one Mineral or one "
+            "Energy Credit."
+        )
+    else:
+        pool = (
+            "Energy Credits and Minerals are pooled as Operational Reserves "
+            "(nomad.operational_reserves.current). The conversion rate changed in 4.4.5; "
+            "do not assume a ratio for this version."
+        )
+    return {
+        "applies_to": "This empire is Nomadic. These rules override settled-empire assumptions.",
+        "operational_reserves": (
+            f"{pool} Judge affordability and economic health against this pool and its "
+            "stage, not against separate Energy and Mineral balances, and do not add them "
+            "together yourself."
+        ),
+        "monthly_lines": (
+            "Negative or missing monthly Mineral and Energy lines are normal for Nomads. "
+            "Income arrives in lumps from harvesting and from collecting Waystation and "
+            "Logistic Ship stockpiles, which do not appear as monthly production. Use "
+            "operational_reserves.monthly_change and stage; never diagnose failing mining "
+            "or an unhealthy economy from the empire balance alone."
+        ),
+        "stages": (
+            "Reserve stages are critical, low, medium and high. Critical brings severe "
+            "research and production penalties. The approach (conserve, balance, burn, "
+            "festival) sets how fast reserves are spent."
+        ),
+        "collection_chain": (
+            "Waystations collect resources into their own stockpile until a Logistic Ship "
+            "or Arkship collects them; Logistic Ships carry cargo back to the Arkships. Use "
+            "nomad.waystations and nomad.logistic_ships for this chain."
+        ),
+        "missing_data": (
+            "If reserves, stockpiles or cargo are absent from the data, say the save "
+            "information is not available rather than inferring the economy is unhealthy."
+        ),
+        "market": "Minerals and Energy can be bought on the market but not sold.",
+    }
+
+
+def _version_tuple(version: str) -> tuple[int, int, int] | None:
+    match = re.search(r"(\d+)\.(\d+)(?:\.(\d+))?", version or "")
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2)), int(match.group(3) or 0)
 
 
 def _add_model_facing_war_stats(briefing: dict[str, Any]) -> None:

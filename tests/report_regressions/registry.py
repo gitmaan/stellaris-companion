@@ -38,6 +38,31 @@ class Report:
 
 
 REPORTS: dict[int, Report] = {
+    79: Report(
+        summary="Advisor treats a Nomad economy as a failing settled mining economy.",
+        root_cause=(
+            "Nothing marked the empire as Nomadic, so the maintained Nomad rules never applied, "
+            "and the briefing had no Operational Reserves, Waystation stockpile or Logistic Ship "
+            "data. Negative Mineral lines without a production entry read as failing mining."
+        ),
+        fixed_by=("PR #98",),
+        layer="nomads extractor + briefing identity + model_context rules + knowledge retrieval",
+        cases=(
+            Case(
+                f"{_HERE}/test_report_nomads.py"
+                "::test_issue_79_nomad_economy_is_read_as_operational_reserves",
+                "new",
+                True,
+                "Synthetic layout from real 4.4 save structures; no real Nomad save checked yet.",
+            ),
+            Case(
+                "tests/test_game_knowledge.py"
+                "::test_nomad_identity_brings_reserves_rules_to_generic_questions",
+                "referenced",
+                True,
+            ),
+        ),
+    ),
     95: Report(
         summary="Chronicle and Advisor lose the story when the player changes empire.",
         root_cause=(
