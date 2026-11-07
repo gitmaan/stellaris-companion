@@ -308,22 +308,7 @@ jobs:
           PUBLISH_MODE: ${{ needs.setup.outputs.publish == 'true' && 'always' || 'never' }}
           RELEASE_CHANNEL: ${{ needs.setup.outputs.channel }}
         working-directory: electron
-        # Apple's stapling service sometimes drops the connection. Stapling runs
-        # before any upload, so retry only that failure; anything else fails now.
-        run: |
-          for attempt in 1 2 3; do
-            if npx electron-builder ${{ matrix.electron_args }} --publish "$PUBLISH_MODE" --config.publish.channel="$RELEASE_CHANNEL" --config.forceCodeSigning=true 2>&1 | tee electron-builder.log; then
-              exit 0
-            fi
-            if ! grep -qE 'Failed to staple|The staple and validate action failed' electron-builder.log; then
-              exit 1
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              echo "::warning::Apple stapling failed on attempt $attempt; retrying."
-              sleep $((attempt * 60))
-            fi
-          done
-          exit 1
+        run: npx electron-builder ${{ matrix.electron_args }} --publish "$PUBLISH_MODE" --config.publish.channel="$RELEASE_CHANNEL" --config.forceCodeSigning=true
 
       - name: Build or publish Electron App
         if: ${{ !startsWith(matrix.name, 'mac') }}
