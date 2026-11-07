@@ -150,6 +150,7 @@ DISPLAY_NAME_OVERRIDES = {
     "war_started": "War Started",
     "war_ended": "War Ended",
     "colony_count_change": "Colony Count Change",
+    "operational_reserves_stage_change": "Operational Reserves Stage Change",
     "military_power_change": "Military Power Change",
 }
 

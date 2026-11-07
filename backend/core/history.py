@@ -200,6 +200,18 @@ def build_event_state_from_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
     if history:
         event_state["history"] = history
 
+    nomad = briefing.get("nomad")
+    if isinstance(nomad, dict) and nomad.get("is_nomadic") is True:
+        reserves = nomad.get("operational_reserves")
+        reserves = reserves if isinstance(reserves, dict) else {}
+        # Same shape as the briefing so event detection reads either one.
+        event_state["nomad"] = {
+            "is_nomadic": True,
+            "operational_reserves": {
+                k: reserves.get(k) for k in ("stage", "current") if k in reserves
+            },
+        }
+
     return event_state
 
 

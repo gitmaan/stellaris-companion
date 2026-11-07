@@ -2,7 +2,18 @@
 
 from __future__ import annotations
 
-from ._synthetic import advisor_request, country, ingest_synthetic_save, synthetic_meta, system
+from contextlib import closing
+
+from backend.core.database import GameDatabase
+
+from ._synthetic import (
+    advisor_request,
+    country,
+    ingest_synthetic_save,
+    persist_snapshot,
+    synthetic_meta,
+    system,
+)
 
 
 def nomad_sections() -> dict:
@@ -130,3 +141,41 @@ def test_settled_empires_get_no_nomad_rules(monkeypatch, tmp_path):
     assert briefing["identity"]["is_nomadic"] is False
     assert "nomad" not in briefing
     assert "nomad_economy" not in briefing["model_context"]
+
+
+def test_issue_79_history_reports_reserve_stages_not_resource_swings(monkeypatch, tmp_path):
+    """https://github.com/gitmaan/stellaris-companion/issues/79
+
+    The same misreading reached campaign history: lump-sum Nomad income swings
+    became "Minerals net" and "Energy net" events that the Chronicle narrates.
+    """
+    earlier = nomad_sections()
+    earlier["country"]["0"]["budget"]["current_month"]["income"]["trade"] = {"alloys": "5"}
+    later = nomad_sections()
+    country_state = later["country"]["0"]
+    # A harvest landed last month and reserves fell a stage since.
+    country_state["budget"]["current_month"]["income"]["harvest"] = {"minerals": "180"}
+    country_state["budget"]["current_month"]["expenses"]["ship_upkeep"]["energy"] = "90"
+    later["situations"]["situations"]["0"].update(stage="1", progress="2900")
+    later["country"]["0"]["budget"]["current_month"]["income"]["trade"] = {"alloys": "30"}
+
+    first = ingest_synthetic_save(
+        monkeypatch, tmp_path, earlier, meta=synthetic_meta(date="2310.01.01"), filename="a.sav"
+    )
+    second = ingest_synthetic_save(
+        monkeypatch, tmp_path, later, meta=synthetic_meta(date="2311.01.01"), filename="b.sav"
+    )
+    with closing(GameDatabase(tmp_path / "history.db")) as db:
+        persist_snapshot(db, first)
+        inserted, _, session_id = persist_snapshot(db, second)
+        assert inserted
+        events = db.get_recent_events(session_id=session_id, limit=50)
+
+    by_type = {event["event_type"]: event for event in events}
+    assert by_type["operational_reserves_stage_change"]["summary"] == (
+        "Operational Reserves: medium → low"
+    )
+    assert "minerals_net_change" not in by_type
+    assert "energy_net_change" not in by_type
+    # Resources outside the pool are still reported as usual.
+    assert "alloys_net_change" in by_type
