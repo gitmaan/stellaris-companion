@@ -136,8 +136,11 @@ for (const scenario of [{ scale: 1, uiScale: 1 }, { scale: 1.25, uiScale: 1 }, {
         const blocks = message.locator('.markdown-content p')
         for (let index = 0; index <= paragraphs.length; index++) {
           const block = blocks.nth(index)
-          await block.evaluate(element => element.scrollIntoView({ block: 'center', behavior: 'instant' }))
-          await expect.poll(() => block.evaluate(element => {
+          // The virtual list can re-measure rows after a scroll and shift this one,
+          // so scroll and measure together, as a reader scrolling again would.
+          await expect.poll(() => block.evaluate(async element => {
+            element.scrollIntoView({ block: 'center', behavior: 'instant' })
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
             const bounds = element.getBoundingClientRect()
             const viewport = element.closest('[data-chat-scroll]').getBoundingClientRect()
             const bubble = element.closest('[data-message-id]').getBoundingClientRect()

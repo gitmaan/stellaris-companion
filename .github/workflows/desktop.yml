@@ -70,7 +70,8 @@ jobs:
     name: Desktop E2E - Linux
     runs-on: ubuntu-latest
     env:
-      VITE_REPORT_ENDPOINT: https://feedback.galacticfilingcabinet.com/report
+      # Same setting the release builds ship with; the fallback keeps fork PRs working.
+      VITE_REPORT_ENDPOINT: ${{ vars.VITE_REPORT_ENDPOINT || 'https://feedback.galacticfilingcabinet.com' }}
       E2E_FEEDBACK_SUBMIT: '1'
 
     steps:
@@ -121,7 +122,8 @@ jobs:
     name: Desktop E2E - Windows regressions
     runs-on: windows-latest
     env:
-      VITE_REPORT_ENDPOINT: https://feedback.galacticfilingcabinet.com/report
+      # Same setting the release builds ship with; the fallback keeps fork PRs working.
+      VITE_REPORT_ENDPOINT: ${{ vars.VITE_REPORT_ENDPOINT || 'https://feedback.galacticfilingcabinet.com' }}
       E2E_FEEDBACK_SUBMIT: '1'
 
     steps:

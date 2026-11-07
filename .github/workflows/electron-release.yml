@@ -140,7 +140,7 @@ jobs:
           E2E_SHOW_WINDOWS: '1'
           # Same as Desktop CI: report submission is disabled without an endpoint.
           # Tests block all outbound requests, so nothing reaches the service.
-          VITE_REPORT_ENDPOINT: ${{ vars.VITE_REPORT_ENDPOINT }}
+          VITE_REPORT_ENDPOINT: ${{ vars.VITE_REPORT_ENDPOINT || 'https://feedback.galacticfilingcabinet.com' }}
           E2E_FEEDBACK_SUBMIT: '1'
 
   release:
@@ -308,7 +308,22 @@ jobs:
           PUBLISH_MODE: ${{ needs.setup.outputs.publish == 'true' && 'always' || 'never' }}
           RELEASE_CHANNEL: ${{ needs.setup.outputs.channel }}
         working-directory: electron
-        run: npx electron-builder ${{ matrix.electron_args }} --publish "$PUBLISH_MODE" --config.publish.channel="$RELEASE_CHANNEL" --config.forceCodeSigning=true
+        # Apple's stapling service sometimes drops the connection. Stapling runs
+        # before any upload, so retry only that failure; anything else fails now.
+        run: |
+          for attempt in 1 2 3; do
+            if npx electron-builder ${{ matrix.electron_args }} --publish "$PUBLISH_MODE" --config.publish.channel="$RELEASE_CHANNEL" --config.forceCodeSigning=true 2>&1 | tee electron-builder.log; then
+              exit 0
+            fi
+            if ! grep -qE 'Failed to staple|The staple and validate action failed' electron-builder.log; then
+              exit 1
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "::warning::Apple stapling failed on attempt $attempt; retrying."
+              sleep $((attempt * 60))
+            fi
+          done
+          exit 1
 
       - name: Build or publish Electron App
         if: ${{ !startsWith(matrix.name, 'mac') }}
