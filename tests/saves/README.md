@@ -19,3 +19,18 @@ is also picked up automatically (baseline id `test_save`).
 
 The regression test then diffs future exports of that save against the baselines,
 catching extraction drift when the extractor or the game data model changes.
+
+## Before a release: check every local save
+
+Baselines catch drift in a few chosen saves. To run *all* your saves through the
+app's real pipeline (ingestion, model briefing, campaign history in date order):
+
+```bash
+python3 scripts/check_local_saves.py          # newest 2 saves per campaign
+python3 scripts/check_local_saves.py --all    # every save
+```
+
+It reads saves in place from the Stellaris save folder (or paths you pass), keeps
+history in a temporary database, and uploads nothing. It exits non-zero on a
+crash, a failure the pipeline logged and carried on from, or a missing core
+value such as the game date or empire name.
