@@ -108,7 +108,10 @@ def test_decline_survives_restart_and_does_not_change_original_archive(db):
     )
     reopened = GameDatabase(db.path)
     try:
-        assert StoryContinuity(reopened).offer(new[0])["candidates"] == []
+        offer = StoryContinuity(reopened).offer(new[0])
+        assert offer["decision"] == "separate"
+        # Declining is remembered but not final: the earlier empire stays linkable.
+        assert [c["save_id"] for c in offer["candidates"]] == [old[0]]
         assert StoryContinuity(reopened).context(new[0])["parts"] == []
         assert reopened.get_chronicle_by_save_id(old[0])["chronicle_text"] == "The Omnian age."
     finally:
@@ -344,3 +347,46 @@ def test_mcp_uses_same_ancestry_and_rejects_prepared_writes_after_rewind(db):
             narrative="Do not reuse prior linked prose on this branch.",
         )
     assert db.get_chronicle_by_save_id(child[0]) == before
+
+
+def test_a_declined_story_can_be_linked_later(db):
+    old = capture(db, 0, "2300.01.01")
+    cache(db, old, "The Omnian age.")
+    new = capture(db, 7, "2301.01.01")
+    store = StoryContinuity(db)
+    store.decide(
+        new[0], predecessor_save_id=None, expected_revision=store.offer(new[0])["offer_revision"]
+    )
+    linked = continue_from(db, new, old)
+    assert linked["decision"] == "continue" and linked["candidates"] == []
+    assert [p["save_id"] for p in store.context(new[0])["parts"]] == [old[0]]
+    assert "The Omnian age." in story_prompt(store.context(new[0]))
+
+
+def test_disconnecting_keeps_the_earlier_empire_available_to_relink(db):
+    old = capture(db, 0, "2300.01.01")
+    cache(db, old)
+    new = capture(db, 7, "2301.01.01")
+    continue_from(db, new, old)
+    store = StoryContinuity(db)
+    disconnected = store.decide(
+        new[0], predecessor_save_id=None, expected_revision=store.offer(new[0])["offer_revision"]
+    )
+    assert disconnected["decision"] == "separate" and disconnected["parts"] == []
+    assert [c["save_id"] for c in disconnected["candidates"]] == [old[0]]
+    continue_from(db, new, old)
+    assert [p["save_id"] for p in store.context(new[0])["parts"]] == [old[0]]
+
+
+def test_a_story_detached_by_rewind_can_be_linked_again(db):
+    old = capture(db, 0, "2300.01.01")
+    cache(db, old)
+    new = capture(db, 7, "2301.01.01")
+    continue_from(db, new, old)
+    capture(db, 7, "2300.06.01")  # rewind before the link's anchor
+    store = StoryContinuity(db)
+    offer = store.offer(new[0])
+    assert offer["status"] == "rewound" and offer["decision"] == "continue"
+    assert [c["save_id"] for c in offer["candidates"]] == [old[0]]
+    continue_from(db, new, old)
+    assert store.context(new[0])["status"] == "continued"

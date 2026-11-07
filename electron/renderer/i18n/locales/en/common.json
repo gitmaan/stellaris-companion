@@ -1215,6 +1215,8 @@
     "disconnect": "Disconnect story",
     "rewound": "This save rewound past the story transition. Earlier history stays preserved, and will not automatically rejoin this timeline.",
     "changed": "The campaign or story changed. Review the current choice and try again.",
-    "resetRequired": "This Chronicle belongs to an earlier story continuation. Its prose is preserved. Use Manage campaigns → Reset Chronicle to write on this timeline."
+    "resetRequired": "This Chronicle belongs to an earlier story continuation. Its prose is preserved. Use Manage campaigns → Reset Chronicle to write on this timeline.",
+    "keptSeparate": "This empire's story is kept separate.",
+    "link": "Link an earlier story"
   }
 }

@@ -154,11 +154,15 @@ class StoryContinuity:
             source = self.db.execute(
                 "SELECT * FROM campaign_sources WHERE save_id=?", (save_id,)
             ).fetchone()
-            decision = self.db.execute(
-                "SELECT 1 FROM story_continuations WHERE save_id=?", (save_id,)
+            row = self.db.execute(
+                "SELECT decision FROM story_continuations WHERE save_id=?", (save_id,)
             ).fetchone()
+            decision = row["decision"] if row else None
+            # Keeping a story separate, disconnecting, or rewinding past the link is
+            # never final: earlier empires stay available to link later.
+            linkable = decision != "continue" or context["status"] == "rewound"
             candidates = []
-            if source and path and not decision and self._visible(save_id):
+            if source and path and linkable and self._visible(save_id):
                 for other in self.db.execute(
                     "SELECT * FROM campaign_sources WHERE galaxy_id=? AND player_id<>? ORDER BY save_id",
                     (source["galaxy_id"], source["player_id"]),
@@ -189,6 +193,7 @@ class StoryContinuity:
             return {
                 "save_id": save_id,
                 **context,
+                "decision": decision,
                 "candidates": candidates,
                 "offer_revision": revision,
             }

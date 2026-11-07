@@ -262,9 +262,12 @@ function createMockChronicleBackend(options = {}) {
           sendJson(res, 409, { detail: { code: 'STORY_CHANGED', error: 'Story changed' } })
           return
         }
+        options.storyCandidates ??= options.story.candidates
         options.story = {
           ...options.story,
-          candidates: [],
+          // Like the backend, only an active link hides the earlier empires.
+          candidates: body.predecessor_save_id ? [] : options.storyCandidates,
+          decision: body.predecessor_save_id ? 'continue' : 'separate',
           status: body.predecessor_save_id ? 'continued' : 'separate',
           parts: body.predecessor_save_id ? options.storyParts : [],
           offer_revision: 'story-accepted',

@@ -1226,6 +1226,8 @@
     "disconnect": "Dissocier le récit",
     "rewound": "Cette sauvegarde revient avant le changement de perspective. Le récit précédent reste conservé et ne sera pas automatiquement rattaché à cette chronologie.",
     "changed": "La campagne ou le récit a changé. Vérifiez le choix actuel et réessayez.",
-    "resetRequired": "Cette chronique appartient à une continuation antérieure. Son texte est conservé. Utilisez Gérer les campagnes → Réinitialiser la chronique pour écrire dans cette chronologie."
+    "resetRequired": "Cette chronique appartient à une continuation antérieure. Son texte est conservé. Utilisez Gérer les campagnes → Réinitialiser la chronique pour écrire dans cette chronologie.",
+    "keptSeparate": "L’histoire de cet empire reste séparée.",
+    "link": "Relier une histoire précédente"
   }
 }

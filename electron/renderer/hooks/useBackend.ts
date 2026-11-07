@@ -106,6 +106,8 @@ export interface StoryContinuationResponse {
   status: 'separate' | 'continued' | 'rewound'
   revision: string
   offer_revision: string
+  /** The saved choice for this empire; null until the player decides. */
+  decision?: 'continue' | 'separate' | null
   can_decide: boolean
   candidates: Array<{ save_id: string; empire_name: string; game_date: string }>
   parts: StoryPart[]

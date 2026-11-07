@@ -1215,6 +1215,8 @@
     "disconnect": "Geschichte trennen",
     "rewound": "Dieser Spielstand liegt vor dem Perspektivwechsel. Die frühere Geschichte bleibt erhalten und wird nicht automatisch mit diesem Zeitverlauf verknüpft.",
     "changed": "Die Kampagne oder Geschichte hat sich geändert. Prüfe die aktuelle Auswahl und versuche es erneut.",
-    "resetRequired": "Diese Chronik gehört zu einer früheren Fortsetzung. Ihr Text bleibt erhalten. Wähle Kampagnen verwalten → Chronik zurücksetzen, um in diesem Zeitverlauf weiterzuschreiben."
+    "resetRequired": "Diese Chronik gehört zu einer früheren Fortsetzung. Ihr Text bleibt erhalten. Wähle Kampagnen verwalten → Chronik zurücksetzen, um in diesem Zeitverlauf weiterzuschreiben.",
+    "keptSeparate": "Die Geschichte dieses Imperiums bleibt getrennt.",
+    "link": "Frühere Geschichte verknüpfen"
   }
 }

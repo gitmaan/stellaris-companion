@@ -63,7 +63,8 @@ test('continue story exposes the earlier archive in Advisor and Chronicle', asyn
     await panel.getByRole('button', { name: 'Earlier in this story' }).click()
     await archive.getByRole('button', { name: 'Disconnect story' }).click()
     await expect(archive).not.toBeVisible()
-    await expect(panel).not.toBeVisible()
+    await expect(panel.getByText('Story continues from Omnian Core.')).not.toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Link an earlier story' })).toBeVisible()
   })
 })
 
@@ -73,7 +74,23 @@ test('keeping separate dismisses the offer without exposing earlier prose', asyn
     await panel.getByRole('button', { name: 'Keep separate' }).click()
     await expect(panel).not.toBeVisible()
     await page.getByRole('button', { name: /Chronicle/i }).click()
-    await expect(panel).not.toBeVisible()
+    await expect(panel.getByText("This empire's story is kept separate.")).toBeVisible()
+    await expect(panel.getByText('The old Core remembers.')).not.toBeVisible()
+  })
+})
+
+test('a story kept separate can be linked later from the Chronicle', async () => {
+  await scenario(async page => {
+    const panel = page.getByRole('region', { name: 'Story continuity' })
+    await panel.getByRole('button', { name: 'Keep separate' }).click()
+    await page.getByRole('button', { name: /Chronicle/i }).click()
+    await panel.getByRole('button', { name: 'Link an earlier story' }).click()
+    await panel.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(panel.getByRole('button', { name: 'Continue story', exact: true })).not.toBeVisible()
+    await panel.getByRole('button', { name: 'Link an earlier story' }).click()
+    await panel.getByRole('button', { name: 'Continue story', exact: true }).click()
+    await expect(panel.getByText('Story continues from Omnian Core.')).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Link an earlier story' })).not.toBeVisible()
   })
 })
 

@@ -1226,6 +1226,8 @@
     "disconnect": "Desvincular historia",
     "rewound": "Esta partida retrocedió a antes del cambio de perspectiva. La historia anterior se conserva y no se volverá a vincular automáticamente a esta línea temporal.",
     "changed": "La campaña o la historia ha cambiado. Revisa la opción actual e inténtalo de nuevo.",
-    "resetRequired": "Esta crónica pertenece a una continuación anterior. Su texto se conserva. Usa Gestionar campañas → Reiniciar crónica para escribir en esta línea temporal."
+    "resetRequired": "Esta crónica pertenece a una continuación anterior. Su texto se conserva. Usa Gestionar campañas → Reiniciar crónica para escribir en esta línea temporal.",
+    "keptSeparate": "La historia de este imperio se mantiene separada.",
+    "link": "Vincular una historia anterior"
   }
 }

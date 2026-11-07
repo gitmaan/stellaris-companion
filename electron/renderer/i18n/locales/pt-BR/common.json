@@ -1226,6 +1226,8 @@
     "disconnect": "Desvincular história",
     "rewound": "Este save voltou para antes da mudança de perspectiva. A história anterior permanece preservada e não será vinculada automaticamente a esta linha do tempo.",
     "changed": "A campanha ou a história mudou. Revise a opção atual e tente novamente.",
-    "resetRequired": "Esta crônica pertence a uma continuação anterior. Seu texto está preservado. Use Gerenciar campanhas → Redefinir crônica para escrever nesta linha do tempo."
+    "resetRequired": "Esta crônica pertence a uma continuação anterior. Seu texto está preservado. Use Gerenciar campanhas → Redefinir crônica para escrever nesta linha do tempo.",
+    "keptSeparate": "A história deste império está separada.",
+    "link": "Vincular uma história anterior"
   }
 }
