@@ -255,6 +255,28 @@ function createMockChronicleBackend(options = {}) {
   async function handler(req, res) {
     const url = new URL(req.url, 'http://127.0.0.1')
 
+    if (url.pathname.match(/^\/api\/playthroughs\/[^/]+\/story$/) && options.story) {
+      if (req.method === 'POST') {
+        const body = await readJsonBody(req)
+        if (options.storyConflict) {
+          sendJson(res, 409, { detail: { code: 'STORY_CHANGED', error: 'Story changed' } })
+          return
+        }
+        options.storyCandidates ??= options.story.candidates
+        options.story = {
+          ...options.story,
+          // Like the backend, only an active link hides the earlier empires.
+          candidates: body.predecessor_save_id ? [] : options.storyCandidates,
+          decision: body.predecessor_save_id ? 'continue' : 'separate',
+          status: body.predecessor_save_id ? 'continued' : 'separate',
+          parts: body.predecessor_save_id ? options.storyParts : [],
+          offer_revision: 'story-accepted',
+        }
+      }
+      sendJson(res, 200, options.story)
+      return
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/health') {
       sendJson(res, 200, currentHealthPayload())
       return

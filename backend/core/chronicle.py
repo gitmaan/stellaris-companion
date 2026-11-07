@@ -47,6 +47,12 @@ from backend.core.json_utils import json_dumps
 from backend.core.language import build_language_policy, localized_text, normalize_language
 from backend.core.model_briefing import build_model_briefing
 from backend.core.model_routing import display_model_name, normalize_model_routing_mode
+from backend.core.story_continuity import (
+    NO_STORY,
+    StoryContinuity,
+    archive_needs_story_reset,
+    story_prompt,
+)
 from backend.core.structured_output import (
     validate_structured_response as _validate_structured_response,
 )
@@ -481,6 +487,16 @@ class ChronicleGenerator:
 
         current_date = snapshot_range.get("last_game_date")
         current_snapshot_id = snapshot_range.get("last_snapshot_id")
+        story = StoryContinuity(self.db).context(
+            save_id, snapshot_id=current_snapshot_id, language=output_language
+        )
+        if archive_needs_story_reset(chapters_data, story):
+            response = cached_chronicle_response(cached)
+            response["story_reset_required"] = True
+            response["message"] = (
+                "This Chronicle belongs to an earlier story continuation. It has been preserved; reset it to write on this timeline."
+            )
+            return response
         source_date = game_date_key(current_date)
         archive_dates = [
             game_date_key(ch.get("end_date")) for ch in chapters_data.get("chapters", [])
@@ -580,6 +596,7 @@ class ChronicleGenerator:
             isinstance(current_era_cache, dict)
             and current_era_cache.get("start_snapshot_id") == era_start_snapshot_id
             and cached_current_era is not None
+            and current_era_cache.get("story_revision", NO_STORY) == story["revision"]
         )
 
         regenerate_for_event_growth = False
@@ -659,6 +676,7 @@ class ChronicleGenerator:
                         "language": output_language,
                         "coverage_date": current_date,
                         "current_era": current_era,
+                        "story_revision": story["revision"],
                     }
                     logger.debug(
                         "Chronicle current era generated (save_id=%s era_start_snapshot_id=%s)",
@@ -684,6 +702,9 @@ class ChronicleGenerator:
         )
         event_count = len(all_events)
         content_changed = bool(chapters_finalized or (current_era and not used_cached_current_era))
+        if content_changed:
+            chapters_data["story_revision"] = story["revision"]
+            chapters_data["story_linked"] = bool(story["parts"])
         removed_era = bool(current_era_cache and "current_era_cache" not in chapters_data)
         if (
             cached
@@ -702,6 +723,7 @@ class ChronicleGenerator:
                 chapters_data=chapters_data,
                 event_count=event_count,
                 snapshot_count=snapshot_range.get("snapshot_count", 0),
+                expected_story_revision=story["revision"],
             )
         response = cached_chronicle_response(saved)
         response.update(
@@ -940,6 +962,7 @@ class ChronicleGenerator:
             events=events,
             briefing=briefing,
             previous_chapters=previous_chapters,
+            story_context=source.get("story_context", ""),
             start_date=chapter["start_date"],
             end_date=chapter["end_date"],
             custom_instructions=custom_instructions,
@@ -1478,6 +1501,11 @@ class ChronicleGenerator:
             "selected_event_count": len(selected_events),
             "partial_coverage": partial,
             "historical_context_limited": bool(briefing.get("historical_context_limited")),
+            "story_context": story_prompt(
+                StoryContinuity(self.db).context(
+                    save_id, snapshot_id=end_snapshot_id, language=language
+                )
+            ),
         }
         # Generate chapter content
         content = self._generate_chapter_content(
@@ -1485,6 +1513,7 @@ class ChronicleGenerator:
             events=chapter_events,
             briefing=briefing,
             previous_chapters=chapters,
+            story_context=source_bundle["story_context"],
             start_date=start_date,
             end_date=end_date,
             custom_instructions=custom_instructions,
@@ -1544,6 +1573,7 @@ class ChronicleGenerator:
         custom_instructions: str | None = None,
         regeneration_instructions: str | None = None,
         language: str = "en",
+        story_context: str = "",
     ) -> dict[str, Any]:
         """Generate and validate a structured Chronicle chapter."""
         identity = briefing.get("identity", {})
@@ -1614,6 +1644,8 @@ Incorporate this guidance while maintaining narrative consistency.
 {voice}
 {custom_section}
 {language_policy}
+
+{story_context}
 
 === PREVIOUS CHAPTERS (literary continuity, not additional evidence) ===
 {previous_context}
@@ -1696,7 +1728,12 @@ than a factual claim. When a reason is not present in the event list, leave it u
         )
 
         events = events_between_dates(events, era_start_date, current_date)
-        if not events:
+        story_context = story_prompt(
+            StoryContinuity(self.db).context(
+                save_id, snapshot_id=current_snapshot_id, language=language
+            )
+        )
+        if not events and not story_context:
             return None
 
         identity = briefing.get("identity", {})
@@ -1754,6 +1791,9 @@ than a factual claim. When a reason is not present in the event list, leave it u
 {voice}
 {era_custom_section}
 {language_policy}
+
+{story_context}
+Current perspective: {empire_name}, observed at {current_date or "unknown date"}.
 
 === PREVIOUS CHAPTERS (literary continuity, not additional evidence) ===
 {previous_context}

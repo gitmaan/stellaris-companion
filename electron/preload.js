@@ -129,6 +129,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       include_trashed: includeTrashed,
     }),
     conversations: (saveId) => ipcRenderer.invoke('backend:conversations', { save_id: saveId }),
+    story: (saveId) => ipcRenderer.invoke('backend:story', { save_id: saveId }),
+    setStory: (saveId, predecessorSaveId, expectedRevision) => ipcRenderer.invoke('backend:set-story', {
+      save_id: saveId, predecessor_save_id: predecessorSaveId, expected_revision: expectedRevision,
+    }),
     createConversation: (saveId) => ipcRenderer.invoke('backend:create-conversation', { save_id: saveId }),
     conversation: (saveId, conversationId, beforeTurnId) => ipcRenderer.invoke('backend:conversation', { save_id: saveId, conversation_id: conversationId, before_turn_id: beforeTurnId }),
     editChapter: (saveId, chapterNumber, expectedRevision, title, narrative) => ipcRenderer.invoke('backend:edit-chapter', {

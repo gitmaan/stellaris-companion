@@ -28,6 +28,7 @@ from backend.core.advisor_providers import (
     normalize_advisor_provider,
 )
 from backend.core.chronicle_store import ChronicleConflict, cached_chronicle_response
+from backend.core.story_continuity import NO_STORY, StoryContinuity, story_prompt
 
 _chronicle_in_flight: set[str] = set()
 _chronicle_in_flight_lock = threading.Lock()
@@ -82,6 +83,12 @@ class ChatRequest(BaseModel):
 
 class AdvisorConversationRequest(BaseModel):
     title: str = Field(default="", max_length=100)
+
+
+class StoryContinuationRequest(BaseModel):
+    predecessor_save_id: str | None = Field(default=None, min_length=1, max_length=200)
+    expected_revision: str = Field(min_length=1, max_length=200)
+    language: str = "en"
 
 
 class RecapRequest(BaseModel):
@@ -677,6 +684,56 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail={"error": "Playthrough not found"})
         return db
 
+    @app.get("/api/playthroughs/{save_id}/story", dependencies=[Depends(verify_token)])
+    def get_story_continuation(
+        request: Request,
+        save_id: str,
+        language: Annotated[str, Query(max_length=20)] = "en",
+    ) -> dict[str, Any]:
+        from backend.core.language import normalize_language
+
+        db = _advisor_database(request, save_id)
+        current, _ = _resolve_current_save_id(request)
+        return {
+            **StoryContinuity(db).offer(save_id, language=normalize_language(language)),
+            "can_decide": current == save_id,
+        }
+
+    @app.post("/api/playthroughs/{save_id}/story", dependencies=[Depends(verify_token)])
+    def set_story_continuation(
+        request: Request, save_id: str, body: StoryContinuationRequest
+    ) -> dict[str, Any]:
+        from backend.core.language import normalize_language
+
+        db = _advisor_database(request, save_id)
+        companion = getattr(request.app.state, "companion", None)
+        with getattr(companion, "_briefing_lock", contextlib.nullcontext()):
+            current, _ = _resolve_current_save_id(request)
+            if current != save_id:
+                raise HTTPException(
+                    409,
+                    detail={
+                        "code": "CAMPAIGN_CHANGED",
+                        "error": "Load this empire before changing its story.",
+                    },
+                )
+            try:
+                result = StoryContinuity(db).decide(
+                    save_id,
+                    predecessor_save_id=body.predecessor_save_id,
+                    expected_revision=body.expected_revision,
+                    language=normalize_language(body.language),
+                )
+            except ChronicleConflict as exc:
+                raise HTTPException(
+                    409, detail={"code": "STORY_CHANGED", "error": str(exc)}
+                ) from exc
+            except ValueError as exc:
+                raise HTTPException(
+                    400, detail={"code": "STORY_UNAVAILABLE", "error": str(exc)}
+                ) from exc
+        return {**result, "can_decide": True}
+
     @app.get("/api/playthroughs/{save_id}/conversations", dependencies=[Depends(verify_token)])
     def list_advisor_conversations(request: Request, save_id: str) -> dict[str, Any]:
         db = _advisor_database(request, save_id)
@@ -865,6 +922,7 @@ def create_app() -> FastAPI:
                                     "game_date",
                                     "source_hash",
                                     "snapshot_id",
+                                    "story_revision",
                                     "response_time_ms",
                                     "model",
                                     "model_display",
@@ -889,13 +947,30 @@ def create_app() -> FastAPI:
             requested_model = (body.model or "").strip()[:120] or None
             start_time = time.time()
             source = None
+            story_context = {"revision": NO_STORY, "parts": []}
+            source_snapshot_id = None
             try:
                 if hasattr(companion, "ask_precomputed_with_context"):
                     source = companion.capture_advisor_source(save_id=save_id)
+                    if db is not None and save_id:
+                        story_context, source_snapshot_id = StoryContinuity(
+                            db
+                        ).capture_advisor_context(
+                            save_id,
+                            source_hash=source.source_hash,
+                            game_date=source.game_date,
+                            language=output_language,
+                        )
                     restored = None
                     if history_available:
                         try:
                             restored = db.get_advisor_turns(save_id, conversation_id, limit=6)
+                            restored = StoryContinuity(db).filter_restored_turns(
+                                save_id,
+                                restored,
+                                story_context,
+                                snapshot_id=source_snapshot_id,
+                            )
                         except (sqlite3.Error, ValueError):
                             history_available = False
                     reply = companion.ask_precomputed_with_context(
@@ -906,6 +981,7 @@ def create_app() -> FastAPI:
                         model_routing_mode=body.model_routing_mode,
                         language=output_language,
                         source=source,
+                        history_context=story_prompt(story_context),
                         restored_turns=restored,
                         persist_memory=False,
                     )
@@ -921,6 +997,19 @@ def create_app() -> FastAPI:
                         language=body.language,
                     )
                     call_stats = companion.get_call_stats()
+                if (
+                    db is not None
+                    and save_id
+                    and StoryContinuity(db).context(save_id, language=output_language)["revision"]
+                    != story_context["revision"]
+                ):
+                    raise ChronicleConflict(
+                        "The story continuation changed while this reply was prepared. Try again."
+                    )
+            except ChronicleConflict as exc:
+                raise HTTPException(
+                    409, detail={"code": "STORY_CHANGED", "error": str(exc)}
+                ) from exc
             except AdvisorProviderError as exc:
                 detail = {"error": str(exc), "code": exc.code}
                 if getattr(exc, "reference", None):
@@ -932,7 +1021,8 @@ def create_app() -> FastAPI:
                 "save_id": source.save_id if source else save_id,
                 "game_date": source.game_date if source else precompute_status.get("game_date"),
                 "source_hash": source.source_hash if source else None,
-                "snapshot_id": None,
+                "snapshot_id": source_snapshot_id,
+                "story_revision": story_context["revision"],
                 "conversation_id": conversation_id,
                 "turn_id": None,
                 "history_saved": False,
@@ -959,6 +1049,7 @@ def create_app() -> FastAPI:
                             "model_routing",
                             "completion",
                             "provider",
+                            "story_revision",
                         )
                     }
                     turn = db.save_advisor_turn(
@@ -970,6 +1061,7 @@ def create_app() -> FastAPI:
                         language=output_language,
                         game_date=result["game_date"],
                         source_hash=result["source_hash"],
+                        snapshot_id=source_snapshot_id,
                         response=metadata,
                     )
                     result["turn_id"], result["history_saved"] = turn["id"], True

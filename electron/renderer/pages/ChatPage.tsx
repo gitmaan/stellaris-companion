@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 
 import { useTranslation } from 'react-i18next'
+import StoryContinuityPanel from '../components/StoryContinuityPanel'
 import type { TFunction } from 'i18next'
 import ChatMessage from '../components/ChatMessage'
 import ChatInput from '../components/ChatInput'
@@ -149,6 +150,7 @@ function getProviderErrorMessage({
     action: code === 'CHATGPT_LIMIT' ? 'usage' : ['CHATGPT_RECONNECT', 'CHATGPT_PERMISSION', 'CHATGPT_MODEL', 'CHATGPT_INELIGIBLE'].includes(code) ? 'settings' : undefined,
   }
   if (code === 'ADVISOR_INTERNAL_ERROR') return { content: String(t('chat.errors.advisorInternal')) }
+  if (code === 'STORY_CHANGED') return { content: String(t('story.changed')) }
   const providerName = getAdvisorProviderName(provider)
   const providerErrorKeys: Record<string, string> = {
     ADVISOR_PROVIDER_NOT_CONFIGURED: 'providerNotConfigured',
@@ -190,6 +192,7 @@ interface ChatPageProps {
 }
 
 function ChatPage({
+  isActive = true,
   modelRoutingMode,
   onOpenSettings,
   onOpenSaveSettings,
@@ -586,6 +589,7 @@ function ChatPage({
 
   return (
     <div className="chat-column flex flex-col h-full min-h-0 relative w-full max-w-[1000px] mx-auto">
+      <StoryContinuityPanel saveId={activeCampaignId} isActive={isActive} />
       <AdvisorInfoPanel
         key={campaignIdRef.current}
         isOpen={advisorPanelOpen}

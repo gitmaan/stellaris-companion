@@ -6,6 +6,7 @@ import type {
   ChatResponse,
   ChatContinuity,
   ConversationsResponse,
+  StoryContinuationResponse,
   ConversationResponse,
   CreatedConversationResponse,
   ChronicleCustomResponse,
@@ -207,6 +208,8 @@ declare global {
         sessions: () => Promise<BackendIpcResponse<SessionsResponse>>
         playthroughs: (includeTrashed?: boolean) => Promise<BackendIpcResponse<PlaythroughsResponse>>
         conversations: (saveId: string) => Promise<BackendIpcResponse<ConversationsResponse>>
+        story: (saveId: string) => Promise<BackendIpcResponse<StoryContinuationResponse>>
+        setStory: (saveId: string, predecessorSaveId: string | null, expectedRevision: string) => Promise<BackendIpcResponse<StoryContinuationResponse>>
         createConversation: (saveId: string) => Promise<BackendIpcResponse<CreatedConversationResponse>>
         conversation: (saveId: string, conversationId: string, beforeTurnId?: string) => Promise<BackendIpcResponse<ConversationResponse>>
         editChapter: (saveId: string, chapterNumber: number, expectedRevision: string, title: string, narrative: string) => Promise<BackendIpcResponse<ChronicleResponse>>

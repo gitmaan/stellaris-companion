@@ -1199,5 +1199,24 @@
     "jumpToSection": "Jump to section…",
     "settingsSaveHelp": "Display preferences and folder changes save immediately. Text fields with an Apply or Save button save when you press it.",
     "nextQuestion": "Write your next question while the advisor responds…"
+  },
+  "story": {
+    "title": "Story continuity",
+    "offer": "Continue an earlier story?",
+    "explanation": "Another empire was recorded in this galaxy. You can continue its story while keeping each empire’s game history separate.",
+    "predecessor": "Earlier empire",
+    "continue": "Continue story",
+    "separate": "Keep separate",
+    "connected": "Story continues from {{empire}}.",
+    "readEarlier": "Earlier in this story",
+    "archiveNote": "Earlier chapters and recent discussions are preserved at the point you changed perspective. They describe the previous empire, not your current state.",
+    "noEarlierProse": "No earlier prose with verified coverage is available in this language. The original archive is unchanged.",
+    "discussions": "Recent earlier discussions",
+    "disconnect": "Disconnect story",
+    "rewound": "This save rewound past the story transition. Earlier history stays preserved, and will not automatically rejoin this timeline.",
+    "changed": "The campaign or story changed. Review the current choice and try again.",
+    "resetRequired": "This Chronicle belongs to an earlier story continuation. Its prose is preserved. Use Manage campaigns → Reset Chronicle to write on this timeline.",
+    "keptSeparate": "This empire's story is kept separate.",
+    "link": "Link an earlier story"
   }
 }

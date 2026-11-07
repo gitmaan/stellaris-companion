@@ -92,6 +92,26 @@ export interface AdvisorTurn extends Omit<ChatResponse, 'text'> {
 }
 
 export interface ConversationsResponse { conversations: AdvisorConversation[] }
+
+export interface StoryPart {
+  save_id: string
+  empire_name: string
+  game_date: string
+  chronicle: string
+  discussions: Array<{ question: string; answer: string; game_date: string; language: string }>
+}
+
+export interface StoryContinuationResponse {
+  save_id: string
+  status: 'separate' | 'continued' | 'rewound'
+  revision: string
+  offer_revision: string
+  /** The saved choice for this empire; null until the player decides. */
+  decision?: 'continue' | 'separate' | null
+  can_decide: boolean
+  candidates: Array<{ save_id: string; empire_name: string; game_date: string }>
+  parts: StoryPart[]
+}
 export interface ConversationResponse { conversation: AdvisorConversation; turns: AdvisorTurn[]; has_more: boolean }
 export interface CreatedConversationResponse { conversation: AdvisorConversation }
 
@@ -273,6 +293,7 @@ export interface CurrentEra {
 }
 
 export interface ChronicleResponse {
+  story_reset_required?: boolean
   chronicle_revision?: string
   coverage_date?: string | null
   // New structured format
@@ -602,6 +623,8 @@ export function useBackend() {
   }, [callApi])
 
   const conversations = useCallback((saveId: string) => callApi<ConversationsResponse>('conversations', () => window.electronAPI!.backend.conversations(saveId)), [callApi])
+  const story = useCallback((saveId: string) => callApi<StoryContinuationResponse>('story', () => window.electronAPI!.backend.story(saveId)), [callApi])
+  const setStory = useCallback((saveId: string, predecessorSaveId: string | null, expectedRevision: string) => callApi<StoryContinuationResponse>('setStory', () => window.electronAPI!.backend.setStory(saveId, predecessorSaveId, expectedRevision)), [callApi])
   const createConversation = useCallback((saveId: string) => callApi<CreatedConversationResponse>('createConversation', () => window.electronAPI!.backend.createConversation(saveId)), [callApi])
   const conversation = useCallback((saveId: string, conversationId: string, beforeTurnId?: string) => callApi<ConversationResponse>('conversation', () => window.electronAPI!.backend.conversation(saveId, conversationId, beforeTurnId)), [callApi])
   const editChapter = useCallback((saveId: string, chapterNumber: number, expectedRevision: string, title: string, narrative: string) => callApi<ChronicleResponse>('editChapter', () => window.electronAPI!.backend.editChapter(saveId, chapterNumber, expectedRevision, title, narrative)), [callApi])
@@ -787,6 +810,7 @@ export function useBackend() {
     playthroughs,
     cachedChronicle,
     conversations, createConversation, conversation, editChapter, undoChapter,
+    story, setStory,
     setPlaythroughLabel,
     trashPlaythrough,
     restorePlaythrough,
@@ -807,7 +831,7 @@ export function useBackend() {
     get loadingStates() {
       return loadingStatesRef.current
     },
-  }), [health, chat, status, sessions, playthroughs, cachedChronicle, conversations, createConversation, conversation, editChapter, undoChapter, setPlaythroughLabel, trashPlaythrough, restorePlaythrough, resetChronicle, undoChronicleReset, deletePlaythrough, historyStorage, sessionEvents, recap, chronicle, regenerateChapter, endSession, getChronicleCustom, setChronicleCustom, isLoading])
+  }), [health, chat, status, sessions, playthroughs, cachedChronicle, conversations, story, setStory, createConversation, conversation, editChapter, undoChapter, setPlaythroughLabel, trashPlaythrough, restorePlaythrough, resetChronicle, undoChronicleReset, deletePlaythrough, historyStorage, sessionEvents, recap, chronicle, regenerateChapter, endSession, getChronicleCustom, setChronicleCustom, isLoading])
 }
 
 export default useBackend

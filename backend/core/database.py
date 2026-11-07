@@ -405,6 +405,24 @@ class GameDatabase:
                 """,
                 "CREATE INDEX idx_advisor_turns_conversation ON advisor_turns(conversation_id, created_at);",
             ],
+            12: [
+                # Narrative ancestry is separate from empire-scoped snapshots, events and chats.
+                """CREATE TABLE IF NOT EXISTS campaign_sources (
+                    save_id TEXT PRIMARY KEY,
+                    galaxy_id TEXT NOT NULL,
+                    player_id INTEGER NOT NULL,
+                    empire_name TEXT NOT NULL
+                );""",
+                "CREATE INDEX IF NOT EXISTS idx_campaign_sources_galaxy ON campaign_sources(galaxy_id);",
+                """CREATE TABLE IF NOT EXISTS story_continuations (
+                    save_id TEXT PRIMARY KEY,
+                    predecessor_save_id TEXT,
+                    anchor_snapshot_id INTEGER NOT NULL,
+                    decision TEXT NOT NULL CHECK(decision IN ('continue', 'separate')),
+                    revision TEXT NOT NULL,
+                    history_json TEXT NOT NULL DEFAULT '[]'
+                );""",
+            ],
         }
 
         current = self.get_schema_version()
@@ -424,6 +442,10 @@ class GameDatabase:
                 try:
                     for stmt in statements:
                         self._conn.execute(stmt)
+                    if next_version == 12:
+                        from backend.core.story_continuity import backfill_campaign_sources
+
+                        backfill_campaign_sources(self)
                     self._set_schema_version(next_version)
                     self._conn.execute("COMMIT;")
                 except Exception:
@@ -1776,6 +1798,9 @@ class GameDatabase:
                 self._conn.execute("DELETE FROM chronicle_revisions WHERE save_id = ?", (save_id,))
                 self._conn.execute("DELETE FROM sessions WHERE save_id = ?", (save_id,))
                 self._conn.execute("DELETE FROM playthrough_metadata WHERE save_id = ?", (save_id,))
+                from backend.core.story_continuity import remove_story_source
+
+                remove_story_source(self, save_id)
                 self._conn.execute("COMMIT;")
             except Exception:
                 self._conn.execute("ROLLBACK;")
@@ -2426,6 +2451,7 @@ class GameDatabase:
         snapshot_count: int,
         record_undo: bool = True,
         external_write: bool = False,
+        expected_story_revision: str | None = None,
     ) -> dict[str, Any]:
         """Commit one prepared replacement only while its source archive still exists.
 
@@ -2448,6 +2474,16 @@ class GameDatabase:
                 raise ChronicleConflict(
                     "The campaign was removed or archived while this Chronicle was prepared."
                 )
+            if expected_story_revision is not None:
+                from backend.core.story_continuity import StoryContinuity
+
+                if (
+                    StoryContinuity(self).context(save_id, language=language)["revision"]
+                    != expected_story_revision
+                ):
+                    raise ChronicleConflict(
+                        "The story continuation changed while this Chronicle was prepared."
+                    )
             cached = self.get_cached_chronicle_for_save(save_id, language=language)
             before = load_chapters_data(cached)
             if chronicle_revision(before) != expected_revision:

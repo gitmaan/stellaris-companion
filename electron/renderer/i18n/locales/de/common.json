@@ -1199,5 +1199,24 @@
     "jumpToSection": "Zum Bereich…",
     "settingsSaveHelp": "Anzeigeeinstellungen und Ordneränderungen werden sofort gespeichert. Textfelder mit einer Schaltfläche zum Anwenden oder Speichern werden beim Drücken dieser Schaltfläche gespeichert.",
     "nextQuestion": "Schreibe deine nächste Frage, während der Berater antwortet…"
+  },
+  "story": {
+    "title": "Fortlaufende Geschichte",
+    "offer": "Eine frühere Geschichte fortsetzen?",
+    "explanation": "In dieser Galaxie wurde ein anderes Reich aufgezeichnet. Du kannst dessen Geschichte fortsetzen; die Spieldaten beider Reiche bleiben getrennt.",
+    "predecessor": "Früheres Reich",
+    "continue": "Geschichte fortsetzen",
+    "separate": "Getrennt halten",
+    "connected": "Die Geschichte von {{empire}} wird fortgesetzt.",
+    "readEarlier": "Bisher in dieser Geschichte",
+    "archiveNote": "Frühere Kapitel und jüngste Gespräche bleiben mit dem Stand des Perspektivwechsels erhalten. Sie beschreiben das vorherige Reich, nicht deinen aktuellen Zustand.",
+    "noEarlierProse": "In dieser Sprache liegt kein früherer Text mit bestätigtem Zeitraum vor. Das ursprüngliche Archiv bleibt unverändert.",
+    "discussions": "Jüngste frühere Gespräche",
+    "disconnect": "Geschichte trennen",
+    "rewound": "Dieser Spielstand liegt vor dem Perspektivwechsel. Die frühere Geschichte bleibt erhalten und wird nicht automatisch mit diesem Zeitverlauf verknüpft.",
+    "changed": "Die Kampagne oder Geschichte hat sich geändert. Prüfe die aktuelle Auswahl und versuche es erneut.",
+    "resetRequired": "Diese Chronik gehört zu einer früheren Fortsetzung. Ihr Text bleibt erhalten. Wähle Kampagnen verwalten → Chronik zurücksetzen, um in diesem Zeitverlauf weiterzuschreiben.",
+    "keptSeparate": "Die Geschichte dieses Imperiums bleibt getrennt.",
+    "link": "Frühere Geschichte verknüpfen"
   }
 }

@@ -66,6 +66,17 @@ function registerBackendIpcHandlers({ ipcMain, validateSender, callBackendApiEnv
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/conversations`)
   })
 
+  safeHandle('backend:story', async ({ save_id }) => {
+    const query = new URLSearchParams(withLanguage())
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/story?${query}`)
+  })
+
+  safeHandle('backend:set-story', async ({ save_id, predecessor_save_id, expected_revision }) => {
+    return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/story`, {
+      method: 'POST', body: JSON.stringify(withLanguage({ predecessor_save_id, expected_revision })),
+    })
+  })
+
   safeHandle('backend:create-conversation', async ({ save_id }) => {
     return await callBackendApiEnvelope(`/api/playthroughs/${encodeURIComponent(save_id)}/conversations`, { method: 'POST', body: '{}' })
   })
