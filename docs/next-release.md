@@ -1,3 +1,25 @@
+# Beta 1.1.2-beta.3 candidate
+
+This beta adds story continuation across player empire changes (#97, for #95)
+and Nomad economy support (#98, for #79). Stable remains 1.1.1.
+
+## Release validation
+
+- Complete combined Python, Rust, desktop, localization and renderer checks.
+- Build all four platforms with publication disabled and inspect their artifacts,
+  including the bundled identity catalog smoke check.
+- Database schema 12 adds two story tables without rewriting history. Older apps
+  skip newer schemas, so returning to 1.1.1 keeps working and ignores story links.
+- Verify macOS signing/notarization, package versions, update manifests and hashes.
+- Merge only after the candidate checks pass, then tag the verified main commit.
+- Verify final beta assets and feeds, while stable release/feed remains 1.1.1.
+
+Not claimed: Nomad save fields have not been checked against a real Nomad save;
+reserves and stockpiles are read defensively and degrade to missing data. #83 and
+#86 still await reporter confirmation.
+
+## Earlier release records
+
 # Beta 1.1.2-beta.2 candidate
 
 This beta adds the Chronicle rewind and
