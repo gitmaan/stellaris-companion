@@ -559,6 +559,9 @@ def build_game_knowledge_prompt(
             for entity in entities
             if entity and entity["source"] == "verified_catalog"
         )
+        if isinstance(campaign_identity, dict) and campaign_identity.get("is_nomadic") is True:
+            # A Nomad's economy questions need the reserves rules, whatever the wording.
+            identity_names = f"{identity_names} Operational Reserves Nomad Economy".strip()
         knowledge_content = _select_relevant_sections(
             knowledge_content,
             topics,
