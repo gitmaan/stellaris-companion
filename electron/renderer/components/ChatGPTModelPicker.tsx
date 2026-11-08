@@ -15,12 +15,12 @@ export default function ChatGPTModelPicker({ compact = false, disabled = false }
     if (status?.ready && !status.models.length) void loadModels()
   }, [status?.ready, status?.account?.id, loadModels])
   if (!status?.ready) return null
-  const label = (model: { id: string; name: string }) => {
+  const label = (model: { id: string; name: string; lowerUsage?: boolean }) => {
     if (model.id === status.recommendedModel) return `${model.name} · ${t('chatgpt.recommended')}`
-    if (model.id === 'gpt-5.6-luna') return `${model.name} · ${t('chatgpt.lowerUsage')}`
+    if (model.lowerUsage) return `${model.name} · ${t('chatgpt.lowerUsage')}`
     return model.name
   }
-  const primary = status.models.filter(model => model.id === status.recommendedModel || model.id === 'gpt-5.6-luna')
+  const primary = status.models.filter(model => model.id === status.recommendedModel || model.lowerUsage)
   const other = status.models.filter(model => !primary.includes(model))
   const selected = status.models.find(model => model.id === status.model)
   const selectedLabel = selected ? label(selected) : status.account?.modelName || status.model

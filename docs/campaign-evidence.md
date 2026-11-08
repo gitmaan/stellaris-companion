@@ -78,8 +78,9 @@ not certify factual quality.
 New ChatGPT connections prefer `gpt-6.1-terra` when the account offers it, with the
 previous tested models retained as fallbacks. Direct OpenAI discovery also recommends
 Terra when available. Saved and explicitly entered choices remain selected. Advisor
-uses low reasoning and Chronicle uses medium; the official Terra Chat Completions
-adapter uses its reasoning-inclusive completion allowance. See
+uses low reasoning and Chronicle uses medium for Terra; other GPT-6 models use the
+levels in `model_catalog.json`. Official OpenAI reasoning models use their
+reasoning-inclusive completion allowance. See
 [provider completion behavior](provider-completion.md).
 
 ## Versioned mechanics

@@ -4,7 +4,19 @@
   "refreshSeconds": 3600,
   "openai": {
     "baseUrl": "https://api.openai.com/v1",
-    "defaultModel": "gpt-6.1-terra"
+    "defaultModel": "gpt-6.1-terra",
+    "fallbackModels": ["gpt-5.6-terra", "gpt-6-luna", "gpt-5.6-luna", "gpt-6.1-sol", "gpt-5.6-sol"],
+    "lowerUsageModels": ["gpt-6-luna", "gpt-5.6-luna"],
+    "reasoningEffort": {
+      "gpt-6-astra": { "advisor": "medium", "chronicle": "medium" },
+      "gpt-6.1-sol": { "advisor": "low", "chronicle": "medium" },
+      "gpt-6.1-terra": { "advisor": "low", "chronicle": "medium" },
+      "gpt-6-luna": { "advisor": "none", "chronicle": "none" },
+      "gpt-5.6-sol": { "advisor": "low", "chronicle": "medium" },
+      "gpt-5.6-terra": { "advisor": "low", "chronicle": "medium" },
+      "gpt-5.6-luna": { "advisor": "low", "chronicle": "medium" }
+    },
+    "reasoningSource": "https://developers.openai.com/api/docs/guides/latest-model"
   },
   "openrouterRecommendations": ["gemini-flash-lite", "deepseek-flash", "claude-sonnet"],
   "families": {

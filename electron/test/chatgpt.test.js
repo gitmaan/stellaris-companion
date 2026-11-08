@@ -413,3 +413,28 @@ test('cancelling during model discovery prevents verification and any later infe
     assert.equal(h.calls.filter(call => call.url.endsWith('/responses')).length, before)
   } finally { h.service.close() }
 })
+
+test('each GPT-6 model gets effort levels it accepts, and Luna is the lower-usage choice', async () => {
+  const h = harness({ fetch: request => {
+    if (request.url.endsWith('/models')) return Response.json({ models: [
+      { slug: 'gpt-6-astra', visibility: 'list' }, { slug: 'gpt-6.1-sol', visibility: 'list' },
+      { slug: 'gpt-6-luna', visibility: 'list' }, { slug: 'account-model', visibility: 'list' },
+    ] })
+  } })
+  try {
+    await h.signIn()
+    // Without Terra, a new connection falls back to the lower-usage GPT-6 model.
+    assert.equal(h.service.status().recommendedModel, 'gpt-6-luna')
+    assert.deepEqual(h.service.status().models.filter(model => model.lowerUsage).map(model => model.id), ['gpt-6-luna'])
+    const effort = async (model, purpose) => {
+      await h.service.generate({ model, instructions: 'x', input: 'y', purpose })
+      return JSON.parse(h.calls.at(-1).body).reasoning?.effort
+    }
+    assert.equal(await effort('gpt-6.1-sol', 'advisor'), 'low')
+    assert.equal(await effort('gpt-6.1-sol', 'chronicle'), 'medium')
+    assert.equal(await effort('gpt-6-astra', 'advisor'), 'medium')
+    assert.equal(await effort('gpt-6-luna', 'advisor'), 'none')
+    assert.equal(await effort('gpt-6-luna', 'chronicle'), 'none')
+    assert.equal(await effort('account-model', 'advisor'), undefined)
+  } finally { h.service.close() }
+})

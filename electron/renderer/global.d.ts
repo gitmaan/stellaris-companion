@@ -37,7 +37,7 @@ export interface ChatGPTStatus {
   accounts: Array<{ id: string; email: string; name: string; model: string }>
   model: string
   recommendedModel?: string
-  models: Array<{ id: string; name: string; contextLength?: number }>
+  models: Array<{ id: string; name: string; contextLength?: number; lowerUsage?: boolean }>
   revocationConfirmed?: boolean
 }
 export interface ChatGPTResult { ok: boolean; status: ChatGPTStatus; code?: string }

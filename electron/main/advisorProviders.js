@@ -442,13 +442,14 @@ async function testAdvisorModel({
     max_tokens: 512,
     stream: false,
   }
-  // The official Terra API uses a shared reasoning/output budget. Keep local
+  // Official OpenAI reasoning models share one reasoning/output budget. Keep local
   // and other compatible servers on their existing Chat Completions contract.
-  if (selected === 'custom' && resolvedBaseUrl === modelCatalog.openai.baseUrl
-      && resolvedModel === modelCatalog.openai.defaultModel) {
+  const effort = selected === 'custom' && resolvedBaseUrl === modelCatalog.openai.baseUrl
+    ? modelCatalog.openai.reasoningEffort[resolvedModel]?.advisor : undefined
+  if (effort) {
     delete baseBody.max_tokens
     baseBody.max_completion_tokens = 2048
-    baseBody.reasoning_effort = 'low'
+    baseBody.reasoning_effort = effort
   }
   const structuredBody = {
     ...baseBody,
