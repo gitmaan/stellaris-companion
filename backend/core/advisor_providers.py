@@ -237,12 +237,19 @@ class AdvisorGenerationResult:
     completion: dict[str, Any] = field(default_factory=dict)
 
 
-def _uses_openai_terra(config: AdvisorProviderConfig, model: str) -> bool:
-    return (
-        config.provider == ADVISOR_PROVIDER_CUSTOM
-        and config.base_url == MODEL_CATALOG["openai"]["baseUrl"]
-        and model == MODEL_CATALOG["openai"]["defaultModel"]
-    )
+def _openai_reasoning_effort(config: AdvisorProviderConfig, model: str, purpose: str) -> str | None:
+    """Effort for a known official OpenAI reasoning model, else None.
+
+    These models share one budget for reasoning and output and reject sampling
+    temperature, so they use the reasoning request contract.
+    """
+    if (
+        config.provider != ADVISOR_PROVIDER_CUSTOM
+        or config.base_url != MODEL_CATALOG["openai"]["baseUrl"]
+    ):
+        return None
+    efforts = MODEL_CATALOG["openai"]["reasoningEffort"].get(model) or {}
+    return efforts.get("chronicle" if purpose == "chronicle" else "advisor")
 
 
 def generation_output_limits(
@@ -265,7 +272,7 @@ def generation_output_limits(
         GEMINI_FLASH_LITE_RESERVE_MODEL,
     }:
         ceiling = 16384
-    elif _uses_openai_terra(config, model):
+    elif _openai_reasoning_effort(config, model, purpose):
         # Includes reasoning tokens; keep room for a complete Advisor/Chronicle.
         ceiling = 16384
     elif config.provider == ADVISOR_PROVIDER_CUSTOM and config.base_url in {
@@ -718,8 +725,8 @@ class OpenAICompatibleAdvisorGenerator:
 
         requested_model = str(model or self.config.model).strip()
         resolved_model = self._resolve_model(requested_model)
-        openai_terra = _uses_openai_terra(self.config, resolved_model)
-        token_limit_key = "max_completion_tokens" if openai_terra else "max_tokens"
+        reasoning_effort = _openai_reasoning_effort(self.config, resolved_model, purpose)
+        token_limit_key = "max_completion_tokens" if reasoning_effort else "max_tokens"
         output_limit, retry_ceiling = generation_output_limits(
             self.config, resolved_model, purpose, max_output_tokens
         )
@@ -746,8 +753,8 @@ class OpenAICompatibleAdvisorGenerator:
             token_limit_key: output_limit,
             "stream": False,
         }
-        if openai_terra:
-            request_body["reasoning_effort"] = "medium" if purpose == "chronicle" else "low"
+        if reasoning_effort:
+            request_body["reasoning_effort"] = reasoning_effort
         elif response_schema is None:
             request_body["temperature"] = temperature
         if response_schema is not None:

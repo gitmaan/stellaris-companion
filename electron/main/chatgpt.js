@@ -8,8 +8,11 @@ const RESOURCE = 'https://api.openai.com/v1'
 const SCOPES = 'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct'
 const SECRET_KEY = 'secrets.chatgpt-accounts'
 // Prefer balanced models for new accounts while preserving saved selections.
-const TESTED_MODEL_PREFERENCE = [modelCatalog.openai.defaultModel, 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol']
+const TESTED_MODEL_PREFERENCE = [modelCatalog.openai.defaultModel, ...modelCatalog.openai.fallbackModels]
 const preferredModel = models => TESTED_MODEL_PREFERENCE.map(id => models.find(model => model.id === id)).find(Boolean) || models[0]
+// Each model accepts its own effort levels; unlisted models keep the provider default.
+const reasoningEffort = (model, purpose) =>
+  modelCatalog.openai.reasoningEffort[model]?.[purpose === 'chronicle' ? 'chronicle' : 'advisor']
 const MESSAGES = {
   CHATGPT_CANCELLED: 'Sign-in cancelled. You can try again whenever you’re ready.',
   CHATGPT_RECONNECT: 'Reconnect your ChatGPT account to continue.',
@@ -197,7 +200,8 @@ function createChatGPTService({ store, getSecret, setSecret, openExternal,
     const data = await response.json()
     if (generation !== epoch) throw new ChatGPTError('CHATGPT_CANCELLED', 409)
     const models = (data.models || []).filter(item => item.visibility === 'list' && typeof item.slug === 'string')
-      .map(item => ({ id: item.slug, name: item.display_name || item.slug, contextLength: item.context_window || item.context_length || undefined }))
+      .map(item => ({ id: item.slug, name: item.display_name || item.slug, contextLength: item.context_window || item.context_length || undefined,
+        ...(modelCatalog.openai.lowerUsageModels.includes(item.slug) ? { lowerUsage: true } : {}) }))
       .filter(item => !item.contextLength || item.contextLength >= 32768)
     if (!models.length) throw new ChatGPTError('CHATGPT_MODEL', 400)
     catalogs.set(account.id, models)
@@ -215,7 +219,8 @@ function createChatGPTService({ store, getSecret, setSecret, openExternal,
     if (generation !== epoch) throw new ChatGPTError('CHATGPT_CANCELLED', 409)
     const controller = new AbortController(); requests.add(controller)
     const body = { model, instructions, input: [{ role: 'user', content: input }], store: false, stream: true }
-    if (TESTED_MODEL_PREFERENCE.includes(model)) body.reasoning = { effort: purpose === 'chronicle' ? 'medium' : 'low' }
+    const effort = reasoningEffort(model, purpose)
+    if (effort) body.reasoning = { effort }
     if (schema) body.text = { format: { type: 'json_schema', name: schemaName, strict: true, schema } }
     try {
       const response = await authorizedFetch(account, `${RESOURCE}/responses`, { method: 'POST',

@@ -126,6 +126,32 @@ def test_official_terra_uses_reasoning_budget_and_recovers_with_the_same_contrac
         assert "temperature" not in request and "max_tokens" not in request
 
 
+@pytest.mark.parametrize(
+    ("model", "purpose", "effort"),
+    [
+        ("gpt-6.1-sol", "advisor", "low"),
+        ("gpt-6.1-sol", "chronicle", "medium"),
+        ("gpt-6-astra", "advisor", "medium"),
+        ("gpt-6-luna", "advisor", "none"),
+        ("gpt-6-luna", "chronicle", "none"),
+    ],
+)
+def test_other_official_reasoning_models_use_the_reasoning_contract(model, purpose, effort):
+    generator, requests = generator_with(
+        reply(VALID_JSON), model=model, url="https://api.openai.com/v1"
+    )
+    generator.generate(
+        system_prompt="system",
+        user_prompt="question",
+        purpose=purpose,
+        response_schema=CurrentEraOutput if purpose == "chronicle" else None,
+    )
+    assert requests[0]["model"] == model
+    assert requests[0]["reasoning_effort"] == effort
+    assert requests[0]["max_completion_tokens"] == 8192
+    assert "temperature" not in requests[0] and "max_tokens" not in requests[0]
+
+
 def test_terra_schema_fallback_preserves_reasoning_and_token_parameters():
     generator, requests = generator_with(
         httpx.Response(400, json={"error": {"message": "response_format is unsupported"}}),
@@ -154,6 +180,7 @@ def test_terra_schema_fallback_preserves_reasoning_and_token_parameters():
         ("gpt-6.1-terra", "https://proxy.example/v1"),
         ("gpt-6.1-terra", "https://api.openai.com.example/v1"),
         ("gpt-6.1-terra", "http://127.0.0.1:1234/v1"),
+        ("gpt-6-luna", "https://proxy.example/v1"),
         ("existing-model", "https://api.openai.com/v1"),
     ],
 )

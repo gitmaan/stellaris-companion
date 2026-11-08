@@ -24,7 +24,7 @@ function createChatGPTFixture() {
         if (globalThis.__chatgptFailCatalog) return Response.json({ error: { code: 'server_error' } }, { status: 503 })
         if (globalThis.__chatgptHoldCatalog) await new Promise(resolve => { globalThis.__chatgptReleaseCatalog = resolve })
         const models = process.env.E2E_CHATGPT_MODEL_CATALOG === 'current'
-          ? [['gpt-6-astra', 'GPT-6-Astra'], ['gpt-5.6-sol', 'GPT-5.6-Sol'], ['gpt-6.1-terra', 'GPT-6.1-Terra'], ['gpt-5.6-luna', 'GPT-5.6-Luna']]
+          ? [['gpt-6-astra', 'GPT-6-Astra'], ['gpt-6.1-sol', 'GPT-6.1-Sol'], ['gpt-6.1-terra', 'GPT-6.1-Terra'], ['gpt-6-luna', 'GPT-6-Luna']]
           : [['fixture-strategist', 'Strategist'], ['fixture-strategist-fast', 'Strategist Fast']]
         return Response.json({ models: models.map(([slug, display_name]) => ({ slug, display_name, visibility: 'list', context_window: 272000 })) })
       }
