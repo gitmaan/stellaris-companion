@@ -149,6 +149,8 @@ def _name_technologies(technology: Any, game_version: str) -> dict[str, Any] | N
         for value in group.values():
             if isinstance(value, dict):
                 identifiers.append(value.get("tech"))
+                queued = value.get("queued_techs")
+                identifiers.extend(queued if isinstance(queued, list) else [])
             elif isinstance(value, list):
                 identifiers.extend(value)
     researched = technology.get("researched_techs")
@@ -169,7 +171,8 @@ def _name_technologies(technology: Any, game_version: str) -> dict[str, Any] | N
             "player sees: tech_cryostasis_1 is Automated Colony Ships. names gives the "
             "in-game name of each ID in technology.in_progress and "
             "technology.available_techs, and technology.researched_techs already lists "
-            "in-game names. Refer to technologies by these names, in the player's language, "
+            "in-game names. A technology in in_progress (tech or queued_techs) is not "
+            "researched yet; special_project means that field is working on a project first. Refer to technologies by these names, in the player's language, "
             "and match a technology the player mentions against them before saying it is "
             "missing. An entry that still looks like an ID (tech_...) is modded or newer than "
             "this catalog: never present it, or a name guessed from it, as the exact in-game "

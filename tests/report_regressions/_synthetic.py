@@ -29,7 +29,7 @@ class SyntheticSession:
         self,
         sections: dict[str, Any],
         *,
-        duplicate_values: dict[tuple[str, str, str], list[str]] | None = None,
+        duplicate_values: dict[tuple[str, ...], list[str]] | None = None,
     ) -> None:
         self._sections = deepcopy(sections)
         self._duplicate_values = duplicate_values or {}
@@ -78,8 +78,21 @@ class SyntheticSession:
                 entries.append(projected)
         return entries
 
-    def get_duplicate_values(self, section: str, key: str, field: str) -> list[str]:
-        return list(self._duplicate_values.get((section, str(key), field), []))
+    def get_duplicate_values(
+        self, section: str, key: str, field: str, within: str | None = None
+    ) -> list[str]:
+        """Mirror the Rust op: entry-wide by default, one child block with ``within``.
+
+        A case that matters for the difference registers both
+        ``(section, key, field)`` and ``(section, key, field, within)``. Cases that
+        only register the entry-wide list get it for scoped lookups too.
+        """
+        values = self._duplicate_values
+        if within is not None and (section, str(key), field, within) in values:
+            return list(values[(section, str(key), field, within)])
+        if within is not None and field != "technology":
+            return []
+        return list(values.get((section, str(key), field), []))
 
     def get_entry_text(self, section: str, key: str) -> str | None:
         return None
@@ -200,7 +213,7 @@ def ingest_synthetic_save(
     sections: dict[str, Any],
     *,
     meta: str | None = None,
-    duplicate_values: dict[tuple[str, str, str], list[str]] | None = None,
+    duplicate_values: dict[tuple[str, ...], list[str]] | None = None,
     filename: str = "synthetic.sav",
 ) -> dict:
     """Write a meta-only save and return the worker payload for it."""
