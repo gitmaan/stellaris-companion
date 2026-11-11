@@ -7,6 +7,8 @@ import re
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
+from .save_values import repeated
+
 logger = logging.getLogger(__name__)
 
 # Country types that count as diplomatic "empires" for the known-empires tally.
@@ -1002,6 +1004,7 @@ class DiplomacyMixin:
         # Get player military power for comparison
         player_status = self.get_player_status()
         player_military = player_status.get("military_power", 0)
+        player_id = self.get_player_empire_id()
 
         # Check for War in Heaven using contains_kv (faster than contains_tokens)
         try:
@@ -1097,14 +1100,11 @@ class DiplomacyMixin:
             # Extract opinion of player from relations_manager
             rm = country.get("relations_manager")
             if isinstance(rm, dict):
-                relations = rm.get("relation", [])
-                if isinstance(relations, list):
-                    for rel in relations:
-                        if isinstance(rel, dict) and rel.get("country") == 0:
-                            opinion = rel.get("opinion")
-                            if opinion is not None:
-                                empire_info["opinion_of_player"] = int(opinion)
-                            break
+                for rel in repeated(rm.get("relation")):
+                    if isinstance(rel, dict) and str(rel.get("country")) == str(player_id):
+                        with contextlib.suppress(ValueError, TypeError):
+                            empire_info["opinion_of_player"] = int(float(rel["relation_current"]))
+                        break
 
             result["fallen_empires"].append(empire_info)
 

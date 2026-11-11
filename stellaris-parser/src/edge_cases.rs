@@ -1,121 +1,16 @@
 //! Clausewitz format edge case tests
 //!
 //! These tests validate jomini's handling of Clausewitz format edge cases:
-//! - Duplicate keys: With HashMap<String, Value> deserialization, the last value wins.
-//!   Note: jomini CAN accumulate duplicates with custom deserializers, but our
-//!   current implementation uses simple HashMap deserialization for flexibility.
 //! - Condensed syntax (a={b="1"c=d}) → parsed correctly
 //! - Escape sequences (\" and \\) → handled properly
 //!
-//! See docs/RUST_PARSER_ARCHITECTURE.md for the full architecture decision record.
+//! Repeated keys are covered in `crate::grouped`, which is what the commands use.
 
 #[cfg(test)]
 mod tests {
     use jomini::text::de::from_utf8_slice;
     use serde_json::Value;
     use std::collections::HashMap;
-
-    /// Test duplicate keys behavior with HashMap deserialization
-    ///
-    /// When deserializing to HashMap<String, Value>, duplicate keys are overwritten
-    /// (last value wins). This is standard HashMap behavior.
-    ///
-    /// For applications that need to preserve all values, consider:
-    /// 1. Using jomini's TextTape mid-level API
-    /// 2. Using custom deserializers with #[jomini(duplicated)]
-    ///
-    /// Our current implementation accepts this behavior because:
-    /// - Most Stellaris data doesn't rely on duplicate key ordering
-    /// - Python's fallback regex parser handles cases where we need all values
-    #[test]
-    fn test_duplicate_keys() {
-        let clausewitz_data = br#"
-species={
-    name="Human"
-    traits={
-        trait=trait_adaptive
-        trait=trait_nomadic
-        trait=trait_quick_learners
-    }
-}
-"#;
-
-        // Should parse without error
-        let parsed: HashMap<String, Value> = from_utf8_slice(clausewitz_data)
-            .expect("Should parse Clausewitz data with duplicate keys");
-
-        // Verify we can access the data
-        let species = parsed.get("species").expect("species section should exist");
-        assert!(species.get("name").is_some(), "name should exist");
-
-        let traits = species.get("traits").expect("traits section should exist");
-
-        // With HashMap deserialization, duplicate keys result in last value winning
-        // This is expected behavior - document it for consumers
-        let trait_value = traits.get("trait").expect("trait key should exist");
-
-        // The last trait value should be present
-        assert!(
-            trait_value.as_str().is_some(),
-            "trait should have a string value (last one wins): {:?}",
-            trait_value
-        );
-    }
-
-    /// Test that duplicate keys don't cause parse errors
-    ///
-    /// The parser should handle duplicate keys gracefully, even if only the last
-    /// value is preserved in HashMap deserialization.
-    #[test]
-    fn test_duplicate_keys_no_parse_error() {
-        // Real pattern from Stellaris saves: multiple trait entries
-        let clausewitz_data = br#"
-traits={
-    trait="trait_organic"
-    trait="trait_adaptive"
-    trait="trait_nomadic"
-    trait="trait_wasteful"
-}
-"#;
-
-        // This should not error, even though there are duplicate keys
-        let result: Result<HashMap<String, Value>, _> = from_utf8_slice(clausewitz_data);
-        assert!(
-            result.is_ok(),
-            "Parsing duplicate keys should not error: {:?}",
-            result.err()
-        );
-
-        let parsed = result.unwrap();
-        let traits = parsed.get("traits").expect("traits should exist");
-
-        // Verify the structure parsed (last value wins)
-        assert!(traits.get("trait").is_some(), "trait key should exist");
-    }
-
-    /// Test numeric duplicate keys (fleet IDs, etc.)
-    #[test]
-    fn test_duplicate_keys_numeric() {
-        let clausewitz_data = br#"
-fleet_manager={
-    fleet=123
-    fleet=456
-    fleet=789
-}
-"#;
-
-        let result: Result<HashMap<String, Value>, _> = from_utf8_slice(clausewitz_data);
-        assert!(
-            result.is_ok(),
-            "Parsing numeric duplicate keys should not error"
-        );
-
-        let parsed = result.unwrap();
-        let manager = parsed
-            .get("fleet_manager")
-            .expect("fleet_manager should exist");
-        assert!(manager.get("fleet").is_some(), "fleet key should exist");
-    }
 
     /// Test that condensed syntax without whitespace is parsed correctly
     ///

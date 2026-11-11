@@ -6,7 +6,6 @@
 use crate::error::{ErrorKind, SCHEMA_VERSION, TOOL_VERSION};
 use aho_corasick::AhoCorasick;
 use anyhow::{Context, Result};
-use jomini::text::de::from_windows1252_slice;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -236,11 +235,14 @@ impl ParsedSave {
     fn load(path: &str) -> Result<Self> {
         let (gamestate_bytes, meta_bytes) = crate::commands::extract::read_sav_file(path)?;
 
-        let gamestate: HashMap<String, Value> = from_windows1252_slice(&gamestate_bytes)
+        let gamestate = crate::grouped::parse_document(&gamestate_bytes)
             .with_context(|| "Failed to parse gamestate")?;
 
         let meta = if let Some(meta_bytes) = meta_bytes {
-            Some(from_windows1252_slice(&meta_bytes).with_context(|| "Failed to parse meta file")?)
+            Some(
+                crate::grouped::parse_document(&meta_bytes)
+                    .with_context(|| "Failed to parse meta file")?,
+            )
         } else {
             None
         };

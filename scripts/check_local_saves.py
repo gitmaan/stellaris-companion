@@ -29,6 +29,7 @@ import queue
 import sys
 import tempfile
 import time
+import zipfile
 from collections import defaultdict
 from contextlib import closing
 from dataclasses import dataclass, field
@@ -209,6 +210,35 @@ def check_events(events: list[dict[str, Any]]) -> list[str]:
     return warnings
 
 
+def check_parser(save_path: Path) -> list[str]:
+    """Compare what the parser returns with an independent reading of the save text.
+
+    Every key and value in the save must be present in the parser's output,
+    including keys the save repeats. This catches parser changes that silently
+    drop data, whatever the extractors do with it afterwards.
+    """
+    from stellaris_companion.rust_bridge import session
+    from stellaris_save_extractor.clausewitz_reference import differences, parse
+
+    with zipfile.ZipFile(save_path) as archive:
+        expected = parse(archive.read("gamestate").decode("utf-8", errors="replace"))
+    problems: list[str] = []
+    sections = list(expected)
+    with session(save_path) as active:
+        for start in range(0, len(sections), 8):
+            chunk = sections[start : start + 8]
+            parsed = active.extract_sections(chunk)
+            for section in chunk:
+                if section not in parsed:
+                    problems.append(f"{section}: section missing from parser output")
+                else:
+                    problems += differences(expected[section], parsed[section], section)
+    shown = [f"Parser differs from the save text: {line}"[:300] for line in problems[:5]]
+    if len(problems) > len(shown):
+        shown.append(f"Parser differs from the save text in {len(problems)} or more places")
+    return shown
+
+
 def ingest(save_path: Path, collector: _Collector) -> SaveResult:
     from backend.core import ingestion_worker
     from backend.core.model_briefing import build_model_briefing
@@ -246,6 +276,10 @@ def ingest(save_path: Path, collector: _Collector) -> SaveResult:
     for record in collector.records:
         text = f"Logged {record.levelname.lower()}: {record.getMessage()}"[:300]
         (result.errors if is_swallowed_failure(record) else result.warnings).append(text)
+    try:
+        result.errors += check_parser(save_path)
+    except Exception as exc:  # noqa: BLE001
+        result.errors.append(f"Parser cross-check failed: {type(exc).__name__}: {exc}")
     return result
 
 

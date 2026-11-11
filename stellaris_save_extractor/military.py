@@ -8,6 +8,7 @@ import re
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
 from .fleet_classification import classify_owned_fleet
+from .save_values import is_yes
 
 logger = logging.getLogger(__name__)
 
@@ -462,7 +463,7 @@ class MilitaryMixin:
             fleet = fleets.get(record["fleet_id"])
             if not isinstance(fleet, dict):
                 continue
-            if fleet.get("station") != "yes" and fleet.get("orbital_station") != "yes":
+            if not is_yes(fleet.get("station")) and not is_yes(fleet.get("orbital_station")):
                 continue
 
             system_id = self._fleet_system_id(fleet)

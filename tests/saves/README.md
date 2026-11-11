@@ -35,6 +35,10 @@ history in a temporary database, and uploads nothing. It exits non-zero on a
 crash, a failure the pipeline logged and carried on from, or a missing core
 value such as the game date or empire name.
 
+It also compares what the parser returned with an independent reading of each
+save's text (`stellaris_save_extractor/clausewitz_reference.py`) and fails if any
+key or value in the save is missing from the parser's output.
+
 It also exits non-zero when your installed game, or any checked save, is newer
 than the shipped name catalogs (`identity_catalog.json`, `technology_catalog.json`).
 Regenerate both with

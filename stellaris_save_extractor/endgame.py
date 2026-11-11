@@ -321,19 +321,15 @@ class EndgameMixin:
         player_id = self.get_player_empire_id()
         country_data = self._get_player_country_entry(player_id)
 
+        # Insights are levels of a repeatable technology, stored with the other
+        # researched technologies as technology/level pairs.
+        result["insights_collected"] = self._get_researched_technology_levels(player_id).get(
+            "tech_repeatable_lcluster_clue", 0
+        )
+
         if isinstance(country_data, dict):
             tech_status = country_data.get("tech_status", {})
             if isinstance(tech_status, dict):
-                # Look for tech_repeatable_lcluster_clue in technology list
-                # Note: Due to duplicate key issues, we may need to check multiple formats
-                # Try the level field for repeatables
-                repeatables = tech_status.get("repeatables", {})
-                if isinstance(repeatables, dict):
-                    clue_level = repeatables.get("tech_repeatable_lcluster_clue")
-                    if clue_level is not None:
-                        with contextlib.suppress(ValueError, TypeError):
-                            result["insights_collected"] = int(clue_level)
-
                 # Check for activation tech progress in tech_status.potential block
                 potential = tech_status.get("potential", {})
                 if isinstance(potential, dict):

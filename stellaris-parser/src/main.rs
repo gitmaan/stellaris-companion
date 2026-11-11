@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 mod commands;
 mod edge_cases;
 mod error;
+mod grouped;
 mod output;
 
 #[derive(Parser)]

@@ -117,6 +117,7 @@ class SpeciesMixin:
                 "section": "species_db",
                 "key": sp["id"],
                 "field": "trait",
+                "within": "traits",
             }
             for sp in species_data_list
         ]
@@ -244,6 +245,7 @@ class SpeciesMixin:
                 "section": "species_db",
                 "key": sp["id"],
                 "field": "trait",
+                "within": "traits",
             }
             for sp in species_data_list
         ]
