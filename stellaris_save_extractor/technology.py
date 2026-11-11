@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from collections import Counter
 
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
@@ -20,7 +19,9 @@ class TechnologyMixin:
             Dict with detailed technology tracking including:
             - completed_count: Number of researched technologies
             - researched_techs: List of completed tech names
-            - in_progress: Current research for each category with progress details
+            - in_progress: Head of each research queue with progress details;
+              ``special_project`` when that is a project, and ``queued_techs``
+              for technologies waiting behind it
             - research_speed: Monthly research income by category
             - available_techs: Technologies available for research by category
 
@@ -32,8 +33,8 @@ class TechnologyMixin:
     def _get_technology_rust(self) -> dict:
         """Get technology using Rust session.
 
-        Uses get_duplicate_values for researched techs (handles duplicate keys)
-        and parsed dict access for queues, alternatives, and budget.
+        Uses get_duplicate_values scoped to tech_status for researched techs and
+        their levels, and parsed dict access for queues, alternatives, and budget.
 
         Returns:
             Dict with technology status
@@ -69,32 +70,45 @@ class TechnologyMixin:
             result["error"] = "Could not find tech_status section"
             return result
 
-        # Extract researched techs using get_duplicate_values (handles duplicate keys correctly)
-        technologies = session.get_duplicate_values("country", str(player_id), "technology")
-        result["researched_techs"] = sorted(list(set(technologies)))
+        # Finished technologies only: the research queues below also hold
+        # ``technology=`` keys, for technologies that are still being researched.
+        researched_levels = self._get_researched_technology_levels(player_id)
+        result["researched_techs"] = sorted(researched_levels)
         result["completed_count"] = len(result["researched_techs"])
 
-        # Extract current research from queue structures (Rust handles these correctly)
+        # The head of each queue is what the field is working on. It can be a
+        # special project, with technologies waiting behind it.
         for category in ["physics", "society", "engineering"]:
-            queue_key = f"{category}_queue"
-            queue = tech_status.get(queue_key, [])
-            if isinstance(queue, list) and len(queue) > 0:
-                current = queue[0]  # First item in queue is current research
-                if isinstance(current, dict):
-                    tech_name = current.get("technology")
-                    progress_str = current.get("progress", "0")
-                    try:
-                        progress = float(progress_str)
-                    except (ValueError, TypeError):
-                        progress = 0.0
-
-                    result["in_progress"][category] = {
-                        "tech": tech_name,
-                        "progress": progress,
-                        "cost": None,  # Would need tech definitions to get actual cost
-                        "percent_complete": None,  # Can't calculate without cost
-                        "leader_id": None,
-                    }
+            queue = tech_status.get(f"{category}_queue", [])
+            items = (
+                [item for item in queue if isinstance(item, dict)]
+                if isinstance(queue, list)
+                else []
+            )
+            if not items:
+                continue
+            current = items[0]
+            try:
+                progress = float(current.get("progress", "0"))
+            except (ValueError, TypeError):
+                progress = 0.0
+            entry = {
+                "tech": current.get("technology"),
+                "progress": progress,
+                "cost": None,  # Would need tech definitions to get actual cost
+                "percent_complete": None,  # Can't calculate without cost
+                "leader_id": None,
+            }
+            if not entry["tech"] and "special_project" in current:
+                entry["special_project"] = True
+            queued = [
+                item["technology"]
+                for item in items[1:]
+                if isinstance(item.get("technology"), str) and item["technology"]
+            ]
+            if queued:
+                entry["queued_techs"] = queued
+            result["in_progress"][category] = entry
 
         # Extract available techs from alternatives structure
         alternatives = tech_status.get("alternatives", {})
@@ -130,17 +144,13 @@ class TechnologyMixin:
 
             result["research_speed"] = {cat: round(val, 2) for cat, val in research_totals.items()}
 
-        # Extract repeatable technologies and their levels
-        repeatable_techs = [t for t in technologies if t.startswith("tech_repeatable_")]
-        repeatable_counts = Counter(repeatable_techs)
-
-        # Clean up the names and organize by type
-        repeatables = {}
-        for tech, level in repeatable_counts.items():
-            clean_name = tech.replace("tech_repeatable_", "")
-            repeatables[clean_name] = level
-
+        # Repeatable technologies and the level each has reached
+        repeatables = {
+            tech.replace("tech_repeatable_", ""): level
+            for tech, level in researched_levels.items()
+            if tech.startswith("tech_repeatable_")
+        }
         result["repeatables"] = repeatables
-        result["repeatables_total_levels"] = sum(repeatable_counts.values())
+        result["repeatables_total_levels"] = sum(repeatables.values())
 
         return result
