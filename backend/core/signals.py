@@ -21,6 +21,11 @@ if TYPE_CHECKING:
 # Schema version for signals payload - increment when structure changes
 SIGNALS_FORMAT_VERSION = 1
 
+# Bump when the way treaties are read from a save changes. Two snapshots read
+# differently are not compared, so a corrected reading is not recorded in the
+# campaign history as treaties signed or ended on the day the app was updated.
+TREATY_READING_VERSION = 2
+
 _MEGASTRUCTURE_STAGE_SUFFIX_RE = re.compile(r"_(\d+)$")
 
 
@@ -715,7 +720,6 @@ def _extract_diplomacy_signals(extractor: SaveExtractor) -> dict[str, Any]:
     collect_empire_names(raw.get("non_aggression_pacts", []))
     collect_empire_names(raw.get("commercial_pacts", []))
     collect_empire_names(raw.get("migration_treaties", []))
-    collect_empire_names(raw.get("sensor_links", []))
     collect_empire_names(raw.get("closed_borders", []))
 
     # Also collect from relations list which has more contacts
@@ -765,7 +769,6 @@ def _extract_diplomacy_signals(extractor: SaveExtractor) -> dict[str, Any]:
         ("non_aggression_pacts", "non_aggression_pact"),
         ("commercial_pacts", "commercial_pact"),
         ("migration_treaties", "migration_treaty"),
-        ("sensor_links", "sensor_link"),
     ]
 
     for source_key, treaty_name in treaty_mappings:
@@ -817,6 +820,7 @@ def _extract_diplomacy_signals(extractor: SaveExtractor) -> dict[str, Any]:
         "allies": allies,
         "rivals": rivals,
         "treaties": treaties,
+        "treaty_reading": TREATY_READING_VERSION,
         "empire_names": str_names,
         "known_empire_ids": known_empire_ids,
     }

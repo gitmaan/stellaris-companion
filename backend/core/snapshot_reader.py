@@ -219,6 +219,14 @@ def get_diplomacy_sets(
     return allies, rivals, treaties
 
 
+def get_treaty_reading(briefing: dict[str, Any]) -> int:
+    """Which version of the treaty reader produced this snapshot (1 if unrecorded)."""
+    try:
+        return int(get_diplomacy(briefing).get("treaty_reading") or 1)
+    except (TypeError, ValueError):
+        return 1
+
+
 def get_known_empire_ids(briefing: dict[str, Any]) -> set[int]:
     """Get set of known empire IDs (for first contact detection).
 
