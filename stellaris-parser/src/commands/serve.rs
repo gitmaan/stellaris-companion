@@ -45,20 +45,6 @@ enum Request {
     GetCountrySummaries {
         fields: Vec<String>,
     },
-    GetDuplicateValues {
-        section: String,
-        key: String,
-        field: String,
-        /// Only count `field` where it is a direct child of this child block
-        /// (e.g. `tech_status`), instead of anywhere inside the entry.
-        #[serde(default)]
-        within: Option<String>,
-    },
-    /// Get raw Clausewitz text for a single entry (for duplicate-key parsing in Python)
-    GetEntryText {
-        section: String,
-        key: String,
-    },
     /// Batch multiple operations in a single request to reduce IPC overhead
     Multi {
         ops: Vec<MultiOp>,
@@ -95,19 +81,6 @@ enum MultiOp {
     },
     GetCountrySummaries {
         fields: Vec<String>,
-    },
-    GetDuplicateValues {
-        section: String,
-        key: String,
-        field: String,
-        /// Only count `field` where it is a direct child of this child block
-        /// (e.g. `tech_status`), instead of anywhere inside the entry.
-        #[serde(default)]
-        within: Option<String>,
-    },
-    GetEntryText {
-        section: String,
-        key: String,
     },
 }
 
@@ -169,15 +142,6 @@ enum ResponseData {
     },
     CountrySummaries {
         countries: Vec<Value>,
-    },
-    DuplicateValues {
-        values: Vec<String>,
-        found: bool,
-    },
-    /// Raw Clausewitz text for a single entry
-    EntryText {
-        text: String,
-        found: bool,
     },
     /// Results from a multi-op batch request
     MultiResults {
@@ -623,324 +587,12 @@ fn handle_get_country_summaries(parsed: &ParsedSave, fields: Vec<String>) -> io:
     })
 }
 
-/// Handle get_duplicate_values operation - extract all values for a field with duplicate keys
-///
-/// This is needed because jomini's JSON-style deserialization collapses duplicate keys,
-/// but Stellaris save files use duplicate keys for list-like structures (e.g., traits="x"
-/// appearing multiple times for a leader).
-///
-/// This function scans the raw gamestate bytes to find the entry and extracts all values
-/// for the specified field using byte-level parsing.
-fn handle_get_duplicate_values(
-    gamestate_bytes: &[u8],
-    section: String,
-    key: String,
-    field: String,
-    within: Option<String>,
-) -> io::Result<()> {
-    // Convert to string for searching (save files are Windows-1252 encoded, mostly ASCII-compatible)
-    let content = String::from_utf8_lossy(gamestate_bytes);
-    let (values, found, _) =
-        extract_duplicate_values(&content, &section, &key, &field, within.as_deref(), None);
-
-    write_response(&SuccessResponse {
-        ok: true,
-        data: ResponseData::DuplicateValues { values, found },
-    })
-}
-
-/// Helper to extract duplicate values from raw bytes with optional cached section offset.
-/// Returns (values, found, section_end_for_caching).
-fn extract_duplicate_values(
-    content: &str,
-    section: &str,
-    key: &str,
-    field: &str,
-    within: Option<&str>,
-    cached_section_start: Option<usize>,
-) -> (Vec<String>, bool, Option<usize>) {
-    let mut values: Vec<String> = Vec::new();
-
-    // Find section start (use cache if available)
-    let section_content_start = if let Some(start) = cached_section_start {
-        start
-    } else {
-        let section_pattern = format!("\n{}=", section);
-        if let Some(section_start) = content.find(&section_pattern) {
-            match content[section_start..].find('{') {
-                Some(pos) => section_start + pos + 1,
-                None => return (values, false, None),
-            }
-        } else {
-            return (values, false, None);
-        }
-    };
-
-    // Look for the entry: \n\t<key>=
-    let entry_patterns = [
-        format!("\n\t{}=\n\t{{", key),
-        format!("\n\t{}={{", key),
-        format!("\n\t{} =", key),
-    ];
-
-    let mut entry_start: Option<usize> = None;
-    for pattern in &entry_patterns {
-        if let Some(pos) = content[section_content_start..].find(pattern) {
-            entry_start = Some(section_content_start + pos);
-            break;
-        }
-    }
-
-    let Some(start) = entry_start else {
-        return (values, false, Some(section_content_start));
-    };
-
-    // Find the entry's content by counting braces
-    let entry_content = &content[start..];
-    let mut brace_count = 0;
-    let mut entry_end = entry_content.len();
-    let mut in_entry = false;
-
-    for (i, ch) in entry_content.chars().enumerate() {
-        if ch == '{' {
-            brace_count += 1;
-            in_entry = true;
-        } else if ch == '}' {
-            brace_count -= 1;
-            if in_entry && brace_count == 0 {
-                entry_end = i + 1;
-                break;
-            }
-        }
-    }
-
-    let entry_block = &entry_content[..entry_end];
-
-    if let Some(within) = within {
-        let values = direct_child_values(entry_block, within, field);
-        return (values, true, Some(section_content_start));
-    }
-
-    // Extract all values for the field: field="value"
-    let field_pattern = format!("{}=\"", field);
-    let mut search_pos = 0;
-
-    while let Some(field_start) = entry_block[search_pos..].find(&field_pattern) {
-        let value_start = search_pos + field_start + field_pattern.len();
-        if let Some(value_end) = entry_block[value_start..].find('"') {
-            let value = &entry_block[value_start..value_start + value_end];
-            values.push(value.to_string());
-            search_pos = value_start + value_end + 1;
-        } else {
-            break;
-        }
-    }
-
-    (values, true, Some(section_content_start))
-}
-
-/// One lexical token of Clausewitz text.
-#[derive(Debug, PartialEq)]
-enum ClausewitzToken<'a> {
-    Open,
-    Close,
-    Equals,
-    Atom(&'a str),
-}
-
-/// Split Clausewitz text into braces, `=` and atoms (bare words or quoted strings,
-/// returned without their quotes). Braces and `=` inside quotes are part of the atom.
-fn clausewitz_tokens(text: &str) -> impl Iterator<Item = ClausewitzToken<'_>> {
-    let bytes = text.as_bytes();
-    let mut pos = 0;
-    std::iter::from_fn(move || {
-        while pos < bytes.len() && bytes[pos].is_ascii_whitespace() {
-            pos += 1;
-        }
-        if pos >= bytes.len() {
-            return None;
-        }
-        let start = pos;
-        match bytes[pos] {
-            b'{' => {
-                pos += 1;
-                Some(ClausewitzToken::Open)
-            }
-            b'}' => {
-                pos += 1;
-                Some(ClausewitzToken::Close)
-            }
-            b'=' => {
-                pos += 1;
-                Some(ClausewitzToken::Equals)
-            }
-            b'"' => {
-                pos += 1;
-                let inner = pos;
-                while pos < bytes.len() && bytes[pos] != b'"' {
-                    pos += if bytes[pos] == b'\\' { 2 } else { 1 };
-                }
-                let end = pos.min(bytes.len());
-                pos = (pos + 1).min(bytes.len());
-                // Quotes and backslashes are ASCII, so these are char boundaries.
-                Some(ClausewitzToken::Atom(text.get(inner..end).unwrap_or("")))
-            }
-            _ => {
-                while pos < bytes.len()
-                    && !bytes[pos].is_ascii_whitespace()
-                    && !matches!(bytes[pos], b'{' | b'}' | b'=' | b'"')
-                {
-                    pos += 1;
-                }
-                Some(ClausewitzToken::Atom(text.get(start..pos).unwrap_or("")))
-            }
-        }
-    })
-}
-
-/// Values of every `field=value` that is a direct child of the entry's own
-/// `within={ ... }` block, in file order. Quoted and bare values both count.
-///
-/// The plain substring search used without `within` also matches the same key
-/// nested deeper: a country's research queues hold `technology="..."` for techs
-/// that are still being researched, which are not researched technologies.
-fn direct_child_values(entry_block: &str, within: &str, field: &str) -> Vec<String> {
-    use ClausewitzToken::{Atom, Close, Equals, Open};
-
-    let mut values = Vec::new();
-    let mut depth = 0usize;
-    // Depth of the `within` block's direct children, once we are inside it.
-    let mut target_depth: Option<usize> = None;
-    let mut tokens = clausewitz_tokens(entry_block).peekable();
-
-    while let Some(token) = tokens.next() {
-        match token {
-            Open => depth += 1,
-            Close => {
-                if target_depth == Some(depth) {
-                    break;
-                }
-                depth = depth.saturating_sub(1);
-            }
-            Equals => {}
-            Atom(name) => {
-                if tokens.peek() != Some(&Equals) {
-                    continue;
-                }
-                tokens.next();
-                match target_depth {
-                    // The entry's own children are at depth 1.
-                    None if depth == 1 && name == within => {
-                        if tokens.peek() == Some(&Open) {
-                            tokens.next();
-                            depth += 1;
-                            target_depth = Some(depth);
-                        }
-                    }
-                    Some(target) if depth == target && name == field => {
-                        if let Some(Atom(value)) = tokens.peek() {
-                            values.push((*value).to_string());
-                            tokens.next();
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-    values
-}
-
-/// Handle get_entry_text operation - extract raw Clausewitz text for a single entry
-///
-/// This is needed for cases where Python needs to parse duplicate keys (like relation={})
-/// that can't be represented in JSON. Instead of searching the entire gamestate in Python,
-/// this returns just the entry's raw text for targeted regex parsing.
-fn handle_get_entry_text(gamestate_bytes: &[u8], section: String, key: String) -> io::Result<()> {
-    let content = String::from_utf8_lossy(gamestate_bytes);
-    let (text, found) = extract_entry_text(&content, &section, &key, None);
-
-    write_response(&SuccessResponse {
-        ok: true,
-        data: ResponseData::EntryText { text, found },
-    })
-}
-
-/// Helper to extract raw entry text with optional cached section offset.
-/// Returns (text, found, section_end_for_caching).
-fn extract_entry_text(
-    content: &str,
-    section: &str,
-    key: &str,
-    cached_section_start: Option<usize>,
-) -> (String, bool) {
-    // Find section start (use cache if available)
-    let section_content_start = if let Some(start) = cached_section_start {
-        start
-    } else {
-        let section_pattern = format!("\n{}=", section);
-        if let Some(section_start) = content.find(&section_pattern) {
-            match content[section_start..].find('{') {
-                Some(pos) => section_start + pos + 1,
-                None => return (String::new(), false),
-            }
-        } else {
-            return (String::new(), false);
-        }
-    };
-
-    // Look for the entry: \n\t<key>=
-    let entry_patterns = [
-        format!("\n\t{}=\n\t{{", key),
-        format!("\n\t{}={{", key),
-        format!("\n\t{} =", key),
-    ];
-
-    let mut entry_start: Option<usize> = None;
-    for pattern in &entry_patterns {
-        if let Some(pos) = content[section_content_start..].find(pattern) {
-            entry_start = Some(section_content_start + pos);
-            break;
-        }
-    }
-
-    let Some(start) = entry_start else {
-        return (String::new(), false);
-    };
-
-    // Find the entry's content by counting braces
-    let entry_content = &content[start..];
-    let mut brace_count = 0;
-    let mut entry_end = entry_content.len();
-    let mut in_entry = false;
-
-    for (i, ch) in entry_content.chars().enumerate() {
-        if ch == '{' {
-            brace_count += 1;
-            in_entry = true;
-        } else if ch == '}' {
-            brace_count -= 1;
-            if in_entry && brace_count == 0 {
-                entry_end = i + 1;
-                break;
-            }
-        }
-    }
-
-    let entry_block = &entry_content[..entry_end];
-    (entry_block.to_string(), true)
-}
-
 /// Handle multi-op batch request - execute multiple operations in one request
 /// to reduce IPC round-trip overhead.
 ///
 /// Returns results in the same order as the input operations.
 fn handle_multi_op(parsed: &ParsedSave, ops: Vec<MultiOp>) -> io::Result<()> {
     let mut results: Vec<Value> = Vec::with_capacity(ops.len());
-
-    // Cache for section offsets in get_duplicate_values (section_name -> content_start_offset)
-    let mut section_offset_cache: HashMap<String, usize> = HashMap::new();
-    let content = String::from_utf8_lossy(&parsed.gamestate_bytes);
 
     for op in ops {
         let result = match op {
@@ -1128,32 +780,6 @@ fn handle_multi_op(parsed: &ParsedSave, ops: Vec<MultiOp>) -> io::Result<()> {
                 }
                 json!({ "countries": countries })
             }
-            MultiOp::GetDuplicateValues {
-                section,
-                key,
-                field,
-                within,
-            } => {
-                // Use cached section offset if available to avoid re-scanning 84MB gamestate
-                let cached_offset = section_offset_cache.get(&section).copied();
-                let (values, found, new_offset) = extract_duplicate_values(
-                    &content,
-                    &section,
-                    &key,
-                    &field,
-                    within.as_deref(),
-                    cached_offset,
-                );
-                // Cache the section offset for future ops in this batch
-                if let Some(offset) = new_offset {
-                    section_offset_cache.insert(section.clone(), offset);
-                }
-                json!({ "values": values, "found": found })
-            }
-            MultiOp::GetEntryText { section, key } => {
-                let (text, found) = extract_entry_text(&content, &section, &key, None);
-                json!({ "text": text, "found": found })
-            }
         };
         results.push(result);
     }
@@ -1243,15 +869,6 @@ pub fn run(path: &str) -> Result<()> {
             Request::ContainsKv { pairs } => handle_contains_kv(&parsed, pairs),
             Request::GetCountrySummaries { fields } => {
                 handle_get_country_summaries(&parsed, fields)
-            }
-            Request::GetDuplicateValues {
-                section,
-                key,
-                field,
-                within,
-            } => handle_get_duplicate_values(&parsed.gamestate_bytes, section, key, field, within),
-            Request::GetEntryText { section, key } => {
-                handle_get_entry_text(&parsed.gamestate_bytes, section, key)
             }
             Request::Multi { ops } => handle_multi_op(&parsed, ops),
             Request::Close => {
@@ -1438,120 +1055,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_duplicate_values_request() {
-        let json = r#"{"op": "get_duplicate_values", "section": "leaders", "key": "123", "field": "traits"}"#;
-        let req: Request = serde_json::from_str(json).unwrap();
-        match req {
-            Request::GetDuplicateValues {
-                section,
-                key,
-                field,
-                within,
-            } => {
-                assert_eq!(section, "leaders");
-                assert_eq!(key, "123");
-                assert_eq!(field, "traits");
-                assert_eq!(within, None);
-            }
-            _ => panic!("Wrong request type"),
-        }
-    }
-
-    const COUNTRY_WITH_RESEARCH: &str = concat!(
-        "\ncountry=\n{\n",
-        "\t0=\n\t{\n",
-        "\t\tname=\"tech_status={ technology=tech_in_a_name }\"\n",
-        "\t\ttech_status=\n\t\t{\n",
-        "\t\t\ttechnology=\"tech_lasers_1\"\n\t\t\tlevel=1\n",
-        "\t\t\ttechnology=\"tech_repeatable_naval_cap\"\n\t\t\tlevel=3\n",
-        "\t\t\tphysics_queue=\n\t\t\t{\n\t\t\t\t{\n",
-        "\t\t\t\t\tprogress=12.5\n\t\t\t\t\ttechnology=\"tech_lasers_2\"\n",
-        "\t\t\t\t}\n\t\t\t}\n",
-        "\t\t\talternatives=\n\t\t\t{\n\t\t\t\tphysics=\n\t\t\t\t{\n",
-        "\t\t\t\t\t\"tech_shields_1\"\n\t\t\t\t}\n\t\t\t}\n",
-        "\t\t\tlast_increased_tech=\"tech_lasers_1\"\n",
-        "\t\t}\n",
-        "\t\tother={ technology=\"tech_elsewhere\" level=9 }\n",
-        "\t}\n",
-        "\t1=\n\t{\n\t\ttech_status=\n\t\t{\n\t\t\ttechnology=\"tech_other_country\"\n\t\t}\n\t}\n",
-        "}\n"
-    );
-
-    #[test]
-    fn test_duplicate_values_within_ignores_nested_and_sibling_matches() {
-        let (techs, found, _) = extract_duplicate_values(
-            COUNTRY_WITH_RESEARCH,
-            "country",
-            "0",
-            "technology",
-            Some("tech_status"),
-            None,
-        );
-        assert!(found);
-        // Not the queued tech, not the one outside tech_status, not another country's.
-        assert_eq!(techs, vec!["tech_lasers_1", "tech_repeatable_naval_cap"]);
-
-        let (levels, _, _) = extract_duplicate_values(
-            COUNTRY_WITH_RESEARCH,
-            "country",
-            "0",
-            "level",
-            Some("tech_status"),
-            None,
-        );
-        assert_eq!(levels, vec!["1", "3"]);
-
-        let (missing, found, _) = extract_duplicate_values(
-            COUNTRY_WITH_RESEARCH,
-            "country",
-            "0",
-            "technology",
-            Some("no_such_block"),
-            None,
-        );
-        assert!(found);
-        assert!(missing.is_empty());
-    }
-
-    #[test]
-    fn test_duplicate_values_without_within_keeps_the_entry_wide_search() {
-        let (techs, _, _) = extract_duplicate_values(
-            COUNTRY_WITH_RESEARCH,
-            "country",
-            "0",
-            "technology",
-            None,
-            None,
-        );
-        assert_eq!(
-            techs,
-            vec![
-                "tech_lasers_1",
-                "tech_repeatable_naval_cap",
-                "tech_lasers_2",
-                "tech_elsewhere"
-            ]
-        );
-    }
-
-    #[test]
-    fn test_duplicate_values_within_request_and_compact_layout() {
-        let json = r#"{"op": "get_duplicate_values", "section": "country", "key": "0", "field": "technology", "within": "tech_status"}"#;
-        match serde_json::from_str::<Request>(json).unwrap() {
-            Request::GetDuplicateValues { within, .. } => {
-                assert_eq!(within.as_deref(), Some("tech_status"))
-            }
-            _ => panic!("Wrong request type"),
-        }
-        let compact =
-            "{ tech_status={ technology=\"a b\" level=2 q={ technology=\"c\" } technology=d } }";
-        assert_eq!(
-            direct_child_values(compact, "tech_status", "technology"),
-            vec!["a b", "d"]
-        );
-    }
-
-    #[test]
     fn test_multi_op_request() {
         let json = r#"{"op": "multi", "ops": [{"op": "get_entry", "section": "country", "key": "0"}, {"op": "count_keys", "keys": ["name"]}]}"#;
         let req: Request = serde_json::from_str(json).unwrap();
@@ -1586,13 +1089,12 @@ mod tests {
             {"op": "count_keys", "keys": ["name"]},
             {"op": "contains_tokens", "tokens": ["test"]},
             {"op": "contains_kv", "pairs": [["key", "value"]]},
-            {"op": "get_country_summaries", "fields": ["name"]},
-            {"op": "get_duplicate_values", "section": "leaders", "key": "0", "field": "traits"}
+            {"op": "get_country_summaries", "fields": ["name"]}
         ]}"#;
         let req: Request = serde_json::from_str(json).unwrap();
         match req {
             Request::Multi { ops } => {
-                assert_eq!(ops.len(), 8);
+                assert_eq!(ops.len(), 7);
             }
             _ => panic!("Wrong request type"),
         }

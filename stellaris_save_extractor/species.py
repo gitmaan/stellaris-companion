@@ -8,8 +8,17 @@ from stellaris_companion.rust_bridge import (
     ParserError,
     _get_active_session,
 )
+from stellaris_save_extractor.save_values import repeated
 
 logger = logging.getLogger(__name__)
+
+
+def _trait_ids(species_data: dict) -> list[str]:
+    """A species' trait IDs: the ``trait`` keys of its ``traits`` block, in save order."""
+    traits = species_data.get("traits")
+    if not isinstance(traits, dict):
+        return []
+    return [str(trait) for trait in repeated(traits.get("trait"))]
 
 
 class SpeciesMixin:
@@ -18,29 +27,11 @@ class SpeciesMixin:
     def get_species_full(self) -> dict:
         """Get all species in the game with their traits.
 
-        Uses Rust session mode with batch_ops for efficient trait extraction.
-
         Returns:
             Dict with:
               - species: List of species with id, name, class, traits, home_planet
               - count: Total number of species
               - player_species_id: The player's founder species ID
-        """
-        return self._get_species_full_rust()
-
-    def _get_species_full_rust(self) -> dict:
-        """Get species using Rust parser.
-
-        Uses session mode with two-phase approach:
-        - Phase 1: Iterate species with session.iter_section() to collect data
-        - Phase 2: Use batch_ops to fetch all traits in one IPC call
-        - Phase 3: Build final result with traits
-
-        Note: iter_section and get_duplicate_values can't be interleaved
-        (both use the same stdin/stdout pipe), so we use batch_ops for traits.
-
-        Returns:
-            Dict with species data
 
         Raises:
             ParserError: If no Rust session is active
@@ -63,9 +54,7 @@ class SpeciesMixin:
             if founder_ref is not None:
                 result["player_species_id"] = str(founder_ref)
 
-        # Phase 1: Iterate species and collect data
-        # (can't call get_duplicate_values during iter_section - same pipe)
-        species_data_list = []
+        species_list = []
         for species_id, species_data in session.iter_section("species_db"):
             # P010: entry might be string "none" for deleted entries
             if not isinstance(species_data, dict):
@@ -89,60 +78,24 @@ class SpeciesMixin:
                 default="",
                 context="species",
             )
-            display_name = resolved.display.strip() or None
-
-            if display_name is None and species_class:
-                # Fallback: keep class value as-is (often short codes like MAM/REP/AVI)
-                display_name = str(species_class)
-
-            # Store for phase 2
-            species_data_list.append(
-                {
-                    "id": str(species_id),
-                    "name": display_name,
-                    "name_key": raw_name_key,
-                    "name_source": resolved.source,
-                    "name_confidence": resolved.confidence,
-                    "class": species_class,
-                    "portrait": species_data.get("portrait"),
-                    "home_planet": species_data.get("home_planet"),
-                }
-            )
-
-        # Phase 2: Batch fetch all traits in one IPC call (P025: use batch_ops)
-        # This avoids N round-trips and leverages section offset caching in Rust
-        trait_ops = [
-            {
-                "op": "get_duplicate_values",
-                "section": "species_db",
-                "key": sp["id"],
-                "field": "trait",
-                "within": "traits",
-            }
-            for sp in species_data_list
-        ]
-        trait_results = session.batch_ops(trait_ops) if trait_ops else []
-
-        # Phase 3: Build species info with traits
-        species_list = []
-        for i, sp in enumerate(species_data_list):
-            # Get traits from batch result
-            traits = trait_results[i].get("values", []) if i < len(trait_results) else []
+            # Fallback: keep class value as-is (often short codes like MAM/REP/AVI)
+            display_name = resolved.display.strip() or str(species_class)
 
             species_info = {
-                "id": sp["id"],
-                "name": sp["name"],
-                "name_key": sp.get("name_key"),
-                "name_source": sp.get("name_source"),
-                "name_confidence": sp.get("name_confidence"),
-                "class": sp["class"],
-                "portrait": sp["portrait"],
-                "traits": traits,
-                "is_player_species": sp["id"] == result["player_species_id"],
+                "id": str(species_id),
+                "name": display_name,
+                "name_key": raw_name_key,
+                "name_source": resolved.source,
+                "name_confidence": resolved.confidence,
+                "class": species_class,
+                "portrait": species_data.get("portrait"),
+                "traits": _trait_ids(species_data),
+                "is_player_species": str(species_id) == result["player_species_id"],
             }
 
-            if sp["home_planet"] is not None:
-                species_info["home_planet_id"] = str(sp["home_planet"])
+            home_planet = species_data.get("home_planet")
+            if home_planet is not None:
+                species_info["home_planet_id"] = str(home_planet)
 
             species_list.append(species_info)
 
@@ -235,26 +188,11 @@ class SpeciesMixin:
                         "class": species_class,
                         "empire": needed_species[sid],
                         "is_player_species": sid == player_species_id,
+                        "traits": _trait_ids(species_data),
                     }
                 )
 
-        # 4. Batch fetch traits only for needed species
-        trait_ops = [
-            {
-                "op": "get_duplicate_values",
-                "section": "species_db",
-                "key": sp["id"],
-                "field": "trait",
-                "within": "traits",
-            }
-            for sp in species_data_list
-        ]
-        trait_results = session.batch_ops(trait_ops) if trait_ops else []
-
-        for i, sp in enumerate(species_data_list):
-            sp["traits"] = trait_results[i].get("values", []) if i < len(trait_results) else []
-
-        # 5. Build result
+        # 4. Build result
         player_species = None
         known_empire_species = []
         for sp in species_data_list:
