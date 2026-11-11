@@ -4,7 +4,7 @@ import contextlib
 import logging
 import os
 import re
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
@@ -846,14 +846,13 @@ class PlayerMixin:
             if civic in {"distinguished_admiralty", "nationalistic_zeal"}:
                 unresolved_families.add("councilor_civic_modifiers")
 
-        researched_techs = self._get_researched_technologies(player_id)
-        for tech in sorted(set(researched_techs)):
+        researched_techs = self._get_researched_technology_levels(player_id)
+        for tech in sorted(researched_techs):
             amount = _NAVAL_CAP_TECH_ADDS.get(tech)
             if amount:
                 add_flat(f"Technology ({tech})", amount, "technology")
 
-        repeatables = Counter(t for t in researched_techs if t == "tech_repeatable_naval_cap")
-        repeatable_levels = repeatables.get("tech_repeatable_naval_cap", 0)
+        repeatable_levels = researched_techs.get("tech_repeatable_naval_cap", 0)
         if repeatable_levels:
             add_flat(
                 "Repeatable naval-cap tech",
@@ -1057,13 +1056,38 @@ class PlayerMixin:
             return set()
         return {flag for flag in flags if isinstance(flag, str)}
 
-    def _get_researched_technologies(self, player_id: int) -> list[str]:
-        """Return researched technology IDs for the player country."""
+    def _get_researched_technology_levels(self, player_id: int) -> dict[str, int]:
+        """Return ``{technology ID: level}`` for technologies the player has finished.
+
+        Only direct children of the country's ``tech_status`` block count. Its
+        research queues also hold ``technology=`` keys, for technologies that are
+        still being researched. A repeatable's level is its ``level=`` value, or
+        the number of times it is listed in saves that repeat the key instead.
+        """
         session = _get_active_session()
         if not session:
-            return []
-        values = session.get_duplicate_values("country", str(player_id), "technology")
-        return [value for value in values if isinstance(value, str)]
+            return {}
+        country = str(player_id)
+        technologies = [
+            value
+            for value in session.get_duplicate_values(
+                "country", country, "technology", within="tech_status"
+            )
+            if isinstance(value, str) and value
+        ]
+        levels = session.get_duplicate_values("country", country, "level", within="tech_status")
+        researched: dict[str, int] = {}
+        if len(levels) == len(technologies):
+            for technology, level in zip(technologies, levels, strict=True):
+                try:
+                    parsed = max(int(float(level)), 1)
+                except (TypeError, ValueError):
+                    parsed = 1
+                researched[technology] = max(researched.get(technology, 0), parsed)
+        else:
+            for technology in technologies:
+                researched[technology] = researched.get(technology, 0) + 1
+        return researched
 
     def get_active_policies(self) -> dict[str, str]:
         """Return selected player policies, preserving unfamiliar game-version IDs."""

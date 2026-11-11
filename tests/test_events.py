@@ -498,6 +498,28 @@ class TestComputeEvents:
         event_types = [e.event_type for e in result]
         assert "technology_researched" in event_types
 
+    def test_technology_researched_uses_in_game_names(self, base_prev_snapshot, base_curr_snapshot):
+        """Issue #104: tech_cryostasis_1 is "Automated Colony Ships", not "Cryostasis 1"."""
+        base_prev_snapshot["history"]["technology"]["techs"] = []
+        base_curr_snapshot["history"]["technology"]["techs"] = [
+            "tech_cryostasis_1",
+            "tech_my_mod_reactor",
+        ]
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        summaries = {
+            e.data["tech"]: e.summary for e in result if e.event_type == "technology_researched"
+        }
+        assert summaries == {
+            "tech_cryostasis_1": "Researched: Automated Colony Ships",
+            "tech_my_mod_reactor": "Researched: My Mod Reactor",
+        }
+
     def test_detects_systems_gained(self, base_prev_snapshot, base_curr_snapshot):
         """Detects gaining systems."""
         base_prev_snapshot["history"]["systems"]["system_count"] = 10

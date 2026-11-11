@@ -1,5 +1,5 @@
 {
-  "game_version": "Pegasus v4.4.6 (fdde)",
+  "game_version": "Cygnus v4.5.3 (4e91)",
   "source": "Stellaris common/ definitions with localisation/english display names",
   "authority": {
     "ancient_machine_intelligence": "Ancient Machine Intelligence",
@@ -344,6 +344,7 @@
     "cosmic_dawn": "Cosmic Dawn",
     "cybernetic_creed": "Cybernetic Creed",
     "default": "Prosperous Unification",
+    "default_nomadic": "Prosperous Unification",
     "default_nomads": "Voidfarers",
     "default_pre_ftl": "Developing Civilization",
     "demonic_incursion": "Daemonic Incursion",
@@ -402,11 +403,13 @@
     "star_slingshot": "Slingshot to the Stars",
     "starlit_citadel": "Starlit Citadel",
     "storm_chasers": "Storm Chasers",
+    "storm_chasers_nomadic": "Storm Chasers",
     "subterranean": "Subterranean",
     "subterranean_machines": "Subterranean Machines",
     "syncretic_evolution": "Syncretic Evolution",
     "synthetic_fertility": "Synthetic Fertility",
     "toxic_knights": "Knights of the Toxic God",
+    "toxic_knights_nomadic": "Knights of the Toxic God",
     "treasure_hunters": "Treasure Hunters",
     "tree_of_life": "Tree of Life",
     "unplugged": "Hard Reset",

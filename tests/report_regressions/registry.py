@@ -38,6 +38,52 @@ class Report:
 
 
 REPORTS: dict[int, Report] = {
+    104: Report(
+        summary="A research option is shown under an ID that looks like another technology.",
+        root_cause=(
+            "The save lists research options by internal ID and the Advisor received no "
+            "names, so tech_cryostasis_1 (Automated Colony Ships) read as a different "
+            "technology and the one the game showed looked missing. For external AI "
+            "clients the MCP summary also cut each field to four options without saying "
+            "so and showed names made up from the IDs. Separately, the researched list "
+            "was read from every technology= key under the country, which includes the "
+            "research queues, so technologies in progress counted as researched."
+        ),
+        fixed_by=("PR #105", "PR #106"),
+        layer="Rust lookup + technology extractor + name catalog + model_context + events + MCP",
+        cases=(
+            Case(
+                f"{_HERE}/test_report_technology.py"
+                "::test_issue_104_research_options_carry_their_in_game_names",
+                "new",
+                True,
+                "Names checked against the installed Cygnus 4.5.3 game files; no 4.5.3 save "
+                "was available, so the save layout is the 4.4.6 one.",
+            ),
+            Case(
+                f"{_HERE}/test_report_technology.py"
+                "::test_issue_104_technologies_still_in_research_are_not_reported_as_researched",
+                "new",
+                True,
+                "Queue contamination, repeatable levels and the special-project queue head "
+                "were confirmed on real 4.2.4, 4.4.6 and 4.5.2 saves before and after the fix.",
+            ),
+            Case(
+                "tests/test_events.py"
+                "::TestComputeEvents::test_technology_researched_uses_in_game_names",
+                "referenced",
+                True,
+            ),
+            Case(
+                "tests/test_mcp_context.py"
+                "::test_external_clients_get_every_research_option_under_its_in_game_name",
+                "referenced",
+                True,
+                "External AI clients: five options were cut to four, under names made up "
+                'from the IDs ("Cryostasis I").',
+            ),
+        ),
+    ),
     79: Report(
         summary="Advisor treats a Nomad economy as a failing settled mining economy.",
         root_cause=(

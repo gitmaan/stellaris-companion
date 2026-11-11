@@ -596,7 +596,9 @@ class RustSession:
         response = self._recv()
         return response
 
-    def get_duplicate_values(self, section: str, key: str, field: str) -> list[str]:
+    def get_duplicate_values(
+        self, section: str, key: str, field: str, within: str | None = None
+    ) -> list[str]:
         """Extract all values for a field that has duplicate keys in Clausewitz format.
 
         Stellaris save files use duplicate keys for list-like structures (e.g.,
@@ -608,6 +610,10 @@ class RustSession:
             section: Section name (e.g., "leaders", "species_db")
             key: Entry ID/key within the section (e.g., "123" for leader ID)
             field: Field name that has duplicate values (e.g., "traits")
+            within: Only count the field where it is a direct child of this child
+                block of the entry (e.g., "tech_status"). Without it the field is
+                matched anywhere inside the entry, however deeply nested: a
+                country's research queues also hold ``technology=`` keys.
 
         Returns:
             List of all values for that field. Empty list if entry not found
@@ -621,14 +627,15 @@ class RustSession:
             This is specifically for fields with duplicate keys in Clausewitz format.
             For normal fields, use get_entry() instead.
         """
-        self._send(
-            {
-                "op": "get_duplicate_values",
-                "section": section,
-                "key": key,
-                "field": field,
-            }
-        )
+        request = {
+            "op": "get_duplicate_values",
+            "section": section,
+            "key": key,
+            "field": field,
+        }
+        if within is not None:
+            request["within"] = within
+        self._send(request)
         response = self._recv()
         return response.get("values", [])
 

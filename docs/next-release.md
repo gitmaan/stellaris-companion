@@ -34,7 +34,8 @@ consented private save attachments from #82. Stable remains 1.1.1.
   134 desktop unit tests and the 10 Advisor provider Electron journeys.
 - Build all four platforms with publication disabled and inspect their artifacts.
 - Confirm the packaged backend loads `stellaris_companion/identity_catalog.json`
-  (a missing file degrades silently to raw identifiers, so check a real lookup).
+  and `stellaris_companion/technology_catalog.json` (a missing file degrades silently
+  to raw identifiers, so check a real lookup in each).
 - Repeat the packaged ChatGPT bridge checks from beta.1, and confirm an injected
   internal failure shows the localized message, its reference and REPORT.
 - Verify macOS signing/notarization, package versions, update manifests and hashes.

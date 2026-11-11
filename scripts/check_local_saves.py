@@ -5,7 +5,9 @@ A pre-release check for things synthetic tests can't catch. Each save goes
 through the same steps the app uses: the ingestion worker (Rust parser and
 extractors), the model briefing, and campaign history (snapshots and events,
 in game-date order). The check reports crashes, swallowed errors, and values that
-are essentially never legitimately empty.
+are essentially never legitimately empty. It also fails when the installed game
+or a save is newer than the shipped name catalogs, which otherwise go stale
+without anyone noticing.
 
 Everything stays on this machine: saves are read in place, history goes into a
 temporary database that is deleted afterwards, and nothing is uploaded.
@@ -22,6 +24,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import queue
 import sys
 import tempfile
@@ -112,6 +115,88 @@ def check_briefing(briefing: dict[str, Any]) -> tuple[list[str], list[str]]:
     return errors, warnings
 
 
+_REGENERATE = (
+    "Regenerate them: python3 scripts/generate_identity_catalog.py --game-dir <Stellaris install>"
+)
+
+
+def default_game_dirs() -> list[Path]:
+    """Where a Steam install of Stellaris usually lives, plus STELLARIS_GAME_DIR."""
+    home = Path.home()
+    candidates = [
+        home / "Library/Application Support/Steam/steamapps/common/Stellaris",
+        Path("C:/Program Files (x86)/Steam/steamapps/common/Stellaris"),
+        home / ".steam/steam/steamapps/common/Stellaris",
+        home / ".local/share/Steam/steamapps/common/Stellaris",
+    ]
+    override = os.environ.get("STELLARIS_GAME_DIR")
+    return [Path(override)] if override else candidates
+
+
+def installed_game_version(game_dirs: list[Path]) -> str | None:
+    for game_dir in game_dirs:
+        try:
+            settings = json.loads(
+                (game_dir.expanduser() / "launcher-settings.json").read_text(encoding="utf-8-sig")
+            )
+        except (OSError, ValueError):
+            continue
+        version = settings.get("version") if isinstance(settings, dict) else None
+        if isinstance(version, str) and version.strip():
+            return version.strip()
+    return None
+
+
+def check_installed_game(game_dirs: list[Path]) -> str | None:
+    """Return a problem if the installed game is newer than the name catalogs."""
+    from stellaris_companion.technology_names import (
+        TECHNOLOGY_CATALOG_GAME_VERSION,
+        catalog_covers_game_version,
+    )
+
+    installed = installed_game_version(game_dirs)
+    if installed is None or catalog_covers_game_version(installed) is not False:
+        return None
+    return (
+        f"Installed game is {installed}, but the name catalogs are from "
+        f"{TECHNOLOGY_CATALOG_GAME_VERSION}. {_REGENERATE}"
+    )
+
+
+def check_name_catalogs(briefing: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Return (errors, warnings) about names the catalogs cannot supply for this save."""
+    from stellaris_companion.technology_names import (
+        TECHNOLOGY_CATALOG_GAME_VERSION,
+        catalog_covers_game_version,
+        technology_display_name,
+    )
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    meta = briefing.get("meta") if isinstance(briefing.get("meta"), dict) else {}
+    version = str(meta.get("version") or "").strip()
+    if catalog_covers_game_version(version) is False:
+        errors.append(
+            f"Save is from {version}, newer than the name catalogs "
+            f"({TECHNOLOGY_CATALOG_GAME_VERSION}). {_REGENERATE}"
+        )
+    technology = briefing.get("technology") if isinstance(briefing.get("technology"), dict) else {}
+    identifiers: list[Any] = list(technology.get("researched_techs") or [])
+    for group in (technology.get("in_progress"), technology.get("available_techs")):
+        for value in (group or {}).values() if isinstance(group, dict) else ():
+            identifiers += [value.get("tech")] if isinstance(value, dict) else list(value or [])
+    unnamed = sorted(
+        {i for i in identifiers if isinstance(i, str) and i and not technology_display_name(i)}
+    )
+    if unnamed:
+        sample = ", ".join(unnamed[:5])
+        warnings.append(
+            f"{len(unnamed)} technology IDs have no catalog name (modded, or newer than "
+            f"the catalog): {sample}"
+        )
+    return errors, warnings
+
+
 def check_events(events: list[dict[str, Any]]) -> list[str]:
     """Flag event history that couldn't come from one campaign played forward."""
     warnings = []
@@ -150,9 +235,9 @@ def ingest(save_path: Path, collector: _Collector) -> SaveResult:
     result.empire = str(meta.get("empire_name") or "")
     result.date = str(meta.get("date") or "")
     result.version = str(meta.get("version") or "")
-    errors, warnings = check_briefing(briefing)
-    result.errors += errors
-    result.warnings += warnings
+    for errors, warnings in (check_briefing(briefing), check_name_catalogs(briefing)):
+        result.errors += errors
+        result.warnings += warnings
     try:
         model = build_model_briefing(briefing)
         result.briefing_kb = round(len(json.dumps(model, default=str)) / 1024)
@@ -206,6 +291,9 @@ def main(argv: list[str] | None = None) -> int:
         "--all", action="store_true", help="Check every save, not just 2 per campaign"
     )
     parser.add_argument("--json", type=Path, help="Also write a summary (no save contents) here")
+    parser.add_argument(
+        "--game-dir", type=Path, help="Stellaris install to compare the name catalogs against"
+    )
     args = parser.parse_args(argv)
 
     from stellaris_companion.save_loader import get_platform_save_paths
@@ -221,6 +309,10 @@ def main(argv: list[str] | None = None) -> int:
     logging.getLogger().addHandler(collector)
     # The worker raises its own logging to DEBUG; keep only what matters here.
     logging.basicConfig = lambda **kwargs: None  # type: ignore[assignment]
+
+    stale_catalogs = check_installed_game([args.game_dir] if args.game_dir else default_game_dirs())
+    if stale_catalogs:
+        print(f"FAIL name catalogs: {stale_catalogs}\n")
 
     summary: list[dict[str, Any]] = []
     failed = 0
@@ -261,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n{total - failed}/{total} saves passed." if failed else f"\nAll {total} saves passed.")
     if args.json:
         args.json.write_text(json.dumps(summary, indent=2))
-    return 1 if failed else 0
+    return 1 if failed or stale_catalogs else 0
 
 
 if __name__ == "__main__":

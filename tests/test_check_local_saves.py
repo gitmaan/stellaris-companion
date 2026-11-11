@@ -89,6 +89,52 @@ def test_nomads_without_planets_are_not_flagged():
     assert warnings == []
 
 
+def test_a_save_newer_than_the_name_catalogs_is_an_error():
+    errors, warnings = check.check_name_catalogs(
+        _briefing(meta={"date": "2250.01.01", "empire_name": "Union", "version": "Next v99.0.0"})
+    )
+    assert len(errors) == 1
+    assert errors[0].startswith("Save is from Next v99.0.0, newer than the name catalogs (")
+    assert "generate_identity_catalog.py" in errors[0]
+    assert warnings == []
+    # Same or older versions, and unreadable ones, are not flagged.
+    assert check.check_name_catalogs(_briefing()) == ([], [])
+    assert check.check_name_catalogs(_briefing(meta={"version": "modded build"})) == ([], [])
+
+
+def test_technology_ids_without_a_catalog_name_are_listed_as_a_warning():
+    errors, warnings = check.check_name_catalogs(
+        _briefing(
+            technology={
+                "researched_techs": ["tech_colonization_1", "tech_my_mod_reactor"],
+                "in_progress": {"physics": {"tech": "tech_lasers_2"}, "society": None},
+                "available_techs": {"physics": ["tech_cryostasis_1", "tech_other_mod_thing"]},
+            }
+        )
+    )
+    assert errors == []
+    assert warnings == [
+        "2 technology IDs have no catalog name (modded, or newer than the catalog): "
+        "tech_my_mod_reactor, tech_other_mod_thing"
+    ]
+
+
+def test_an_installed_game_newer_than_the_name_catalogs_is_reported(tmp_path):
+    newer, same, broken = tmp_path / "newer", tmp_path / "same", tmp_path / "broken"
+    for game_dir, version in ((newer, "Next v99.0.0 (abcd)"), (same, "Pegasus v4.4.6")):
+        game_dir.mkdir()
+        (game_dir / "launcher-settings.json").write_text(
+            f'{{"version": "{version}"}}', encoding="utf-8"
+        )
+    broken.mkdir()
+    (broken / "launcher-settings.json").write_text("not json", encoding="utf-8")
+
+    problem = check.check_installed_game([tmp_path / "missing", broken, newer])
+    assert problem.startswith("Installed game is Next v99.0.0 (abcd), but the name catalogs")
+    assert check.check_installed_game([same]) is None
+    assert check.check_installed_game([tmp_path / "missing", broken]) is None
+
+
 def _record(level, message):
     return logging.LogRecord("stellaris", level, __file__, 1, message, None, None)
 
@@ -108,5 +154,6 @@ def test_a_flood_of_one_event_type_is_flagged():
 
 def test_a_real_save_passes_the_whole_pipeline(test_save_path, capsys):
     pytest.importorskip("stellaris_companion.rust_bridge")
-    assert check.main([test_save_path]) == 0
+    # No game install: this test is about the save, not this machine's catalogs.
+    assert check.main([test_save_path, "--game-dir", str(Path(test_save_path).parent)]) == 0
     assert "All 1 saves passed." in capsys.readouterr().out

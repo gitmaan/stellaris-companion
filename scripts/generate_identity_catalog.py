@@ -1,21 +1,31 @@
 #!/usr/bin/env python3
-"""Generate the empire identity name catalog from an installed Stellaris.
+"""Generate the identity and technology name catalogs from an installed Stellaris.
 
 Reads the IDs that the game defines in ``common/governments/authorities``,
-``common/governments/civics`` (civics and origins) and ``common/ethics``, then
-looks up each ID's English display name in ``localisation/english``. The output
-keeps only ID -> name strings plus the source game version, so no other
-localisation text is redistributed.
+``common/governments/civics`` (civics and origins), ``common/ethics`` and
+``common/technology``, then looks up each ID's English display name in
+``localisation/english``. The outputs keep only ID -> name strings plus the
+source game version, so no other localisation text is redistributed.
 
 Usage:
     python3 scripts/generate_identity_catalog.py \\
-        --game-dir "~/Library/Application Support/Steam/steamapps/common/Stellaris" \\
-        --output stellaris_companion/identity_catalog.json
+        --game-dir "~/Library/Application Support/Steam/steamapps/common/Stellaris"
+
+Both catalogs are written from the same install so their versions stay in step:
+``stellaris_companion/identity_catalog.json`` and
+``stellaris_companion/technology_catalog.json``.
 
 Every defined entry is included, playable or not (fallen empire, enclave,
 nomadic and pre-FTL civics/origins appear in saves too). ``swap_type`` display
 variants (e.g. the lithoid Devouring Swarm "Terravore") are added under their
 own name keys. IDs whose name cannot be resolved are reported and omitted.
+
+Technologies keep their full save ID (``tech_cryostasis_1``) as the key because
+that is what a save's research lists contain. Some empires see a technology
+under a ``technology_swap`` name instead (Wilderness, Nomads, ...). Which one the
+UI shows depends on game script, so the catalog does not decide: ``variants``
+lists the other names a technology can appear under, and each swap ID is also
+named under its own key.
 """
 
 from __future__ import annotations
@@ -86,7 +96,7 @@ def parse_definitions(text: str) -> list[dict]:
             elif depth == 1 and current is not None:
                 if token == "is_origin" and after == "yes":
                     current["is_origin"] = True
-                elif token == "swap_type" and after == "{":
+                elif token in ("swap_type", "technology_swap") and after == "{":
                     in_swap_depth = 2
             elif (
                 depth == 2
@@ -177,10 +187,88 @@ def collect_ids(game_dir: Path) -> dict[str, list[str]]:
     return ids
 
 
-def build_catalog(game_dir: Path) -> tuple[dict, list[str]]:
+def _load_english(game_dir: Path) -> tuple[dict[str, str], set[str]]:
     localisation, conflicts = load_localisation(game_dir / "localisation" / "english")
     if not localisation:
         raise SystemExit(f"No English localisation found under {game_dir / 'localisation'}")
+    return localisation, conflicts
+
+
+def collect_technology_ids(game_dir: Path) -> list[str]:
+    paths = sorted((game_dir / "common" / "technology").glob("*.txt"))
+    if not paths:
+        raise SystemExit(f"No technology definition files found under {game_dir / 'common'}")
+    ids: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        for entry in parse_definitions(read_text(path)):
+            if entry["id"] not in seen:
+                seen.add(entry["id"])
+                ids.append(entry["id"])
+    return ids
+
+
+def _resolved(identifier: str, localisation: dict[str, str], conflicts: set[str]) -> str:
+    """Return the display name, or raise ``LookupError`` with the reason it is unusable."""
+    if identifier in conflicts:
+        raise LookupError("conflicting English names")
+    try:
+        name = resolve_name(identifier, localisation)
+    except KeyError:
+        raise LookupError("no English name") from None
+    if not name or "[" in name:
+        raise LookupError(f"dynamic or empty name {name!r}")
+    return name
+
+
+def collect_technologies(game_dir: Path) -> dict[str, list[str]]:
+    """Return ``{technology ID: [technology_swap IDs]}`` in definition order."""
+    paths = sorted((game_dir / "common" / "technology").glob("*.txt"))
+    if not paths:
+        raise SystemExit(f"No technology definition files found under {game_dir / 'common'}")
+    technologies: dict[str, list[str]] = {}
+    for path in paths:
+        for entry in parse_definitions(read_text(path)):
+            swaps = technologies.setdefault(entry["id"], [])
+            swaps.extend(name for name in entry["swap_names"] if name not in swaps)
+    return technologies
+
+
+def build_technology_catalog(
+    game_dir: Path, english: tuple[dict[str, str], set[str]] | None = None
+) -> tuple[dict, list[str]]:
+    """Return technology names, their swap-name variants, and the IDs left out."""
+    localisation, conflicts = english or _load_english(game_dir)
+    names: dict[str, str] = {}
+    variants: dict[str, list[str]] = {}
+    unresolved: list[str] = []
+    for identifier, swaps in collect_technologies(game_dir).items():
+        try:
+            names[identifier] = _resolved(identifier, localisation, conflicts)
+        except LookupError as reason:
+            unresolved.append(f"technology:{identifier} ({reason})")
+            continue
+        for swap in swaps:
+            try:
+                swap_name = _resolved(swap, localisation, conflicts)
+            except LookupError:
+                continue  # A swap without its own text shows the base name.
+            names.setdefault(swap, swap_name)
+            if swap_name != names[identifier] and swap_name not in variants.get(identifier, []):
+                variants.setdefault(identifier, []).append(swap_name)
+    catalog = {
+        "game_version": read_game_version(game_dir),
+        "source": "Stellaris common/technology definitions with localisation/english display names",
+        "technology": dict(sorted(names.items())),
+        "variants": dict(sorted(variants.items())),
+    }
+    return catalog, unresolved
+
+
+def build_catalog(
+    game_dir: Path, english: tuple[dict[str, str], set[str]] | None = None
+) -> tuple[dict, list[str]]:
+    localisation, conflicts = english or _load_english(game_dir)
     ids = collect_ids(game_dir)
     catalog: dict = {
         "game_version": read_game_version(game_dir),
@@ -209,25 +297,33 @@ def build_catalog(game_dir: Path) -> tuple[dict, list[str]]:
     return catalog, unresolved
 
 
+def _write_catalog(path: Path, catalog: dict) -> None:
+    path.write_text(json.dumps(catalog, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--game-dir", required=True, type=Path, help="Stellaris install directory")
+    package = Path(__file__).resolve().parents[1] / "stellaris_companion"
+    parser.add_argument("--output", type=Path, default=package / "identity_catalog.json")
     parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path(__file__).resolve().parents[1]
-        / "stellaris_companion"
-        / "identity_catalog.json",
+        "--technology-output", type=Path, default=package / "technology_catalog.json"
     )
     args = parser.parse_args(argv)
     game_dir = args.game_dir.expanduser()
-    catalog, unresolved = build_catalog(game_dir)
-    args.output.write_text(
-        json.dumps(catalog, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
+    english = _load_english(game_dir)
+    catalog, unresolved = build_catalog(game_dir, english)
+    technology, technology_unresolved = build_technology_catalog(game_dir, english)
+    _write_catalog(args.output, catalog)
+    _write_catalog(args.technology_output, technology)
     counts = ", ".join(f"{kind}={len(catalog[kind])}" for kind in KINDS)
     print(f"Wrote {args.output} from {catalog['game_version']}: {counts}")
-    for item in unresolved:
+    print(
+        f"Wrote {args.technology_output} from {technology['game_version']}: "
+        f"technology={len(technology['technology'])}, "
+        f"with variants={len(technology['variants'])}"
+    )
+    for item in (*unresolved, *technology_unresolved):
         print(f"  skipped {item}", file=sys.stderr)
     return 0
 
