@@ -4,23 +4,52 @@ const fs = require('node:fs/promises')
 const path = require('node:path')
 const os = require('node:os')
 const crypto = require('node:crypto')
+const { execFileSync } = require('node:child_process')
 const { createReportSaveService, CONSENT_VERSION } = require('../main/reportSaves')
 
-async function fixture(t) {
+const repoRoot = path.join(__dirname, '..', '..')
+const python = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3')
+
+// Write a minimal save and describe it with the real backend, exactly as
+// /api/report-save does. The app compares this description with what Node sees.
+// The file is created first and written later, like a save the game overwrites
+// or takes a while to write: its creation time and last-change time then differ,
+// which is where Python and Node disagree about "ctime" on Windows.
+function describeWithBackend(savePath) {
+  const script = [
+    'import json, sys, time, zipfile',
+    'from pathlib import Path',
+    'from backend.core.report_save import describe_report_save',
+    'path = Path(sys.argv[1])',
+    'path.write_bytes(b"")',
+    'time.sleep(1.5)',
+    'with zipfile.ZipFile(path, "w") as archive:',
+    '    archive.writestr("meta", "name=\\"Backend empire\\"\\ndate=\\"2300.01.01\\"\\nversion=\\"Cygnus v4.5.2\\"")',
+    '    archive.writestr("gamestate", "synthetic=yes")',
+    'print(json.dumps(describe_report_save(path)))',
+  ].join('\n')
+  return JSON.parse(execFileSync(python, ['-c', script, savePath], { cwd: repoRoot, encoding: 'utf8' }))
+}
+
+async function fixture(t, { backend = false } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'report-save-test-'))
   t.after(() => fs.rm(root, { recursive: true, force: true }))
   const source = path.join(root, 'autosave.sav')
-  const bytes = Buffer.from('PK\x03\x04synthetic Stellaris archive')
-  await fs.writeFile(source, bytes)
+  let bytes = Buffer.from('PK\x03\x04synthetic Stellaris archive')
+  let backendDescription = null
+  if (backend) {
+    backendDescription = describeWithBackend(source)
+    bytes = await fs.readFile(source)
+  } else await fs.writeFile(source, bytes)
   const state = new Map(), secrets = new Map(), requests = []
-  let failUpload = false, failReport = false
+  let failUpload = false, failReport = false, describedHash = null
   const store = { get: (key, fallback) => state.get(key) ?? fallback, set: (key, value) => state.set(key, value) }
   const service = createReportSaveService({
     directory: path.join(root, 'staging'), store,
     getSecret: key => secrets.get(key), setSecret: (key, value) => value ? secrets.set(key, value) : secrets.delete(key),
     describeSave: async () => {
-      const stat = await fs.stat(source, { bigint: true })
-      return { path: source, fingerprint: [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].join(':'), filename: 'autosave.sav', sizeBytes: bytes.length, empireName: 'Test empire', gameDate: '2300.01.01', gameVersion: '4.5.2' }
+      if (backendDescription) return backendDescription
+      return { path: source, sha256: describedHash ?? crypto.createHash('sha256').update(bytes).digest('hex'), filename: 'autosave.sav', sizeBytes: bytes.length, empireName: 'Test empire', gameDate: '2300.01.01', gameVersion: '4.5.2' }
     },
     fetchImpl: async (url, options) => {
       requests.push({ url, options })
@@ -41,17 +70,32 @@ async function fixture(t) {
     },
   })
   const input = async () => ({ selectionId: (await service.select()).selectionId, consent: true, consentVersion: CONSENT_VERSION, report: { category: 'Bug', description: 'Synthetic report', context: {} } })
-  return { service, input, root, source, state, secrets, requests, failUpload: value => { failUpload = value }, failReport: value => { failReport = value } }
+  return { service, input, root, source, state, secrets, requests, failUpload: value => { failUpload = value }, failReport: value => { failReport = value }, describeHash: value => { describedHash = value } }
 }
 
 test('preview reveals no local path; each upload requires current explicit consent', async t => {
   const f = await fixture(t)
   const preview = await f.service.select()
   assert.equal(preview.path, undefined)
-  assert.equal(preview.fingerprint, undefined)
+  assert.equal(preview.sha256, undefined)
   assert.equal(preview.empireName, 'Test empire')
   await assert.rejects(f.service.submit({ ...(await f.input()), consent: false }), /consent/)
   assert.equal(f.requests.some(r => r.options.method === 'POST'), false)
+})
+
+test('attaches a save described by the real Python backend', async t => {
+  // The description comes from Python and the capture runs in Node. The two
+  // runtimes do not report the same file metadata on every platform (#79).
+  let f
+  try { f = await fixture(t, { backend: true }) } catch (error) {
+    if (process.env.PYTHON_BIN) throw error
+    return t.skip(`Python backend unavailable: ${error.message.split('\n')[0]}`)
+  }
+  const preview = await f.service.select()
+  assert.equal(preview.empireName, 'Backend empire')
+  assert.equal(preview.gameVersion, 'Cygnus v4.5.2')
+  const receipt = await f.service.submit({ selectionId: preview.selectionId, consent: true, consentVersion: CONSENT_VERSION, report: { category: 'Bug', description: 'Cross-runtime report', context: {} } })
+  assert.equal(receipt.status, 'ready')
 })
 
 test('captures exactly the selected bytes and deletes staging files after upload', async t => {
@@ -63,6 +107,17 @@ test('captures exactly the selected bytes and deletes staging files after upload
   await f.service.remove(receipt.id)
   assert.deepEqual(await f.service.list(), [])
   assert.equal(f.secrets.size, 0)
+})
+
+test('refuses a save whose bytes are not the ones the backend described', async t => {
+  // Same size and untouched since selection, so only the content hash can tell.
+  const f = await fixture(t)
+  f.describeHash(crypto.createHash('sha256').update('a different save of the same size').digest('hex'))
+  await assert.rejects(f.service.submit(await f.input()), /changed after its details were read/)
+  assert.equal(f.requests.some(r => r.options.method === 'POST'), false)
+  assert.deepEqual(await fs.readdir(path.join(f.root, 'staging')), [])
+  f.describeHash('not-a-hash')
+  await assert.rejects(f.service.select(), /cannot be attached/)
 })
 
 test('refuses an autosave changed after the user reviewed its metadata', async t => {
