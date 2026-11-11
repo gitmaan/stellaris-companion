@@ -15,7 +15,7 @@ import pytest
 
 from backend.core.briefing_names import briefing_value_name
 from backend.core.model_briefing import build_model_briefing
-from backend.mcp.context import _display_identifier
+from backend.mcp.context import _compact_value, _display_identifier
 from stellaris_companion import game_names
 from stellaris_companion.campaign_evidence import english_identity_names, resolve_empire_identity
 from stellaris_companion.game_install import GameInstall, find_game_install
@@ -43,6 +43,11 @@ ENGLISH = """l_english:
  war_goal_wg_independence:0 "Independence"
  tr_discovery_adopt:0 "$tradition_discovery$ Traditions"
  tradition_discovery:0 "Discovery"
+ tradition_unyielding:0 "Fortification"
+ first_claw:0 "Talon"
+ corvette:0 "Corvette"
+ picket:0 "Corvette"
+ found:0 "Alien System Found"
  r_core:0 "§YIsolated§! £energy£ Core"
  quoted:0 "The \\"Old\\" Guard"
  NAME_Barnard's_Star:0 "Barnard's Star"
@@ -358,6 +363,50 @@ def test_the_advisor_briefing_calls_things_what_the_players_game_calls_them(inst
     assert "exactly as written" in note["instruction"]
 
 
+KEYED_BY_IDS = {
+    "meta": {"version": "Test v9.9.9"},
+    "progression": {
+        "traditions": {
+            "by_tree": {
+                "unyielding": {"finished": True},
+                "discovery": {"finished": False},
+                "my_mod_tree": {"finished": False},
+            }
+        }
+    },
+    "military": {
+        "ship_classes": {"first_claw": 3, "corvette": 20},
+        "fleets": {"fleets": [{"name": "1st Fleet", "ship_classes": {"corvette": 4, "picket": 2}}]},
+    },
+    "projects": {"precursor_progress": {"cybrex": {"found": 2}}},
+}
+
+
+def test_a_dict_keyed_by_save_ids_is_keyed_by_the_games_names(installed) -> None:
+    source = json.loads(json.dumps(KEYED_BY_IDS))
+
+    briefing = build_model_briefing(source)
+
+    assert source == KEYED_BY_IDS
+    # In save order; a tree the game has no name for keeps its ID.
+    assert list(briefing["progression"]["traditions"]["by_tree"].items()) == [
+        ("Fortification", {"finished": True}),
+        ("Discovery", {"finished": False}),
+        ("my_mod_tree", {"finished": False}),
+    ]
+    assert briefing["military"]["ship_classes"] == {"Talon": 3, "Corvette": 20}
+    # Two classes with one name: renaming would make one count replace the other.
+    assert briefing["military"]["fleets"]["fleets"][0]["ship_classes"] == {
+        "corvette": 4,
+        "picket": 2,
+    }
+    # "found" is game text too, but it is the app's own word for a field here.
+    assert briefing["projects"]["precursor_progress"]["cybrex"] == {"found": 2}
+    # External AI clients are shown the same keys.
+    shown = _compact_value(KEYED_BY_IDS["military"], section="military")
+    assert shown["ship_classes"] == {"Talon": 3, "Corvette": 20}
+
+
 def test_without_an_install_the_advisor_briefing_keeps_the_saves_ids() -> None:
     briefing = build_model_briefing(json.loads(json.dumps(CAMPAIGN)))
 
@@ -365,6 +414,9 @@ def test_without_an_install_the_advisor_briefing_keeps_the_saves_ids() -> None:
     assert briefing["defense"] == CAMPAIGN["defense"]
     assert briefing["diplomacy"] == CAMPAIGN["diplomacy"]
     assert "names" not in briefing["model_context"]
+    keyed = build_model_briefing(json.loads(json.dumps(KEYED_BY_IDS)))
+    assert keyed["progression"] == KEYED_BY_IDS["progression"]
+    assert keyed["military"] == KEYED_BY_IDS["military"]
 
 
 def test_changing_the_games_language_is_picked_up_while_the_app_runs(
