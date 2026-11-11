@@ -33,8 +33,8 @@ class TechnologyMixin:
     def _get_technology_rust(self) -> dict:
         """Get technology using Rust session.
 
-        Uses get_duplicate_values scoped to tech_status for researched techs and
-        their levels, and parsed dict access for queues, alternatives, and budget.
+        Researched technologies and their levels are the direct children of the
+        country's ``tech_status`` block; queues, alternatives and budget sit beside them.
 
         Returns:
             Dict with technology status

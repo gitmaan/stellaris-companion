@@ -21,20 +21,14 @@ def test_issue_15_naval_usage_below_cap_is_not_presented_as_full(monkeypatch, tm
                 used_naval_capacity="48",
                 fleet_size="48",
                 government={"civics": []},
+                tech_status={
+                    "technology": ["tech_doctrine_navy_size_1", "tech_doctrine_navy_size_2"],
+                    "level": ["1", "1"],
+                },
             )
         },
     }
-    payload = ingest_synthetic_save(
-        monkeypatch,
-        tmp_path,
-        sections,
-        duplicate_values={
-            ("country", "0", "technology"): [
-                "tech_doctrine_navy_size_1",
-                "tech_doctrine_navy_size_2",
-            ]
-        },
-    )
+    payload = ingest_synthetic_save(monkeypatch, tmp_path, sections)
 
     _, system_prompt, model_briefing = advisor_request(
         monkeypatch, payload, "Am I at full naval capacity?"
