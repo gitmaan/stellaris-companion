@@ -92,3 +92,17 @@ were never guarded have come back (#11 returned as #44).
 
 Close duplicates with a link to the issue that tracks the problem. If a report
 contains a separate request, open an issue for it and link it.
+
+### Crediting reporters
+
+People who report problems put real time into this project. Credit them in the
+squash-merge commit message of the fix:
+
+- `Co-authored-by:` when their own analysis shaped the fix, for example they
+  traced the cause or found the faulty code.
+- `Reported-by:` when their report led to the fix.
+- `Helped-by:` when they supplied something the fix depended on, such as a save.
+
+Use GitHub's no-reply address, `ID+login@users.noreply.github.com` (the ID is in
+`gh api users/<login>`), so no private email ends up in history. Then thank them
+by @mention in the notes of the release that ships the fix.
