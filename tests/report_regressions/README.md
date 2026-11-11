@@ -54,6 +54,7 @@ matter to the report need writing.
 | #12 | Completed Grand Archive "under construction" | extractor + signals/events/DB | new + referenced |
 | #15 | Naval usage read as the naval cap | extractor + Advisor prompt policy | new + referenced |
 | #16 | Completed Dyson Swarm "under construction" | extractor | referenced |
+| #79 | Nomad economy read as failing mining; Festival upkeep labelled as the reserves' monthly change | nomads extractor + briefing identity + model rules + knowledge retrieval | new + referenced |
 | #81 | Rogue Servitor denied over a "missing" DLC | metadata + campaign evidence + prompt | new + referenced |
 | #83 | Chronicle dates after loading an older save | Chronicle + database | referenced |
 | #95 | Story lost after changing the player's empire | ingestion + narrative ancestry + Advisor/Chronicle/MCP | new + referenced |

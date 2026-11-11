@@ -152,12 +152,20 @@ class NomadsMixin:
         except (TypeError, ValueError):
             pass
         approach = entry.get("approach")
-        return {
+        summary = {
             "current": _number(entry.get("progress")),
-            "monthly_change": _number(entry.get("last_month_progress")),
             "stage": stage,
             "approach": RESERVE_APPROACHES.get(approach, approach),
         }
+        # The pool moves with every Energy and Mineral gain or cost, which the save
+        # does not total per month. The situation's own monthly progress is only
+        # what the Festival approach drains (the game's `monthly_progress` for
+        # situation_nomad_economy), so it is 0 under every other approach and must
+        # not be read as the reserves' monthly change.
+        festival_upkeep = _number(entry.get("last_month_progress"))
+        if festival_upkeep is not None and festival_upkeep < 0:
+            summary["festival_upkeep_last_month"] = -festival_upkeep
+        return summary
 
     def _nomad_fleet_state(self, session: Any, arkship_refs: list) -> dict[str, Any]:
         """Arkships, Waystation stockpiles and Logistic Ship cargo from owned fleets."""
