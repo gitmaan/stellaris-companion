@@ -21,7 +21,7 @@ test('explicit save consent, failed upload retry, persistent receipt and deletio
     await page.route(/^https?:\/\//, route => route.abort())
     await app.evaluate(async ({ app, ipcMain, BrowserWindow }) => {
       const require = process.mainModule.require.bind(process.mainModule)
-      const fs = require('node:fs/promises'), path = require('node:path')
+      const fs = require('node:fs/promises'), path = require('node:path'), crypto = require('node:crypto')
       const { createReportSaveService, registerReportSaveIpc, CONSENT_VERSION } = require(path.join(app.getAppPath(), 'main/reportSaves'))
       const source = path.join(app.getPath('userData'), 'synthetic.sav')
       const bytes = Buffer.from('PK\x03\x04synthetic archive')
@@ -33,8 +33,7 @@ test('explicit save consent, failed upload retry, persistent receipt and deletio
         store: { get: (key, fallback) => values.get(key) ?? fallback, set: (key, value) => values.set(key, value) },
         getSecret: key => secrets.get(key), setSecret: (key, value) => secrets.set(key, value),
         describeSave: async () => {
-          const stat = await fs.stat(source, { bigint: true })
-          return { path: source, fingerprint: [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].join(':'), filename: 'synthetic.sav', sizeBytes: bytes.length, empireName: 'Synthetic Nomads', gameDate: '2300.01.01', gameVersion: '4.5.2' }
+          return { path: source, sha256: crypto.createHash('sha256').update(bytes).digest('hex'), filename: 'synthetic.sav', sizeBytes: bytes.length, empireName: 'Synthetic Nomads', gameDate: '2300.01.01', gameVersion: '4.5.2' }
         },
         notify: event => BrowserWindow.getAllWindows()[0].webContents.send('report-saves:progress', event),
         fetchImpl: async (url, options) => {

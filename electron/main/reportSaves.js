@@ -9,6 +9,10 @@ const CONSENT_VERSION = 'report-save-2026-11-02'
 const MAX_BYTES = 50 * 1024 * 1024
 const RETENTION_MS = 90 * 86400000
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
+const SHA256 = /^[a-f0-9]{64}$/
+// Only ever compared with another fingerprint taken by this process. The backend
+// describes the save from Python, which reports dev and ctime differently on
+// Windows, so the backend's description is tied to the file by content hash.
 const fingerprint = stat => [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].join(':')
 
 function createReportSaveService({ directory, store, getSecret, setSecret, describeSave, fetchImpl = globalThis.fetch, notify = () => {}, baseUrl = 'https://feedback.galacticfilingcabinet.com' }) {
@@ -65,11 +69,11 @@ function createReportSaveService({ directory, store, getSecret, setSecret, descr
     if (!capabilities.enabled || capabilities.consentVersion !== CONSENT_VERSION || capabilities.retentionDays !== 90) throw new Error('Save sharing is currently unavailable. You can still send a report without a save.')
     const info = await describeSave()
     const stat = await fsp.stat(info.path, { bigint: true })
-    if (!stat.isFile() || path.extname(info.path).toLowerCase() !== '.sav' || stat.size < 4 || stat.size > MAX_BYTES || Number(stat.size) !== info.sizeBytes || fingerprint(stat) !== info.fingerprint) throw new Error('This save changed or cannot be attached (maximum 50 MiB). Select it again.')
+    if (!stat.isFile() || path.extname(info.path).toLowerCase() !== '.sav' || stat.size < 4 || stat.size > MAX_BYTES || Number(stat.size) !== info.sizeBytes || !SHA256.test(info.sha256)) throw new Error('This save changed or cannot be attached (maximum 50 MiB). Select it again.')
     selections.clear()
     const selectionId = crypto.randomUUID()
     selections.set(selectionId, { ...info, fingerprint: fingerprint(stat) })
-    const { path: localPath, fingerprint: localFingerprint, ...preview } = info
+    const { path: localPath, sha256: describedHash, ...preview } = info
     return { ...preview, selectionId, consentVersion: CONSENT_VERSION }
   }
   async function capture(info, id) {
@@ -86,7 +90,10 @@ function createReportSaveService({ directory, store, getSecret, setSecret, descr
         callback(null, chunk)
       } }), fs.createWriteStream(files(id).save, { flags: 'wx', mode: 0o600 }))
       if (bytes !== info.sizeBytes || fingerprint(await source.stat({ bigint: true })) !== info.fingerprint || fingerprint(await fsp.stat(info.path, { bigint: true })) !== info.fingerprint) throw new Error('The save changed during capture. Select it again.')
-      return hash.digest('hex')
+      const sha256 = hash.digest('hex')
+      // The bytes captured must be the bytes the backend described for consent.
+      if (sha256 !== info.sha256) throw new Error('The save changed after its details were read. Select it again and review the updated details.')
+      return sha256
     } finally { await source.close() }
   }
   async function retry(id) {

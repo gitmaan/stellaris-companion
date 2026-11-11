@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 import stat
 import zipfile
@@ -25,6 +26,10 @@ def describe_report_save(path: Path) -> dict[str, Any]:
         if meta.file_size > 1024 * 1024:
             raise ValueError("Save metadata is too large.")
         text = archive.read(meta).decode("utf-8", errors="replace")
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
     after = path.stat()
     if (before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
         after.st_ino,
@@ -38,16 +43,10 @@ def describe_report_save(path: Path) -> dict[str, Any]:
         # This authenticated route is called only by Electron's main process.
         # The IPC service strips this path before returning the consent preview.
         "path": str(path),
-        "fingerprint": ":".join(
-            str(value)
-            for value in (
-                before.st_dev,
-                before.st_ino,
-                before.st_size,
-                before.st_mtime_ns,
-                before.st_ctime_ns,
-            )
-        ),
+        # Electron must capture these exact bytes. File metadata cannot say so:
+        # Python and Node report it differently on Windows (ctime is creation
+        # time here and change time there), so it is never compared across them.
+        "sha256": digest.hexdigest(),
         "filename": path.name,
         "sizeBytes": before.st_size,
         "empireName": values.get("name", "")[:200],

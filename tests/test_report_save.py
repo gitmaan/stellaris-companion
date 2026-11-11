@@ -28,6 +28,10 @@ def test_describes_only_bounded_stellaris_archives(tmp_path):
     assert info["empireName"] == "Test empire"
     assert info["gameVersion"] == "4.5.2"
     assert info["sizeBytes"] == path.stat().st_size
+    # The file is identified by its bytes, never by metadata the Electron side
+    # would have to read through a different runtime (issue #79).
+    assert info["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert "fingerprint" not in info
     make_save(path, gamestate=False)
     with pytest.raises(ValueError):
         describe_report_save(path)
