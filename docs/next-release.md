@@ -1,3 +1,32 @@
+# Beta 1.1.2-beta.4 candidate
+
+This beta names technologies as the game shows them (#105, for #104), stops counting
+research in progress as researched (#106, for #104), fixes save attachment on Windows
+(#107, for #79), and carries the Nomad history fix (#101) and GPT-6 reasoning settings
+(#103) merged after beta.3. Stable remains 1.1.1.
+
+## Release validation
+
+- Complete combined Python, Rust, desktop, localization and renderer checks.
+- Run `scripts/check_local_saves.py`; it now fails if the installed game or a checked
+  save is newer than the name catalogs.
+- Build all four platforms with publication disabled and inspect their artifacts,
+  including the bundled identity and technology catalog smoke checks.
+- The Rust parser changed (#106): the packaged parser must be the one built from this
+  commit, or the researched list silently keeps the old behaviour.
+- No database schema change since beta.3.
+- Verify macOS signing/notarization, package versions, update manifests and hashes.
+- Merge only after the candidate checks pass, then tag the verified main commit.
+- Verify final beta assets and feeds, while stable release/feed remains 1.1.1.
+
+Not claimed: the Windows save attachment fix was reproduced and verified on a Windows
+CI runner, not in the installed app. Technology names are English, generated from
+Cygnus 4.5.3; no 4.5.3 save was available, and the newest real save checked is 4.5.2.
+The Nomad reserve's monthly change reads as 0 in the one real Nomad save seen so far.
+#83 and #86 still await reporter confirmation.
+
+## Earlier release records
+
 # Beta 1.1.2-beta.3 candidate
 
 This beta adds story continuation across player empire changes (#97, for #95)
@@ -17,8 +46,6 @@ and Nomad economy support (#98, for #79). Stable remains 1.1.1.
 Not claimed: Nomad save fields have not been checked against a real Nomad save;
 reserves and stockpiles are read defensively and degrade to missing data. #83 and
 #86 still await reporter confirmation.
-
-## Earlier release records
 
 # Beta 1.1.2-beta.2 candidate
 

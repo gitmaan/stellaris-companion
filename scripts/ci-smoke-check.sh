@@ -56,6 +56,16 @@ assert civics.get("machine_servitor") == "Rogue Servitor", civics.get("machine_s
 print(f"identity catalog ok: {sys.argv[1]} ({len(civics)} civics)")
 PY
 
+# Technology names sit beside the identity catalog and degrade the same silent way.
+TECH_CATALOG="$(dirname "${CATALOG}")/technology_catalog.json"
+[[ -f "${TECH_CATALOG}" ]] || die "missing bundled technology catalog (stellaris_companion/technology_catalog.json)"
+"${PYTHON_BIN}" - "${TECH_CATALOG}" <<'PY' || die "bundled technology catalog does not resolve tech_cryostasis_1"
+import json, sys
+technologies = json.load(open(sys.argv[1], encoding="utf-8"))["technology"]
+assert technologies.get("tech_cryostasis_1") == "Automated Colony Ships", technologies.get("tech_cryostasis_1")
+print(f"technology catalog ok: {sys.argv[1]} ({len(technologies)} technologies)")
+PY
+
 "${PYTHON_BIN}" scripts/smoke_mcp_stdio.py "${BACKEND_EXE}" || die "bundled backend did not pass MCP stdio smoke test"
 "${PYTHON_BIN}" scripts/smoke_electron_backend_boot.py "${BACKEND_EXE}" || die "bundled backend did not pass Electron boot smoke test"
 
