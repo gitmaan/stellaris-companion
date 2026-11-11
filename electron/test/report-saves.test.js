@@ -42,15 +42,14 @@ async function fixture(t, { backend = false } = {}) {
     bytes = await fs.readFile(source)
   } else await fs.writeFile(source, bytes)
   const state = new Map(), secrets = new Map(), requests = []
-  let failUpload = false, failReport = false
+  let failUpload = false, failReport = false, describedHash = null
   const store = { get: (key, fallback) => state.get(key) ?? fallback, set: (key, value) => state.set(key, value) }
   const service = createReportSaveService({
     directory: path.join(root, 'staging'), store,
     getSecret: key => secrets.get(key), setSecret: (key, value) => value ? secrets.set(key, value) : secrets.delete(key),
     describeSave: async () => {
       if (backendDescription) return backendDescription
-      const stat = await fs.stat(source, { bigint: true })
-      return { path: source, fingerprint: [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].join(':'), filename: 'autosave.sav', sizeBytes: bytes.length, empireName: 'Test empire', gameDate: '2300.01.01', gameVersion: '4.5.2' }
+      return { path: source, sha256: describedHash ?? crypto.createHash('sha256').update(bytes).digest('hex'), filename: 'autosave.sav', sizeBytes: bytes.length, empireName: 'Test empire', gameDate: '2300.01.01', gameVersion: '4.5.2' }
     },
     fetchImpl: async (url, options) => {
       requests.push({ url, options })
@@ -71,14 +70,14 @@ async function fixture(t, { backend = false } = {}) {
     },
   })
   const input = async () => ({ selectionId: (await service.select()).selectionId, consent: true, consentVersion: CONSENT_VERSION, report: { category: 'Bug', description: 'Synthetic report', context: {} } })
-  return { service, input, root, source, state, secrets, requests, failUpload: value => { failUpload = value }, failReport: value => { failReport = value } }
+  return { service, input, root, source, state, secrets, requests, failUpload: value => { failUpload = value }, failReport: value => { failReport = value }, describeHash: value => { describedHash = value } }
 }
 
 test('preview reveals no local path; each upload requires current explicit consent', async t => {
   const f = await fixture(t)
   const preview = await f.service.select()
   assert.equal(preview.path, undefined)
-  assert.equal(preview.fingerprint, undefined)
+  assert.equal(preview.sha256, undefined)
   assert.equal(preview.empireName, 'Test empire')
   await assert.rejects(f.service.submit({ ...(await f.input()), consent: false }), /consent/)
   assert.equal(f.requests.some(r => r.options.method === 'POST'), false)
@@ -108,6 +107,17 @@ test('captures exactly the selected bytes and deletes staging files after upload
   await f.service.remove(receipt.id)
   assert.deepEqual(await f.service.list(), [])
   assert.equal(f.secrets.size, 0)
+})
+
+test('refuses a save whose bytes are not the ones the backend described', async t => {
+  // Same size and untouched since selection, so only the content hash can tell.
+  const f = await fixture(t)
+  f.describeHash(crypto.createHash('sha256').update('a different save of the same size').digest('hex'))
+  await assert.rejects(f.service.submit(await f.input()), /changed after its details were read/)
+  assert.equal(f.requests.some(r => r.options.method === 'POST'), false)
+  assert.deepEqual(await fs.readdir(path.join(f.root, 'staging')), [])
+  f.describeHash('not-a-hash')
+  await assert.rejects(f.service.select(), /cannot be attached/)
 })
 
 test('refuses an autosave changed after the user reviewed its metadata', async t => {
