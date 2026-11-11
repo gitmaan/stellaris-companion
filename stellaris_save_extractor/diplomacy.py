@@ -7,6 +7,7 @@ import re
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
+from .game_vocabulary import WAR_IN_HEAVEN_FLAG
 from .save_values import is_yes, repeated
 
 logger = logging.getLogger(__name__)
@@ -891,13 +892,7 @@ class DiplomacyMixin:
         player_military = player_status.get("military_power", 0)
         player_id = self.get_player_empire_id()
 
-        # Check for War in Heaven using contains_kv (faster than contains_tokens)
-        try:
-            wih_result = session.contains_kv([("war_in_heaven", "yes")])
-            if wih_result.get("matches", {}).get("war_in_heaven=yes"):
-                result["war_in_heaven"] = True
-        except Exception:
-            pass
+        result["war_in_heaven"] = WAR_IN_HEAVEN_FLAG in self._get_global_flags()
 
         # FE archetype mapping
         FE_ARCHETYPES = {

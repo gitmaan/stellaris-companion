@@ -1074,10 +1074,9 @@ def _extract_crisis_signals(extractor: SaveExtractor) -> dict[str, Any]:
 
     Returns format compatible with events.py _extract_crisis():
         Dict with:
-        - active: bool (whether a crisis has spawned)
+        - active: bool (whether a crisis is in progress)
         - type: str | None (prethoryn, contingency, unbidden, etc.)
-        - progress: int | None (crisis systems count as a proxy for progress)
-        - player_is_crisis_fighter: bool
+        - defeated: list of crises already beaten
         - player_crisis_kills: int
         - crisis_countries: list of {country_id, type}
     """
@@ -1087,7 +1086,6 @@ def _extract_crisis_signals(extractor: SaveExtractor) -> dict[str, Any]:
         return {
             "active": False,
             "type": None,
-            "progress": None,
         }
 
     # Normalize to format expected by events.py
@@ -1100,17 +1098,9 @@ def _extract_crisis_signals(extractor: SaveExtractor) -> dict[str, Any]:
         "type": crisis_type,
     }
 
-    # Include crisis systems count as progress indicator
-    crisis_systems = raw.get("crisis_systems_count")
-    if crisis_systems is not None:
-        try:
-            result["progress"] = int(crisis_systems)
-        except (ValueError, TypeError):
-            result["progress"] = None
-
-    # Include additional details useful for narrative/reporting
-    if raw.get("player_is_crisis_fighter"):
-        result["player_is_crisis_fighter"] = True
+    defeated = raw.get("crises_defeated")
+    if isinstance(defeated, list) and defeated:
+        result["defeated"] = defeated
 
     player_kills = raw.get("player_crisis_kills")
     if player_kills:
