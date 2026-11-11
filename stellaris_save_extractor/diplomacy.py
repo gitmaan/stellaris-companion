@@ -7,9 +7,22 @@ import re
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
-from .save_values import repeated
+from .save_values import is_yes, repeated
 
 logger = logging.getLogger(__name__)
+
+# Treaties and stances between two empires, as (name here, key in the save's
+# relation block). The save keys were read off real 4.2-4.4 saves, except
+# defensive_pact and non_aggression_pact, which no available save contains and
+# which follow the game's own trigger names (has_defensive_pact, ...).
+_TREATY_KEYS = (
+    ("defensive_pact", "defensive_pact"),
+    ("non_aggression_pact", "non_aggression_pact"),
+    ("commercial_pact", "commercial_pact"),
+    ("migration_treaty", "migration_access"),
+    ("closed_borders", "closed_borders"),
+    ("rival", "is_rival"),
+)
 
 # Country types that count as diplomatic "empires" for the known-empires tally.
 # Everything else in a relations_manager (enclaves, marauders, drones/space fauna,
@@ -153,16 +166,7 @@ class DiplomacyMixin:
         return self._get_diplomacy_rust()
 
     def _get_diplomacy_rust(self) -> dict:
-        """Get diplomatic relations using Rust parser with regex for relation entries.
-
-        The Rust parser is used to:
-        - Get federation ID from player country efficiently
-        - Extract player country data
-
-        Regex is used for parsing the relations_manager.relation entries because
-        the Rust parser collapses duplicate 'relation' keys into a single dict,
-        but Stellaris saves have multiple relation={} entries.
-        """
+        """Get the player's relations and treaties from the parsed country entry."""
         result = {
             "relations": [],
             "treaties": [],
@@ -174,7 +178,6 @@ class DiplomacyMixin:
             "closed_borders": [],
             "migration_treaties": [],
             "commercial_pacts": [],
-            "sensor_links": [],
         }
 
         player_id = self.get_player_empire_id()
@@ -197,75 +200,31 @@ class DiplomacyMixin:
                 with contextlib.suppress(ValueError, TypeError):
                     federation_id = int(fed_val)
 
-        # For relations, use get_entry_text to get raw text (fast), then regex parse
-        # This is needed because Rust parser collapses duplicate 'relation' keys
-        session = _get_active_session()
-        if not session:
+        if not _get_active_session():
             raise ParserError("Rust session required for get_diplomacy()")
-        player_chunk = session.get_entry_text("country", str(player_id))
-        if not player_chunk:
+        if not isinstance(player_country, dict):
             result["error"] = "Could not find player country"
             return result
-
-        # Find relations_manager section
-        rel_match = re.search(r"relations_manager=\s*\{", player_chunk)
-        if not rel_match:
+        relations_manager = player_country.get("relations_manager")
+        if not isinstance(relations_manager, dict):
             result["error"] = "Could not find relations_manager section"
-            return result
-
-        rel_block = self._extract_braced_block(
-            player_chunk[rel_match.start() :], "relations_manager"
-        )
-        if not rel_block:
-            result["error"] = "Could not parse relations_manager block"
             return result
 
         relations_found: list[dict] = []
         allies: list[dict] = []
-        rivals: list[dict] = []
-        defensive_pacts: list[dict] = []
-        non_aggression_pacts: list[dict] = []
-        closed_borders: list[dict] = []
-        migration_treaties: list[dict] = []
-        commercial_pacts: list[dict] = []
-        sensor_links: list[dict] = []
         treaties: list[dict] = []
+        partners: dict[str, list[dict]] = {name: [] for name, _ in _TREATY_KEYS}
 
-        for match in re.finditer(r"\brelation\s*=\s*\{", rel_block):
-            rel_start = match.start()
-            brace_count = 0
-            rel_end = None
-            for i, char in enumerate(rel_block[rel_start:], rel_start):
-                if char == "{":
-                    brace_count += 1
-                elif char == "}":
-                    brace_count -= 1
-                    if brace_count == 0:
-                        rel_end = i + 1
-                        break
-            if rel_end is None:
+        for relation in repeated(relations_manager.get("relation")):
+            if not isinstance(relation, dict) or str(relation.get("owner")) != str(player_id):
+                continue
+            try:
+                target_country_id = int(relation["country"])
+            except (KeyError, TypeError, ValueError):
                 continue
 
-            rel_text = rel_block[rel_start:rel_end]
-
-            # Only process relations where owner=player_id
-            if not re.search(rf"\bowner={player_id}\b", rel_text):
-                continue
-
-            relation_info = {}
-
-            # Extract country ID and resolve to name
-            country_match = re.search(r"\bcountry=(\d+)", rel_text)
-            if country_match:
-                relation_info["country_id"] = int(country_match.group(1))
-            target_country_id = relation_info.get("country_id")
-            if target_country_id is None:
-                continue
-
-            # Resolve empire name
-            relation_info["empire_name"] = country_names.get(
-                target_country_id, f"Empire {target_country_id}"
-            )
+            empire_name = country_names.get(target_country_id, f"Empire {target_country_id}")
+            relation_info: dict = {"country_id": target_country_id, "empire_name": empire_name}
 
             # Record the target's country type so callers can distinguish real
             # empires from special entities (enclaves, marauders, primitives, etc.).
@@ -286,98 +245,28 @@ class DiplomacyMixin:
             if ethics:
                 relation_info["ethics"] = ethics
 
-            # Extract trust
-            trust_match = re.search(r"\btrust=(\d+)", rel_text)
-            if trust_match:
-                relation_info["trust"] = int(trust_match.group(1))
+            with contextlib.suppress(KeyError, TypeError, ValueError):
+                relation_info["trust"] = int(float(relation["trust"]))
+            with contextlib.suppress(KeyError, TypeError, ValueError):
+                relation_info["opinion"] = int(float(relation["relation_current"]))
 
-            # Extract relation score
-            rel_current = re.search(r"\brelation_current=([-\d]+)", rel_text)
-            if rel_current:
-                relation_info["opinion"] = int(rel_current.group(1))
+            partner = {"id": target_country_id, "name": empire_name}
+            # `alliance` marks an ally (a fellow federation member); it is not a
+            # defensive pact, which has its own key.
+            if is_yes(relation.get("alliance")):
+                relation_info["alliance"] = True
+                allies.append(partner)
 
-            empire_name = relation_info["empire_name"]
-
-            # Check for treaties/agreements
-            if "alliance=yes" in rel_text or "defensive_pact=yes" in rel_text:
-                relation_info["defensive_pact"] = True
-                defensive_pacts.append({"id": target_country_id, "name": empire_name})
-                allies.append({"id": target_country_id, "name": empire_name})
+            for treaty, save_key in _TREATY_KEYS:
+                if not is_yes(relation.get(save_key)):
+                    continue
+                relation_info[treaty] = True
+                partners[treaty].append(partner)
                 treaties.append(
-                    {
-                        "country_id": target_country_id,
-                        "empire_name": empire_name,
-                        "type": "defensive_pact",
-                    }
+                    {"country_id": target_country_id, "empire_name": empire_name, "type": treaty}
                 )
 
-            if "non_aggression_pact=yes" in rel_text:
-                relation_info["non_aggression_pact"] = True
-                non_aggression_pacts.append({"id": target_country_id, "name": empire_name})
-                treaties.append(
-                    {
-                        "country_id": target_country_id,
-                        "empire_name": empire_name,
-                        "type": "non_aggression_pact",
-                    }
-                )
-
-            if "commercial_pact=yes" in rel_text:
-                relation_info["commercial_pact"] = True
-                commercial_pacts.append({"id": target_country_id, "name": empire_name})
-                treaties.append(
-                    {
-                        "country_id": target_country_id,
-                        "empire_name": empire_name,
-                        "type": "commercial_pact",
-                    }
-                )
-
-            if "migration_treaty=yes" in rel_text or "migration_pact=yes" in rel_text:
-                relation_info["migration_treaty"] = True
-                migration_treaties.append({"id": target_country_id, "name": empire_name})
-                treaties.append(
-                    {
-                        "country_id": target_country_id,
-                        "empire_name": empire_name,
-                        "type": "migration_treaty",
-                    }
-                )
-
-            if "sensor_link=yes" in rel_text:
-                relation_info["sensor_link"] = True
-                sensor_links.append({"id": target_country_id, "name": empire_name})
-                treaties.append(
-                    {
-                        "country_id": target_country_id,
-                        "empire_name": empire_name,
-                        "type": "sensor_link",
-                    }
-                )
-
-            if "closed_borders=yes" in rel_text:
-                relation_info["closed_borders"] = True
-                closed_borders.append({"id": target_country_id, "name": empire_name})
-                treaties.append(
-                    {
-                        "country_id": target_country_id,
-                        "empire_name": empire_name,
-                        "type": "closed_borders",
-                    }
-                )
-
-            if "rival=yes" in rel_text or "rivalry=yes" in rel_text:
-                relation_info["rival"] = True
-                rivals.append({"id": target_country_id, "name": empire_name})
-                treaties.append(
-                    {
-                        "country_id": target_country_id,
-                        "empire_name": empire_name,
-                        "type": "rival",
-                    }
-                )
-
-            if "research_agreement=yes" in rel_text:
+            if is_yes(relation.get("research_agreement")):
                 relation_info["research_agreement"] = True
                 treaties.append(
                     {
@@ -386,14 +275,11 @@ class DiplomacyMixin:
                         "type": "research_agreement",
                     }
                 )
-
-            if "embassy=yes" in rel_text:
+            if is_yes(relation.get("embassy")):
                 relation_info["embassy"] = True
-
-            if "truce=" in rel_text and "truce" not in rel_text.split("=")[0]:
+            if "truce" in relation:
                 relation_info["has_truce"] = True
-
-            if "communications=yes" in rel_text:
+            if is_yes(relation.get("communications")):
                 relation_info["has_contact"] = True
 
             relations_found.append(relation_info)
@@ -401,13 +287,12 @@ class DiplomacyMixin:
         # Build result
         result["relations"] = relations_found
         result["allies"] = allies
-        result["rivals"] = rivals
-        result["defensive_pacts"] = defensive_pacts
-        result["non_aggression_pacts"] = non_aggression_pacts
-        result["closed_borders"] = closed_borders
-        result["migration_treaties"] = migration_treaties
-        result["commercial_pacts"] = commercial_pacts
-        result["sensor_links"] = sensor_links
+        result["rivals"] = partners["rival"]
+        result["defensive_pacts"] = partners["defensive_pact"]
+        result["non_aggression_pacts"] = partners["non_aggression_pact"]
+        result["closed_borders"] = partners["closed_borders"]
+        result["migration_treaties"] = partners["migration_treaty"]
+        result["commercial_pacts"] = partners["commercial_pact"]
         result["treaties"] = treaties
         result["relation_count"] = len(relations_found)
         # Segment relations by target type: empire_count reflects actual known

@@ -40,6 +40,7 @@ from backend.core.snapshot_reader import (
     get_subject_sets,
     get_system_count,
     get_tech_list,
+    get_treaty_reading,
     get_war_battle_locations,
     get_war_names,
 )
@@ -763,8 +764,13 @@ def compute_events(
             )
         )
 
-    for treaty, curr_set in curr_treaties.items():
+    # Snapshots made by different versions of the treaty reader disagree about
+    # what the save says, not about what happened in the game.
+    if get_treaty_reading(prev) != get_treaty_reading(curr):
+        prev_treaties = curr_treaties = {}
+    for treaty in sorted(set(prev_treaties) | set(curr_treaties)):
         prev_set = prev_treaties.get(treaty, set())
+        curr_set = curr_treaties.get(treaty, set())
         for cid in sorted(curr_set - prev_set)[:5]:
             empire_name = _get_empire_name(cid, empire_names)
             events.append(
