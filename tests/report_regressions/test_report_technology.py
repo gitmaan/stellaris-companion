@@ -20,6 +20,8 @@ def test_issue_104_research_options_carry_their_in_game_names(monkeypatch, tmp_p
                 "Colony Union",
                 government={"civics": []},
                 tech_status={
+                    "technology": ["tech_colonization_1", "tech_my_mod_drive"],
+                    "level": ["1", "1"],
                     "physics_queue": [{"technology": "tech_lasers_2", "progress": "120"}],
                     "alternatives": {
                         "physics": ["tech_cryostasis_1", "tech_my_mod_reactor"],
@@ -30,14 +32,7 @@ def test_issue_104_research_options_carry_their_in_game_names(monkeypatch, tmp_p
             )
         },
     }
-    payload = ingest_synthetic_save(
-        monkeypatch,
-        tmp_path,
-        sections,
-        duplicate_values={
-            ("country", "0", "technology"): ["tech_colonization_1", "tech_my_mod_drive"]
-        },
-    )
+    payload = ingest_synthetic_save(monkeypatch, tmp_path, sections)
 
     _, _, model_briefing = advisor_request(
         monkeypatch, payload, "Which physics technologies can I research?"
@@ -67,15 +62,13 @@ def test_issue_104_technologies_still_in_research_are_not_reported_as_researched
 ):
     """https://github.com/gitmaan/stellaris-companion/issues/104
 
-    A country's research queues hold ``technology=`` keys too. The entry-wide
-    lookup counted them, so the technology being researched was reported as
+    A country's research queues hold ``technology=`` keys too. A lookup that
+    searched the whole country counted them, so the technology being researched was reported as
     already researched (and as an available option at the same time), a queued
     naval technology raised the naval cap early, and a level-3 repeatable was
     read as level 1 or 2. A special project at the head of a queue hid the
     technology waiting behind it.
     """
-    researched = ["tech_colonization_1", "tech_repeatable_naval_cap"]
-    queued = ["tech_cryostasis_1", "tech_doctrine_navy_size_1", "tech_repeatable_naval_cap"]
     sections = {
         "player": [{"name": "Reporter", "country": "0"}],
         "galaxy": {"difficulty": "ensign"},
@@ -85,6 +78,10 @@ def test_issue_104_technologies_still_in_research_are_not_reported_as_researched
                 government={"civics": []},
                 used_naval_capacity="20",
                 tech_status={
+                    # Finished technologies are the block's own keys, with levels...
+                    "technology": ["tech_colonization_1", "tech_repeatable_naval_cap"],
+                    "level": ["1", "3"],
+                    # ...and the queues below name technologies that are not finished.
                     "physics_queue": [{"technology": "tech_cryostasis_1", "progress": "120"}],
                     "society_queue": [
                         {"special_project": "1", "progress": "205.4"},
@@ -103,21 +100,8 @@ def test_issue_104_technologies_still_in_research_are_not_reported_as_researched
         },
     }
 
-    def ingest(duplicate_values):
-        payload = ingest_synthetic_save(
-            monkeypatch, tmp_path, sections, duplicate_values=duplicate_values
-        )
-        return advisor_request(monkeypatch, payload, "What have I researched?")[2]
-
-    model_briefing = ingest(
-        {
-            # What the save holds anywhere under the country, queues included...
-            ("country", "0", "technology"): researched + queued,
-            # ...and what tech_status itself lists as finished, with levels.
-            ("country", "0", "technology", "tech_status"): researched,
-            ("country", "0", "level", "tech_status"): ["1", "3"],
-        }
-    )
+    payload = ingest_synthetic_save(monkeypatch, tmp_path, sections)
+    model_briefing = advisor_request(monkeypatch, payload, "What have I researched?")[2]
 
     technology = model_briefing["technology"]
     assert technology["completed_count"] == 2
@@ -139,11 +123,10 @@ def test_issue_104_technologies_still_in_research_are_not_reported_as_researched
     assert naval["analysis"]["breakdown"]["flat_additions"] == {"Repeatable naval-cap tech": 60.0}
 
     # Saves that repeat the key per level instead of writing level= still count levels.
-    older = ingest(
-        {
-            ("country", "0", "technology"): ["tech_repeatable_naval_cap"] * 2 + queued,
-            ("country", "0", "technology", "tech_status"): ["tech_repeatable_naval_cap"] * 2,
-        }
-    )
+    status = sections["country"]["0"]["tech_status"]
+    status["technology"] = ["tech_repeatable_naval_cap"] * 2
+    del status["level"]
+    payload = ingest_synthetic_save(monkeypatch, tmp_path, sections)
+    older = advisor_request(monkeypatch, payload, "What have I researched?")[2]
     assert older["technology"]["repeatables"] == {"naval_cap": 2}
     assert older["technology"]["completed_count"] == 1

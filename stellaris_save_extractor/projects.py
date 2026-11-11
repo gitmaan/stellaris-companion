@@ -5,6 +5,7 @@ import re
 
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import _get_active_session
+from stellaris_save_extractor.save_values import repeated
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +60,8 @@ class ProjectsMixin:
     def _get_special_projects_rust(self) -> dict:
         """Get special projects using Rust parser.
 
-        Uses Rust session for country data, precursor flags, and completed_event_chain
-        (via get_duplicate_values). Still uses regex for active special projects
-        (nested block structure not easily extracted via Rust ops).
+        Reads the player's parsed country entry: precursor flags, finished event
+        chains and the active special projects.
 
         Returns:
             Dict with special project details
@@ -88,11 +88,10 @@ class ProjectsMixin:
         if not player_data or not isinstance(player_data, dict):
             return result
 
-        # Extract completed event chains using get_duplicate_values (P023)
-        # This handles the duplicate key issue where jomini collapses them
-        completed_chains = session.get_duplicate_values(
-            "country", str(player_id), "completed_event_chain"
-        )
+        events = player_data.get("events")
+        if not isinstance(events, dict):
+            events = {}
+        completed_chains = [str(chain) for chain in repeated(events.get("completed_event_chain"))]
         result["completed_chains"] = completed_chains
 
         # Identify notable completed chains
@@ -105,18 +104,14 @@ class ProjectsMixin:
                     break
         result["notable_completed"] = list(set(notable))
 
-        # Extract active projects from parsed events dict (fast path)
-        # The Rust parser handles the nested block structure correctly
-        events = player_data.get("events", {})
-        if isinstance(events, dict):
-            active_projects = self._extract_active_projects_from_dict(events)
-            result["active_projects"] = active_projects
-            result["active_count"] = len(active_projects)
+        active_projects = self._extract_active_projects_from_dict(events)
+        result["active_projects"] = active_projects
+        result["active_count"] = len(active_projects)
 
-            if active_projects:
-                days_list = [p["days_left"] for p in active_projects if p.get("days_left")]
-                if days_list:
-                    result["soonest_completion"] = min(days_list)
+        if active_projects:
+            days_list = [p["days_left"] for p in active_projects if p.get("days_left")]
+            if days_list:
+                result["soonest_completion"] = min(days_list)
 
         # Extract precursor progress from flags (Rust handles this well)
         # Pass completed chains to check for completed precursor homeworlds

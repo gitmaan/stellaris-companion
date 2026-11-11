@@ -596,80 +596,6 @@ class RustSession:
         response = self._recv()
         return response
 
-    def get_duplicate_values(
-        self, section: str, key: str, field: str, within: str | None = None
-    ) -> list[str]:
-        """Extract all values for a field that has duplicate keys in Clausewitz format.
-
-        Stellaris save files use duplicate keys for list-like structures (e.g.,
-        `traits="x"` appearing multiple times for a leader). The standard JSON-style
-        parser only keeps the last value. This method scans the raw bytes to extract
-        ALL values for the specified field.
-
-        Args:
-            section: Section name (e.g., "leaders", "species_db")
-            key: Entry ID/key within the section (e.g., "123" for leader ID)
-            field: Field name that has duplicate values (e.g., "traits")
-            within: Only count the field where it is a direct child of this child
-                block of the entry (e.g., "tech_status"). Without it the field is
-                matched anywhere inside the entry, however deeply nested: a
-                country's research queues also hold ``technology=`` keys.
-
-        Returns:
-            List of all values for that field. Empty list if entry not found
-            or field has no values.
-
-        Example:
-            >>> sess.get_duplicate_values("leaders", "12345", "traits")
-            ["leader_trait_resilient", "leader_trait_carefree", "leader_trait_spark_of_genius"]
-
-        Note:
-            This is specifically for fields with duplicate keys in Clausewitz format.
-            For normal fields, use get_entry() instead.
-        """
-        request = {
-            "op": "get_duplicate_values",
-            "section": section,
-            "key": key,
-            "field": field,
-        }
-        if within is not None:
-            request["within"] = within
-        self._send(request)
-        response = self._recv()
-        return response.get("values", [])
-
-    def get_entry_text(self, section: str, key: str) -> str | None:
-        """Get raw Clausewitz text for a single entry.
-
-        This is useful when you need to parse duplicate keys (like relation={})
-        that can't be represented in JSON. Instead of searching the entire gamestate
-        in Python, this returns just the entry's raw text for targeted regex parsing.
-
-        Args:
-            section: Section name (e.g., "country")
-            key: Entry ID/key within the section (e.g., "0" for player country)
-
-        Returns:
-            Raw Clausewitz text for the entry, or None if not found.
-
-        Example:
-            >>> text = sess.get_entry_text("country", "0")
-            >>> # text contains the raw ~500KB country block
-            >>> # Now parse with regex for duplicate relation={} blocks
-        """
-        self._send(
-            {
-                "op": "get_entry_text",
-                "section": section,
-                "key": key,
-            }
-        )
-        response = self._recv()
-        if response.get("found"):
-            return response.get("text", "")
-        return None
-
     def batch_ops(self, ops: list[dict]) -> list[dict]:
         """Execute multiple operations in a single request to reduce IPC overhead.
 
@@ -686,8 +612,6 @@ class RustSession:
                  - {"op": "contains_tokens", "tokens": [...]}
                  - {"op": "contains_kv", "pairs": [[key, value], ...]}
                  - {"op": "get_country_summaries", "fields": [...]}
-                 - {"op": "get_duplicate_values", "section": "...", "key": "...", "field": "..."}
-                 - {"op": "get_entry_text", "section": "...", "key": "..."}
 
                  Note: iter_section and close are NOT supported in batch mode.
 

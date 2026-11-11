@@ -46,6 +46,26 @@ species_db=
 \t\t}
 \t}
 }
+leaders=
+{
+\t9=
+\t{
+\t\tname=
+\t\t{
+\t\t\tfull_names=
+\t\t\t{
+\t\t\t\tkey="星海联邦第一舰队总司令官阁下"
+\t\t\t\tliteral=yes
+\t\t\t}
+\t\t}
+\t\tcountry=0
+\t\tclass="commander"
+\t\tlevel=4
+\t\ttraits="leader_trait_resilient"
+\t\ttraits="leader_trait_cautious"
+\t\ttraits="leader_trait_shipwright"
+\t}
+}
 fleet=
 {
 \t7=
@@ -247,13 +267,6 @@ def test_names_are_read_as_utf8(parsed):
     assert parsed["_meta"]["name"] == "Krüger"
 
 
-def test_a_species_portrait_is_not_one_of_its_traits(save_path):
-    rust_bridge = pytest.importorskip("stellaris_companion.rust_bridge")
-    with rust_bridge.session(save_path) as active:
-        scoped = active.get_duplicate_values("species_db", "1", "trait", within="traits")
-    assert scoped == ["trait_organic", "trait_adaptive", "trait_nomadic"]
-
-
 @pytest.fixture(scope="module")
 def extractor(save_path):
     rust_bridge = pytest.importorskip("stellaris_companion.rust_bridge")
@@ -285,6 +298,18 @@ def test_a_fallen_empires_opinion_of_the_player_is_read(extractor):
 
 def test_lgate_insights_come_from_the_repeatable_technology_level(extractor):
     assert extractor.get_lgate_status()["insights_collected"] == 4
+
+
+def test_a_leader_named_in_another_script_keeps_all_their_traits(extractor):
+    """Traits are the last keys of a leader. A reading that measured the entry in
+    characters but cut it in bytes dropped the last trait of a leader whose name
+    takes more than one byte per character."""
+    (leader,) = extractor.get_leaders()["leaders"]
+    assert leader["traits"] == [
+        "leader_trait_resilient",
+        "leader_trait_cautious",
+        "leader_trait_shipwright",
+    ]
 
 
 def test_species_traits_do_not_include_the_portrait(extractor):
