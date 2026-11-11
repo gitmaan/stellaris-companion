@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import uuid
 from contextlib import contextmanager
 from copy import deepcopy
@@ -13,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.advisor_memory import sanitize_advisor_memory
+from backend.core.briefing_names import ID_PATTERN, briefing_value_name
 from backend.core.chronicle_store import (
     ChronicleConflict,
     cached_chronicle_response,
@@ -34,7 +34,11 @@ from backend.core.story_continuity import (
 from stellaris_companion.campaign_evidence import resolve_empire_identity
 from stellaris_companion.evidence_policy import EvidencePurpose, build_evidence_policy
 from stellaris_companion.game_knowledge import build_game_knowledge_prompt, load_game_knowledge
-from stellaris_companion.technology_names import technology_display_name
+from stellaris_companion.technology_names import (
+    name_usage,
+    names_source,
+    technology_display_name,
+)
 
 DEFAULT_EVENT_LIMIT = 25
 MAX_EVENT_LIMIT = 120
@@ -181,8 +185,6 @@ DISPLAY_ID_PREFIXES = (
     "crisis_",
     "relic_",
 )
-
-DISPLAY_ID_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 
 
 class McpContextError(RuntimeError):
@@ -1743,13 +1745,15 @@ def _assemble_chronicle_text(
     return "\n".join(lines)
 
 
-MCP_TECHNOLOGY_INSTRUCTION = (
-    "Technology lists in this context use English in-game names. Refer to technologies by "
-    "these names, in the player's language, and match a technology the player mentions against "
-    "them and against also_shown_as before saying it is missing. A list that ends with a "
-    "truncation marker is incomplete: say so, or ask for the full section, rather than filling "
-    "the gap. Never invent a technology or present a guess as the exact in-game name."
-)
+def _technology_instruction() -> str:
+    return (
+        f"Technology lists in this context use in-game names ({names_source()}). Refer to "
+        f"technologies by these names, {name_usage()}, and match a technology the player "
+        "mentions against them and against also_shown_as before saying it is missing. A list "
+        "that ends with a truncation marker is incomplete: say so, or ask for the full section, "
+        "rather than filling the gap. Never invent a technology or present a guess as the exact "
+        "in-game name."
+    )
 
 
 def _compact_briefing_section(section: str, value: Any, **limits: Any) -> Any:
@@ -1759,7 +1763,7 @@ def _compact_briefing_section(section: str, value: Any, **limits: Any) -> Any:
         return _player_facing_model_context(value)
     if section in {"meta", "identity"}:
         return deepcopy(value)
-    return _compact_value(value, **limits)
+    return _compact_value(value, section=section, **limits)
 
 
 def _player_facing_model_context(value: Any) -> Any:
@@ -1780,7 +1784,7 @@ def _player_facing_model_context(value: Any) -> Any:
             str(names.get(identifier) or _display_identifier(str(identifier))): variants
             for identifier, variants in also_shown_as.items()
         }
-    technology["instruction"] = MCP_TECHNOLOGY_INSTRUCTION
+    technology["instruction"] = _technology_instruction()
     return context
 
 
@@ -1790,11 +1794,15 @@ def _compact_value(
     max_depth: int = 4,
     max_list_items: int = MAX_LIST_ITEMS_COMPACT,
     max_text_length: int = MAX_TEXT_LENGTH,
+    section: str = "",
+    field: str = "",
 ) -> Any:
     # Scalars are rendered the same at every depth: an identifier at the depth
     # limit must not reach the client raw while its siblings are shown by name.
+    # ``section`` and ``field`` say where in a briefing the value sits, which
+    # decides what kind of thing an ID names.
     if isinstance(value, str):
-        value = _display_identifier(value)
+        value = _display_identifier(value, section, field)
         if len(value) <= max_text_length:
             return value
         return f"{value[:max_text_length].rstrip()}... [truncated {len(value) - max_text_length} chars]"
@@ -1813,6 +1821,8 @@ def _compact_value(
                 max_depth=max_depth - 1,
                 max_list_items=max_list_items,
                 max_text_length=max_text_length,
+                section=section,
+                field=field,
             )
             for item in value[:max_list_items]
         ]
@@ -1830,22 +1840,28 @@ def _compact_value(
                 max_depth=max_depth - 1,
                 max_list_items=max_list_items,
                 max_text_length=max_text_length,
+                section=section,
+                field=key_text,
             )
         return _drop_empty(result)
     return str(value)
 
 
-def _display_identifier(value: str) -> str:
+def _display_identifier(value: str, section: str = "", field: str = "") -> str:
+    """Show an ID by its in-game name, or in readable words when the game has none."""
     text = str(value or "").strip()
     if not text:
         return text
     if text in DISPLAY_NAME_OVERRIDES:
         return DISPLAY_NAME_OVERRIDES[text]
+    name = briefing_value_name(text, section, field)
+    if name:
+        return name
+    if not ID_PATTERN.match(text):
+        return value
     technology = technology_display_name(text)
     if technology:
         return technology
-    if not _looks_like_display_identifier(text):
-        return value
 
     stem = text
     for prefix in sorted(DISPLAY_ID_PREFIXES, key=len, reverse=True):
@@ -1859,12 +1875,6 @@ def _display_identifier(value: str) -> str:
         suffix = f" {ROMAN_NUMERALS[parts.pop()]}"
     label = " ".join(_title_part(part) for part in parts).strip()
     return f"{label}{suffix}".strip() or value
-
-
-def _looks_like_display_identifier(value: str) -> bool:
-    if value in DISPLAY_NAME_OVERRIDES:
-        return True
-    return bool(DISPLAY_ID_PATTERN.match(value))
 
 
 def _title_part(part: str) -> str:

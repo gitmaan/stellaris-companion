@@ -1,13 +1,15 @@
-"""English in-game names for technology IDs found in saves.
+"""In-game names for technology IDs found in saves.
 
 A save lists technologies by internal ID, and many IDs say nothing about the name
-the player sees: ``tech_cryostasis_1`` is "Automated Colony Ships". The names
-here are generated from shipped game files by
-``scripts/generate_identity_catalog.py``; the JSON records its source game version.
+the player sees: ``tech_cryostasis_1`` is "Automated Colony Ships". Names come
+from the player's installed game when there is one (``game_names``): their
+version, their language, their mods. Otherwise they come from the English catalog
+shipped here, generated from game files by ``scripts/generate_identity_catalog.py``;
+the JSON records its source game version.
 
-This is a name catalog, not a rules catalog: it says what an ID is called in the
-English UI, not whether the technology is available to this empire. Modded or
-newer-than-catalog IDs have no entry, and callers keep the ID visible for them.
+These are names, not rules: they say what an ID is called on screen, not whether
+the technology is available to this empire. An ID neither source knows has no
+name, and callers keep the ID visible for it.
 """
 
 from __future__ import annotations
@@ -18,6 +20,8 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
+from .game_names import game_name, installed_names
+
 logger = logging.getLogger(__name__)
 
 TECHNOLOGY_CATALOG_PATH = Path(__file__).with_name("technology_catalog.json")
@@ -26,7 +30,7 @@ TECHNOLOGY_CATALOG_PATH = Path(__file__).with_name("technology_catalog.json")
 def _load_technology_catalog(
     path: Path = TECHNOLOGY_CATALOG_PATH,
 ) -> tuple[str | None, dict[str, str], dict[str, tuple[str, ...]]]:
-    """Load ``{id: name}`` and ``{id: other names}``, or nothing if unreadable."""
+    """Load ``{id: name}`` and ``{id: variant ids}``, or nothing if unreadable."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         names = {
@@ -35,7 +39,7 @@ def _load_technology_catalog(
             if isinstance(name, str) and name
         }
         variants = {
-            str(identifier): tuple(name for name in other if isinstance(name, str) and name)
+            str(identifier): tuple(swap for swap in other if isinstance(swap, str) and swap)
             for identifier, other in (data.get("variants") or {}).items()
             if isinstance(other, list)
         }
@@ -59,6 +63,27 @@ def _version_tuple(version: object) -> tuple[int, int, int] | None:
     return int(match.group(1)), int(match.group(2)), int(match.group(3) or 0)
 
 
+def names_game_version() -> str | None:
+    """The game version the names in use were read from."""
+    installed = installed_names()
+    return installed.version if installed else TECHNOLOGY_CATALOG_GAME_VERSION
+
+
+def names_source() -> str:
+    """Where the names in use come from, in words a model can be told."""
+    installed = installed_names()
+    if installed:
+        return installed.source
+    return f"English game text, {TECHNOLOGY_CATALOG_GAME_VERSION or 'unknown version'}"
+
+
+def name_usage() -> str:
+    """How a model should use these names, as a clause for its instructions."""
+    if installed_names():
+        return "exactly as written, since they are what the player's own game shows"
+    return "in the player's language"
+
+
 def catalog_covers_game_version(
     game_version: object, catalog_version: object = TECHNOLOGY_CATALOG_GAME_VERSION
 ) -> bool | None:
@@ -74,10 +99,11 @@ def catalog_covers_game_version(
 
 
 def technology_display_name(identifier: object) -> str | None:
-    """Return the English in-game name for a save technology ID, if catalogued."""
+    """Return the in-game name for a save technology ID, if the game or catalog has one."""
     if not isinstance(identifier, str):
         return None
-    return _TECHNOLOGY_NAMES.get(identifier.strip())
+    key = identifier.strip()
+    return game_name(key) or _TECHNOLOGY_NAMES.get(key)
 
 
 def technology_label(identifier: object) -> str:
@@ -103,4 +129,10 @@ def technology_variant_names(identifier: object) -> tuple[str, ...]:
     """Other names the game can show for this technology, depending on the empire."""
     if not isinstance(identifier, str):
         return ()
-    return _TECHNOLOGY_VARIANTS.get(identifier.strip(), ())
+    shown = technology_display_name(identifier)
+    names: list[str] = []
+    for variant in _TECHNOLOGY_VARIANTS.get(identifier.strip(), ()):
+        name = technology_display_name(variant)
+        if name and name != shown and name not in names:
+            names.append(name)
+    return tuple(names)

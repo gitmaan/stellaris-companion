@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from .campaign_evidence import resolve_content_availability, resolve_empire_identity
+from .campaign_evidence import english_identity_names, resolve_content_availability
 from .evidence_policy import build_evidence_prompt
 from .knowledge_applicability import (
     APPLICABILITY_PATTERN,
@@ -552,13 +552,7 @@ def build_game_knowledge_prompt(
         knowledge.annotated_content if experimental_applicability else knowledge.content
     )
     if knowledge_content and topics is not None:
-        typed = resolve_empire_identity(campaign_identity)
-        entities = [typed["authority"], typed["origin"], *typed["civics"], *typed["ethics"]]
-        identity_names = " ".join(
-            entity["name"]
-            for entity in entities
-            if entity and entity["source"] == "verified_catalog"
-        )
+        identity_names = " ".join(english_identity_names(campaign_identity))
         if isinstance(campaign_identity, dict) and campaign_identity.get("is_nomadic") is True:
             # A Nomad's economy questions need the reserves rules, whatever the wording.
             identity_names = f"{identity_names} Operational Reserves Nomad Economy".strip()

@@ -105,6 +105,7 @@ For development, set `GOOGLE_API_KEY` in `.env` or use the same setup screen.
 
 - **Your `.sav` files stay on your machine.**
 - **Local processing by default**: parsing, extraction, and history storage are local.
+- **Real in-game names, read locally**: when Stellaris is installed on the same machine, the app reads the game's own text files so buildings, traditions, technologies and the rest are called what your game calls them, in your game's language and with your mods. Nothing is copied; only the names of things in your campaign travel with the extracted context.
 - **What leaves your machine**: Advisor questions, Chronicle prompts, and extracted game context are sent to the provider and model you select. Ollama and LM Studio connect through local loopback addresses by default, but Ollama cloud models process prompts remotely. OpenRouter and custom remote endpoints receive that context over the network.
 - **One selected AI provider**: The same provider and model power Advisor and in-app Chronicle generation; existing Chronicle chapters remain readable when that provider is offline.
 - **MCP client access**: configured local AI apps can read the extracted campaign cache through the MCP Relay.
