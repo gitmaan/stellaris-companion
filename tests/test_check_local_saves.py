@@ -135,6 +135,34 @@ def test_an_installed_game_newer_than_the_name_catalogs_is_reported(tmp_path):
     assert check.check_installed_game([tmp_path / "missing", broken]) is None
 
 
+def test_a_catalogued_name_the_app_reads_differently_from_the_game_is_reported(tmp_path):
+    from stellaris_companion.technology_names import TECHNOLOGY_CATALOG_GAME_VERSION
+
+    def game(name: str, version: str, text: str) -> Path:
+        game_dir = tmp_path / name
+        (game_dir / "common").mkdir(parents=True)
+        (game_dir / "localisation" / "english").mkdir(parents=True)
+        (game_dir / "localisation" / "english" / "t_l_english.yml").write_text(
+            f"l_english:\n{text}", encoding="utf-8-sig"
+        )
+        (game_dir / "launcher-settings.json").write_text(
+            f'{{"version": "{version}"}}', encoding="utf-8"
+        )
+        return game_dir
+
+    renamed = ' tech_lasers_1:0 "Crimson Lasers"\n'
+    same_version = game("same", TECHNOLOGY_CATALOG_GAME_VERSION, renamed)
+    other_version = game("other", "Next v99.0.0", renamed)
+    empty = game("empty", TECHNOLOGY_CATALOG_GAME_VERSION, "")
+
+    problems = check.check_game_names([tmp_path / "missing", same_version])
+    assert "tech_lasers_1: catalog has 'Red Lasers', the app reads 'Crimson Lasers'" in problems
+    # A different game version is allowed to name things differently.
+    assert check.check_game_names([other_version]) == []
+    assert check.check_game_names([empty]) == [f"no English game text could be read from {empty}"]
+    assert check.check_game_names([tmp_path / "missing"]) == []
+
+
 def _record(level, message):
     return logging.LogRecord("stellaris", level, __file__, 1, message, None, None)
 

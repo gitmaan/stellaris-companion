@@ -14,6 +14,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .game_names import game_name
+
 logger = logging.getLogger(__name__)
 
 # Paradox's 4.3.6 release (2026-05-11) integrated all three packs into the base game.
@@ -27,12 +29,12 @@ BASE_GAME_DLC_INTEGRATIONS = {
 _VERSION_PATTERN = re.compile(r"(?<![\w.])v?(\d+)\.(\d+)(?:\.(\d+))?(?![.\d])", re.I)
 _DLC_STATUS_VALUES = frozenset({"reported", "not_recorded", "invalid"})
 
-# Display names generated from shipped game files by
+# Display names come from the player's installed game when there is one
+# (game_names), otherwise from this English catalog, generated from game files by
 # scripts/generate_identity_catalog.py; the JSON records its source game version.
-# This is a name catalog, not a rules catalog: it says what an ID is called in the
-# English UI, not whether it is playable, compatible, or still exists in the game.
-# Unknown, modded, or newer-than-catalog identifiers deliberately keep their
-# identifier as the display.
+# These are names, not rules: they say what an ID is called on screen, not whether
+# it is playable, compatible, or still exists in the game. An identifier neither
+# source knows deliberately keeps its identifier as the display.
 IDENTITY_CATALOG_PATH = Path(__file__).with_name("identity_catalog.json")
 _IDENTITY_KINDS = ("authority", "civic", "ethic", "origin")
 
@@ -114,9 +116,10 @@ def resolve_empire_identity(identity: dict[str, Any] | None) -> dict[str, Any]:
 
     A civic remains a civic even when its name describes an empire archetype. The
     caller's raw fields are never changed. Both save keys and legacy prefix-stripped
-    IDs resolve to the same canonical ID for each kind. Names come from a name
-    catalog generated from one game version's files, not a rules catalog; IDs it
-    does not know (mods, newer releases) keep their identifier as the name.
+    IDs resolve to the same canonical ID for each kind. Names come from the
+    installed game, else from the shipped English catalog; an ID neither knows
+    keeps its identifier as the name. ``source`` says which: ``installed_game``,
+    ``verified_catalog`` or ``raw_identifier``.
     """
     raw = identity if isinstance(identity, dict) else {}
 
@@ -126,12 +129,14 @@ def resolve_empire_identity(identity: dict[str, Any] | None) -> dict[str, Any]:
         identifier = value.strip().removeprefix(_IDENTITY_PREFIXES[kind])
         if not identifier:
             return None
-        name = _IDENTITY_NAMES[kind].get(identifier)
+        installed = game_name(_IDENTITY_PREFIXES[kind] + identifier)
+        name = installed or _IDENTITY_NAMES[kind].get(identifier)
+        source = "installed_game" if installed else "verified_catalog"
         return {
             "id": identifier,
             "name": name or identifier,
             "kind": kind,
-            "source": "verified_catalog" if name else "raw_identifier",
+            "source": source if name else "raw_identifier",
         }
 
     def entries(value: Any, kind: str) -> list[dict[str, str]]:
@@ -145,3 +150,15 @@ def resolve_empire_identity(identity: dict[str, Any] | None) -> dict[str, Any]:
         "ethics": entries(raw.get("ethics"), "ethic"),
         "origin": entry(raw.get("origin"), "origin"),
     }
+
+
+def english_identity_names(identity: dict[str, Any] | None) -> list[str]:
+    """English names of an empire's authority, origin, civics and ethics.
+
+    The app's own game knowledge is written in English, so matching it against an
+    empire needs English names whatever language the player's game is in.
+    """
+    typed = resolve_empire_identity(identity)
+    entities = [typed["authority"], typed["origin"], *typed["civics"], *typed["ethics"]]
+    names = (_IDENTITY_NAMES[entity["kind"]].get(entity["id"]) for entity in entities if entity)
+    return [name for name in names if name]

@@ -64,7 +64,7 @@ class KnowledgeScope:
                 entry = typed[field]
                 if entry and entry["id"] == expected:
                     statuses.append("supported")
-                elif entry and entry["source"] == "verified_catalog":
+                elif entry and entry["source"] != "raw_identifier":
                     statuses.append("contradicted")
                 else:
                     statuses.append("unknown")

@@ -855,253 +855,253 @@
   },
   "variants": {
     "tech_antimatter_power": [
-      "Antimatter Metabolism"
+      "tech_bio_antimatter_power"
     ],
     "tech_arc_emitter_1": [
-      "Lightning Emitter"
+      "tech_bio_arc_emitter_1"
     ],
     "tech_arc_emitter_2": [
-      "Focused Lightning Emitter"
+      "tech_bio_arc_emitter_2"
     ],
     "tech_archaeo_mass_accelerator": [
-      "Ancient Fragmentor Artillery"
+      "tech_bio_archaeo_mass_accelerator"
     ],
     "tech_archaeo_mass_drivers": [
-      "Ancient Macro Shard Batteries"
+      "tech_bio_archaeo_mass_drivers"
     ],
     "tech_archaeo_point_defence": [
-      "Ancient Web Slinger"
+      "tech_bio_archaeo_point_defence"
     ],
     "tech_autocannons_1": [
-      "Quill Battery"
+      "tech_bio_autocannons_1"
     ],
     "tech_autocannons_2": [
-      "Ripper Quill Battery"
+      "tech_bio_autocannons_2"
     ],
     "tech_autocannons_3": [
-      "Stormfire Quill Battery"
+      "tech_bio_autocannons_3"
     ],
     "tech_battleship_build_speed": [
-      "Standardized Huge-Scale Cloning"
+      "tech_extra_large_space_fauna_build_speed"
     ],
     "tech_battleship_hull_1": [
-      "Improved Huge Space Fauna Tissues"
+      "tech_extra_large_space_fauna_hull_1"
     ],
     "tech_battleship_hull_2": [
-      "Advanced Huge Space Fauna Tissues"
+      "tech_extra_large_space_fauna_hull_2"
     ],
     "tech_cold_fusion_power": [
-      "Cold Fusion Metabolism"
+      "tech_bio_cold_fusion_power"
     ],
     "tech_colonization_1": [
-      "New Worlds Initiative"
+      "tech_colonization_1_wilderness"
     ],
     "tech_corvette_build_speed": [
-      "Standardized Small-Scale Cloning"
+      "tech_small_space_fauna_build_speed"
     ],
     "tech_corvette_hull_1": [
-      "Improved Small Space Fauna Tissues"
+      "tech_small_space_fauna_hull_1"
     ],
     "tech_corvette_hull_2": [
-      "Advanced Small Space Fauna Tissues"
+      "tech_small_space_fauna_hull_2"
     ],
     "tech_cruiser_build_speed": [
-      "Standardized Large-Scale Cloning"
+      "tech_large_space_fauna_build_speed"
     ],
     "tech_cruiser_hull_1": [
-      "Improved Large Space Fauna Tissues"
+      "tech_large_space_fauna_hull_1"
     ],
     "tech_cruiser_hull_2": [
-      "Advanced Large Space Fauna Tissues"
+      "tech_large_space_fauna_hull_2"
     ],
     "tech_cryostasis_1": [
-      "Seedling Incubation"
+      "tech_cryostasis_1_wilderness"
     ],
     "tech_cryostasis_2": [
-      "Permanent Incubation"
+      "tech_cryostasis_2_wilderness"
     ],
     "tech_dark_matter_power_core": [
-      "Dark Matter Metabolism"
+      "tech_bio_dark_matter_power_core"
     ],
     "tech_dark_matter_propulsion": [
-      "Dark Matter Stellar Motor Organs"
+      "tech_bioship_thrusters_5"
     ],
     "tech_destroyer_build_speed": [
-      "Standardized Medium-Scale Cloning"
+      "tech_medium_space_fauna_build_speed"
     ],
     "tech_destroyer_hull_1": [
-      "Improved Medium Space Fauna Tissues"
+      "tech_medium_space_fauna_hull_1"
     ],
     "tech_destroyer_hull_2": [
-      "Advanced Medium Space Fauna Tissues"
+      "tech_medium_space_fauna_hull_2"
     ],
     "tech_disruptors_1": [
-      "Molecular Disruptor"
+      "tech_bio_disruptors_1"
     ],
     "tech_disruptors_2": [
-      "Ion Molecular Disruptor"
+      "tech_bio_disruptors_2"
     ],
     "tech_disruptors_3": [
-      "Phased Molecular Disruptor"
+      "tech_bio_disruptors_3"
     ],
     "tech_energy_lance_1": [
-      "Particle Beam"
+      "tech_bio_energy_lance_1"
     ],
     "tech_energy_lance_2": [
-      "Tachyon Beam"
+      "tech_bio_energy_lance_2"
     ],
     "tech_energy_torpedoes_1": [
-      "Proton Thrower"
+      "tech_bio_energy_torpedoes_1"
     ],
     "tech_energy_torpedoes_2": [
-      "Neutron Thrower"
+      "tech_bio_energy_torpedoes_2"
     ],
     "tech_fission_power": [
-      "Fission Metabolism"
+      "tech_bio_fission_power"
     ],
     "tech_flak_batteries_1": [
-      "Barb Batteries"
+      "tech_bio_flak_batteries_1"
     ],
     "tech_flak_batteries_2": [
-      "Barb Cannons"
+      "tech_bio_flak_batteries_2"
     ],
     "tech_flak_batteries_3": [
-      "Barb Artillery"
+      "tech_bio_flak_batteries_3"
     ],
     "tech_fusion_power": [
-      "Fusion Metabolism"
+      "tech_bio_fusion_power"
     ],
     "tech_jump_drive_1": [
-      "Jump Organ"
+      "tech_bio_jump_drive_1"
     ],
     "tech_kinetic_artillery_1": [
-      "Chitin Battery"
+      "tech_bio_kinetic_artillery_1"
     ],
     "tech_kinetic_artillery_2": [
-      "Chitin Artillery"
+      "tech_bio_kinetic_artillery_2"
     ],
     "tech_lasers_1": [
-      "Red Beam Projector"
+      "tech_bio_lasers_1"
     ],
     "tech_lasers_2": [
-      "Blue Beam Projector"
+      "tech_bio_lasers_2"
     ],
     "tech_lasers_3": [
-      "UV Beam Projector"
+      "tech_bio_lasers_3"
     ],
     "tech_lasers_4": [
-      "X-Ray Beam Projector"
+      "tech_bio_lasers_4"
     ],
     "tech_lasers_5": [
-      "Gamma Beam Projector"
+      "tech_bio_lasers_5"
     ],
     "tech_mass_drivers_1": [
-      "Shard Accelerator"
+      "tech_bio_mass_drivers_1"
     ],
     "tech_mass_drivers_2": [
-      "Bio-Coil Shard Accelerator"
+      "tech_bio_mass_drivers_2"
     ],
     "tech_mass_drivers_3": [
-      "Shard Rail Accelerator"
+      "tech_bio_mass_drivers_3"
     ],
     "tech_mass_drivers_4": [
-      "Advanced Shard Rail Accelerator"
+      "tech_bio_mass_drivers_4"
     ],
     "tech_mass_drivers_5": [
-      "Shard Gauss Accelerator"
+      "tech_bio_mass_drivers_5"
     ],
     "tech_mine_exotic_gases": [
-      "Improved Exotic Gas Extraction"
+      "tech_nomads_mine_exotic_gases"
     ],
     "tech_mine_living_metal": [
-      "Improved Living Metal"
+      "tech_nomads_mine_living_metal"
     ],
     "tech_mine_rare_crystals": [
-      "Improved Rare Crystal Mining"
+      "tech_nomads_mine_rare_crystals"
     ],
     "tech_mine_volatile_motes": [
-      "Improved Mote Stabilization"
+      "tech_nomads_mine_volatile_motes"
     ],
     "tech_mining_drone_weapon_1": [
-      "Mining Beam Projector"
+      "tech_mining_bio_laser"
     ],
     "tech_nanite_autocannon": [
-      "Nanite Quill Battery"
+      "tech_bio_nanite_autocannon"
     ],
     "tech_nanite_flak_batteries": [
-      "Nanite-Infused Barb Artillery"
+      "tech_bio_nanite_flak_batteries"
     ],
     "tech_pd_tracking_1": [
-      "Sentinel Snapper Gun"
+      "tech_bio_pd_tracking_1"
     ],
     "tech_pd_tracking_2": [
-      "Barrier Snapper Gun"
+      "tech_bio_pd_tracking_2"
     ],
     "tech_pd_tracking_3": [
-      "Guardian Snapper Gun"
+      "tech_bio_pd_tracking_3"
     ],
     "tech_planetary_defenses": [
-      "Arkship Defenses"
+      "tech_nomads_arkship_defenses"
     ],
     "tech_planetary_shield_generator": [
-      "Shield Amplifier"
+      "tech_nomads_shield_generator"
     ],
     "tech_plasma_1": [
-      "Bio-Plasma Thrower"
+      "tech_bio_plasma_1"
     ],
     "tech_plasma_2": [
-      "Bio-Plasma Accelerator"
+      "tech_bio_plasma_2"
     ],
     "tech_plasma_3": [
-      "Bio-Plasma Cannon"
+      "tech_bio_plasma_3"
     ],
     "tech_psi_jump_drive_1": [
-      "Psionic Jump Organ"
+      "tech_bio_psi_jump_drive_1"
     ],
     "tech_refit_standards": [
-      "Hatchery Optimization"
+      "tech_refit_standards_beastmasters"
     ],
     "tech_space_construction": [
-      "Zero-G Engineering"
+      "tech_nomads_space_construction"
     ],
     "tech_strike_craft_1": [
-      "Basic Fighter Wing"
+      "tech_bio_strike_craft_1"
     ],
     "tech_strike_craft_2": [
-      "Improved Fighter Wing"
+      "tech_bio_strike_craft_2"
     ],
     "tech_strike_craft_3": [
-      "Advanced Fighter Wing"
+      "tech_bio_strike_craft_3"
     ],
     "tech_swarmer_missiles_1": [
-      "Bio-Swarmer Missiles"
+      "tech_bio_swarmer_missiles_1"
     ],
     "tech_swarmer_missiles_2": [
-      "Bio-Whirlwind Missiles"
+      "tech_bio_swarmer_missiles_2"
     ],
     "tech_thought_enforcement": [
-      "Thought Pre-Emption"
+      "tech_thought_enforcement_gestalt"
     ],
     "tech_thrusters_1": [
-      "Chemical Stellar Motor Organs"
+      "tech_bioship_thrusters_1"
     ],
     "tech_thrusters_2": [
-      "Ion Stellar Motor Organs"
+      "tech_bioship_thrusters_2"
     ],
     "tech_thrusters_3": [
-      "Plasma Stellar Motor Organs"
+      "tech_bioship_thrusters_3"
     ],
     "tech_thrusters_4": [
-      "Impulse Stellar Motor Organs"
+      "tech_bioship_thrusters_4"
     ],
     "tech_titan_hull_1": [
-      "Improved Gigantic Space Fauna Tissues"
+      "tech_titanic_space_fauna_hull_1"
     ],
     "tech_titan_hull_2": [
-      "Advanced Gigantic Space Fauna Tissues"
+      "tech_titanic_space_fauna_hull_2"
     ],
     "tech_zero_point_power": [
-      "Zero Point Metabolism"
+      "tech_bio_zero_point_power"
     ]
   }
 }

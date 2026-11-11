@@ -176,7 +176,7 @@ def test_generator_names_technologies_by_full_save_id(tmp_path) -> None:
         "tech_beta": "Beta",
         "tech_ref": "Alpha Ships II",
     }
-    assert catalog["variants"] == {"tech_alpha": ["Alpha Variant"]}
+    assert catalog["variants"] == {"tech_alpha": ["tech_alpha_variant"]}
     assert skipped == [
         "technology:tech_unnamed (no English name)",
         "technology:tech_dup (conflicting English names)",

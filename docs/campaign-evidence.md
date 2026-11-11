@@ -28,6 +28,34 @@ Utopia, Synthetic Dawn, and Humanoids became base-game content in **4.3.6**. The
 applies that boundary to the reported campaign version; it does not apply it to older
 or unknown versions. The source is the
 [official Stellaris 4.3.6 announcement](https://store.steampowered.com/news/posts/?appids=281990&enddate=1778509430&feed=steam_community_announcements).
+### Names
+
+A save records things by internal ID, and the name on screen is often nothing like it:
+`building_factory_3` is Civilian Repli-Complexes. Names come from two places, in order:
+
+1. **The player's installed game** (`stellaris_companion/game_names.py`). The app finds
+   the install (Steam and its extra libraries, a Steam folder the saves sit in, GOG on
+   Windows, or `STELLARIS_GAME_DIR`), reads the language from the player's
+   `settings.txt` and the enabled mods from `dlc_load.json`, and reads the game's own
+   text files the way the game loads them. That gives the names for the installed
+   version, in the language the player plays in, including their mods. The files are
+   read in about a fifth of a second on first use, nothing is copied or cached on disk,
+   and a change of version, language or mods is picked up within a minute.
+2. **The English catalogs shipped with the app**, for a save opened on a machine without
+   the game. They cover technologies and empire identity (below); anything else keeps a
+   readable form of its ID.
+
+`backend/core/briefing_names.py` says which game text key names a briefing value. Most
+values are the game's key as they stand (`tr_discovery_adopt`). A few fields need their
+kind put in front (`foundry_2` in a planet's building list is `building_foundry_2`; a
+starbase's `crew_quarters` is named under `sm_crew_quarters`), and `NAME_KEY_PREFIXES`
+lists those fields, so a value is looked up as the kind of thing it is. One bare word
+outside those fields is never looked up. Text the running game fills in
+(`[Root.GetName]`) is not a fixed name and gives none.
+
+External AI clients (MCP) are shown these names. The in-app Advisor gets them for
+technologies and empire identity; its other IDs are still raw.
+
 `stellaris_companion/identity_catalog.json` maps every authority, civic, origin, and
 ethic ID defined in the shipped game files to its English display name. It is generated
 by `scripts/generate_identity_catalog.py --game-dir <Stellaris install>` and records the
@@ -49,17 +77,20 @@ events and the MCP summary use the same names. Stored briefings keep the IDs.
 
 Some empire types see a technology under another name (Wilderness empires see
 Automated Colony Ships as Seedling Incubation). Deciding which applies means evaluating
-game script, so the catalog only lists the alternatives (`variants`), and the briefing
-passes them as `also_shown_as`. Modded and newer IDs have no entry and are never given
-an invented name; when a save is newer than the catalog, the briefing says so.
+game script, so the catalog only lists the alternatives (`variants`, by ID), and the
+briefing passes their names as `also_shown_as`. An ID neither the installed game nor the
+catalog knows is never given an invented name; when a save is newer than the names in
+use, the briefing says so.
 
 External AI clients (MCP) never see raw IDs, so every technology in their payloads is
-shown under its catalog name and the naming notes are keyed by name. Their text summary
+shown under its in-game name and the naming notes are keyed by name. Their text summary
 lists every research option; any list a summary does shorten ends with a count of what
 was left out.
 
 `scripts/check_local_saves.py` fails when the installed game or a checked save is newer
-than the catalogs, so run it before a release and regenerate when it says to.
+than the catalogs, so run it before a release and regenerate when it says to. It also
+fails when the app's reading of the installed game disagrees with a catalogued name:
+the catalogs are written by the generator's own reader, so the two check each other.
 
 Legacy empty DLC arrays are ambiguous because older extraction used an empty array
 for both absence and an explicitly empty block. They remain unknown unless the source

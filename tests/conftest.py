@@ -17,6 +17,19 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration: marks tests as integration tests")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def names_from_shipped_catalogs():
+    """Tests get the same names whatever game this machine has installed.
+
+    Tests of installed-game names pass their own with ``game_names.use_names``.
+    """
+    from stellaris_companion import game_names
+
+    game_names.use_names(None)
+    yield
+    game_names.use_installed_game()
+
+
 @pytest.fixture(scope="session")
 def project_root():
     """Return the project root directory."""

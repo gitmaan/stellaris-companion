@@ -14,8 +14,10 @@ from stellaris_companion.campaign_evidence import (
 )
 from stellaris_companion.evidence_policy import build_evidence_policy
 from stellaris_companion.technology_names import (
-    TECHNOLOGY_CATALOG_GAME_VERSION,
     catalog_covers_game_version,
+    name_usage,
+    names_game_version,
+    names_source,
     technology_display_name,
     technology_names_for,
     technology_variant_names,
@@ -165,17 +167,18 @@ def _name_technologies(technology: Any, game_version: str) -> dict[str, Any] | N
     names = technology_names_for(identifiers)
     context: dict[str, Any] = {
         "names": names,
-        "names_source": f"English game text, {TECHNOLOGY_CATALOG_GAME_VERSION or 'unknown version'}",
+        "names_source": names_source(),
         "instruction": (
             "Saves record technologies by internal ID, which often differs from what the "
             "player sees: tech_cryostasis_1 is Automated Colony Ships. names gives the "
             "in-game name of each ID in technology.in_progress and "
             "technology.available_techs, and technology.researched_techs already lists "
             "in-game names. A technology in in_progress (tech or queued_techs) is not "
-            "researched yet; special_project means that field is working on a project first. Refer to technologies by these names, in the player's language, "
+            "researched yet; special_project means that field is working on a project first. "
+            f"Refer to technologies by these names, {name_usage()}, "
             "and match a technology the player mentions against them before saying it is "
-            "missing. An entry that still looks like an ID (tech_...) is modded or newer than "
-            "this catalog: never present it, or a name guessed from it, as the exact in-game "
+            "missing. An entry that still looks like an ID (tech_...) is one these names do not "
+            "cover (a mod, or a newer game): never present it, or a name guessed from it, as the exact in-game "
             "name, and never invent an ID."
         ),
     }
@@ -191,10 +194,11 @@ def _name_technologies(technology: Any, game_version: str) -> dict[str, Any] | N
             "also_shown_as name instead. The save does not say which; treat both as the same "
             "technology."
         )
-    if catalog_covers_game_version(game_version) is False:
+    if catalog_covers_game_version(game_version, names_game_version()) is False:
         context["catalog_note"] = (
-            f"This save is from {game_version}, newer than the name catalog. Technologies "
-            "added or renamed since may be missing or out of date here."
+            f"This save is from {game_version}, newer than the name catalog "
+            f"({names_game_version()}). Technologies added or renamed since may be missing or "
+            "out of date here."
         )
     return context
 

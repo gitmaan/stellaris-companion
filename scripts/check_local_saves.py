@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import queue
 import sys
 import tempfile
@@ -87,6 +86,40 @@ def discover_saves(targets: list[Path], *, per_campaign: int | None) -> dict[str
     return dict(sorted(result.items()))
 
 
+def check_game_names(game_dirs: list[Path]) -> list[str]:
+    """Where the app's reading of the installed game's names differs from the catalogs.
+
+    The catalogs are written by ``scripts/generate_identity_catalog.py``, which reads
+    the game's text with its own code. When both come from the same game version,
+    every catalogued name must be what the app reads from the install.
+    """
+    from stellaris_companion.campaign_evidence import _IDENTITY_NAMES, _IDENTITY_PREFIXES
+    from stellaris_companion.game_install import GameInstall, is_game_dir, read_game_version
+    from stellaris_companion.game_names import GameNames
+    from stellaris_companion.technology_names import (
+        _TECHNOLOGY_NAMES,
+        TECHNOLOGY_CATALOG_GAME_VERSION,
+    )
+
+    game_dir = next((path for path in game_dirs if is_game_dir(path)), None)
+    if game_dir is None:
+        return []
+    version = read_game_version(game_dir)
+    names = GameNames.from_install(GameInstall(game_dir=game_dir, version=version))
+    if not names:
+        return [f"no English game text could be read from {game_dir}"]
+    if version != TECHNOLOGY_CATALOG_GAME_VERSION:
+        return []
+    expected = dict(_TECHNOLOGY_NAMES)
+    for kind, catalog in _IDENTITY_NAMES.items():
+        expected.update({_IDENTITY_PREFIXES[kind] + key: name for key, name in catalog.items()})
+    return [
+        f"{key}: catalog has {name!r}, the app reads {names.name(key)!r}"
+        for key, name in expected.items()
+        if names.name(key) != name
+    ]
+
+
 def check_briefing(briefing: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Return (errors, warnings) for values a real campaign always has."""
     errors: list[str] = []
@@ -122,16 +155,11 @@ _REGENERATE = (
 
 
 def default_game_dirs() -> list[Path]:
-    """Where a Steam install of Stellaris usually lives, plus STELLARIS_GAME_DIR."""
-    home = Path.home()
-    candidates = [
-        home / "Library/Application Support/Steam/steamapps/common/Stellaris",
-        Path("C:/Program Files (x86)/Steam/steamapps/common/Stellaris"),
-        home / ".steam/steam/steamapps/common/Stellaris",
-        home / ".local/share/Steam/steamapps/common/Stellaris",
-    ]
-    override = os.environ.get("STELLARIS_GAME_DIR")
-    return [Path(override)] if override else candidates
+    """The Stellaris install the app itself would read names from, if there is one."""
+    from stellaris_companion.game_install import find_game_install
+
+    install = find_game_install()
+    return [install.game_dir] if install else []
 
 
 def installed_game_version(game_dirs: list[Path]) -> str | None:
@@ -365,6 +393,10 @@ def main(argv: list[str] | None = None) -> int:
             f"{', '.join(unknown_names)}. See stellaris_save_extractor/game_vocabulary.py.\n"
         )
 
+    misread_names = check_game_names(game_dirs)
+    if misread_names:
+        print("FAIL game names: " + "; ".join(misread_names[:10]) + "\n")
+
     summary: list[dict[str, Any]] = []
     failed = 0
     with tempfile.TemporaryDirectory(prefix="save-check-") as tmp:
@@ -404,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n{total - failed}/{total} saves passed." if failed else f"\nAll {total} saves passed.")
     if args.json:
         args.json.write_text(json.dumps(summary, indent=2))
-    return 1 if failed or stale_catalogs or unknown_names else 0
+    return 1 if failed or stale_catalogs or unknown_names or misread_names else 0
 
 
 if __name__ == "__main__":

@@ -24,8 +24,8 @@ Technologies keep their full save ID (``tech_cryostasis_1``) as the key because
 that is what a save's research lists contain. Some empires see a technology
 under a ``technology_swap`` name instead (Wilderness, Nomads, ...). Which one the
 UI shows depends on game script, so the catalog does not decide: ``variants``
-lists the other names a technology can appear under, and each swap ID is also
-named under its own key.
+lists the swap IDs whose name differs from the technology's own, and each swap ID
+is named under its own key.
 """
 
 from __future__ import annotations
@@ -237,7 +237,7 @@ def collect_technologies(game_dir: Path) -> dict[str, list[str]]:
 def build_technology_catalog(
     game_dir: Path, english: tuple[dict[str, str], set[str]] | None = None
 ) -> tuple[dict, list[str]]:
-    """Return technology names, their swap-name variants, and the IDs left out."""
+    """Return technology names, their differently named swap IDs, and the IDs left out."""
     localisation, conflicts = english or _load_english(game_dir)
     names: dict[str, str] = {}
     variants: dict[str, list[str]] = {}
@@ -254,8 +254,8 @@ def build_technology_catalog(
             except LookupError:
                 continue  # A swap without its own text shows the base name.
             names.setdefault(swap, swap_name)
-            if swap_name != names[identifier] and swap_name not in variants.get(identifier, []):
-                variants.setdefault(identifier, []).append(swap_name)
+            if swap_name != names[identifier] and swap not in variants.get(identifier, []):
+                variants.setdefault(identifier, []).append(swap)
     catalog = {
         "game_version": read_game_version(game_dir),
         "source": "Stellaris common/technology definitions with localisation/english display names",
