@@ -8,6 +8,7 @@ installed game and still works without one.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ import pytest
 from backend.core.briefing_names import briefing_value_name
 from backend.core.model_briefing import build_model_briefing
 from backend.mcp.context import _display_identifier
-from stellaris_companion import game_install, game_names
+from stellaris_companion import game_names
 from stellaris_companion.campaign_evidence import english_identity_names, resolve_empire_identity
 from stellaris_companion.game_install import GameInstall, find_game_install
 from stellaris_companion.game_names import GameNames, read_localisation
@@ -126,20 +127,32 @@ def test_the_install_is_found_with_its_version_language_and_mods(machine, tmp_pa
     assert install.mod_dirs == (tmp_path / "workshop" / "cool_mod",)
 
 
-def test_a_steam_library_on_another_drive_is_searched(tmp_path, monkeypatch) -> None:
-    steam = tmp_path / "Steam"
+def test_a_steam_library_on_another_drive_is_searched(
+    empty_home, tmp_path, monkeypatch, add_steam_library
+) -> None:
+    monkeypatch.setattr(sys, "platform", "darwin")
     library = tmp_path / "Games Drive" / "SteamLibrary"
-    (steam / "steamapps").mkdir(parents=True)
-    escaped = str(library).replace("\\", "\\\\")
-    (steam / "steamapps" / "libraryfolders.vdf").write_text(
-        f'"libraryfolders"\n{{\n\t"0"\n\t{{\n\t\t"path"\t\t"{escaped}"\n\t}}\n}}\n'
-    )
+    add_steam_library(empty_home / "Library" / "Application Support" / "Steam", library)
     game = make_game(library / "steamapps" / "common")
-    monkeypatch.delenv("STELLARIS_GAME_DIR", raising=False)
-    monkeypatch.setattr(game_install, "_steam_roots", lambda: [steam])
-    monkeypatch.setattr(game_install, "_save_dirs", lambda: [])
 
     assert find_game_install() == GameInstall(game_dir=game, version="Test v9.9.9")
+
+
+def test_a_game_run_through_proton_is_found_with_the_settings_kept_beside_it(
+    empty_home, tmp_path, monkeypatch, add_steam_library
+) -> None:
+    monkeypatch.setattr(sys, "platform", "linux")
+    library = tmp_path / "Games Drive" / "SteamLibrary"
+    add_steam_library(empty_home / ".local" / "share" / "Steam", library)
+    game = make_game(library / "steamapps" / "common")
+    windows_documents = "steamapps/compatdata/281990/pfx/drive_c/users/steamuser/Documents"
+    user = library.joinpath(*windows_documents.split("/"), "Paradox Interactive", "Stellaris")
+    user.mkdir(parents=True)
+    (user / "settings.txt").write_text('language="l_german"\n')
+
+    assert find_game_install() == GameInstall(
+        game_dir=game, version="Test v9.9.9", language="german"
+    )
 
 
 def test_no_install_means_no_names_and_no_error(tmp_path, monkeypatch) -> None:
