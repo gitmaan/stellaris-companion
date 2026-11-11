@@ -53,8 +53,14 @@ lists those fields, so a value is looked up as the kind of thing it is. One bare
 outside those fields is never looked up. Text the running game fills in
 (`[Root.GetName]`) is not a fixed name and gives none.
 
-External AI clients (MCP) are shown these names. The in-app Advisor gets them for
-technologies and empire identity; its other IDs are still raw.
+The model briefing (in-app Advisor, Chronicle, and external AI clients through MCP)
+has each such value replaced by its name, and `model_context.names` tells the model
+the names are the player's own and that a value still written as an ID has none.
+Stored briefings keep the save's IDs. Three things are left as IDs on purpose: the
+`identity` section (other code reads it; `model_context.empire_identity` has the
+names), research options (named alongside, below), and `country_type`, which is a
+code the instructions refer to. Without an install the in-app briefing keeps IDs, and
+MCP clients get the readable form of each ID as before.
 
 `stellaris_companion/identity_catalog.json` maps every authority, civic, origin, and
 ethic ID defined in the shipped game files to its English display name. It is generated

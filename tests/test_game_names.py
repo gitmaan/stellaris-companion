@@ -292,6 +292,68 @@ def test_the_advisor_is_told_the_names_are_the_players_own(installed) -> None:
     assert "catalog_note" not in naming
 
 
+CAMPAIGN = {
+    "meta": {"version": "Test v9.9.9"},
+    "identity": {"ethics": ["xenophile"], "civics": ["technocracy"], "authority": "democratic"},
+    "territory": {
+        "planets": [
+            {
+                "name": "Arid",
+                "type": "arid",
+                "buildings": ["foundry_2", "unknown_mod_building"],
+                "last_building": "building_factory_3",
+            }
+        ]
+    },
+    "defense": {"starbases": [{"level": "citadel", "buildings": ["crew_quarters"]}]},
+    "progression": {"traditions": {"traditions": ["tr_discovery_adopt"]}},
+    "diplomacy": {
+        "relations": [
+            {"empire_name": "Xani", "country_type": "fallen_empire", "ethics": ["xenophile"]}
+        ]
+    },
+    "situation": {"game_phase": "early_game", "wars": [{"war_goal": "wg_independence"}]},
+    "technology": {"available_techs": {"physics": ["tech_cryostasis_1"]}},
+}
+
+
+def test_the_advisor_briefing_calls_things_what_the_players_game_calls_them(installed) -> None:
+    source = json.loads(json.dumps(CAMPAIGN))
+
+    briefing = build_model_briefing(source)
+
+    assert source == CAMPAIGN  # the stored briefing keeps the save's IDs
+    planet = briefing["territory"]["planets"][0]
+    assert planet == {
+        "name": "Arid",  # a planet's own name is not looked up
+        "type": "Arid World",
+        "buildings": ["Alloy Mega-Forges", "unknown_mod_building"],
+        "last_building": "Civilian Repli-Complexes",
+    }
+    assert briefing["defense"]["starbases"][0]["buildings"] == ["Crew Quarters"]
+    assert briefing["progression"]["traditions"]["traditions"] == ["Discovery Traditions"]
+    assert briefing["situation"]["wars"][0]["war_goal"] == "Independence"
+    relation = briefing["diplomacy"]["relations"][0]
+    assert relation["ethics"] == ["Xenophile"]
+    # Codes the instructions and other code refer to keep their value.
+    assert relation["country_type"] == "fallen_empire"
+    assert briefing["situation"]["game_phase"] == "early_game"
+    assert briefing["identity"] == CAMPAIGN["identity"]
+    assert briefing["technology"]["available_techs"] == {"physics": ["tech_cryostasis_1"]}
+    note = briefing["model_context"]["names"]
+    assert note["source"] == "English text of the installed game, Test v9.9.9"
+    assert "exactly as written" in note["instruction"]
+
+
+def test_without_an_install_the_advisor_briefing_keeps_the_saves_ids() -> None:
+    briefing = build_model_briefing(json.loads(json.dumps(CAMPAIGN)))
+
+    assert briefing["territory"] == CAMPAIGN["territory"]
+    assert briefing["defense"] == CAMPAIGN["defense"]
+    assert briefing["diplomacy"] == CAMPAIGN["diplomacy"]
+    assert "names" not in briefing["model_context"]
+
+
 def test_changing_the_games_language_is_picked_up_while_the_app_runs(
     machine, tmp_path, monkeypatch
 ) -> None:

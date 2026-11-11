@@ -7,6 +7,7 @@ import re
 from copy import deepcopy
 from typing import Any
 
+from backend.core.briefing_names import briefing_value_name
 from backend.core.json_utils import json_dumps
 from stellaris_companion.campaign_evidence import (
     resolve_content_availability,
@@ -24,6 +25,13 @@ from stellaris_companion.technology_names import (
 )
 
 MODEL_BRIEFING_SCHEMA_VERSION = 3
+
+# Sections left as they are when values are given their in-game names: identity
+# holds the raw IDs other code reads (model_context.empire_identity has the names),
+# and technology is named by _name_technologies, which keeps research options by ID.
+_SECTIONS_KEPT_AS_IDS = frozenset({"meta", "identity", "technology", "model_context"})
+# Codes that instructions and code refer to by value, not things with a name on screen.
+_FIELDS_KEPT_AS_IDS = frozenset({"country_type"})
 
 
 def get_briefing_metadata(briefing: dict[str, Any]) -> dict[str, Any]:
@@ -128,10 +136,53 @@ def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
     technology = _name_technologies(result.get("technology"), version)
     if technology:
         result["model_context"]["technology"] = technology
+    if _name_values(result):
+        result["model_context"]["names"] = {
+            "source": names_source(),
+            "instruction": (
+                "Buildings, districts, traditions, ascension perks, traits, starbase modules, "
+                "megastructures and similar values in this briefing are written as the "
+                "player's own game shows them. Use those names exactly as written. A value "
+                "still written as an ID (lowercase_words_joined_by_underscores) has no "
+                "in-game name here: describe it in plain words and never present a name "
+                "guessed from it as the exact in-game name."
+            ),
+        }
     nomad = result.get("nomad")
     if isinstance(nomad, dict) and nomad.get("is_nomadic") is True:
         result["model_context"]["nomad_economy"] = _nomad_economy_rules(version)
     return result
+
+
+def _name_values(briefing: dict[str, Any]) -> int:
+    """Replace save IDs with the installed game's names, in place; return how many.
+
+    The save records a building as ``building_factory_3`` and the player sees
+    "Civilian Repli-Complexes". Only values are renamed, never keys, and only when
+    the installed game has a name for that kind of value; without an install
+    nothing changes.
+    """
+    renamed = 0
+
+    def name(value: Any, section: str, field: str) -> Any:
+        nonlocal renamed
+        if isinstance(value, str):
+            shown = briefing_value_name(value, section, field)
+            if shown and shown != value:
+                renamed += 1
+                return shown
+        elif isinstance(value, list):
+            value[:] = [name(item, section, field) for item in value]
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                if key not in _FIELDS_KEPT_AS_IDS:
+                    value[key] = name(item, section, str(key))
+        return value
+
+    for section, value in briefing.items():
+        if section not in _SECTIONS_KEPT_AS_IDS:
+            name(value, section, "")
+    return renamed
 
 
 def _name_technologies(technology: Any, game_version: str) -> dict[str, Any] | None:
