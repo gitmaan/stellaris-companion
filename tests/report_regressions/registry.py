@@ -109,6 +109,13 @@ REPORTS: dict[int, Report] = {
                 "Campaign history: reserve stages replace pooled Energy/Mineral swings.",
             ),
             Case(
+                f"{_HERE}/test_report_nomads.py"
+                "::test_issue_79_festival_upkeep_is_not_the_reserves_monthly_change",
+                "new",
+                True,
+                "From the game's situation definition (4.5.3); no real Festival save checked.",
+            ),
+            Case(
                 "tests/test_game_knowledge.py"
                 "::test_nomad_identity_brings_reserves_rules_to_generic_questions",
                 "referenced",

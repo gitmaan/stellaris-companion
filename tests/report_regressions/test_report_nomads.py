@@ -78,7 +78,7 @@ def nomad_sections() -> dict:
                     "type": "situation_nomad_economy",
                     "country": "0",
                     "progress": "8450.5",
-                    "last_month_progress": "-62.25",
+                    "last_month_progress": "0",
                     "approach": "situation_nomad_economy_smooth_spending",
                     "stage": "2",
                 }
@@ -110,7 +110,6 @@ def test_issue_79_nomad_economy_is_read_as_operational_reserves(monkeypatch, tmp
     assert nomad["detected_by"] == ["arkship_colony", "operational_reserves_situation"]
     assert nomad["operational_reserves"] == {
         "current": 8450.5,
-        "monthly_change": -62.25,
         "stage": "medium",
         "approach": "balance",
     }
@@ -124,10 +123,38 @@ def test_issue_79_nomad_economy_is_read_as_operational_reserves(monkeypatch, tmp
 
     rules = briefing["model_context"]["nomad_economy"]
     assert "one point equals one Mineral or one Energy Credit" in rules["operational_reserves"]
-    assert "never diagnose failing mining" in rules["monthly_lines"]
+    assert "never diagnose failing mining" in rules["monthly_lines"].lower()
+    assert "not a monthly change" in rules["monthly_lines"]
     # The question never says "Nomad", yet the maintained Nomad economy mechanics
     # are retrieved alongside the always-on briefing rules.
     assert "### Operational Reserves and Arkship Economy" in system_prompt
+
+
+def test_issue_79_festival_upkeep_is_not_the_reserves_monthly_change(monkeypatch, tmp_path):
+    """https://github.com/gitmaan/stellaris-companion/issues/79
+
+    The reserves situation's own monthly progress is only what the Festival approach
+    drains; it is 0 under every other approach. It was labelled "monthly_change",
+    which told the Advisor that a Nomad's reserves were flat.
+    """
+    sections = nomad_sections()
+    reserves = sections["situations"]["situations"]["0"]
+    reserves["approach"] = "situation_nomad_economy_harvest_everything"
+    reserves["last_month_progress"] = "-62.25"
+    payload = ingest_synthetic_save(
+        monkeypatch,
+        tmp_path,
+        sections,
+        meta=synthetic_meta(name="Barcalan Collective", date="2310.01.01", version="Cygnus v4.5.2"),
+    )
+    _, _, briefing = advisor_request(monkeypatch, payload, "How are my reserves doing?")
+
+    assert briefing["nomad"]["operational_reserves"] == {
+        "current": 8450.5,
+        "stage": "medium",
+        "approach": "festival",
+        "festival_upkeep_last_month": 62.25,
+    }
 
 
 def test_settled_empires_get_no_nomad_rules(monkeypatch, tmp_path):
