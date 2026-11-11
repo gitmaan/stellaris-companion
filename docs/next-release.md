@@ -1,3 +1,42 @@
+# Beta 1.1.2-beta.5 candidate
+
+This beta reads names from the player's installed game (#115, #118), keeps every value
+of a repeated save key and reads saves as UTF-8 (#110, #117), reads crises, the Khan and
+the War in Heaven from the game's own names (#111), reads treaties from the keys the
+game writes (#112), reads guardians and space fauna from their country types (#114),
+stops presenting Festival upkeep as the Nomad reserves' monthly change (#113, for #79),
+and finds saves, settings and the game from one list of places (#116). Stable remains
+1.1.1.
+
+## Release validation
+
+- Complete combined Python, Rust, desktop, localization and renderer checks.
+- Run `scripts/check_local_saves.py`; it now also fails if the app's reading of the
+  installed game's text disagrees with the shipped name catalogs, or if the installed
+  game never defines a crisis, guardian or flag name the app looks for.
+- Build all four platforms with publication disabled and inspect their artifacts,
+  including the bundled identity and technology catalog smoke checks.
+- The Rust parser changed twice (#110, #117) and the Python side depends on its new
+  output: the packaged parser must be the one built from this commit, or repeated keys
+  silently read as one value.
+- No database schema change since beta.4. A snapshot's signals now record a treaty
+  reading version, so a corrected treaty reading is not shown as treaties signed or
+  ended on the day of the update.
+- Verify macOS signing/notarization, package versions, update manifests and hashes.
+- Merge only after the candidate checks pass, then tag the verified main commit.
+- Verify final beta assets and feeds, while stable release/feed remains 1.1.1.
+
+Not claimed: names from the installed game were checked on one macOS Steam install in
+English, and in German and Simplified Chinese by pointing the app at those text files;
+no save from a non-English player was available. Mods are covered by a made-up mod in
+tests, not a real one, and mods packed as a `.zip` are not read. Finding the game and
+saves on Windows and Linux (Proton libraries on other drives, a Documents folder moved
+into OneDrive) is tested with folders built by the tests, not on real installs. The
+loss of a leader's last trait under a long non-ASCII name (#117) is shown by a test
+save only. #83 and #86 still await reporter confirmation.
+
+## Earlier release records
+
 # Beta 1.1.2-beta.4 candidate
 
 This beta names technologies as the game shows them (#105, for #104), stops counting
@@ -24,8 +63,6 @@ CI runner, not in the installed app. Technology names are English, generated fro
 Cygnus 4.5.3; no 4.5.3 save was available, and the newest real save checked is 4.5.2.
 The Nomad reserve's monthly change reads as 0 in the one real Nomad save seen so far.
 #83 and #86 still await reporter confirmation.
-
-## Earlier release records
 
 # Beta 1.1.2-beta.3 candidate
 
