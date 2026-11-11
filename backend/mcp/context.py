@@ -34,6 +34,7 @@ from backend.core.story_continuity import (
 from stellaris_companion.campaign_evidence import resolve_empire_identity
 from stellaris_companion.evidence_policy import EvidencePurpose, build_evidence_policy
 from stellaris_companion.game_knowledge import build_game_knowledge_prompt, load_game_knowledge
+from stellaris_companion.technology_names import technology_display_name
 
 DEFAULT_EVENT_LIMIT = 25
 MAX_EVENT_LIMIT = 120
@@ -139,14 +140,8 @@ ROMAN_NUMERALS = {
     "6": "VI",
 }
 
+# Technology names come from the generated catalog (technology_names), not from here.
 DISPLAY_NAME_OVERRIDES = {
-    "tech_doctrine_fleet_size_1": "Fleet Doctrines",
-    "tech_automated_exploration": "Automated Exploration Protocols",
-    "tech_mass_drivers_1": "Mass Drivers",
-    "tech_mass_drivers_2": "Coilguns",
-    "tech_mass_drivers_3": "Railguns",
-    "tech_mass_drivers_4": "Advanced Railguns",
-    "tech_mass_drivers_5": "Gauss Cannons",
     "war_started": "War Started",
     "war_ended": "War Ended",
     "colony_count_change": "Colony Count Change",
@@ -1748,12 +1743,45 @@ def _assemble_chronicle_text(
     return "\n".join(lines)
 
 
+MCP_TECHNOLOGY_INSTRUCTION = (
+    "Technology lists in this context use English in-game names. Refer to technologies by "
+    "these names, in the player's language, and match a technology the player mentions against "
+    "them and against also_shown_as before saying it is missing. A list that ends with a "
+    "truncation marker is incomplete: say so, or ask for the full section, rather than filling "
+    "the gap. Never invent a technology or present a guess as the exact in-game name."
+)
+
+
 def _compact_briefing_section(section: str, value: Any, **limits: Any) -> Any:
     # Truncating evidence or humanizing canonical IDs changes their meaning.
     # Keep the small interpretation contract and its source fields intact.
-    if section in {"meta", "identity", "model_context"}:
+    if section == "model_context":
+        return _player_facing_model_context(value)
+    if section in {"meta", "identity"}:
         return deepcopy(value)
     return _compact_value(value, **limits)
+
+
+def _player_facing_model_context(value: Any) -> Any:
+    """Key the technology naming notes by name, as the technology lists here are.
+
+    Compaction shows every technology under its in-game name, so the ID-keyed map
+    the in-app Advisor uses would point at IDs this payload no longer contains.
+    """
+    context = deepcopy(value)
+    technology = context.get("technology") if isinstance(context, dict) else None
+    if not isinstance(technology, dict):
+        return context
+    names = technology.pop("names", None)
+    names = names if isinstance(names, dict) else {}
+    also_shown_as = technology.get("also_shown_as")
+    if isinstance(also_shown_as, dict):
+        technology["also_shown_as"] = {
+            str(names.get(identifier) or _display_identifier(str(identifier))): variants
+            for identifier, variants in also_shown_as.items()
+        }
+    technology["instruction"] = MCP_TECHNOLOGY_INSTRUCTION
+    return context
 
 
 def _compact_value(
@@ -1763,19 +1791,20 @@ def _compact_value(
     max_list_items: int = MAX_LIST_ITEMS_COMPACT,
     max_text_length: int = MAX_TEXT_LENGTH,
 ) -> Any:
-    if max_depth <= 0:
-        if isinstance(value, dict):
-            return {"_truncated": f"{len(value)} keys"}
-        if isinstance(value, list):
-            return {"_truncated": f"{len(value)} items"}
-        return value
-
+    # Scalars are rendered the same at every depth: an identifier at the depth
+    # limit must not reach the client raw while its siblings are shown by name.
     if isinstance(value, str):
         value = _display_identifier(value)
         if len(value) <= max_text_length:
             return value
         return f"{value[:max_text_length].rstrip()}... [truncated {len(value) - max_text_length} chars]"
     if isinstance(value, int | float | bool) or value is None:
+        return value
+    if max_depth <= 0:
+        if isinstance(value, dict):
+            return {"_truncated": f"{len(value)} keys"}
+        if isinstance(value, list):
+            return {"_truncated": f"{len(value)} items"}
         return value
     if isinstance(value, list):
         items = [
@@ -1812,6 +1841,9 @@ def _display_identifier(value: str) -> str:
         return text
     if text in DISPLAY_NAME_OVERRIDES:
         return DISPLAY_NAME_OVERRIDES[text]
+    technology = technology_display_name(text)
+    if technology:
+        return technology
     if not _looks_like_display_identifier(text):
         return value
 

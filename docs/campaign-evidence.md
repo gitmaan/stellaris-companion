@@ -53,6 +53,11 @@ game script, so the catalog only lists the alternatives (`variants`), and the br
 passes them as `also_shown_as`. Modded and newer IDs have no entry and are never given
 an invented name; when a save is newer than the catalog, the briefing says so.
 
+External AI clients (MCP) never see raw IDs, so every technology in their payloads is
+shown under its catalog name and the naming notes are keyed by name. Their text summary
+lists every research option; any list a summary does shorten ends with a count of what
+was left out.
+
 `scripts/check_local_saves.py` fails when the installed game or a checked save is newer
 than the catalogs, so run it before a release and regenerate when it says to.
 

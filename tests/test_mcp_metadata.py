@@ -137,14 +137,33 @@ def test_mcpb_wrapper_relays_a_real_protocol_session(tmp_path: Path) -> None:
     assert len(by_id[2]["result"]["tools"]) == 10
 
 
-def test_technology_summary_uses_in_game_names_for_research_options() -> None:
-    """Issue #104: tech_cryostasis_1 is "Automated Colony Ships"."""
+def test_technology_summary_names_every_research_option() -> None:
+    """Issue #104: five options were cut to four, under names made up from their IDs."""
     from backend.mcp.server import _technology_summary
 
-    summary = _technology_summary(
-        {"available_techs": {"physics": ["tech_cryostasis_1", "tech_my_mod_reactor"]}}, {}, {}
+    physics = [
+        "tech_cryostasis_1",
+        "tech_physics_1",
+        "tech_sensors_2",
+        "tech_shields_2",
+        "tech_space_science_1",
+    ]
+    summary = _technology_summary({"available_techs": {"physics": physics}}, {}, {})
+
+    assert summary == (
+        "Technology: available picks physics: Automated Colony Ships, Quantum Computing, "
+        "Gravitic Sensors, Improved Deflectors, Zero-G Laboratories."
     )
 
-    assert "physics: Automated Colony Ships, " in summary
-    assert "Cryostasis" not in summary
-    assert "tech_my_mod_reactor" not in summary and "Reactor" in summary
+
+def test_summaries_say_when_a_list_is_cut_short() -> None:
+    from backend.mcp.server import _capped, _event_lines, _render_value
+
+    assert _capped(["a", "b", "c"], 3) == "a, b, c"
+    assert _capped(["a", "b", "c"], 2) == "a, b (+1 more)"
+    assert _render_value([str(n) for n in range(10)], depth=0).endswith("7 (+2 more)")
+    assert _render_value(["x", {"_truncated_items": 4}], depth=0) == "x, +4 more not shown"
+    events = [{"summary": f"Event {n}"} for n in range(12)]
+    assert _event_lines(events, heading="Recent")[-1] == (
+        "- (+2 more events in the structured result)"
+    )

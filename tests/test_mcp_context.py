@@ -224,7 +224,7 @@ def test_strategy_context_is_read_only_and_does_not_require_gemini(
     assert payload["advisor_custom_instructions"]
     assert payload["advisor_memory"]
     assert payload["briefing"]["technology"]["recommended_research"] == [
-        "Fleet Doctrines",
+        "Doctrine: Space Combat",
         "Automated Exploration Protocols",
         "Coilguns",
     ]
@@ -374,6 +374,64 @@ def test_stored_evidence_has_identical_meaning_in_all_mcp_briefings(
     assert chronicle["chronicle_guidance"]["facts_policy"] == build_evidence_policy("chronicle")
     assert "never as evidence that an event occurred" in chronicle["game_knowledge"]["prompt"]
     assert db.get_latest_session_briefing_json(session_id=session_id) == stored
+
+
+def test_external_clients_get_every_research_option_under_its_in_game_name(tmp_path):
+    """Issue #104: five options arrived as four, under names made up from their IDs."""
+    from backend.mcp.server import _tool_result
+
+    db, session_id, _ = _make_test_db(tmp_path)
+    briefing = json.loads(db.get_latest_session_briefing_json(session_id=session_id))
+    briefing["meta"]["version"] = "Cygnus v4.5.3"
+    briefing["technology"] = {
+        "completed_count": 1,
+        "researched_techs": ["tech_colonization_1"],
+        "in_progress": {"physics": {"tech": "tech_lasers_2", "progress": 12.0}},
+        "available_techs": {
+            "physics": [
+                "tech_cryostasis_1",
+                "tech_physics_1",
+                "tech_sensors_2",
+                "tech_shields_2",
+                "tech_space_science_1",
+            ],
+            "society": ["tech_my_mod_gene_vats"],
+        },
+    }
+    db.update_session_latest_briefing(
+        session_id=session_id,
+        latest_briefing_json=json_dumps(briefing),
+        last_game_date="2235.04.01",
+    )
+    context = StellarisMcpContext(db=db)
+    advisor = context.get_strategy_context(question="Which physics technologies can I research?")
+    focused = context.get_empire_briefing(sections=["technology"])
+
+    physics = [
+        "Automated Colony Ships",
+        "Quantum Computing",
+        "Gravitic Sensors",
+        "Improved Deflectors",
+        "Zero-G Laboratories",
+    ]
+    for received in (advisor["briefing"], focused["sections"]):
+        technology = received["technology"]
+        assert technology["available_techs"]["physics"] == physics
+        assert technology["in_progress"]["physics"]["tech"] == "Blue Lasers"
+        assert technology["researched_techs"] == ["New Worlds Protocol"]
+        naming = received["model_context"]["technology"]
+        # Notes are keyed by the names shown above, not by IDs this payload no longer has.
+        assert "names" not in naming
+        assert naming["also_shown_as"] == {
+            "Blue Lasers": ["Blue Beam Projector"],
+            "Automated Colony Ships": ["Seedling Incubation"],
+        }
+        assert "Never invent a technology" in naming["instruction"]
+        assert "tech_" not in json.dumps(received["model_context"]["technology"])
+
+    # Clients that read only the text block get all five as well.
+    text = _tool_result(advisor)["content"][0]["text"]
+    assert "available picks physics: " + ", ".join(physics) in text
 
 
 def test_chronicle_source_material_uses_chapter_event_range(tmp_path: Path) -> None:
@@ -530,7 +588,7 @@ def test_mcp_server_lists_and_calls_tools(tmp_path: Path) -> None:
     assert "naval usage" not in strategy_text
     assert "fleet usage" not in strategy_text
     assert "maxed out" not in strategy_text
-    assert "Fleet Doctrines" in strategy_text
+    assert "Doctrine: Space Combat" in strategy_text
     _assert_no_internal_leaks(strategy_text)
 
 
