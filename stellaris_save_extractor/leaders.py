@@ -7,6 +7,7 @@ from stellaris_companion.rust_bridge import (
     ParserError,
     _get_active_session,
 )
+from stellaris_save_extractor.save_values import repeated
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +42,7 @@ class LeadersMixin:
         return self._get_leaders_rust()
 
     def _get_leaders_rust(self) -> dict:
-        """Rust-optimized leader extraction using session methods.
-
-        Uses iter_section for leader iteration and batch_ops for traits.
-        No self.gamestate access needed - all data from Rust session.
-
-        Note: Uses two-phase approach because iter_section and get_duplicate_values
-        cannot be interleaved (both use the same stdin/stdout pipe). Phase 2 uses
-        batch_ops to fetch all traits in a single IPC call (P025).
+        """Read the player's leaders from the parsed ``leaders`` section.
 
         Returns:
             Dict with leader details
@@ -71,8 +65,6 @@ class LeadersMixin:
         # back to the legacy country scan when the field is absent (older saves).
         owned_leader_ids = self._get_player_owned_leader_ids()
 
-        # Phase 1: Iterate and collect player leader data
-        # (can't call get_duplicate_values during iter_section - same pipe)
         player_leaders_data = []
         for leader_id, leader_data in session.iter_section("leaders"):
             # P010: entry might be string "none" for deleted entries
@@ -93,25 +85,10 @@ class LeadersMixin:
             if not leader_class:
                 continue
 
-            # Store leader data for phase 2
             player_leaders_data.append((str(leader_id), leader_data, leader_class))
 
-        # Phase 2: Batch fetch all traits in one IPC call (P025: use batch_ops)
-        # This avoids N round-trips and leverages section offset caching in Rust
-        trait_ops = [
-            {
-                "op": "get_duplicate_values",
-                "section": "leaders",
-                "key": lid,
-                "field": "traits",
-            }
-            for lid, _, _ in player_leaders_data
-        ]
-        trait_results = session.batch_ops(trait_ops) if trait_ops else []
-
-        # Phase 3: Build leader info with traits
         leaders_found = []
-        for i, (leader_id, leader_data, leader_class) in enumerate(player_leaders_data):
+        for leader_id, leader_data, leader_class in player_leaders_data:
             leader_info = {
                 "id": leader_id,
                 "class": leader_class,
@@ -132,8 +109,7 @@ class LeadersMixin:
             if age is not None:
                 leader_info["age"] = int(age)
 
-            # Get traits from batch result
-            traits = trait_results[i].get("values", []) if i < len(trait_results) else []
+            traits = [str(trait) for trait in repeated(leader_data.get("traits"))]
             if traits:
                 leader_info["traits"] = traits
 

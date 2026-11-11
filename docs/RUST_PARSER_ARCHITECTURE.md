@@ -75,8 +75,6 @@ Supported `op` values (see `stellaris-parser/src/commands/serve.rs`):
 - `contains_tokens` `{ tokens: string[] }`
 - `contains_kv` `{ pairs: [string, string][] }`
 - `get_country_summaries` `{ fields: string[] }`
-- `get_duplicate_values` `{ section: string, key: string, field: string }`
-- `get_entry_text` `{ section: string, key: string }` (raw Clausewitz text for one entry)
 - `multi` `{ ops: MultiOp[] }` (batch multiple non-streaming operations)
 - `close`
 

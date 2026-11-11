@@ -8,6 +8,7 @@ from collections import defaultdict
 
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
+from stellaris_save_extractor.save_values import repeated
 
 logger = logging.getLogger(__name__)
 
@@ -1064,18 +1065,16 @@ class PlayerMixin:
         still being researched. A repeatable's level is its ``level=`` value, or
         the number of times it is listed in saves that repeat the key instead.
         """
-        session = _get_active_session()
-        if not session:
+        country = self._get_player_country_entry(player_id)
+        status = country.get("tech_status") if isinstance(country, dict) else None
+        if not isinstance(status, dict):
             return {}
-        country = str(player_id)
         technologies = [
             value
-            for value in session.get_duplicate_values(
-                "country", country, "technology", within="tech_status"
-            )
+            for value in repeated(status.get("technology"))
             if isinstance(value, str) and value
         ]
-        levels = session.get_duplicate_values("country", country, "level", within="tech_status")
+        levels = repeated(status.get("level"))
         researched: dict[str, int] = {}
         if len(levels) == len(technologies):
             for technology, level in zip(technologies, levels, strict=True):

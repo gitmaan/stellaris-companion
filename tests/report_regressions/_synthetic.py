@@ -25,14 +25,8 @@ from stellaris_companion import rust_bridge
 class SyntheticSession:
     """In-memory stand-in for ``rust_bridge.RustSession``."""
 
-    def __init__(
-        self,
-        sections: dict[str, Any],
-        *,
-        duplicate_values: dict[tuple[str, ...], list[str]] | None = None,
-    ) -> None:
+    def __init__(self, sections: dict[str, Any]) -> None:
         self._sections = deepcopy(sections)
-        self._duplicate_values = duplicate_values or {}
         self._streaming = False
 
     def _section(self, name: str) -> dict[str, Any]:
@@ -78,28 +72,6 @@ class SyntheticSession:
                 entries.append(projected)
         return entries
 
-    def get_duplicate_values(
-        self, section: str, key: str, field: str, within: str | None = None
-    ) -> list[str]:
-        """Mirror the Rust op: entry-wide by default, one child block with ``within``.
-
-        A case that matters for the difference registers both
-        ``(section, key, field)`` and ``(section, key, field, within)``. Cases that
-        only register the entry-wide list get it for scoped lookups too.
-        """
-        values = self._duplicate_values
-        if within is not None and (section, str(key), field, within) in values:
-            return list(values[(section, str(key), field, within)])
-        if within is not None and field != "technology":
-            return []
-        return list(values.get((section, str(key), field), []))
-
-    def get_entry_text(self, section: str, key: str) -> str | None:
-        return None
-
-    def get_duplicate_blocks(self, section: str, key: str, field: str) -> list:
-        return []
-
     def count_keys(self, keys: list[str]) -> dict:
         return {"counts": {key: 0 for key in keys}}
 
@@ -130,9 +102,6 @@ class SyntheticSession:
                 results.append({"entries": entries})
             elif kind == "extract_sections":
                 results.append({"data": self.extract_sections(op["sections"])})
-            elif kind == "get_duplicate_values":
-                values = self.get_duplicate_values(op["section"], op["key"], op["field"])
-                results.append({"values": values})
             else:
                 raise AssertionError(f"batch op {kind!r} is not modelled by SyntheticSession")
         return results
@@ -213,12 +182,11 @@ def ingest_synthetic_save(
     sections: dict[str, Any],
     *,
     meta: str | None = None,
-    duplicate_values: dict[tuple[str, ...], list[str]] | None = None,
     filename: str = "synthetic.sav",
 ) -> dict:
     """Write a meta-only save and return the worker payload for it."""
     save_path = write_meta_only_save(tmp_path / filename, meta or synthetic_meta())
-    session = SyntheticSession(sections, duplicate_values=duplicate_values)
+    session = SyntheticSession(sections)
     payload = run_ingestion_worker(monkeypatch, save_path, session)
     payload["save_path"] = save_path
     return payload
