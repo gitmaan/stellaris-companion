@@ -224,9 +224,11 @@ def _nomad_economy_rules(version: str) -> dict[str, str]:
         "monthly_lines": (
             "Negative or missing monthly Mineral and Energy lines are normal for Nomads. "
             "Income arrives in lumps from harvesting and from collecting Waystation and "
-            "Logistic Ship stockpiles, which do not appear as monthly production. Use "
-            "operational_reserves.monthly_change and stage; never diagnose failing mining "
-            "or an unhealthy economy from the empire balance alone."
+            "Logistic Ship stockpiles, which do not appear as monthly production. The save "
+            "holds the reserves' level and stage, not a monthly change, so do not state one; "
+            "operational_reserves.festival_upkeep_last_month, when present, is only what the "
+            "Festival approach drained last month. Never diagnose failing mining or an "
+            "unhealthy economy from the empire balance alone."
         ),
         "stages": (
             "Reserve stages are critical, low, medium and high. Critical brings severe "
