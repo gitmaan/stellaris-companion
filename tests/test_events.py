@@ -456,6 +456,46 @@ class TestComputeEvents:
         event_types = [e.event_type for e in result]
         assert "treaty_signed" in event_types
 
+    def test_detects_a_treaty_ending_when_it_was_the_last_of_its_kind(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        base_prev_snapshot["history"]["diplomacy"]["treaties"] = {"commercial_pact": [1]}
+        base_curr_snapshot["history"]["diplomacy"]["treaties"] = {}
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        assert [e.summary for e in result if e.event_type == "treaty_ended"] == [
+            "Treaty ended (commercial_pact) with empire #1"
+        ]
+
+    def test_a_corrected_treaty_reading_is_not_recorded_as_history(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """An app update that reads treaties differently did not sign or end anything."""
+        base_prev_snapshot["history"]["diplomacy"]["treaties"] = {"defensive_pact": [1, 2]}
+        base_curr_snapshot["history"]["diplomacy"].update(
+            {"treaties": {"migration_treaty": [3, 4]}, "treaty_reading": 2}
+        )
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        assert not [e for e in result if e.event_type in {"treaty_signed", "treaty_ended"}]
+
+        base_prev_snapshot["history"]["diplomacy"]["treaty_reading"] = 2
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+        assert sorted(e.event_type for e in result if e.event_type.startswith("treaty_")) == [
+            "treaty_ended",
+            "treaty_ended",
+            "treaty_signed",
+            "treaty_signed",
+        ]
+
     def test_detects_midgame_milestone(self, base_prev_snapshot, base_curr_snapshot):
         """Detects entering midgame."""
         base_prev_snapshot["meta"]["date"] = "2249.01.01"

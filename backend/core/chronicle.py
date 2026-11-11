@@ -2177,6 +2177,8 @@ Do NOT give advice. Write as a historian, not an advisor.
             statuses = []
             if rel.get("rival"):
                 statuses.append("rival")
+            if rel.get("alliance"):
+                statuses.append("ally")
             if rel.get("defensive_pact"):
                 statuses.append("defensive pact")
             if rel.get("non_aggression_pact"):
