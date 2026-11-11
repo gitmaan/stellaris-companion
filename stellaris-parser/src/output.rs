@@ -1,40 +1,10 @@
-//! Output formatting and encoding handling for Stellaris parser
+//! Checks on the text the parser hands to JSON.
 //!
-//! ## Encoding Strategy
-//!
-//! Stellaris save files use Windows-1252 encoding for text. This is a single-byte encoding
-//! that is a superset of ASCII but includes characters in the 128-255 range that are not
-//! valid UTF-8 bytes.
-//!
-//! ### Non-UTF8 Byte Handling
-//!
-//! We use jomini's `from_windows1252_slice` function which:
-//! 1. Accepts any byte sequence (no UTF-8 validation on input)
-//! 2. Decodes Windows-1252 bytes (0x80-0xFF) to their Unicode equivalents
-//! 3. Returns valid UTF-8 strings suitable for JSON output
-//!
-//! This approach means:
-//! - Bytes 0x00-0x7F: Passed through as ASCII (same in both encodings)
-//! - Bytes 0x80-0xFF: Decoded from Windows-1252 to Unicode codepoints
-//! - Special characters like color codes (e.g., 0x15) are preserved as their
-//!   Windows-1252 Unicode equivalents
-//!
-//! ### Color Codes
-//!
-//! Stellaris uses special byte sequences for in-game text coloring (e.g., `\x15`).
-//! These bytes are preserved in the output as their Windows-1252 decoded form.
-//! When displaying text, downstream consumers should handle or strip these codes.
-//!
-//! ### Lossy Conversion Note
-//!
-//! Windows-1252 is fully mapped to Unicode, so there is no data loss in the
-//! encoding conversion. All byte values 0x00-0xFF have defined Unicode mappings
-//! in Windows-1252.
-//!
-//! ## References
-//!
-//! - jomini library: <https://docs.rs/jomini>
-//! - Windows-1252: <https://en.wikipedia.org/wiki/Windows-1252>
+//! Stellaris saves are UTF-8. `crate::grouped::parse_document` decodes them as
+//! UTF-8 and falls back to Windows-1252 for any string that is not valid UTF-8, so
+//! older saves and mods that still carry single-byte text are read rather than
+//! mangled. Colour codes such as `\x15` are control characters in both encodings
+//! and pass through unchanged; consumers strip them for display.
 
 use serde_json::Value;
 
@@ -56,9 +26,8 @@ pub fn validate_json_strings(value: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jomini::text::de::from_windows1252_slice;
+    use crate::grouped::parse_document;
     use serde_json::json;
-    use std::collections::HashMap;
 
     /// Test that Windows-1252 encoded bytes are properly decoded
     #[test]
@@ -67,8 +36,7 @@ mod tests {
         // This is NOT valid UTF-8, but IS valid Windows-1252
         let data = b"test={name=\"Hello\x92World\"}";
 
-        // Using from_windows1252_slice should succeed
-        let result: Result<HashMap<String, Value>, _> = from_windows1252_slice(data);
+        let result = parse_document(data);
         assert!(
             result.is_ok(),
             "Windows-1252 encoded data should parse successfully: {:?}",
@@ -97,7 +65,7 @@ empire={
 }
 "#;
 
-        let result: Result<HashMap<String, Value>, _> = from_windows1252_slice(data);
+        let result = parse_document(data);
         assert!(result.is_ok(), "ASCII data should parse successfully");
 
         let parsed = result.unwrap();
@@ -118,7 +86,7 @@ empire={
         // 0x94 = Right double quotation mark (")
         let data = b"test={currency=\"\x80\"ellipsis=\"\x85\"quote=\"\x93text\x94\"}";
 
-        let result: Result<HashMap<String, Value>, _> = from_windows1252_slice(data);
+        let result = parse_document(data);
         assert!(
             result.is_ok(),
             "Windows-1252 special characters should parse: {:?}",
@@ -145,7 +113,7 @@ empire={
         // It should pass through as its Windows-1252 representation
         let data = b"test={text=\"\x15BColored Text\x15!\"}";
 
-        let result: Result<HashMap<String, Value>, _> = from_windows1252_slice(data);
+        let result = parse_document(data);
         assert!(
             result.is_ok(),
             "Color codes should parse: {:?}",
@@ -172,7 +140,7 @@ empire={
         // 0xFC = ü (Latin small letter u with diaeresis)
         let data = b"test={name=\"caf\xe9\"country=\"Espa\xf1a\"city=\"M\xfcnchen\"}";
 
-        let result: Result<HashMap<String, Value>, _> = from_windows1252_slice(data);
+        let result = parse_document(data);
         assert!(
             result.is_ok(),
             "Extended Latin characters should parse: {:?}",
@@ -201,7 +169,7 @@ empire={
         // (ASCII subset is identical)
         let data = br#"test={name="Simple ASCII name"value=42}"#;
 
-        let result: Result<HashMap<String, Value>, _> = from_windows1252_slice(data);
+        let result = parse_document(data);
         assert!(result.is_ok(), "UTF-8 compatible data should parse");
 
         let parsed = result.unwrap();

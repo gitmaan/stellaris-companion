@@ -10,6 +10,8 @@ when present; fall back to the legacy heuristic for older saves that lack it.
 
 from __future__ import annotations
 
+from .save_values import is_yes
+
 MILITARY_SHIP_CLASS = "shipclass_military"
 STARBASE_SHIP_CLASS = "shipclass_starbase"
 
@@ -45,9 +47,9 @@ def classify_owned_fleet(fleet_data: dict, *, military_power_threshold: float = 
         return "civilian"
 
     # Legacy saves (or unrecognized ship_class): fall back to the old heuristic.
-    if fleet_data.get("station") == "yes":
+    if is_yes(fleet_data.get("station")):
         return "starbase"
-    if fleet_data.get("civilian") == "yes":
+    if is_yes(fleet_data.get("civilian")):
         return "civilian"
 
     try:

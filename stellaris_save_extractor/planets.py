@@ -7,6 +7,8 @@ import re
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
+from .save_values import repeated
+
 logger = logging.getLogger(__name__)
 
 
@@ -178,9 +180,16 @@ class PlanetsMixin:
                     planet_info["crime"] = round(float(crime), 1)
 
             # Extract permanent planet modifier
-            pm = colony_value(colony, carrier, "planet_modifier")
-            if isinstance(pm, str) and pm:
-                planet_info["planet_modifier"] = pm.replace("pm_", "")
+            planet_modifiers = [
+                pm.replace("pm_", "")
+                for pm in repeated(colony_value(colony, carrier, "planet_modifier"))
+                if isinstance(pm, str) and pm
+            ]
+            if planet_modifiers:
+                # The single-value field predates planets with several modifiers.
+                planet_info["planet_modifier"] = planet_modifiers[-1]
+            if len(planet_modifiers) > 1:
+                planet_info["planet_modifiers"] = planet_modifiers
 
             # Extract timed modifiers
             timed_mods = self._extract_timed_modifiers_rust(
