@@ -12,12 +12,17 @@ const python = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python
 
 // Write a minimal save and describe it with the real backend, exactly as
 // /api/report-save does. The app compares this description with what Node sees.
+// The file is created first and written later, like a save the game overwrites
+// or takes a while to write: its creation time and last-change time then differ,
+// which is where Python and Node disagree about "ctime" on Windows.
 function describeWithBackend(savePath) {
   const script = [
-    'import json, sys, zipfile',
+    'import json, sys, time, zipfile',
     'from pathlib import Path',
     'from backend.core.report_save import describe_report_save',
     'path = Path(sys.argv[1])',
+    'path.write_bytes(b"")',
+    'time.sleep(1.5)',
     'with zipfile.ZipFile(path, "w") as archive:',
     '    archive.writestr("meta", "name=\\"Backend empire\\"\\ndate=\\"2300.01.01\\"\\nversion=\\"Cygnus v4.5.2\\"")',
     '    archive.writestr("gamestate", "synthetic=yes")',
