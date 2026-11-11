@@ -164,6 +164,16 @@ def check_installed_game(game_dirs: list[Path]) -> str | None:
     )
 
 
+def check_game_vocabulary(game_dirs: list[Path]) -> list[str]:
+    """Country types and flags the extractors look for that the installed game lacks."""
+    from stellaris_save_extractor.game_vocabulary import missing_from_game
+
+    for game_dir in game_dirs:
+        if (game_dir / "common" / "country_types").is_dir():
+            return missing_from_game(game_dir)
+    return []
+
+
 def check_name_catalogs(briefing: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Return (errors, warnings) about names the catalogs cannot supply for this save."""
     from stellaris_companion.technology_names import (
@@ -344,9 +354,16 @@ def main(argv: list[str] | None = None) -> int:
     # The worker raises its own logging to DEBUG; keep only what matters here.
     logging.basicConfig = lambda **kwargs: None  # type: ignore[assignment]
 
-    stale_catalogs = check_installed_game([args.game_dir] if args.game_dir else default_game_dirs())
+    game_dirs = [args.game_dir] if args.game_dir else default_game_dirs()
+    stale_catalogs = check_installed_game(game_dirs)
     if stale_catalogs:
         print(f"FAIL name catalogs: {stale_catalogs}\n")
+    unknown_names = check_game_vocabulary(game_dirs)
+    if unknown_names:
+        print(
+            "FAIL game vocabulary: the installed game never defines or sets "
+            f"{', '.join(unknown_names)}. See stellaris_save_extractor/game_vocabulary.py.\n"
+        )
 
     summary: list[dict[str, Any]] = []
     failed = 0
@@ -387,7 +404,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n{total - failed}/{total} saves passed." if failed else f"\nAll {total} saves passed.")
     if args.json:
         args.json.write_text(json.dumps(summary, indent=2))
-    return 1 if failed or stale_catalogs else 0
+    return 1 if failed or stale_catalogs or unknown_names else 0
 
 
 if __name__ == "__main__":

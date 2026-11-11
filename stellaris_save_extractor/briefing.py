@@ -385,7 +385,8 @@ class BriefingMixin:
         result["crisis_active"] = crisis.get("crisis_active", False)
         if result["crisis_active"]:
             result["crisis_type"] = crisis.get("crisis_type")
-            result["player_is_crisis_fighter"] = crisis.get("player_is_crisis_fighter", False)
+        if crisis.get("crises_defeated"):
+            result["crises_defeated"] = crisis["crises_defeated"]
 
         # Check for Fallen Empires
         if fallen.get("total_count", 0) > 0:
@@ -501,9 +502,8 @@ class BriefingMixin:
         result["crisis_active"] = crisis_status.get("crisis_active", False)
         if result["crisis_active"]:
             result["crisis_type"] = crisis_status.get("crisis_type")
-            result["player_is_crisis_fighter"] = crisis_status.get(
-                "player_is_crisis_fighter", False
-            )
+        if crisis_status.get("crises_defeated"):
+            result["crises_defeated"] = crisis_status["crises_defeated"]
 
         # Check for Fallen Empires (both dormant and awakened)
         fallen = self.get_fallen_empires()
