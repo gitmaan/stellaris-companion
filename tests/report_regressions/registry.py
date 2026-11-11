@@ -49,7 +49,7 @@ REPORTS: dict[int, Report] = {
             "was read from every technology= key under the country, which includes the "
             "research queues, so technologies in progress counted as researched."
         ),
-        fixed_by=("PR #105", "codex/research-queue-techs"),
+        fixed_by=("PR #105", "PR #106"),
         layer="Rust lookup + technology extractor + name catalog + model_context + events + MCP",
         cases=(
             Case(
