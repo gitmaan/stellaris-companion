@@ -54,6 +54,32 @@ KHAN_RISEN_FLAG = "great_khan_announcement"
 # Set when the Khan dies for good; `great_khan_defeated_once` only marks a first defeat.
 KHAN_DEAD_FLAG = "great_khan_dead"
 
+# Guardians and space fauna each have a country type; the value is the name used
+# for that kind in the briefing. Garrison and faction variants (tiyanki_garrison,
+# drone_faction, ...) are script helpers, not the creatures, and are left out.
+LEVIATHAN_COUNTRY_TYPES = {
+    "tiyanki": "tiyanki",
+    "amoeba": "amoeba",
+    "amoeba_borderless": "amoeba",
+    "crystal": "crystal",
+    "drone": "drone",
+    "cloud": "cloud",
+    "guardian_dragon": "ether_drake",
+    "guardian_horror": "dimensional_horror",
+    "guardian_dreadnought": "automated_dreadnought",
+    "guardian_stellarite": "stellarite",
+    "guardian_fortress": "enigmatic_fortress",
+    "guardian_hatchling": "voidspawn",
+    "guardian_wraith": "wraith",
+    "guardian_hiver": "asteroid_hive",
+    "guardian_sphere": "infinity_machine",
+    "guardian_scavenger_bot": "scavenger_bot",
+    "guardian_elderly_tiyanki": "tiyanki_matriarch",
+    "guardian_toxic_god": "toxic_god",
+    "voidworms": "voidworms",
+    "cutholoids": "cutholoids",
+}
+
 # Held for as long as the War in Heaven lasts, then removed.
 WAR_IN_HEAVEN_FLAG = "war_in_heaven_ongoing"
 # Set when the first L-Gate is opened.
@@ -61,7 +87,12 @@ LGATE_OPENED_FLAG = "l_cluster_opened"
 
 
 def country_types() -> set[str]:
-    return {*CRISIS_COUNTRY_TYPES, *MARAUDER_COUNTRY_TYPES, KHAN_COUNTRY_TYPE}
+    return {
+        *CRISIS_COUNTRY_TYPES,
+        *MARAUDER_COUNTRY_TYPES,
+        KHAN_COUNTRY_TYPE,
+        *LEVIATHAN_COUNTRY_TYPES,
+    }
 
 
 def global_flags() -> set[str]:

@@ -1,5 +1,5 @@
-"""Crises, the Great Khan, the War in Heaven and the L-Cluster are read from the
-names the game itself writes: crisis country types and global flags.
+"""Crises, the Great Khan, the War in Heaven, the L-Cluster, guardians and space
+fauna are read from the names the game itself writes: country types and global flags.
 
 The earlier detection searched the whole save for words. Several of those words do
 not exist in the game, so the Prethoryn Scourge and the Contingency were never
@@ -22,9 +22,14 @@ def _save(tmp_path, *, flags=(), countries=()):
     lines += ["player=", "{", "\t", "\t{", '\t\tname="tester"', "\t\tcountry=0", "\t}", "}"]
     lines += ["flags=", "{"] + [f"\t{flag}=62808000" for flag in flags] + ["}"]
     lines += ["country=", "{", "\t0=", "\t{", '\t\ttype="default"', "\t\tcrisis_kills=12", "\t}"]
-    for index, (country_type, name_key) in enumerate(countries, start=1):
+    for index, (country_type, name_key, *fleets) in enumerate(countries, start=1):
         lines += [f"\t{index}=", "\t{", f'\t\ttype="{country_type}"']
-        lines += ["\t\tname=", "\t\t{", f'\t\t\tkey="{name_key}"', "\t\t}", "\t}"]
+        lines += ["\t\tname=", "\t\t{", f'\t\t\tkey="{name_key}"', "\t\t}"]
+        lines += ["\t\tfleets_manager=", "\t\t{", "\t\t\towned_fleets=", "\t\t\t{"]
+        for fleet in range(fleets[0] if fleets else 0):
+            lines += ["\t\t\t\t", "\t\t\t\t{", f"\t\t\t\t\tfleet={index * 100 + fleet}"]
+            lines += ["\t\t\t\t}"]
+        lines += ["\t\t\t}", "\t\t}", "\t}"]
     lines += ["}", ""]
     path = tmp_path / "endgame.sav"
     with zipfile.ZipFile(path, "w") as archive:
@@ -138,6 +143,35 @@ def test_a_war_in_heaven_is_read_from_its_flag(read):
 def test_the_l_cluster_is_open_once_its_flag_is_set(read):
     assert read("get_lgate_status")["lgate_opened"] is False
     assert read("get_lgate_status", flags=["l_cluster_opened"])["lgate_opened"] is True
+
+
+def test_guardians_and_fauna_are_read_from_their_country_types(read):
+    found = read(
+        "get_leviathans",
+        countries=[
+            ("guardian_dragon", "NAME_Grand_Dragon", 1),
+            ("tiyanki", "NAME_Placid_Leviathans", 8),
+            ("amoeba", "NAME_Spaceborne_Organics", 0),
+            ("amoeba_borderless", "NAME_Spaceborne_Organics", 0),
+            # Script helpers and look-alike names are not the creatures.
+            ("tiyanki_garrison", "NAME_Placid_Leviathans", 18),
+            ("drone_faction", "NAME_Mining_Drone_Expansion_Initiative", 3),
+            ("default", "Crystal Cloud Concord", 4),
+        ],
+    )
+    assert [(item["type"], item["status"], item["fleets"]) for item in found["leviathans"]] == [
+        ("amoeba", "defeated", 0),
+        ("ether_drake", "alive", 1),
+        ("tiyanki", "alive", 8),
+    ]
+    assert (found["total_count"], found["alive_count"], found["defeated_count"]) == (3, 2, 1)
+    assert found["leviathans"][1]["name"] == "Ether Drake"
+
+
+def test_no_guardian_is_reported_when_none_exists(read):
+    # `tech_dragon_armor` in research data used to be read as a living Ether Drake.
+    found = read("get_leviathans", flags=["tech_dragon_armor_unlocked"])
+    assert found == {"leviathans": [], "total_count": 0, "defeated_count": 0, "alive_count": 0}
 
 
 def test_every_name_looked_for_is_checked_against_the_installed_game(tmp_path):
