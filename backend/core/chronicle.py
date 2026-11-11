@@ -2285,10 +2285,10 @@ Do NOT give advice. Write as a historian, not an advisor.
 
         crisis = endgame.get("crisis", {})
         if crisis.get("crisis_active"):
-            lines.append(
-                f"CRISIS: {crisis.get('crisis_type', 'Unknown').title()} "
-                f"({crisis.get('crisis_systems_count', 0)} systems)"
-            )
+            lines.append(f"CRISIS: {str(crisis.get('crisis_type') or 'Unknown').title()}")
+        if crisis.get("crises_defeated"):
+            beaten = ", ".join(str(name).title() for name in crisis["crises_defeated"])
+            lines.append(f"Crises defeated: {beaten}")
 
         fe = situation.get("fallen_empires", {})
         if fe.get("awakened_count", 0) > 0:

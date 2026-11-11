@@ -50,6 +50,7 @@ class SaveExtractorBase:
         self._country_authorities = None  # Lazy-loaded country ID→authority map
         self._country_ethics = None  # Lazy-loaded country ID→ethics list map
         self._countries_cache = None  # Lazy-loaded full country section cache
+        self._global_flags = None  # Lazy-loaded top-level flags block
         self._galactic_objects_cache = None  # Lazy-loaded galactic_object section cache
         self._fleets_cache = None  # Lazy-loaded fleet section cache
         self._pop_groups_cache = None  # Lazy-loaded pop_groups section cache
@@ -77,6 +78,7 @@ class SaveExtractorBase:
         self._country_authorities = None
         self._country_ethics = None
         self._countries_cache = None
+        self._global_flags = None
         self._galactic_objects_cache = None
         self._fleets_cache = None
         self._pop_groups_cache = None
@@ -591,6 +593,21 @@ class SaveExtractorBase:
                 result["total_systems"] += 1
 
         return result
+
+    def _get_global_flags(self) -> dict:
+        """The save's global flags (`set_global_flag` in game scripts), by name.
+
+        Events record galaxy-wide facts here under fixed names, for example
+        ``ai_invasion_defeated`` or ``great_khan_dead``, so a flag's presence is an
+        exact answer where searching the save for a word is a guess.
+        """
+        if self._global_flags is None:
+            from stellaris_companion.rust_bridge import _get_active_session
+
+            session = _get_active_session()
+            flags = session.extract_sections(["flags"]).get("flags") if session else None
+            self._global_flags = flags if isinstance(flags, dict) else {}
+        return self._global_flags
 
     def _get_countries_cached(self) -> dict[str, dict]:
         """Iterate countries section once and cache for reuse across extractors.
