@@ -91,7 +91,7 @@ REPORTS: dict[int, Report] = {
             "and the briefing had no Operational Reserves, Waystation stockpile or Logistic Ship "
             "data. Negative Mineral lines without a production entry read as failing mining."
         ),
-        fixed_by=("PR #98",),
+        fixed_by=("PR #98", "PR #113"),
         layer="nomads extractor + briefing identity + model_context rules + knowledge retrieval",
         cases=(
             Case(
