@@ -1319,6 +1319,8 @@ def _chronicle_archive_text(payload: dict[str, Any]) -> str:
             if isinstance(summary, str) and summary.strip():
                 line += f" - {summary.strip()}"
             lines.append(line)
+    if len(chapters) > 8:
+        lines.append(f"(+{len(chapters) - 8} more chapters in the structured result)")
     current_era = _dict(payload.get("current_era"))
     if current_era:
         start_date = current_era.get("start_date")
@@ -1357,7 +1359,7 @@ def _economy_summary(economy: dict[str, Any]) -> str:
     ]
     line = "Economy: " + ", ".join(monthly[:8])
     if stock:
-        line += ". Stockpiles: " + ", ".join(stock[:6])
+        line += ". Stockpiles: " + _capped(stock, 6)
     return line + "."
 
 
@@ -1413,7 +1415,7 @@ def _territory_summary(territory: dict[str, Any], briefing: dict[str, Any]) -> s
         if isinstance(item, dict) and item.get("name")
     ]
     if names:
-        parts.append("notable worlds: " + ", ".join(names[:4]))
+        parts.append("notable worlds: " + _capped(names, 4))
     return "Territory: " + ", ".join(parts) + "." if parts else ""
 
 
@@ -1438,12 +1440,11 @@ def _technology_summary(
     for field in ["physics", "society", "engineering"]:
         items = available.get(field)
         if isinstance(items, list) and items:
-            available_parts.append(f"{field}: {', '.join(_label(item) for item in items[:4])}")
+            # Every option matters to "what can I research?"; a field offers only a few.
+            available_parts.append(f"{field}: {_capped([_label(item) for item in items], 12)}")
     recommended = technology.get("recommended_research")
     if isinstance(recommended, list) and recommended:
-        available_parts.append(
-            "recommended: " + ", ".join(_label(item) for item in recommended[:5])
-        )
+        available_parts.append("recommended: " + _capped([_label(item) for item in recommended], 5))
     if available_parts:
         parts.append("available picks " + "; ".join(available_parts))
     return "Technology: " + ". ".join(parts) + "." if parts else ""
@@ -1470,7 +1471,7 @@ def _diplomacy_summary(
         parts.append(f"{_number(count)} fallen empires observed")
     empires = fallen.get("empires") if isinstance(fallen.get("empires"), list) else []
     names = []
-    for empire in empires[:4]:
+    for empire in empires:
         if isinstance(empire, dict):
             name = empire.get("name")
             archetype = empire.get("archetype")
@@ -1479,7 +1480,7 @@ def _diplomacy_summary(
             elif name:
                 names.append(str(name))
     if names:
-        parts.append("watch " + ", ".join(names))
+        parts.append("watch " + _capped(names, 4))
     return "Diplomacy: " + ", ".join(parts) + "." if parts else ""
 
 
@@ -1502,6 +1503,8 @@ def _event_lines(events_value: Any, *, heading: str) -> list[str]:
         if kind:
             prefix += f"{_label(kind)} - "
         lines.append(prefix + summary.strip())
+    if len(events) > 10:
+        lines.append(f"- (+{len(events) - 10} more events in the structured result)")
     return lines
 
 
@@ -1517,16 +1520,26 @@ def _render_value(value: Any, *, depth: int) -> str:
     if isinstance(value, int | float | bool):
         return _number(value) if isinstance(value, int | float) else str(value)
     if isinstance(value, list):
-        parts = [_render_value(item, depth=depth + 1) for item in value[:8]]
-        return ", ".join(part for part in parts if part)
+        parts = [_render_value(item, depth=depth + 1) for item in value]
+        return _capped([part for part in parts if part], 8)
     if isinstance(value, dict):
+        if set(value) == {"_truncated_items"}:
+            return f"+{value['_truncated_items']} more not shown"
         parts = []
-        for key, item in list(value.items())[:10]:
+        for key, item in value.items():
             rendered = _render_value(item, depth=depth + 1)
             if rendered:
                 parts.append(f"{_label(key)}: {rendered}")
-        return "; ".join(parts)
+        shown = "; ".join(parts[:10])
+        return f"{shown}; (+{len(parts) - 10} more fields)" if len(parts) > 10 else shown
     return ""
+
+
+def _capped(items: list[str], limit: int) -> str:
+    """Join up to ``limit`` items and say how many were left out, never silently."""
+    shown = ", ".join(items[:limit])
+    hidden = len(items) - limit
+    return f"{shown} (+{hidden} more)" if hidden > 0 else shown
 
 
 def _label(value: Any) -> str:

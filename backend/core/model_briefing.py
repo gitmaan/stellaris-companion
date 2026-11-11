@@ -13,6 +13,13 @@ from stellaris_companion.campaign_evidence import (
     resolve_empire_identity,
 )
 from stellaris_companion.evidence_policy import build_evidence_policy
+from stellaris_companion.technology_names import (
+    TECHNOLOGY_CATALOG_GAME_VERSION,
+    catalog_covers_game_version,
+    technology_display_name,
+    technology_names_for,
+    technology_variant_names,
+)
 
 MODEL_BRIEFING_SCHEMA_VERSION = 3
 
@@ -116,10 +123,77 @@ def build_model_briefing(briefing: dict[str, Any]) -> dict[str, Any]:
         },
         "evidence": build_evidence_policy(),
     }
+    technology = _name_technologies(result.get("technology"), version)
+    if technology:
+        result["model_context"]["technology"] = technology
     nomad = result.get("nomad")
     if isinstance(nomad, dict) and nomad.get("is_nomadic") is True:
         result["model_context"]["nomad_economy"] = _nomad_economy_rules(version)
     return result
+
+
+def _name_technologies(technology: Any, game_version: str) -> dict[str, Any] | None:
+    """Give the model in-game technology names; the save only records internal IDs.
+
+    Researched technologies are renamed in place in this model-facing copy, which
+    costs nothing: a name is about as long as its ID. Current research and the
+    research options keep their IDs and are named alongside, with the other names
+    an empire-specific variant can show.
+    """
+    if not isinstance(technology, dict):
+        return None
+    identifiers: list[Any] = []
+    for group in (technology.get("in_progress"), technology.get("available_techs")):
+        if not isinstance(group, dict):
+            continue
+        for value in group.values():
+            if isinstance(value, dict):
+                identifiers.append(value.get("tech"))
+            elif isinstance(value, list):
+                identifiers.extend(value)
+    researched = technology.get("researched_techs")
+    has_researched = isinstance(researched, list) and bool(researched)
+    if has_researched:
+        technology["researched_techs"] = [
+            technology_display_name(identifier) or identifier for identifier in researched
+        ]
+    if not has_researched and not any(isinstance(i, str) and i for i in identifiers):
+        return None
+
+    names = technology_names_for(identifiers)
+    context: dict[str, Any] = {
+        "names": names,
+        "names_source": f"English game text, {TECHNOLOGY_CATALOG_GAME_VERSION or 'unknown version'}",
+        "instruction": (
+            "Saves record technologies by internal ID, which often differs from what the "
+            "player sees: tech_cryostasis_1 is Automated Colony Ships. names gives the "
+            "in-game name of each ID in technology.in_progress and "
+            "technology.available_techs, and technology.researched_techs already lists "
+            "in-game names. Refer to technologies by these names, in the player's language, "
+            "and match a technology the player mentions against them before saying it is "
+            "missing. An entry that still looks like an ID (tech_...) is modded or newer than "
+            "this catalog: never present it, or a name guessed from it, as the exact in-game "
+            "name, and never invent an ID."
+        ),
+    }
+    also_shown_as = {
+        identifier: list(variants)
+        for identifier in names
+        if (variants := technology_variant_names(identifier))
+    }
+    if also_shown_as:
+        context["also_shown_as"] = also_shown_as
+        context["variant_rule"] = (
+            "Some empire types (Wilderness, Nomads and others) see a technology under the "
+            "also_shown_as name instead. The save does not say which; treat both as the same "
+            "technology."
+        )
+    if catalog_covers_game_version(game_version) is False:
+        context["catalog_note"] = (
+            f"This save is from {game_version}, newer than the name catalog. Technologies "
+            "added or renamed since may be missing or out of date here."
+        )
+    return context
 
 
 def _nomad_economy_rules(version: str) -> dict[str, str]:

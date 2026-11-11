@@ -43,6 +43,7 @@ from backend.core.snapshot_reader import (
     get_war_battle_locations,
     get_war_names,
 )
+from stellaris_companion.technology_names import technology_label
 
 
 @dataclass(frozen=True)
@@ -939,7 +940,7 @@ def compute_events(
     curr_techs = get_tech_list(curr)
     new_techs = sorted(curr_techs - prev_techs)[:10]
     for tech in new_techs:
-        display_name = tech.replace("tech_", "").replace("_", " ").title()
+        display_name = technology_label(tech)
         events.append(
             DetectedEvent(
                 event_type="technology_researched",

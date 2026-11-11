@@ -38,6 +38,42 @@ class Report:
 
 
 REPORTS: dict[int, Report] = {
+    104: Report(
+        summary="A research option is shown under an ID that looks like another technology.",
+        root_cause=(
+            "The save lists research options by internal ID and the Advisor received no "
+            "names, so tech_cryostasis_1 (Automated Colony Ships) read as a different "
+            "technology and the one the game showed looked missing. For external AI "
+            "clients the MCP summary also cut each field to four options without saying "
+            "so and showed names made up from the IDs."
+        ),
+        fixed_by=("codex/tech-display-names",),
+        layer="generated technology name catalog + model_context + events + MCP",
+        cases=(
+            Case(
+                f"{_HERE}/test_report_technology.py"
+                "::test_issue_104_research_options_carry_their_in_game_names",
+                "new",
+                True,
+                "Names checked against the installed Cygnus 4.5.3 game files; no 4.5.3 save "
+                "was available, so the save layout is the 4.4.6 one.",
+            ),
+            Case(
+                "tests/test_events.py"
+                "::TestComputeEvents::test_technology_researched_uses_in_game_names",
+                "referenced",
+                True,
+            ),
+            Case(
+                "tests/test_mcp_context.py"
+                "::test_external_clients_get_every_research_option_under_its_in_game_name",
+                "referenced",
+                True,
+                "External AI clients: five options were cut to four, under names made up "
+                'from the IDs ("Cryostasis I").',
+            ),
+        ),
+    ),
     79: Report(
         summary="Advisor treats a Nomad economy as a failing settled mining economy.",
         root_cause=(

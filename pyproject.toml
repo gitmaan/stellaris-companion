@@ -71,7 +71,7 @@ exclude = [
 ]
 
 [tool.setuptools.package-data]
-stellaris_companion = ["model_catalog.json", "identity_catalog.json"]
+stellaris_companion = ["model_catalog.json", "identity_catalog.json", "technology_catalog.json"]
 
 # =============================================================================
 # Ruff - Fast Python linter and formatter
