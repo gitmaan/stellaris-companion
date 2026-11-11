@@ -12,6 +12,7 @@ import pytest
 
 from scripts.generate_identity_catalog import build_technology_catalog
 from stellaris_companion.campaign_evidence import IDENTITY_CATALOG_GAME_VERSION
+from stellaris_companion.game_install import find_game_install
 from stellaris_companion.technology_names import (
     TECHNOLOGY_CATALOG_GAME_VERSION,
     TECHNOLOGY_CATALOG_PATH,
@@ -24,12 +25,8 @@ from stellaris_companion.technology_names import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-GAME_DIR = Path(
-    os.environ.get(
-        "STELLARIS_GAME_DIR",
-        Path.home() / "Library/Application Support/Steam/steamapps/common/Stellaris",
-    )
-)
+INSTALL = find_game_install()
+GAME_DIR = INSTALL.game_dir if INSTALL else Path("no Stellaris install")
 
 
 @pytest.mark.parametrize(

@@ -4,6 +4,7 @@ The game on this machine is the authority on what things are called: it has the
 names for the installed version, in the language the player plays in, including
 any mods they have enabled. This module only locates it and reads three small
 settings files; nothing is copied and nothing leaves the machine.
+The places it looks are the ones ``game_folders`` lists, shared with the search for saves.
 
 ``STELLARIS_GAME_DIR`` points at an install the search does not find. When it is
 set, only that folder is used; set it to an empty string to use no install at all.
@@ -18,13 +19,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from .save_loader import get_platform_save_paths
+from .game_folders import steam_libraries, user_dirs
 
 GAME_DIR_ENV = "STELLARIS_GAME_DIR"
 DEFAULT_LANGUAGE = "english"
 
-_STEAM_GAME = ("steamapps", "common", "Stellaris")
-_LIBRARY_PATH = re.compile(r'"path"\s+"((?:[^"\\]|\\.)*)"')
 _LANGUAGE = re.compile(r'^\s*language\s*=\s*"?l_(\w+)"?', re.M)
 _MOD_PATH = re.compile(r'^\s*path\s*=\s*"([^"]+)"', re.M)
 
@@ -84,22 +83,19 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8-sig", errors="replace")
 
 
-def _save_dirs() -> list[Path]:
+def _chosen_save_dir() -> Path | None:
+    """The save folder the player pointed the app at, when it is not a standard one."""
     chosen = os.environ.get("STELLARIS_SAVE_DIR")
-    return [*([Path(chosen).expanduser()] if chosen else []), *get_platform_save_paths()]
+    return Path(chosen).expanduser() if chosen and chosen.strip() else None
 
 
 def _candidate_game_dirs() -> list[Path]:
-    candidates: list[Path] = []
-    for root in _steam_roots():
-        candidates.append(root.joinpath(*_STEAM_GAME))
-        for library in _steam_libraries(root):
-            candidates.append(library.joinpath(*_STEAM_GAME))
-    # Saves kept inside a Steam library (Proton, Steam Cloud) sit next to the game.
-    for save_dir in _save_dirs():
-        for parent in save_dir.parents:
-            if parent.name == "steamapps":
-                candidates.append(parent / "common" / "Stellaris")
+    candidates = [library / "steamapps" / "common" / "Stellaris" for library in steam_libraries()]
+    # A save folder inside a Steam library Steam's own list does not mention.
+    chosen = _chosen_save_dir()
+    for parent in chosen.parents if chosen else ():
+        if parent.name == "steamapps":
+            candidates.append(parent / "common" / "Stellaris")
     if sys.platform == "win32":
         for variable in ("PROGRAMFILES(X86)", "PROGRAMFILES"):
             base = os.environ.get(variable)
@@ -109,54 +105,10 @@ def _candidate_game_dirs() -> list[Path]:
     return list(dict.fromkeys(candidates))
 
 
-def _steam_roots() -> list[Path]:
-    home = Path.home()
-    if sys.platform == "darwin":
-        return [home / "Library" / "Application Support" / "Steam"]
-    if sys.platform == "win32":
-        roots = []
-        registered = _windows_steam_path()
-        if registered:
-            roots.append(Path(registered))
-        for variable in ("PROGRAMFILES(X86)", "PROGRAMFILES"):
-            base = os.environ.get(variable)
-            if base:
-                roots.append(Path(base) / "Steam")
-        return roots
-    flatpak = home / ".var" / "app" / "com.valvesoftware.Steam"
-    return [
-        home / ".steam" / "steam",
-        home / ".local" / "share" / "Steam",
-        flatpak / ".local" / "share" / "Steam",
-        flatpak / "data" / "Steam",
-        home / "snap" / "steam" / "common" / ".local" / "share" / "Steam",
-    ]
-
-
-def _windows_steam_path() -> str | None:
-    try:
-        import winreg
-
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as key:
-            value, _ = winreg.QueryValueEx(key, "SteamPath")
-    except (ImportError, OSError):
-        return None
-    return value if isinstance(value, str) and value else None
-
-
-def _steam_libraries(steam_root: Path) -> list[Path]:
-    """Other drives and folders the player has told Steam to install games into."""
-    try:
-        text = _read(steam_root / "steamapps" / "libraryfolders.vdf")
-    except OSError:
-        return []
-    return [Path(path.replace("\\\\", "\\")) for path in _LIBRARY_PATH.findall(text)]
-
-
 def _find_user_dir() -> Path | None:
     """The folder holding the player's settings, saves and mods."""
-    for save_dir in _save_dirs():
-        user_dir = save_dir.parent
+    chosen = _chosen_save_dir()
+    for user_dir in [*([chosen.parent] if chosen else []), *user_dirs()]:
         try:
             if (user_dir / "settings.txt").is_file():
                 return user_dir

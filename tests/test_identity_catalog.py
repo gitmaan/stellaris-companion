@@ -17,14 +17,11 @@ from stellaris_companion.campaign_evidence import (
     _load_identity_catalog,
     resolve_empire_identity,
 )
+from stellaris_companion.game_install import find_game_install
 
 ROOT = Path(__file__).resolve().parents[1]
-GAME_DIR = Path(
-    os.environ.get(
-        "STELLARIS_GAME_DIR",
-        Path.home() / "Library/Application Support/Steam/steamapps/common/Stellaris",
-    )
-)
+INSTALL = find_game_install()
+GAME_DIR = INSTALL.game_dir if INSTALL else Path("no Stellaris install")
 
 # The hand-maintained catalog shipped by PR #84, verified against 4.4.6 localisation.
 LEGACY_NAMES = {

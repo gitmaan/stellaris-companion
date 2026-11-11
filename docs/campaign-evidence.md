@@ -35,7 +35,8 @@ A save records things by internal ID, and the name on screen is often nothing li
 
 1. **The player's installed game** (`stellaris_companion/game_names.py`). The app finds
    the install (Steam and its extra libraries, a Steam folder the saves sit in, GOG on
-   Windows, or `STELLARIS_GAME_DIR`), reads the language from the player's
+   Windows, or `STELLARIS_GAME_DIR`; `stellaris_companion/game_folders.py` is the one
+   list of places, shared with the search for saves), reads the language from the player's
    `settings.txt` and the enabled mods from `dlc_load.json`, and reads the game's own
    text files the way the game loads them. That gives the names for the installed
    version, in the language the player plays in, including their mods. The files are

@@ -30,6 +30,40 @@ def names_from_shipped_catalogs():
     game_names.use_installed_game()
 
 
+@pytest.fixture
+def empty_home(tmp_path, monkeypatch):
+    """A home folder with nothing in it, so a test never finds this machine's own game."""
+    from stellaris_companion import game_folders
+
+    home = tmp_path / "home"
+    home.mkdir()
+    for variable in ("HOME", "USERPROFILE"):
+        monkeypatch.setenv(variable, str(home))
+    for variable in (
+        "PROGRAMFILES(X86)",
+        "PROGRAMFILES",
+        "STELLARIS_GAME_DIR",
+        "STELLARIS_SAVE_DIR",
+    ):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setattr(game_folders, "_windows_registry_text", lambda key, name: None)
+    return home
+
+
+@pytest.fixture
+def add_steam_library():
+    """Tell the Steam under ``steam_root`` about a library the player added elsewhere."""
+
+    def add(steam_root, library) -> None:
+        (steam_root / "steamapps").mkdir(parents=True, exist_ok=True)
+        escaped = str(library).replace("\\", "\\\\")
+        (steam_root / "steamapps" / "libraryfolders.vdf").write_text(
+            f'"libraryfolders"\n{{\n\t"0"\n\t{{\n\t\t"path"\t\t"{escaped}"\n\t}}\n}}\n'
+        )
+
+    return add
+
+
 @pytest.fixture(scope="session")
 def project_root():
     """Return the project root directory."""
