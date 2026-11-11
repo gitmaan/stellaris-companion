@@ -57,6 +57,7 @@ matter to the report need writing.
 | #81 | Rogue Servitor denied over a "missing" DLC | metadata + campaign evidence + prompt | new + referenced |
 | #83 | Chronicle dates after loading an older save | Chronicle + database | referenced |
 | #95 | Story lost after changing the player's empire | ingestion + narrative ancestry + Advisor/Chronicle/MCP | new + referenced |
+| #104 | Research option shown under an ID that reads as another technology | technology name catalog + model briefing + events | new + referenced |
 
 `registry.py` has the node IDs, root causes, fixes, and revert-verification
 status. Excluded reports and the reasons are listed in `NOT_COVERED`.

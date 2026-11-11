@@ -31,13 +31,30 @@ or unknown versions. The source is the
 `stellaris_companion/identity_catalog.json` maps every authority, civic, origin, and
 ethic ID defined in the shipped game files to its English display name. It is generated
 by `scripts/generate_identity_catalog.py --game-dir <Stellaris install>` and records the
-source game version (currently Pegasus 4.4.6). It includes non-playable entries (fallen
+source game version (currently Cygnus 4.5.3). It includes non-playable entries (fallen
 empire, enclave, nomadic, pre-FTL) and `swap_type` display variants such as Terravore,
 because names say what an ID is called, not whether a player may pick it. IDs without
-an English name in that version, modded IDs, and IDs added after it (such as Cygnus
-4.5.x content, until the catalog is regenerated from a 4.5 install) keep the raw
+an English name in that version, modded IDs, and IDs added after it (until the
+catalog is regenerated from a newer install) keep the raw
 identifier with `source: "raw_identifier"`. A Rogue Servitor (`civic_machine_servitor`)
 is a civic under Machine Intelligence authority.
+
+The same generator run writes `stellaris_companion/technology_catalog.json`, which maps
+each technology's save ID to its English name. Saves list technologies by ID, and many
+IDs do not resemble the name: `tech_cryostasis_1` is Automated Colony Ships. In the
+model briefing, researched technologies are renamed in place (a name is about as long
+as its ID, so this costs nothing), while current research and the research options keep
+their IDs and are named under `model_context.technology.names`. Chronicle research
+events and the MCP summary use the same names. Stored briefings keep the IDs.
+
+Some empire types see a technology under another name (Wilderness empires see
+Automated Colony Ships as Seedling Incubation). Deciding which applies means evaluating
+game script, so the catalog only lists the alternatives (`variants`), and the briefing
+passes them as `also_shown_as`. Modded and newer IDs have no entry and are never given
+an invented name; when a save is newer than the catalog, the briefing says so.
+
+`scripts/check_local_saves.py` fails when the installed game or a checked save is newer
+than the catalogs, so run it before a release and regenerate when it says to.
 
 Legacy empty DLC arrays are ambiguous because older extraction used an empty array
 for both absence and an explicitly empty block. They remain unknown unless the source

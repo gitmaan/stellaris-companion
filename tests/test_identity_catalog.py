@@ -164,7 +164,7 @@ def test_shipped_catalog_records_source_version_and_only_names() -> None:
     data = json.loads(IDENTITY_CATALOG_PATH.read_text(encoding="utf-8"))
     assert set(data) == {"game_version", "source", "authority", "civic", "ethic", "origin"}
     assert data["game_version"] == IDENTITY_CATALOG_GAME_VERSION
-    assert IDENTITY_CATALOG_GAME_VERSION.startswith("Pegasus v4.4.6")
+    assert IDENTITY_CATALOG_GAME_VERSION.startswith("Cygnus v4.5.3")
     prefixes = ("auth_", "civic_", "ethic_", "origin_")
     for kind, minimum in {"authority": 8, "civic": 250, "ethic": 17, "origin": 60}.items():
         names = data[kind]

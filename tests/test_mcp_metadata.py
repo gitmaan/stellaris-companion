@@ -135,3 +135,16 @@ def test_mcpb_wrapper_relays_a_real_protocol_session(tmp_path: Path) -> None:
     assert by_id[1]["result"]["serverInfo"]["title"] == "Stellaris Companion"
     assert 2 in by_id, (stdout, stderr)
     assert len(by_id[2]["result"]["tools"]) == 10
+
+
+def test_technology_summary_uses_in_game_names_for_research_options() -> None:
+    """Issue #104: tech_cryostasis_1 is "Automated Colony Ships"."""
+    from backend.mcp.server import _technology_summary
+
+    summary = _technology_summary(
+        {"available_techs": {"physics": ["tech_cryostasis_1", "tech_my_mod_reactor"]}}, {}, {}
+    )
+
+    assert "physics: Automated Colony Ships, " in summary
+    assert "Cryostasis" not in summary
+    assert "tech_my_mod_reactor" not in summary and "Reactor" in summary

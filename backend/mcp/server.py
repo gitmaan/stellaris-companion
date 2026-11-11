@@ -23,6 +23,7 @@ from mcp.server.stdio import stdio_server
 
 from backend import __version__ as BACKEND_VERSION
 from backend.mcp.context import McpContextError, StellarisMcpContext, _display_identifier
+from stellaris_companion.technology_names import technology_display_name
 
 SERVER_NAME = "stellaris-companion"
 SERVER_TITLE = "Stellaris Companion"
@@ -1438,11 +1439,13 @@ def _technology_summary(
     for field in ["physics", "society", "engineering"]:
         items = available.get(field)
         if isinstance(items, list) and items:
-            available_parts.append(f"{field}: {', '.join(_label(item) for item in items[:4])}")
+            available_parts.append(
+                f"{field}: {', '.join(_technology_label(item) for item in items[:4])}"
+            )
     recommended = technology.get("recommended_research")
     if isinstance(recommended, list) and recommended:
         available_parts.append(
-            "recommended: " + ", ".join(_label(item) for item in recommended[:5])
+            "recommended: " + ", ".join(_technology_label(item) for item in recommended[:5])
         )
     if available_parts:
         parts.append("available picks " + "; ".join(available_parts))
@@ -1527,6 +1530,10 @@ def _render_value(value: Any, *, depth: int) -> str:
                 parts.append(f"{_label(key)}: {rendered}")
         return "; ".join(parts)
     return ""
+
+
+def _technology_label(value: Any) -> str:
+    return technology_display_name(value) or _label(value)
 
 
 def _label(value: Any) -> str:

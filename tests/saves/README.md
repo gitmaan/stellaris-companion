@@ -34,3 +34,10 @@ It reads saves in place from the Stellaris save folder (or paths you pass), keep
 history in a temporary database, and uploads nothing. It exits non-zero on a
 crash, a failure the pipeline logged and carried on from, or a missing core
 value such as the game date or empire name.
+
+It also exits non-zero when your installed game, or any checked save, is newer
+than the shipped name catalogs (`identity_catalog.json`, `technology_catalog.json`).
+Regenerate both with
+`python3 scripts/generate_identity_catalog.py --game-dir <Stellaris install>` and
+commit the result. Technology IDs with no catalog name are listed as warnings:
+expected for mods, a sign of a stale catalog otherwise.
