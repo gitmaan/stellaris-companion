@@ -174,7 +174,6 @@ class EndgameMixin:
             return result
 
         # Check for Become the Crisis ascension perk
-        # Note: ascension_perks may have duplicate keys, so use regex fallback for reliability
         ascension_perks = country_data.get("ascension_perks", [])
         if isinstance(ascension_perks, list):
             if "ap_become_the_crisis" in ascension_perks:
@@ -206,7 +205,7 @@ class EndgameMixin:
         The Great Khan is a mid-game crisis where marauder clans unify under
         a single leader and begin conquering the galaxy.
 
-        Uses Rust parser for fast extraction when available, falls back to regex.
+        Requires Rust session mode for extraction.
 
         Returns:
             Dict with:

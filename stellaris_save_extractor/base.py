@@ -130,7 +130,7 @@ class SaveExtractorBase:
     def _get_building_types(self) -> dict:
         """Parse the global buildings section to get ID→type mapping.
 
-        Uses Rust bridge for fast parsing when available, falls back to regex.
+        Read through the Rust parser.
 
         Returns:
             Dict mapping building IDs (as strings) to building type names

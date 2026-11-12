@@ -95,7 +95,8 @@ class BriefingMixin:
                     return name
             return None
         except Exception:
-            # Fall back to regex on any error
+            # The campaign ID decides which campaign a save belongs to, so a session
+            # error here is answered from the save's text and not with no ID.
             return self._extract_campaign_id_regex()
 
     def _extract_campaign_id_regex(self) -> str | None:
