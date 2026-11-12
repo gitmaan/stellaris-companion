@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import re
 
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
@@ -87,7 +86,7 @@ class EndgameMixin:
 
         Tracks L-Gate insights collected and whether the L-Cluster has been opened.
 
-        Uses Rust parser for fast extraction when available, falls back to regex.
+        Requires Rust session mode for extraction.
 
         Returns:
             Dict with:
@@ -97,18 +96,9 @@ class EndgameMixin:
               - lgate_opened: Whether L-Cluster has been accessed
               - player_activation_progress: Tech progress toward activation (0-100)
         """
-        return self._get_lgate_status_rust()
-
-    def _get_lgate_status_rust(self) -> dict:
-        """Get L-Gate status using Rust parser.
-
-        Returns:
-            Dict with L-Gate status details
-        """
-        # Check for active session at start - delegate to regex if not available
         session = _get_active_session()
         if not session:
-            return self._get_lgate_status_regex()
+            raise ParserError("Rust session required for get_lgate_status")
 
         result = {
             "lgate_enabled": False,
@@ -153,74 +143,13 @@ class EndgameMixin:
 
         return result
 
-    def _get_lgate_status_regex(self) -> dict:
-        """Get L-Gate status using regex parsing (fallback method).
-
-        Returns:
-            Dict with L-Gate status details
-        """
-        result = {
-            "lgate_enabled": False,
-            "insights_collected": 0,
-            "insights_required": 7,  # Standard requirement
-            "lgate_opened": False,
-            "player_activation_progress": 0,
-        }
-
-        # Check if L-Gates are enabled in galaxy settings
-        if "lgate_enabled=yes" in self.gamestate:
-            result["lgate_enabled"] = True
-        elif "lgate_enabled=no" in self.gamestate:
-            result["lgate_enabled"] = False
-            return result  # No point checking further
-
-        # Get player's L-Gate insights from tech_repeatable_lcluster_clue
-        player_id = self.get_player_empire_id()
-        player_chunk = self._find_player_country_content(player_id)
-
-        if player_chunk:
-            # Look for tech_repeatable_lcluster_clue in technology section
-            tech_block = self._extract_braced_block(player_chunk, "tech_status")
-            if tech_block:
-                # Find the repeatable tech entry
-                clue_match = re.search(
-                    r'technology="tech_repeatable_lcluster_clue"[^}]*level=(\d+)',
-                    tech_block,
-                )
-                if clue_match:
-                    result["insights_collected"] = int(clue_match.group(1))
-
-            # Check for activation tech progress
-            # This appears in potential={} section as "tech_lgate_activation"="XX"
-            potential_match = re.search(r'"tech_lgate_activation"="(\d+)"', player_chunk)
-            if potential_match:
-                result["player_activation_progress"] = int(potential_match.group(1))
-
-        # Check if L-Gate has been opened (look for L-Cluster access)
-        # When opened, there will be bypass connections to the L-Cluster
-        # Or we can check for gray_tempest/lcluster related flags
-        if re.search(r"l_cluster_opened|gray_tempest_country", self.gamestate):
-            result["lgate_opened"] = True
-
-        # Also check if player has the activation tech completed
-        if player_chunk:
-            if "tech_lgate_activation" in player_chunk:
-                tech_section = self._extract_braced_block(player_chunk, "technology")
-                if tech_section and '"tech_lgate_activation"' in tech_section:
-                    # Check if it's in completed techs (not just potential)
-                    completed_block = self._extract_braced_block(tech_section, "completed")
-                    if completed_block and "tech_lgate_activation" in completed_block:
-                        result["lgate_opened"] = True
-
-        return result
-
     def get_menace(self) -> dict:
         """Get Become the Crisis status for the player.
 
         Tracks menace level and crisis ascension progress if player has
         the ap_become_the_crisis ascension perk.
 
-        Uses Rust parser for fast extraction when available, falls back to regex.
+        Requires Rust session mode for extraction.
 
         Returns:
             Dict with:
@@ -228,18 +157,9 @@ class EndgameMixin:
               - menace_level: Current menace accumulated
               - crisis_level: Crisis ascension tier (0-5)
         """
-        return self._get_menace_rust()
-
-    def _get_menace_rust(self) -> dict:
-        """Get menace status using Rust parser.
-
-        Returns:
-            Dict with menace status details
-        """
-        # Check for active session at start - delegate to regex if not available
         session = _get_active_session()
         if not session:
-            return self._get_menace_regex()
+            raise ParserError("Rust session required for get_menace")
 
         result = {
             "has_crisis_perk": False,
@@ -277,44 +197,6 @@ class EndgameMixin:
             if crisis_level is not None:
                 with contextlib.suppress(ValueError, TypeError):
                     result["crisis_level"] = int(crisis_level)
-
-        return result
-
-    def _get_menace_regex(self) -> dict:
-        """Get menace status using regex parsing (fallback method).
-
-        Returns:
-            Dict with menace status details
-        """
-        result = {
-            "has_crisis_perk": False,
-            "menace_level": 0,
-            "crisis_level": 0,
-        }
-
-        player_id = self.get_player_empire_id()
-        player_chunk = self._find_player_country_content(player_id)
-
-        if not player_chunk:
-            return result
-
-        # Check for Become the Crisis ascension perk
-        ascension_block = self._extract_braced_block(player_chunk, "ascension_perks")
-        if ascension_block:
-            if "ap_become_the_crisis" in ascension_block:
-                result["has_crisis_perk"] = True
-
-        # If they have the perk, look for menace tracking
-        if result["has_crisis_perk"]:
-            # Menace is stored in the country block
-            menace_match = re.search(r"\bmenace=(\d+)", player_chunk)
-            if menace_match:
-                result["menace_level"] = int(menace_match.group(1))
-
-            # Crisis level/tier
-            crisis_level_match = re.search(r"\bcrisis_level=(\d+)", player_chunk)
-            if crisis_level_match:
-                result["crisis_level"] = int(crisis_level_match.group(1))
 
         return result
 

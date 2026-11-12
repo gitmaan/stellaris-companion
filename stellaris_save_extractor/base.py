@@ -223,66 +223,6 @@ class SaveExtractorBase:
             return content
         return None
 
-    def _extract_nested_block(self, content: str, key: str, value: str) -> str | None:
-        """Extract a nested block where key=value.
-
-        Args:
-            content: Text to search in
-            key: Key to match (e.g., 'name')
-            value: Value to match (e.g., 'United Nations of Earth')
-
-        Returns:
-            The containing block, or None
-        """
-        # Find the value
-        pattern = rf'{key}\s*=\s*"{re.escape(value)}"'
-        match = re.search(pattern, content)
-
-        if not match:
-            return None
-
-        # Walk backwards to find the opening brace of the containing block
-        pos = match.start()
-        brace_count = 0
-        block_start = 0
-
-        for i in range(pos, -1, -1):
-            if content[i] == "}":
-                brace_count += 1
-            elif content[i] == "{":
-                if brace_count == 0:
-                    # Find the key before this brace
-                    block_start = content.rfind("\n", 0, i) + 1
-                    break
-                brace_count -= 1
-
-        # Now find the matching closing brace
-        brace_count = 0
-        for i in range(block_start, len(content)):
-            if content[i] == "{":
-                brace_count += 1
-            elif content[i] == "}":
-                brace_count -= 1
-                if brace_count == 0:
-                    return content[block_start : i + 1]
-
-        return None
-
-    def _find_country_section_start(self) -> int:
-        """Find the start of the country={} block (not country=0 simple value).
-
-        The gamestate has both:
-        - country=0 (simple value near start, ~line 10)
-        - country=\\n{\\n\\t0=... (actual countries block, deep in file)
-
-        Returns:
-            Position of 'country=' for the block, or -1 if not found
-        """
-        bounds = self._get_section_bounds("country")
-        if not bounds:
-            return -1
-        return bounds[0]
-
     def _find_player_country_content(self, player_id: int = 0) -> str | None:
         """Get the content of the player's country block.
 
@@ -406,17 +346,6 @@ class SaveExtractorBase:
 
         return fleet_ids
 
-    def _find_fleet_section_start(self) -> int:
-        """Find the start of the fleet={} block.
-
-        Returns:
-            Position of 'fleet=' for the block, or -1 if not found
-        """
-        bounds = self._get_section_bounds("fleet")
-        if not bounds:
-            return -1
-        return bounds[0]
-
     def _get_owned_fleet_ids(self, country_content: str) -> list[str]:
         """Extract fleet IDs from owned_fleets section.
 
@@ -465,33 +394,7 @@ class SaveExtractorBase:
 
         return ship_to_fleet
 
-    def _get_player_owned_fleet_ids(self) -> set[str]:
-        """Get all fleet IDs owned by the player.
-
-        Uses fleets_manager.owned_fleets from the player's country data.
-
-        Returns:
-            Set of fleet ID strings owned by the player
-        """
-        owned_fleet_ids = set()
-
-        player_id = self.get_player_empire_id()
-        player_content = self._find_player_country_content(player_id)
-        if not player_content:
-            return owned_fleet_ids
-
-        # Find fleets_manager.owned_fleets
-        fleets_mgr_match = re.search(r"fleets_manager=\s*\{", player_content)
-        if not fleets_mgr_match:
-            return owned_fleet_ids
-
-        content = player_content[fleets_mgr_match.start() : fleets_mgr_match.start() + 50000]
-        for m in re.finditer(r"fleet=(\d+)", content):
-            owned_fleet_ids.add(m.group(1))
-
-        return owned_fleet_ids
-
-    def _count_player_starbases(self, owned_fleet_ids: set[str] = None) -> dict:
+    def _count_player_starbases(self, owned_fleet_ids: set[str]) -> dict:
         """Count player's starbases by level.
 
         Optimized approach: batch-fetch player's fleets via get_entries, extract
@@ -499,7 +402,7 @@ class SaveExtractorBase:
         This avoids iterating the entire ships section (10K+ entries).
 
         Args:
-            owned_fleet_ids: Optional pre-computed set of player fleet IDs
+            owned_fleet_ids: The set of fleet IDs the player owns
 
         Returns:
             Dict with starbase counts by level and totals
@@ -515,10 +418,6 @@ class SaveExtractorBase:
             "total_systems": 0,  # Systems owned (starbases excluding orbital rings)
             "total": 0,  # All starbases including orbital rings
         }
-
-        # Get player's owned fleet IDs
-        if owned_fleet_ids is None:
-            owned_fleet_ids = self._get_player_owned_fleet_ids()
 
         if not owned_fleet_ids:
             return result

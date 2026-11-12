@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # Rust bridge for Clausewitz parsing (required for session mode)
-from stellaris_companion.rust_bridge import _get_active_session
+from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
 
 class BriefingMixin:
@@ -79,18 +79,12 @@ class BriefingMixin:
     def _extract_campaign_id(self) -> str | None:
         """Extract the campaign ID (galaxy name UUID) from the save.
 
-        Dispatches to Rust or regex implementation based on session availability.
+        Requires Rust session mode. Reads the save's text only when the session
+        fails to return the galaxy section.
         """
         session = _get_active_session()
-        if session:
-            return self._extract_campaign_id_rust()
-        return self._extract_campaign_id_regex()
-
-    def _extract_campaign_id_rust(self) -> str | None:
-        """Extract campaign ID using Rust extract_sections (session mode)."""
-        session = _get_active_session()
         if not session:
-            return self._extract_campaign_id_regex()
+            raise ParserError("Rust session required for _extract_campaign_id")
 
         try:
             sections = session.extract_sections(["galaxy"])
@@ -144,13 +138,6 @@ class BriefingMixin:
         if nomad.get("is_nomadic") is not None:
             # Knowledge applicability keys Nomad rules on this flag.
             identity["is_nomadic"] = nomad["is_nomadic"]
-
-        # Pre-warm the player country content cache for methods that still use regex
-        # This saves ~0.45s as many methods share this data
-        # In session mode, skip prewarm - use _get_player_country_entry() for O(1) lookup
-        player_id = self.get_player_empire_id()
-        if not _get_active_session():
-            self._find_player_country_content(player_id)
 
         # Call methods that get_situation() would call - we'll build situation inline
         diplomacy = self.get_diplomacy()

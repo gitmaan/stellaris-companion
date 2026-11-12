@@ -5,7 +5,7 @@ import logging
 import re
 
 # Rust bridge for Clausewitz parsing (required for session mode)
-from stellaris_companion.rust_bridge import _get_active_session
+from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
 logger = logging.getLogger(__name__)
 
@@ -158,24 +158,9 @@ class EconomyMixin:
                 "unemployed_pops": 200
             }
         """
-        # Dispatch to Rust version when session is active
-        session = _get_active_session()
-        if session:
-            return self._get_pop_statistics_rust()
-        return self._get_pop_statistics_regex()
-
-    def _get_pop_statistics_rust(self) -> dict:
-        """Rust-optimized pop statistics using iter_section.
-
-        Benefits over regex version:
-        - No 50MB chunk slicing (memory efficient)
-        - No regex parsing on nested structures
-        - Complete data without truncation risks
-        - Direct dict access for fields
-        """
         session = _get_active_session()
         if not session:
-            return self._get_pop_statistics_regex()
+            raise ParserError("Rust session required for get_pop_statistics")
 
         result = {
             "total_pops": 0,
@@ -272,148 +257,6 @@ class EconomyMixin:
         # Calculate average happiness
         if happiness_weight > 0:
             result["happiness_avg"] = round(happiness_sum / happiness_weight, 1)
-
-        return result
-
-    def _get_pop_statistics_regex(self) -> dict:
-        """Original regex implementation - fallback for non-session mode."""
-        result = {
-            "total_pops": 0,
-            "by_species": {},
-            "by_job_category": {},
-            "by_stratum": {},
-            "happiness_avg": 0.0,
-            "employed_pops": 0,
-            "unemployed_pops": 0,
-        }
-
-        # Step 1: Get player's planet IDs (as integers for comparison)
-        planet_ids = self._get_player_planet_ids()
-        if not planet_ids:
-            return result
-
-        player_planet_set = set(int(pid) for pid in planet_ids)
-
-        # Step 2: Build species ID to name mapping
-        species_names = self._get_species_names()
-
-        # Step 3: Find pop_groups section (this is where actual pop data lives)
-        # Structure: pop_groups=\n{\n\tID=\n\t{ key={ species=X category="Y" } planet=Z size=N happiness=H ... }
-        pop_groups_match = re.search(r"\npop_groups=\n\{", self.gamestate)
-        if not pop_groups_match:
-            # Fallback: try alternate format
-            pop_groups_match = re.search(r"^pop_groups=\s*\{", self.gamestate, re.MULTILINE)
-            if not pop_groups_match:
-                result["error"] = "Could not find pop_groups section"
-                return result
-
-        pop_start = pop_groups_match.start()
-        # Pop groups section can be large in late game
-        pop_chunk = self.gamestate[pop_start : pop_start + 50000000]  # Up to 50MB
-
-        # Tracking for statistics
-        species_counts = {}
-        job_category_counts = {}
-        stratum_counts = {}
-        happiness_values = []
-        total_pops = 0
-
-        # Parse pop groups - each group represents multiple pops of same type
-        # Format: \n\tID=\n\t{ ... key={ species=X category="Y" } ... planet=Z size=N ...
-        pop_pattern = r"\n\t(\d+)=\n\t\{"
-        groups_processed = 0
-        max_groups = 50000  # Safety limit
-
-        for match in re.finditer(pop_pattern, pop_chunk):
-            if groups_processed >= max_groups:
-                result["_note"] = f"Processed {max_groups} pop groups (limit reached)"
-                break
-
-            groups_processed += 1
-            block_start = match.start() + 1
-
-            # Get pop group block content
-            block_chunk = pop_chunk[block_start : block_start + 2500]
-
-            # Find end of this pop group's block
-            brace_count = 0
-            block_end = 0
-            started = False
-            for i, char in enumerate(block_chunk):
-                if char == "{":
-                    brace_count += 1
-                    started = True
-                elif char == "}":
-                    brace_count -= 1
-                    if started and brace_count == 0:
-                        block_end = i + 1
-                        break
-
-            pop_block = block_chunk[:block_end] if block_end > 0 else block_chunk
-
-            # Check if this pop group is on a player-owned planet
-            planet_match = re.search(r"\n\s*planet=(\d+)", pop_block)
-            if not planet_match:
-                continue
-
-            planet_id = int(planet_match.group(1))
-            if planet_id not in player_planet_set:
-                continue
-
-            # Get the size of this pop group (number of pops)
-            size_match = re.search(r"\n\s*size=(\d+)", pop_block)
-            if not size_match:
-                continue
-
-            pop_size = int(size_match.group(1))
-            if pop_size == 0:
-                continue
-
-            total_pops += pop_size
-
-            # Extract species from key={ species=X ... } block
-            # Species is inside the nested key block
-            key_match = re.search(r"key=\s*\{([^}]+)\}", pop_block)
-            if key_match:
-                key_block = key_match.group(1)
-
-                # Extract species ID
-                species_match = re.search(r"species=(\d+)", key_block)
-                if species_match:
-                    species_id = species_match.group(1)
-                    species_name = species_names.get(species_id, f"Species_{species_id}")
-                    species_counts[species_name] = species_counts.get(species_name, 0) + pop_size
-
-                # Extract category (job category: ruler, specialist, worker, slave, etc.)
-                category_match = re.search(r'category="([^"]+)"', key_block)
-                if category_match:
-                    category = category_match.group(1)
-                    job_category_counts[category] = job_category_counts.get(category, 0) + pop_size
-                    # Use category as stratum (they're equivalent in Stellaris)
-                    stratum_counts[category] = stratum_counts.get(category, 0) + pop_size
-
-            # Extract happiness (0.0 to 1.0 scale in save, convert to percentage)
-            # Weight by pop size for accurate average
-            happiness_match = re.search(r"\n\s*happiness=([\d.]+)", pop_block)
-            if happiness_match:
-                happiness = float(happiness_match.group(1))
-                # Add each pop's happiness (weighted by size)
-                happiness_values.extend([happiness * 100] * pop_size)
-
-        # Finalize results
-        result["total_pops"] = total_pops
-        result["by_species"] = species_counts
-        result["by_job_category"] = job_category_counts
-        result["by_stratum"] = stratum_counts
-
-        # Employed pops = total minus unemployed category
-        unemployed = job_category_counts.get("unemployed", 0)
-        result["employed_pops"] = total_pops - unemployed
-        result["unemployed_pops"] = unemployed
-
-        # Calculate average happiness
-        if happiness_values:
-            result["happiness_avg"] = round(sum(happiness_values) / len(happiness_values), 1)
 
         return result
 
@@ -765,24 +608,9 @@ class EconomyMixin:
         """Get budget totals + top sources per resource (compact, non-snapshot)."""
         top_n_sources = max(1, min(int(top_n_sources or 5), 10))
 
-        # Dispatch to Rust version when session is active
-        session = _get_active_session()
-        if session:
-            return self._get_budget_breakdown_rust(top_n_sources)
-        return self._get_budget_breakdown_regex(top_n_sources)
-
-    def _get_budget_breakdown_rust(self, top_n_sources: int = 5) -> dict:
-        """Rust-optimized budget breakdown using get_entry for direct dict access.
-
-        Benefits over regex version:
-        - No brace counting or regex parsing
-        - Direct dict access for budget structure
-        - Complete data without truncation risks
-        - Cleaner code with less parsing logic
-        """
         session = _get_active_session()
         if not session:
-            return self._get_budget_breakdown_regex(top_n_sources)
+            raise ParserError("Rust session required for get_budget_breakdown")
 
         result = {
             "by_resource": {},
@@ -852,123 +680,6 @@ class EconomyMixin:
         result["expense_source_count"] = len(expenses_by_cat)
 
         # Build per-resource breakdown
-        for resource in self._BUDGET_TRACKED_RESOURCES:
-            income_total = sum(v.get(resource, 0.0) for v in income_by_cat.values())
-            expense_total = sum(v.get(resource, 0.0) for v in expenses_by_cat.values())
-            net = round(income_total - expense_total, 2)
-
-            top_income = sorted(
-                (
-                    {"source": src, "amount": round(vals.get(resource, 0.0), 2)}
-                    for src, vals in income_by_cat.items()
-                    if vals.get(resource, 0.0) != 0.0
-                ),
-                key=lambda d: d["amount"],
-                reverse=True,
-            )[:top_n_sources]
-
-            top_expenses = sorted(
-                (
-                    {"source": src, "amount": round(vals.get(resource, 0.0), 2)}
-                    for src, vals in expenses_by_cat.items()
-                    if vals.get(resource, 0.0) != 0.0
-                ),
-                key=lambda d: d["amount"],
-                reverse=True,
-            )[:top_n_sources]
-
-            result["by_resource"][resource] = {
-                "income_total": round(income_total, 2),
-                "expenses_total": round(expense_total, 2),
-                "net": net,
-                "top_income_sources": top_income,
-                "top_expense_sources": top_expenses,
-            }
-
-        return result
-
-    def _get_budget_breakdown_regex(self, top_n_sources: int = 5) -> dict:
-        """Original regex implementation - fallback for non-session mode."""
-
-        result = {
-            "by_resource": {},
-            "tracked_resources": list(self._BUDGET_TRACKED_RESOURCES),
-            "income_source_count": 0,
-            "expense_source_count": 0,
-        }
-
-        player_id = self.get_player_empire_id()
-        country_content = self._find_player_country_content(player_id)
-        if not country_content:
-            result["error"] = "Could not find player country block"
-            return result
-
-        budget_block = self._extract_braced_block(country_content, "budget")
-        if not budget_block:
-            result["error"] = "Could not find budget block"
-            return result
-
-        income_block = self._extract_braced_block(budget_block, "income") or ""
-        expenses_block = self._extract_braced_block(budget_block, "expenses") or ""
-
-        tracked = set(self._BUDGET_TRACKED_RESOURCES)
-
-        def extract_top_level_categories(block: str) -> dict[str, dict[str, float]]:
-            categories: dict[str, dict[str, float]] = {}
-            if not block:
-                return categories
-            inner = self._extract_block_inner(block)
-            if not inner:
-                return categories
-
-            candidates = list(re.finditer(r"\n\s*([A-Za-z0-9_]+)\s*=\s*\{", inner))
-            pos = 0
-            depth = 0
-
-            def extract_block_from(start_idx: int) -> tuple[str, int]:
-                brace_count = 0
-                started = False
-                for i, ch in enumerate(inner[start_idx:], start_idx):
-                    if ch == "{":
-                        brace_count += 1
-                        started = True
-                    elif ch == "}":
-                        brace_count -= 1
-                        if started and brace_count == 0:
-                            return inner[start_idx : i + 1], i + 1
-                return inner[start_idx:], len(inner)
-
-            for m in candidates:
-                if m.start() < pos:
-                    continue
-                depth += inner[pos : m.start()].count("{") - inner[pos : m.start()].count("}")
-                pos = m.start()
-                if depth != 0:
-                    continue
-
-                category = m.group(1)
-                cat_block, end_pos = extract_block_from(pos)
-                pos = end_pos
-                depth = 0
-
-                amounts: dict[str, float] = {}
-                for res, val in re.findall(r"\b([a-z_]+)=([\d.-]+)", cat_block):
-                    if res not in tracked:
-                        continue
-                    try:
-                        amounts[res] = amounts.get(res, 0.0) + float(val)
-                    except ValueError:
-                        continue
-                if amounts:
-                    categories[category] = amounts
-
-            return categories
-
-        income_by_cat = extract_top_level_categories(income_block)
-        expenses_by_cat = extract_top_level_categories(expenses_block)
-        result["income_source_count"] = len(income_by_cat)
-        result["expense_source_count"] = len(expenses_by_cat)
-
         for resource in self._BUDGET_TRACKED_RESOURCES:
             income_total = sum(v.get(resource, 0.0) for v in income_by_cat.values())
             expense_total = sum(v.get(resource, 0.0) for v in expenses_by_cat.values())

@@ -3,7 +3,6 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-import re
 from collections import defaultdict
 
 # Rust bridge for Clausewitz parsing (required for session mode)
@@ -222,56 +221,6 @@ _NAVAL_CAP_TIMED_MODIFIER_HINTS = {
 
 class PlayerMixin:
     """Domain methods extracted from the original SaveExtractor."""
-
-    def _extract_braced_block(self, content: str, key: str) -> str | None:
-        """Extract the full `key={...}` block from a larger text chunk."""
-        match = re.search(rf"\b{re.escape(key)}\s*=\s*\{{", content)
-        if not match:
-            return None
-
-        start = match.start()
-        brace_count = 0
-        started = False
-
-        for i, char in enumerate(content[start:], start):
-            if char == "{":
-                brace_count += 1
-                started = True
-            elif char == "}":
-                brace_count -= 1
-                if started and brace_count == 0:
-                    return content[start : i + 1]
-
-        return None
-
-    def _parse_simple_string_list_block(self, block: str, prefix: str | None = None) -> list[str]:
-        """Parse a simple `{ "a" "b" }` or `{ a b }` block into a de-duped list."""
-        if not block:
-            return []
-
-        open_brace = block.find("{")
-        close_brace = block.rfind("}")
-        if open_brace == -1 or close_brace == -1 or close_brace <= open_brace:
-            return []
-
-        inner = block[open_brace + 1 : close_brace]
-
-        items = re.findall(r'"([^"]+)"', inner)
-        if not items:
-            if prefix:
-                items = re.findall(rf"\b({re.escape(prefix)}[A-Za-z0-9_]+)\b", inner)
-            else:
-                items = re.findall(r"\b([A-Za-z0-9_]+)\b", inner)
-
-        deduped: list[str] = []
-        seen: set[str] = set()
-        for item in items:
-            if item in seen:
-                continue
-            seen.add(item)
-            deduped.append(item)
-
-        return deduped
 
     def _get_player_entries(self) -> list[dict]:
         """Return the normalized ``player`` block, cached per extraction.
