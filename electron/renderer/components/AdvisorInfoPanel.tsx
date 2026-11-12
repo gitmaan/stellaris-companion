@@ -15,10 +15,13 @@ interface AdvisorInfoPanelProps {
   empireOrigin: string | null
 }
 
-function humanizeIdentifier(value: string): string {
+// The backend sends each value as the player's game names it. One the game has no
+// name for arrives as its ID (lowercase_words_joined_by_underscores) and is made readable.
+function displayName(value: string): string {
+  if (!/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(value)) return value
   return value
-    .replace(/^(ethic|civic|authority|origin)_/i, '')
-    .replace(/[_-]+/g, ' ')
+    .replace(/^(ethic|civic|authority|origin)_/, '')
+    .replace(/_+/g, ' ')
     .replace(/\b\w/g, character => character.toUpperCase())
 }
 
@@ -48,19 +51,19 @@ export default function AdvisorInfoPanel({
   const traitGroups = useMemo(() => [
     {
       label: t('advisorPanel.ethics'),
-      values: empireEthics.map(humanizeIdentifier),
+      values: empireEthics.map(displayName),
     },
     {
       label: t('advisorPanel.authority'),
-      values: empireAuthority ? [humanizeIdentifier(empireAuthority)] : [],
+      values: empireAuthority ? [displayName(empireAuthority)] : [],
     },
     {
       label: t('advisorPanel.civics'),
-      values: empireCivics.map(humanizeIdentifier),
+      values: empireCivics.map(displayName),
     },
     {
       label: t('advisorPanel.origin'),
-      values: empireOrigin ? [humanizeIdentifier(empireOrigin)] : [],
+      values: empireOrigin ? [displayName(empireOrigin)] : [],
     },
   ].filter(group => group.values.length > 0), [empireAuthority, empireCivics, empireEthics, empireOrigin, t])
 

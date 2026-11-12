@@ -14,6 +14,7 @@ from typing import Any, Literal
 from backend.core.database import DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
 from backend.core.history import compute_save_id, record_snapshot_from_briefing
 from backend.core.ingestion_worker import WorkerJob, run_worker_job
+from stellaris_companion.campaign_evidence import resolve_empire_identity
 
 logger = logging.getLogger(__name__)
 
@@ -165,19 +166,15 @@ class IngestionManager:
                 else:
                     payload["empire_type"] = "standard"
 
-                # Add basic empire identity fields for UI panels (best-effort).
-                ethics = identity.get("ethics")
-                civics = identity.get("civics")
-                authority = identity.get("authority")
-                origin = identity.get("origin")
-                if isinstance(ethics, list):
-                    payload["empire_ethics"] = ethics
-                if isinstance(civics, list):
-                    payload["empire_civics"] = civics
-                if isinstance(authority, str) and authority:
-                    payload["empire_authority"] = authority
-                if isinstance(origin, str) and origin:
-                    payload["empire_origin"] = origin
+                # The info panel shows these as the player's game names them. One the
+                # game and the catalog do not know stays an ID.
+                named = resolve_empire_identity(identity)
+                payload["empire_ethics"] = [entry["name"] for entry in named["ethics"]]
+                payload["empire_civics"] = [entry["name"] for entry in named["civics"]]
+                if named["authority"]:
+                    payload["empire_authority"] = named["authority"]["name"]
+                if named["origin"]:
+                    payload["empire_origin"] = named["origin"]["name"]
         except Exception:
             pass
 
