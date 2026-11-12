@@ -279,8 +279,11 @@ class TestComputeEvents:
 
     def test_detects_war_started(self, base_prev_snapshot, base_curr_snapshot):
         """Detects new wars starting."""
-        base_prev_snapshot["history"]["wars"]["wars"] = []
-        base_curr_snapshot["history"]["wars"]["wars"] = ["Conquest of Terra"]
+        base_prev_snapshot["history"]["wars"] = {"wars": [], "by_id": {}}
+        base_curr_snapshot["history"]["wars"] = {
+            "wars": ["Conquest of Terra"],
+            "by_id": {"4": "Conquest of Terra"},
+        }
 
         result = compute_events(
             prev=base_prev_snapshot,
@@ -288,13 +291,17 @@ class TestComputeEvents:
             from_snapshot_id=1,
             to_snapshot_id=2,
         )
-        event_types = [e.event_type for e in result]
-        assert "war_started" in event_types
+        started = [e for e in result if e.event_type == "war_started"]
+        assert [e.data["war_name"] for e in started] == ["Conquest of Terra"]
 
     def test_detects_war_ended(self, base_prev_snapshot, base_curr_snapshot):
         """Detects wars ending."""
-        base_prev_snapshot["history"]["wars"]["wars"] = ["Conquest of Terra"]
-        base_curr_snapshot["history"]["wars"]["wars"] = []
+        base_prev_snapshot["history"]["wars"] = {
+            "wars": ["Conquest of Terra"],
+            "by_id": {"4": "Conquest of Terra"},
+            "battle_locations": {"Conquest of Terra": ["Sol"]},
+        }
+        base_curr_snapshot["history"]["wars"] = {"wars": [], "by_id": {}}
 
         result = compute_events(
             prev=base_prev_snapshot,
@@ -302,8 +309,65 @@ class TestComputeEvents:
             from_snapshot_id=1,
             to_snapshot_id=2,
         )
-        event_types = [e.event_type for e in result]
-        assert "war_ended" in event_types
+        ended = [e for e in result if e.event_type == "war_ended"]
+        assert [e.summary for e in ended] == ["War ended: Conquest of Terra (fought at Sol)"]
+
+    def test_a_war_read_under_another_name_is_the_same_war(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """The same war ID is one war, however each snapshot's reading named it."""
+        base_prev_snapshot["history"]["wars"] = {
+            "wars": ["Steccashi MekoNass War"],
+            "by_id": {"4": "Steccashi MekoNass War"},
+        }
+        base_curr_snapshot["history"]["wars"] = {
+            "wars": ["Steccashian - Meko'Naan War"],
+            "by_id": {"4": "Steccashian - Meko'Naan War"},
+        }
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        assert not [e for e in result if e.event_type in {"war_started", "war_ended"}]
+
+    def test_wars_from_a_snapshot_without_ids_are_not_compared(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """Older snapshots only named their wars; a new name is not a new war."""
+        base_prev_snapshot["history"]["wars"] = {"wars": ["Steccashi-MekoNass War"]}
+        base_curr_snapshot["history"]["wars"] = {
+            "wars": ["Steccashian - Meko'Naan War"],
+            "by_id": {"4": "Steccashian - Meko'Naan War"},
+        }
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        assert not [e for e in result if e.event_type in {"war_started", "war_ended"}]
+
+    def test_a_neighbor_read_under_another_name_is_not_a_new_neighbor(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        def geography(*neighbors):
+            return {
+                "border_neighbors": [
+                    {"empire_id": empire_id, "empire_name": name} for empire_id, name in neighbors
+                ]
+            }
+
+        base_prev_snapshot["history"]["geography"] = geography((7, "MekoNass Hive"))
+        base_curr_snapshot["history"]["geography"] = geography(
+            (7, "Meko'Naan Hive"), (9, "Empire of Izk")
+        )
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        new = [e.data["empire_name"] for e in result if e.event_type == "new_border_contact"]
+        assert new == ["Empire of Izk"]
 
     def test_detects_leader_hired(self, base_prev_snapshot, base_curr_snapshot):
         """Detects new leaders being hired."""
@@ -800,6 +864,24 @@ class TestComputeEvents:
         )
         event_types = [e.event_type for e in result]
         assert "fallen_empire_awakened" in event_types
+
+    def test_a_fallen_empire_that_takes_a_new_name_on_awakening_is_still_seen(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """The game renames an empire when it awakens; its ID stays the same."""
+        base_prev_snapshot["history"]["fallen_empires"]["fallen_empires"] = [
+            {"country_id": 15, "name": "Steccashian Conservers", "status": "dormant"}
+        ]
+        base_curr_snapshot["history"]["fallen_empires"]["fallen_empires"] = [
+            {"country_id": 15, "name": "Steccashian Guardians", "status": "awakened"}
+        ]
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        awakened = [e for e in result if e.event_type == "fallen_empire_awakened"]
+        assert [e.data["name"] for e in awakened] == ["Steccashian Guardians"]
 
     def test_detects_war_in_heaven_started(self, base_prev_snapshot, base_curr_snapshot):
         """Detects War in Heaven beginning."""

@@ -49,50 +49,6 @@ class PoliticsMixin:
             return self._get_factions_rust(limit)
         return self._get_factions_regex(limit)
 
-    def _resolve_faction_name(self, name_block: dict | str) -> str:
-        """Resolve a faction name from its name block structure.
-
-        Faction names can be simple keys or nested variable structures like:
-        {key: "%ADJ%", variables: [{key: "1", value: {key: "Name", variables: [...]}}]}
-        """
-        if isinstance(name_block, str):
-            return name_block
-        if not isinstance(name_block, dict):
-            return "Unknown"
-
-        key = name_block.get("key", "Unknown")
-        variables = name_block.get("variables", [])
-
-        # Simple name without variables
-        if not variables:
-            return key
-
-        # Try to resolve variable chain to get actual name
-        # Extract the deepest meaningful name from the variable chain
-        def extract_deepest_name(var_list: list) -> str | None:
-            for var in var_list:
-                value = var.get("value", {})
-                if isinstance(value, dict):
-                    inner_key = value.get("key", "")
-                    inner_vars = value.get("variables", [])
-                    if inner_vars:
-                        # Recurse into nested variables
-                        result = extract_deepest_name(inner_vars)
-                        if result:
-                            return result
-                    elif inner_key and not inner_key.startswith("%"):
-                        return inner_key
-            return None
-
-        resolved = extract_deepest_name(variables)
-        # If we couldn't resolve deeply, use the first level key
-        if not resolved and variables:
-            first_var = variables[0].get("value", {})
-            if isinstance(first_var, dict):
-                resolved = first_var.get("key", key)
-
-        return resolved if resolved else key
-
     def _get_factions_rust(self, limit: int = 10) -> dict:
         """Get factions using Rust session (P030/P031).
 
@@ -139,9 +95,7 @@ class PoliticsMixin:
             # Extract faction type
             faction_type = faction_data.get("type", "unknown")
 
-            # Extract name (may be simple or nested)
-            name_block = faction_data.get("name", {})
-            name = self._resolve_faction_name(name_block)
+            name = self.resolve_name(faction_data.get("name")).display
 
             # Extract support values - P012: fields can be str, int, float
             support_percent = 0.0

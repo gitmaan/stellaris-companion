@@ -124,30 +124,6 @@ class MilitaryMixin:
 
         return result
 
-    def _resolve_war_name(self, name_block: dict | str | None, war_id: str) -> str:
-        """Resolve a war name from its name block structure.
-
-        Args:
-            name_block: The name field from war data
-            war_id: War ID for fallback naming
-
-        Returns:
-            Human-readable war name
-        """
-        if name_block is None:
-            return f"War #{war_id}"
-
-        if isinstance(name_block, str):
-            return name_block
-
-        if isinstance(name_block, dict):
-            key = name_block.get("key", f"War #{war_id}")
-            # For complex war names with variables, just use the key
-            # (most war names are localization keys that aren't resolved in-game anyway)
-            return key
-
-        return f"War #{war_id}"
-
     def _get_wars_rust(self) -> dict:
         """Get war information using Rust parser.
 
@@ -215,7 +191,7 @@ class MilitaryMixin:
                 continue  # Player not involved in this war
 
             # Extract war name
-            war_name = self._resolve_war_name(war_data.get("name"), war_id)
+            war_name = self.resolve_name(war_data.get("name"), default=f"War #{war_id}").display
 
             # Extract start date
             start_date = war_data.get("start_date")
@@ -250,6 +226,7 @@ class MilitaryMixin:
             )
 
             war_info = {
+                "id": str(war_id),
                 "name": war_name,
                 "start_date": start_date,
                 "duration_days": duration_days,

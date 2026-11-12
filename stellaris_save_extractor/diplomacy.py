@@ -1191,14 +1191,9 @@ class DiplomacyMixin:
             if not claims or not isinstance(claims, list):
                 continue
 
-            # Get system name
-            name_data = sys_data.get("name")
-            if isinstance(name_data, dict):
-                system_name = name_data.get("key", f"System {sys_id}")
-            elif isinstance(name_data, str):
-                system_name = name_data
-            else:
-                system_name = f"System {sys_id}"
+            system_name = self.resolve_name(
+                sys_data.get("name"), default=f"System {sys_id}"
+            ).display
 
             # Get system owner from our sectors map
             system_owner = system_owners.get(str(sys_id))

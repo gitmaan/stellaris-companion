@@ -14,7 +14,6 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.signals import (
-    _clean_war_name_part,
     _extract_diplomacy_signals,
     _extract_edicts_signals,
     _extract_leader_signals,
@@ -23,7 +22,6 @@ from backend.core.signals import (
     _extract_systems_signals,
     _extract_technology_signals,
     _extract_war_signals,
-    _resolve_war_name_from_block,
     build_snapshot_signals,
 )
 
@@ -311,6 +309,29 @@ class TestExtractWarSignals:
 
         assert result["player_at_war"] is False
         assert result["count"] == 0
+        assert result["by_id"] == {}
+
+    def test_each_war_is_recorded_under_its_id(self, mock_extractor):
+        """History tells wars apart by ID; the name is what the extractor read."""
+        mock_extractor.get_wars.return_value = {
+            "player_at_war": True,
+            "wars": [
+                {
+                    "id": "7",
+                    "name": "Steccashian - Meko'Naan War",
+                    "battle_stats": {"battle_locations": [{"system": "Sol"}]},
+                },
+                {"id": "9", "name": "Steccashian - Meko'Naan War"},
+            ],
+        }
+        result = _extract_war_signals(mock_extractor)
+
+        assert result["by_id"] == {
+            "7": "Steccashian - Meko'Naan War",
+            "9": "Steccashian - Meko'Naan War",
+        }
+        assert result["count"] == 2
+        assert result["battle_locations"] == {"Steccashian - Meko'Naan War": ["Sol"]}
 
 
 # --- Tests for _extract_diplomacy_signals ---
@@ -446,71 +467,3 @@ class TestExtractSystemsSignals:
         """System count matches starbase count."""
         result = _extract_systems_signals(mock_extractor)
         assert result["count"] == 12
-
-
-# --- Tests for helper functions ---
-
-
-class TestCleanWarNamePart:
-    """Tests for _clean_war_name_part helper function."""
-
-    def test_removes_spec_prefix(self):
-        """Removes SPEC_ prefix."""
-        assert _clean_war_name_part("SPEC_Ubaric") == "Ubaric"
-
-    def test_removes_adj_prefix(self):
-        """Removes ADJ_ prefix."""
-        assert _clean_war_name_part("ADJ_Human") == "Human"
-
-    def test_removes_prescripted_prefix(self):
-        """Removes PRESCRIPTED_ prefix and cleans species pattern."""
-        # Note: "humans1" -> "Humans" (title case of base, number stripped)
-        assert _clean_war_name_part("PRESCRIPTED_adjective_humans1") == "Humans"
-
-    def test_handles_species_number_pattern(self):
-        """Handles species name followed by number."""
-        # Species patterns like "humans1" are title-cased with number stripped
-        assert _clean_war_name_part("humans1") == "Humans"
-        assert _clean_war_name_part("molluscoid5") == "Molluscoid"
-
-    def test_handles_empty_string(self):
-        """Handles empty string."""
-        assert _clean_war_name_part("") == ""
-
-    def test_handles_underscores(self):
-        """Converts underscores to spaces."""
-        assert _clean_war_name_part("war_name_test") == "War Name Test"
-
-
-class TestResolveWarNameFromBlock:
-    """Tests for _resolve_war_name_from_block helper function."""
-
-    def test_handles_simple_string(self):
-        """Returns simple string names directly."""
-        assert _resolve_war_name_from_block("Test War") == "Test War"
-
-    def test_handles_none(self):
-        """Returns None for None input."""
-        assert _resolve_war_name_from_block(None) is None
-
-    def test_handles_empty_string(self):
-        """Returns None for empty string."""
-        assert _resolve_war_name_from_block("") is None
-        assert _resolve_war_name_from_block("   ") is None
-
-    def test_handles_war_vs_adjectives_pattern(self):
-        """Resolves war_vs_adjectives pattern."""
-        name_block = {
-            "key": "war_vs_adjectives",
-            "variables": [
-                {"key": "1", "value": "Ubaric"},
-                {"key": "2", "value": "Ziiran"},
-                {"key": "3", "value": "War"},
-            ],
-        }
-        result = _resolve_war_name_from_block(name_block)
-        assert result == "Ubaric-Ziiran War"
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

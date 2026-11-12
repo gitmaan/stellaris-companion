@@ -729,7 +729,9 @@ def ingest(db, date, *, techs, colonies, wars=()):
     value["meta"].update(campaign_id="timeline-campaign", player_id=0)
     value["technology"] = {"tech_count": techs}
     value["territory"] = {"colonies": {"total_count": colonies}}
-    value["history"] = {"wars": {"count": len(wars), "wars": list(wars)}}
+    value["history"] = {
+        "wars": {"count": len(wars), "wars": list(wars), "by_id": {name: name for name in wars}}
+    }
     inserted, snapshot_id, session = record_snapshot_from_briefing(
         db=db, save_path=None, save_hash=f"timeline-{date}", briefing=value
     )

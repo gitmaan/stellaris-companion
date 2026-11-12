@@ -34,6 +34,7 @@ ENGLISH = """l_english:
  building_foundry_2:1 "Alloy Mega-Forges" # trailing comment
  foundry_2:0 "Something Else Entirely"
  sm_crew_quarters:0 "Crew Quarters"
+ starbase_citadel:0 "Citadel"
  pc_arid:0 "Arid World"
  arid:0 "Dry"
  ethic_xenophile:0 "Xenophile"
@@ -268,6 +269,7 @@ def test_empire_identity_uses_the_players_language_and_keeps_english_for_knowled
         # whatever else is called foundry_2.
         ("territory", "buildings", "foundry_2", "Alloy Mega-Forges"),
         ("defense", "buildings", "crew_quarters", "Crew Quarters"),
+        ("defense", "level", "citadel", "Citadel"),
         ("territory", "type", "arid", "Arid World"),
         ("diplomacy", "ethics", "xenophile", "Xenophile"),
         ("situation", "war_goal", "wg_independence", "Independence"),

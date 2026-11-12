@@ -23,7 +23,7 @@ from backend.core.snapshot_reader import (
     get_edicts,
     get_empire_names,
     get_fallen_empires,
-    get_fallen_empires_by_name,
+    get_fallen_empires_by_id,
     get_finished_traditions,
     get_galactic_community,
     get_galaxy,
@@ -42,7 +42,7 @@ from backend.core.snapshot_reader import (
     get_tech_list,
     get_treaty_reading,
     get_war_battle_locations,
-    get_war_names,
+    get_wars_by_id,
 )
 from stellaris_companion.technology_names import technology_label
 
@@ -522,11 +522,14 @@ def compute_events(
                 )
             )
 
-    # War events - using snapshot_reader
-    prev_wars = get_war_names(prev)
-    curr_wars = get_war_names(curr)
-    started = sorted(curr_wars - prev_wars)
-    ended = sorted(prev_wars - curr_wars)
+    # War events. Wars are matched by ID; a snapshot from before IDs were recorded
+    # only has names, and a war named differently is not a war that ended.
+    prev_wars = get_wars_by_id(prev)
+    curr_wars = get_wars_by_id(curr)
+    if prev_wars is None or curr_wars is None:
+        prev_wars = curr_wars = {}
+    started = sorted(curr_wars[war_id] for war_id in set(curr_wars) - set(prev_wars))
+    ended = sorted(prev_wars[war_id] for war_id in set(prev_wars) - set(curr_wars))
     for name in started[:5]:
         events.append(
             DetectedEvent(
@@ -560,20 +563,21 @@ def compute_events(
     # Border neighbor changes - using snapshot_reader
     prev_border = get_border_neighbors(prev)
     curr_border = get_border_neighbors(curr)
-    prev_neighbor_names = {
-        n.get("empire_name") for n in prev_border if isinstance(n, dict) and n.get("empire_name")
-    }
-    curr_neighbor_names = {
-        n.get("empire_name") for n in curr_border if isinstance(n, dict) and n.get("empire_name")
-    }
-    # Build lookup for current neighbor directions
-    curr_neighbor_dir = {
-        n.get("empire_name"): n.get("direction", "")
-        for n in curr_border
-        if isinstance(n, dict) and n.get("empire_name")
-    }
-    for name in sorted(curr_neighbor_names - prev_neighbor_names)[:3]:
-        direction = curr_neighbor_dir.get(name, "")
+
+    # A neighbor is the same empire while its ID is the same, whatever it is called.
+    def neighbors_by_id(border: list[dict]) -> dict[str, dict]:
+        return {
+            str(n["empire_id"] if n.get("empire_id") is not None else n["empire_name"]): n
+            for n in border
+            if isinstance(n, dict) and n.get("empire_name")
+        }
+
+    prev_neighbors = neighbors_by_id(prev_border)
+    curr_neighbors = neighbors_by_id(curr_border)
+    new_neighbors = [curr_neighbors[key] for key in set(curr_neighbors) - set(prev_neighbors)]
+    for neighbor in sorted(new_neighbors, key=lambda n: n["empire_name"])[:3]:
+        name = neighbor["empire_name"]
+        direction = neighbor.get("direction", "")
         dir_text = f" to the {direction}" if direction else ""
         events.append(
             DetectedEvent(
@@ -1234,13 +1238,14 @@ def compute_events(
         )
 
     # Fallen Empire awakening detection
-    prev_fe = get_fallen_empires_by_name(prev)
-    curr_fe = get_fallen_empires_by_name(curr)
+    prev_fe = get_fallen_empires_by_id(prev)
+    curr_fe = get_fallen_empires_by_id(curr)
 
-    for name, empire in curr_fe.items():
+    for empire_key, empire in curr_fe.items():
         if empire.get("status") == "awakened":
-            prev_empire = prev_fe.get(name, {})
+            prev_empire = prev_fe.get(empire_key, {})
             if prev_empire.get("status") == "dormant":
+                name = empire.get("name") or "Unknown"
                 archetype = empire.get("archetype", "Unknown")
                 military_power = empire.get("military_power")
                 power_text = f" ({military_power:,.0f} power)" if military_power else ""
@@ -1265,7 +1270,7 @@ def compute_events(
     prev_war_in_heaven = prev_fe_data.get("war_in_heaven", False)
     curr_war_in_heaven = curr_fe_data.get("war_in_heaven", False)
     if not prev_war_in_heaven and curr_war_in_heaven:
-        awakened_names = [name for name, e in curr_fe.items() if e.get("status") == "awakened"]
+        awakened_names = [e.get("name") for e in curr_fe.values() if e.get("status") == "awakened"]
         events.append(
             DetectedEvent(
                 event_type="war_in_heaven_started",
