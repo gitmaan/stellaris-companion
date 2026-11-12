@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import re
 
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
@@ -102,56 +101,6 @@ def _format_resolution_name(type_key: str) -> str:
 
 class DiplomacyMixin:
     """Domain methods extracted from the original SaveExtractor."""
-
-    def _extract_braced_block(self, content: str, key: str) -> str | None:
-        """Extract the full `key={...}` block from a larger text chunk."""
-        match = re.search(rf"\b{re.escape(key)}\s*=\s*\{{", content)
-        if not match:
-            return None
-
-        start = match.start()
-        brace_count = 0
-        started = False
-
-        for i, char in enumerate(content[start:], start):
-            if char == "{":
-                brace_count += 1
-                started = True
-            elif char == "}":
-                brace_count -= 1
-                if started and brace_count == 0:
-                    return content[start : i + 1]
-
-        return None
-
-    def _extract_entry_block(self, content: str, entry_id: int) -> str | None:
-        """Extract a `\\t<id>={...}` entry block from a top-level section."""
-        patterns = [
-            rf"\n\t{entry_id}=\n\t\{{",
-            rf"\n\t{entry_id}\s*=\s*\{{",
-        ]
-        start_match = None
-        for pattern in patterns:
-            start_match = re.search(pattern, content)
-            if start_match:
-                break
-        if not start_match:
-            return None
-
-        start = start_match.start()
-        brace_count = 0
-        started = False
-
-        for i, char in enumerate(content[start:], start):
-            if char == "{":
-                brace_count += 1
-                started = True
-            elif char == "}":
-                brace_count -= 1
-                if started and brace_count == 0:
-                    return content[start : i + 1]
-
-        return None
 
     def get_diplomacy(self) -> dict:
         """Get the player's diplomatic relations.
