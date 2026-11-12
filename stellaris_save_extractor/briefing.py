@@ -197,7 +197,7 @@ class BriefingMixin:
         strategic_geography = self.get_strategic_geography()
         fleet_composition = self.get_fleet_composition(limit=50)
         pop_statistics = self.get_pop_statistics()
-        archaeology = self.get_archaeology(limit=50)
+        archaeology = self.get_archaeology(limit=None)
 
         # Merge ship_classes from fleet_composition into fleet entries
         comp_by_id = {f["fleet_id"]: f["ship_classes"] for f in fleet_composition.get("fleets", [])}
