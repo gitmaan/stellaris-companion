@@ -23,7 +23,7 @@ from backend.core.snapshot_reader import (
     get_edicts,
     get_empire_names,
     get_fallen_empires,
-    get_fallen_empires_by_name,
+    get_fallen_empires_by_id,
     get_finished_traditions,
     get_galactic_community,
     get_galaxy,
@@ -42,7 +42,7 @@ from backend.core.snapshot_reader import (
     get_tech_list,
     get_treaty_reading,
     get_war_battle_locations,
-    get_war_names,
+    get_wars_by_id,
 )
 from stellaris_companion.technology_names import technology_label
 
@@ -88,20 +88,19 @@ def _reserves_stage(briefing: dict[str, Any]) -> str | None:
     return stage if isinstance(stage, str) and stage else None
 
 
-def _normalize_federation(briefing: dict[str, Any]) -> str | None:
-    dip = briefing.get("diplomacy", {}) if isinstance(briefing, dict) else {}
-    fed = dip.get("federation")
-    if not fed:
-        return None
-    if isinstance(fed, str):
-        return fed.strip() or "Federation"
-    if isinstance(fed, dict):
-        for key in ("name", "federation_name", "federation", "id"):
-            val = fed.get(key)
-            if isinstance(val, str) and val.strip():
-                return val.strip()
-        return "Federation"
-    return "Federation"
+def _federation(briefing: dict[str, Any]) -> tuple[int | None, str | None]:
+    """The player's federation as (ID, name); (None, None) when they are in none.
+
+    The first federation formed in a galaxy has ID 0. The name is missing from
+    snapshots taken before it was recorded.
+    """
+    diplomacy = briefing.get("diplomacy") if isinstance(briefing, dict) else None
+    federation_id = safe_int(diplomacy.get("federation")) if isinstance(diplomacy, dict) else None
+    if federation_id is None:
+        return None, None
+    details = briefing.get("federation_details")
+    name = details.get("name") if isinstance(details, dict) else None
+    return federation_id, name.strip() if isinstance(name, str) and name.strip() else None
 
 
 def _get_leader_name(leader: dict[str, Any]) -> str:
@@ -479,54 +478,45 @@ def compute_events(
             )
 
     # Federation changes
-    prev_fed = _normalize_federation(prev)
-    curr_fed = _normalize_federation(curr)
-    if prev_fed != curr_fed:
-        if prev_fed is None and curr_fed is not None:
-            events.append(
-                DetectedEvent(
-                    event_type="federation_joined",
-                    summary=f"Joined a federation: {curr_fed}",
-                    data={
-                        "before": None,
-                        "after": curr_fed,
-                        "from_snapshot_id": from_snapshot_id,
-                        "to_snapshot_id": to_snapshot_id,
-                    },
-                )
+    prev_fed_id, prev_fed = _federation(prev)
+    curr_fed_id, curr_fed = _federation(curr)
+    if prev_fed_id != curr_fed_id:
+        if prev_fed_id is None:
+            event_type = "federation_joined"
+            summary = f"Joined a federation: {curr_fed}" if curr_fed else "Joined a federation"
+        elif curr_fed_id is None:
+            event_type = "federation_left"
+            summary = f"Left federation: {prev_fed}" if prev_fed else "Left a federation"
+        else:
+            event_type = "federation_changed"
+            summary = (
+                f"Federation changed: {prev_fed} → {curr_fed}"
+                if prev_fed and curr_fed
+                else "Moved to another federation"
             )
-        elif prev_fed is not None and curr_fed is None:
-            events.append(
-                DetectedEvent(
-                    event_type="federation_left",
-                    summary=f"Left federation: {prev_fed}",
-                    data={
-                        "before": prev_fed,
-                        "after": None,
-                        "from_snapshot_id": from_snapshot_id,
-                        "to_snapshot_id": to_snapshot_id,
-                    },
-                )
+        events.append(
+            DetectedEvent(
+                event_type=event_type,
+                summary=summary,
+                data={
+                    "before": prev_fed,
+                    "after": curr_fed,
+                    "before_id": prev_fed_id,
+                    "after_id": curr_fed_id,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
-        elif prev_fed and curr_fed:
-            events.append(
-                DetectedEvent(
-                    event_type="federation_changed",
-                    summary=f"Federation changed: {prev_fed} → {curr_fed}",
-                    data={
-                        "before": prev_fed,
-                        "after": curr_fed,
-                        "from_snapshot_id": from_snapshot_id,
-                        "to_snapshot_id": to_snapshot_id,
-                    },
-                )
-            )
+        )
 
-    # War events - using snapshot_reader
-    prev_wars = get_war_names(prev)
-    curr_wars = get_war_names(curr)
-    started = sorted(curr_wars - prev_wars)
-    ended = sorted(prev_wars - curr_wars)
+    # War events. Wars are matched by ID; a snapshot from before IDs were recorded
+    # only has names, and a war named differently is not a war that ended.
+    prev_wars = get_wars_by_id(prev)
+    curr_wars = get_wars_by_id(curr)
+    if prev_wars is None or curr_wars is None:
+        prev_wars = curr_wars = {}
+    started = sorted(curr_wars[war_id] for war_id in set(curr_wars) - set(prev_wars))
+    ended = sorted(prev_wars[war_id] for war_id in set(prev_wars) - set(curr_wars))
     for name in started[:5]:
         events.append(
             DetectedEvent(
@@ -560,20 +550,21 @@ def compute_events(
     # Border neighbor changes - using snapshot_reader
     prev_border = get_border_neighbors(prev)
     curr_border = get_border_neighbors(curr)
-    prev_neighbor_names = {
-        n.get("empire_name") for n in prev_border if isinstance(n, dict) and n.get("empire_name")
-    }
-    curr_neighbor_names = {
-        n.get("empire_name") for n in curr_border if isinstance(n, dict) and n.get("empire_name")
-    }
-    # Build lookup for current neighbor directions
-    curr_neighbor_dir = {
-        n.get("empire_name"): n.get("direction", "")
-        for n in curr_border
-        if isinstance(n, dict) and n.get("empire_name")
-    }
-    for name in sorted(curr_neighbor_names - prev_neighbor_names)[:3]:
-        direction = curr_neighbor_dir.get(name, "")
+
+    # A neighbor is the same empire while its ID is the same, whatever it is called.
+    def neighbors_by_id(border: list[dict]) -> dict[str, dict]:
+        return {
+            str(n["empire_id"] if n.get("empire_id") is not None else n["empire_name"]): n
+            for n in border
+            if isinstance(n, dict) and n.get("empire_name")
+        }
+
+    prev_neighbors = neighbors_by_id(prev_border)
+    curr_neighbors = neighbors_by_id(curr_border)
+    new_neighbors = [curr_neighbors[key] for key in set(curr_neighbors) - set(prev_neighbors)]
+    for neighbor in sorted(new_neighbors, key=lambda n: n["empire_name"])[:3]:
+        name = neighbor["empire_name"]
+        direction = neighbor.get("direction", "")
         dir_text = f" to the {direction}" if direction else ""
         events.append(
             DetectedEvent(
@@ -1234,13 +1225,14 @@ def compute_events(
         )
 
     # Fallen Empire awakening detection
-    prev_fe = get_fallen_empires_by_name(prev)
-    curr_fe = get_fallen_empires_by_name(curr)
+    prev_fe = get_fallen_empires_by_id(prev)
+    curr_fe = get_fallen_empires_by_id(curr)
 
-    for name, empire in curr_fe.items():
+    for empire_key, empire in curr_fe.items():
         if empire.get("status") == "awakened":
-            prev_empire = prev_fe.get(name, {})
+            prev_empire = prev_fe.get(empire_key, {})
             if prev_empire.get("status") == "dormant":
+                name = empire.get("name") or "Unknown"
                 archetype = empire.get("archetype", "Unknown")
                 military_power = empire.get("military_power")
                 power_text = f" ({military_power:,.0f} power)" if military_power else ""
@@ -1265,7 +1257,7 @@ def compute_events(
     prev_war_in_heaven = prev_fe_data.get("war_in_heaven", False)
     curr_war_in_heaven = curr_fe_data.get("war_in_heaven", False)
     if not prev_war_in_heaven and curr_war_in_heaven:
-        awakened_names = [name for name, e in curr_fe.items() if e.get("status") == "awakened"]
+        awakened_names = [e.get("name") for e in curr_fe.values() if e.get("status") == "awakened"]
         events.append(
             DetectedEvent(
                 event_type="war_in_heaven_started",

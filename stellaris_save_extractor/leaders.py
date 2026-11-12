@@ -7,6 +7,7 @@ from stellaris_companion.rust_bridge import (
     ParserError,
     _get_active_session,
 )
+from stellaris_companion.stored_names import stored_name
 from stellaris_save_extractor.save_values import repeated
 
 logger = logging.getLogger(__name__)
@@ -182,6 +183,11 @@ class LeadersMixin:
         full_names = name_block.get("full_names")
         if not isinstance(full_names, dict):
             return None
+
+        # The name as the installed game shows it; below are guesses from the key.
+        shown = stored_name(full_names)
+        if shown:
+            return shown
 
         key = full_names.get("key", "")
 

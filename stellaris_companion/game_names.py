@@ -30,7 +30,9 @@ RECHECK_SECONDS = 60.0
 
 _HEADER = re.compile(r"^l_(\w+):[ \t]*(?:#.*)?$", re.M)
 _ENTRY = re.compile(r'^[ \t]*([^\s:#"]+):\d*[ \t]*"(.*?)"[ \t]*(?:#.*)?$', re.M)
-_REFERENCE = re.compile(r"\$([^$|\s]+)(?:\|[^$]*)?\$")
+# "$key$", also written with a format or a grammatical case: "$key|g$", "$2&gen$".
+_REFERENCE = re.compile(r"\$([^$|&\s]+)(?:[|&][^$]*)?\$")
+_GRAMMAR_TAG = re.compile(r"&!\s*[\w,]+")
 _COLOUR = re.compile(r"§.")
 _ICON = re.compile(r"£[^£\s]+£")
 
@@ -68,6 +70,15 @@ def read_localisation(content_dir: Path, language: str) -> dict[str, str]:
     return entries
 
 
+def default_form(text: str) -> str:
+    """The form of a text used when it stands on its own.
+
+    Languages with gender or case give a text several forms ("Земля|||gen:Земли")
+    and tag words for agreement ("Iniciativa&!fem"). The first form is the plain one.
+    """
+    return _GRAMMAR_TAG.sub("", text.split("|||", 1)[0])
+
+
 class GameNames:
     """Display names by game text key, with references and formatting resolved."""
 
@@ -89,6 +100,8 @@ class GameNames:
         for content_dir in install.content_dirs:
             entries.update(read_localisation(content_dir, install.language))
         # Names and what they refer to are short; dropping long text keeps memory small.
+        # A name with a form per grammatical case is long as written and short as shown.
+        entries = {key: default_form(text) for key, text in entries.items()}
         entries = {key: text for key, text in entries.items() if len(text) <= 2 * MAX_NAME_LENGTH}
         return cls(entries, language=install.language, version=install.version)
 
@@ -122,7 +135,7 @@ class GameNames:
             unresolved = unresolved or value is None
             return value or ""
 
-        text = _REFERENCE.sub(substitute, text)
+        text = _REFERENCE.sub(substitute, default_form(text))
         text = _COLOUR.sub("", _ICON.sub("", text))
         text = " ".join(text.replace('\\"', '"').replace("\\n", " ").split())
         # "[Root.GetName]" is filled in by the running game; it is not a fixed name.

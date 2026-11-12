@@ -81,6 +81,20 @@ def get_war_names(briefing: dict[str, Any]) -> set[str]:
     return {str(n).strip() for n in names if str(n).strip()}
 
 
+def get_wars_by_id(briefing: dict[str, Any]) -> dict[str, str] | None:
+    """The player's wars as ``{war ID: name}``.
+
+    None for a snapshot that named its wars without recording their IDs: its wars
+    cannot be matched to another snapshot's, because the same war can be named
+    differently by a later reading of the save.
+    """
+    wars = get_wars(briefing)
+    by_id = wars.get("by_id")
+    if isinstance(by_id, dict):
+        return {str(war_id): str(name) for war_id, name in by_id.items()}
+    return None if get_war_names(briefing) else {}
+
+
 def get_war_battle_locations(briefing: dict[str, Any]) -> dict[str, list[str]]:
     """Get battle location system names per war.
 
@@ -571,11 +585,12 @@ def get_fallen_empires(briefing: dict[str, Any]) -> dict[str, Any]:
     return get_signal(briefing, "fallen_empires", {"fallen_empires": [], "war_in_heaven": False})
 
 
-def get_fallen_empires_by_name(briefing: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Get fallen empires keyed by name for comparison.
+def get_fallen_empires_by_id(briefing: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Get fallen empires keyed by country ID for comparison.
 
-    Returns:
-        Dict mapping empire name to empire data
+    An empire is matched across snapshots by its ID, not its name: the name can
+    be read differently by a later version, and the game renames an empire when
+    it awakens. A snapshot that recorded no ID falls back to the name.
     """
     fe_data = get_fallen_empires(briefing)
     empire_list = fe_data.get("fallen_empires") or []
@@ -585,10 +600,10 @@ def get_fallen_empires_by_name(briefing: dict[str, Any]) -> dict[str, dict[str, 
     for e in empire_list:
         if not isinstance(e, dict):
             continue
-        name = e.get("name")
-        if not name:
+        key = e.get("country_id") if e.get("country_id") is not None else e.get("name")
+        if key is None or key == "":
             continue
-        result[str(name)] = e
+        result[str(key)] = e
     return result
 
 

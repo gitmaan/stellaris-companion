@@ -2207,9 +2207,9 @@ Do NOT give advice. Write as a historian, not an advisor.
             lines.extend(special_lines)
 
         # Federation
-        federation = diplomacy.get("federation")
-        if federation and isinstance(federation, dict):
-            fed_name = federation.get("name", "Unknown Federation")
+        federation_details = briefing.get("federation_details")
+        fed_name = federation_details.get("name") if isinstance(federation_details, dict) else None
+        if fed_name:
             if lines:
                 lines.append("")
             lines.append(f"Federation: {fed_name}")

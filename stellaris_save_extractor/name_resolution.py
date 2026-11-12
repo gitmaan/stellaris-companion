@@ -4,7 +4,9 @@ import re
 from dataclasses import dataclass
 from typing import Any, Literal
 
-NameSource = Literal["missing", "literal", "template", "localization_key", "fallback"]
+from stellaris_companion.stored_names import stored_name
+
+NameSource = Literal["missing", "literal", "game_text", "template", "localization_key", "fallback"]
 NameContext = Literal["generic", "planet", "country", "species", "fleet"]
 
 
@@ -14,7 +16,9 @@ class ResolvedName:
 
     - display: Human-readable string suitable for UI/LLM.
     - raw_key: Original localization key (if applicable).
-    - source: Where the display name came from.
+    - source: Where the display name came from. "game_text" is the name built from
+      the installed game's text, as the game shows it; the others are readable
+      guesses made from the key when there is no install or no text for it.
     - confidence: Heuristic confidence in [0.0, 1.0].
     """
 
@@ -55,6 +59,10 @@ def resolve_name(
         return ResolvedName(display=default, raw_key=None, source="missing", confidence=0.0)
 
     if isinstance(value, dict):
+        shown = stored_name(value)
+        if shown:
+            key = value.get("key")
+            return _from_game_text(shown, key if isinstance(key, str) else None)
         return _resolve_name_block(value, default=default, context=context)
 
     if isinstance(value, str):
@@ -82,11 +90,19 @@ def resolve_name(
         )
 
         if is_likely_key:
+            # A bare word may be a name the player typed; only a key is looked up.
+            shown = stored_name(raw)
+            if shown:
+                return _from_game_text(shown, raw)
             return _resolve_localization_key(raw)
 
         return ResolvedName(display=raw, raw_key=None, source="literal", confidence=1.0)
 
     return ResolvedName(display=str(value), raw_key=None, source="fallback", confidence=0.2)
+
+
+def _from_game_text(display: str, raw_key: str | None) -> ResolvedName:
+    return ResolvedName(display=display, raw_key=raw_key, source="game_text", confidence=1.0)
 
 
 def _resolve_name_block(
