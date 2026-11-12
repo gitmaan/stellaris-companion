@@ -7,7 +7,7 @@ import re
 from copy import deepcopy
 from typing import Any
 
-from backend.core.briefing_names import briefing_value_name
+from backend.core.briefing_names import briefing_key_names, briefing_value_name
 from backend.core.json_utils import json_dumps
 from stellaris_companion.campaign_evidence import (
     resolve_content_availability,
@@ -158,9 +158,10 @@ def _name_values(briefing: dict[str, Any]) -> int:
     """Replace save IDs with the installed game's names, in place; return how many.
 
     The save records a building as ``building_factory_3`` and the player sees
-    "Civilian Repli-Complexes". Only values are renamed, never keys, and only when
-    the installed game has a name for that kind of value; without an install
-    nothing changes.
+    "Civilian Repli-Complexes". Values are renamed, and the keys of the few dicts
+    that are keyed by save IDs (a tradition tree, a ship class), and only when the
+    installed game has a name for that kind of thing; without an install nothing
+    changes.
     """
     renamed = 0
 
@@ -177,6 +178,12 @@ def _name_values(briefing: dict[str, Any]) -> int:
             for key, item in value.items():
                 if key not in _FIELDS_KEPT_AS_IDS:
                     value[key] = name(item, section, str(key))
+            key_names = briefing_key_names(value, section, field)
+            if key_names:
+                renamed += len(key_names)
+                items = [(key_names.get(key, key), item) for key, item in value.items()]
+                value.clear()
+                value.update(items)
         return value
 
     for section, value in briefing.items():

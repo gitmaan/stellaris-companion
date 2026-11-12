@@ -54,6 +54,10 @@ lists those fields, so a value is looked up as the kind of thing it is. One bare
 outside those fields is never looked up. Text the running game fills in
 (`[Root.GetName]`) is not a fixed name and gives none.
 
+Dict keys are the app's own field names and are left alone, except in the few dicts
+that are keyed by save IDs (tradition trees, starbase levels, ship classes, federation
+laws). `KEY_NAME_PREFIXES` lists those, and their keys are shown by name too.
+
 The model briefing (in-app Advisor, Chronicle, and external AI clients through MCP)
 has each such value replaced by its name, and `model_context.names` tells the model
 the names are the player's own and that a value still written as an ID has none.
