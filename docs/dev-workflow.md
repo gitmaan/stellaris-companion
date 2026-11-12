@@ -76,6 +76,23 @@ python3 -m compileall -q backend stellaris_companion stellaris_save_extractor
 pytest -q
 ```
 
+Your own saves, through the real pipeline (no model calls):
+
+```bash
+python3 scripts/check_local_saves.py
+```
+
+What the Advisor then says about them. This asks the configured model questions whose
+answers are lists in the briefing (a planet's buildings, the tradition trees taken) and
+counts the names given exactly. Each question is a real model call, so start with
+`--dry-run`, which lists the questions and the number of calls. Answers vary between
+runs; compare totals, not single answers.
+
+```bash
+python3 scripts/check_advisor_answers.py --dry-run
+python3 scripts/check_advisor_answers.py --out artifacts/advisor-check
+```
+
 Renderer:
 
 ```bash
