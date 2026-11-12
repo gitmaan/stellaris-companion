@@ -1,4 +1,4 @@
-"""Content-availability and identity misreadings reported by players (#81)."""
+"""Content-availability and identity misreadings reported by players (#81, #125)."""
 
 from __future__ import annotations
 
@@ -70,3 +70,51 @@ def test_issue_81_observed_rogue_servitor_is_not_denied_for_unreported_dlc(monke
         assert "MISSING" not in prompt
     assert "Rogue Servitor" in system_prompt
     assert "must not be denied because a generic DLC assumption contradicts it" in system_prompt
+
+
+def test_issue_125_the_empires_origin_is_read_with_its_ethics(monkeypatch, tmp_path):
+    """https://github.com/gitmaan/stellaris-companion/issues/125
+
+    A Void Dwellers empire with two ethics. The save keeps the origin beside the
+    authority and civics, but it was never read, so the Advisor did not know the
+    origin and the info panel had no Origin line.
+    """
+    sections = {
+        "player": [{"name": "Reporter", "country": "0"}],
+        "country": {
+            "0": country(
+                "Habitat Concord",
+                government={
+                    "type": "gov_representative_democracy",
+                    "authority": "auth_democratic",
+                    "civics": ["civic_technocracy", "civic_mining_guilds"],
+                    "origin": "origin_void_dwellers",
+                },
+                ethos={"ethic": ["ethic_pacifist", "ethic_fanatic_materialist"]},
+            )
+        },
+    }
+    payload = ingest_synthetic_save(
+        monkeypatch,
+        tmp_path,
+        sections,
+        meta=synthetic_meta(name="Habitat Concord", date="2218.01.01", version="Cygnus v4.5.3"),
+    )
+
+    # The info panel and the report dialog show these fields as they are.
+    assert payload["identity"]["origin"] == "void_dwellers"
+    assert payload["identity"]["ethics"] == ["pacifist", "fanatic_materialist"]
+
+    companion, _, model_briefing = advisor_request(
+        monkeypatch, payload, "What should a Void Dwellers empire build first?"
+    )
+
+    assert companion.identity["origin"] == "void_dwellers"
+    identity = model_briefing["model_context"]["empire_identity"]
+    assert identity["origin"] == {
+        "id": "void_dwellers",
+        "name": "Void Dwellers",
+        "kind": "origin",
+        "source": "verified_catalog",
+    }
+    assert [ethic["name"] for ethic in identity["ethics"]] == ["Pacifist", "Fanatic Materialist"]

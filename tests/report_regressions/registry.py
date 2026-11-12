@@ -38,6 +38,27 @@ class Report:
 
 
 REPORTS: dict[int, Report] = {
+    125: Report(
+        summary="The Advisor's info panel shows no Origin for the empire.",
+        root_cause=(
+            "The save keeps the empire's origin in the country's government block, beside "
+            "the authority and civics, and the identity extractor never read it. The "
+            "Advisor's empire identity, the info panel and the report dialog all had a "
+            "place for the origin and received nothing. The report also said ethics were "
+            "never read; that did not reproduce: all 22 local Cygnus 4.5.3 saves write "
+            "ethos.ethic and their ethics are read."
+        ),
+        fixed_by=("PR #127",),
+        layer="identity extractor",
+        cases=(
+            Case(
+                f"{_HERE}/test_report_campaign_evidence.py"
+                "::test_issue_125_the_empires_origin_is_read_with_its_ethics",
+                "new",
+                True,
+            ),
+        ),
+    ),
     104: Report(
         summary="A research option is shown under an ID that looks like another technology.",
         root_cause=(

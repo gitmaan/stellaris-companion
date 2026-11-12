@@ -508,14 +508,14 @@ class PlayerMixin:
     def get_empire_identity(self) -> dict:
         """Extract static empire identity for personality generation.
 
-        This extracts ethics, government, civics, and species info from the
+        This extracts ethics, government, civics, origin and species info from the
         player's country block. This data comes from empire creation and
         only changes via government reform or ethics shift events.
 
         Requires Rust session mode to be active.
 
         Returns:
-            Dictionary with ethics, government, civics, species, and gestalt flags
+            Dictionary with ethics, government, civics, origin, species, and gestalt flags
 
         Raises:
             ParserError: If no Rust session is active
@@ -525,6 +525,7 @@ class PlayerMixin:
             "government": None,
             "civics": [],
             "authority": None,
+            "origin": None,
             "species_class": None,
             "species_name": None,
             "is_gestalt": False,
@@ -561,6 +562,10 @@ class PlayerMixin:
             civics = gov.get("civics", [])
             if isinstance(civics, list):
                 result["civics"] = [c.replace("civic_", "") for c in civics if isinstance(c, str)]
+
+            origin = gov.get("origin")
+            if isinstance(origin, str) and origin:
+                result["origin"] = origin.removeprefix("origin_")
 
         # Check for gestalt
         if "gestalt_consciousness" in result["ethics"]:
