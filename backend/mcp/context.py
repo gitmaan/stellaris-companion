@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.advisor_memory import sanitize_advisor_memory
-from backend.core.briefing_names import ID_PATTERN, briefing_value_name
+from backend.core.briefing_names import ID_PATTERN, briefing_key_names, briefing_value_name
 from backend.core.chronicle_store import (
     ChronicleConflict,
     cached_chronicle_response,
@@ -1831,11 +1831,12 @@ def _compact_value(
         return items
     if isinstance(value, dict):
         result: dict[str, Any] = {}
+        key_names = briefing_key_names((str(key) for key in value), section, field)
         for key, item in value.items():
             key_text = str(key)
             if key_text.startswith("_") and key_text not in {"_note"}:
                 continue
-            result[key_text] = _compact_value(
+            result[key_names.get(key_text, key_text)] = _compact_value(
                 item,
                 max_depth=max_depth - 1,
                 max_list_items=max_list_items,
