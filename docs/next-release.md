@@ -1,11 +1,15 @@
 # Beta 1.1.2-beta.5 candidate
 
-This beta reads names from the player's installed game (#115, #118), keeps every value
-of a repeated save key and reads saves as UTF-8 (#110, #117), reads crises, the Khan and
-the War in Heaven from the game's own names (#111), reads treaties from the keys the
-game writes (#112), reads guardians and space fauna from their country types (#114),
-stops presenting Festival upkeep as the Nomad reserves' monthly change (#113, for #79),
-and finds saves, settings and the game from one list of places (#116). Stable remains
+This beta reads names from the player's installed game (#115, #118), builds the names
+the save stores as keys (planets, leaders, empires, fleets, factions, federations and
+wars) the way the game does (#121), keeps every value of a repeated save key and reads
+saves as UTF-8 (#110, #117), reads crises, the Khan and the War in Heaven from the
+game's own names (#111), reads treaties from the keys the game writes (#112), reads
+guardians and space fauna from their country types (#114), stops presenting Festival
+upkeep as the Nomad reserves' monthly change (#113, for #79), finds saves, settings and
+the game from one list of places (#116), and keeps the player's dig sites, an empire
+name with "flag" in it and later tiers of leader traits (#122). A repeatable check of
+what the Advisor says about real saves was added for development (#120). Stable remains
 1.1.1.
 
 ## Release validation
@@ -22,6 +26,13 @@ and finds saves, settings and the game from one list of places (#116). Stable re
 - No database schema change since beta.4. A snapshot's signals now record a treaty
   reading version, so a corrected treaty reading is not shown as treaties signed or
   ended on the day of the update.
+- History now matches wars, neighbours, fallen empires and the player's federation by
+  ID (#121). A snapshot from before war IDs were recorded is not compared for wars, so
+  the first snapshot pair after the update records no war starting or ending. Events and
+  Chronicle text already written keep the names they were written with.
+- Run `scripts/check_advisor_answers.py` (or `scripts/advisor_check_chatgpt.cjs`) on the
+  candidate and read the answers. Before #121, 18 of 40 answers held a key or
+  placeholder where a name belongs; after, 2 of 40.
 - Verify macOS signing/notarization, package versions, update manifests and hashes.
 - Merge only after the candidate checks pass, then tag the verified main commit.
 - Verify final beta assets and feeds, while stable release/feed remains 1.1.1.
@@ -33,7 +44,15 @@ tests, not a real one, and mods packed as a `.zip` are not read. Finding the gam
 saves on Windows and Linux (Proton libraries on other drives, a Documents folder moved
 into OneDrive) is tested with folders built by the tests, not on real installs. The
 loss of a leader's last trait under a long non-ASCII name (#117) is shown by a test
-save only. #83 and #86 still await reporter confirmation.
+save only. Names the save stores as keys (#121) are built from the game's text files
+and the rules in them and were not compared with the game's screen; the one outside
+check is that all eight built empire names match the save folders the game named. In
+languages with gender or case each word is in its plain form, so an adjective can have
+the wrong ending. The live Advisor check is 40 questions, one run each, on one model.
+The dig-site and "flag" fixes (#122) are shown by tests, since no local save has more
+than ten sites; the later-tier trait names follow the pattern of the 65 the game writes
+out. Crisis level and a monthly trend for Nomad reserves are still not read: no save
+with either was available. #83 and #86 still await reporter confirmation.
 
 ## Earlier release records
 
