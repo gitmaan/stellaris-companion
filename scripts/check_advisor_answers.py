@@ -295,17 +295,29 @@ def _stored_briefing(save_path: Path) -> dict[str, Any]:
         return SaveExtractor(str(save_path)).get_complete_briefing()
 
 
-def _advisor(briefing: dict[str, Any], api_key: str, model: str | None) -> Callable[[str], str]:
-    """The app's own ask path for one campaign, as a function from question to answer."""
-    from backend.core.companion import DEFAULT_ADVISOR_MODEL, Companion
-    from backend.core.json_utils import json_dumps
+def _companion(provider: str | None, model: str | None):
+    """The app's Advisor for a provider, or None when that provider is not set up here.
+
+    Gemini reads ``GOOGLE_API_KEY`` (environment or ``.env``). The others are
+    configured as the desktop app configures its backend, through the
+    ``STELLARIS_ADVISOR_*`` and ``STELLARIS_CHATGPT_BRIDGE_*`` environment variables.
+    """
+    from backend.core.companion import Companion
 
     companion = Companion(
         save_path=None,
-        api_key=api_key,
+        api_key=_api_key(),
         auto_precompute=False,
-        advisor_model=model or DEFAULT_ADVISOR_MODEL,
+        advisor_provider=provider,
+        advisor_model=model,
     )
+    return companion if companion.advisor_provider_config.is_configured else None
+
+
+def _advisor(companion: Any, briefing: dict[str, Any]) -> Callable[[str], str]:
+    """The app's own ask path for one campaign, as a function from question to answer."""
+    from backend.core.json_utils import json_dumps
+
     meta = briefing.get("meta") or {}
     companion.apply_precomputed_briefing(
         save_path=None,
@@ -333,7 +345,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--campaigns", type=int, help="Check only the first N campaigns")
     parser.add_argument("--runs", type=int, default=1, help="Ask each question this many times")
     parser.add_argument("--kinds", help="Only these question kinds, comma-separated")
-    parser.add_argument("--model", help="Advisor model (default: the app's default)")
+    parser.add_argument("--provider", help="Advisor provider (default: the app's default, Gemini)")
+    parser.add_argument("--model", help="Advisor model (default: the provider's default)")
     parser.add_argument(
         "--without-game-names",
         action="store_true",
@@ -379,16 +392,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         return 0
 
-    api_key = _api_key()
-    if not api_key:
-        print("GOOGLE_API_KEY is not set (environment or .env).", file=sys.stderr)
+    companion = _companion(args.provider, args.model)
+    if companion is None:
+        print(
+            "The Advisor provider is not set up: Gemini needs GOOGLE_API_KEY (environment or "
+            ".env); ChatGPT is run through scripts/advisor_check_chatgpt.cjs.",
+            file=sys.stderr,
+        )
         return 2
+    config = companion.advisor_provider_config
+    print(f"Asking {config.display_name} ({config.model}).")
 
     if args.without_game_names:
         game_names.use_names(None)
     results: list[Result] = []
     for campaign, stored, cases in plan:
-        ask = _advisor(stored, api_key, args.model)
+        # A fresh Advisor per campaign, so nothing carries over from the last one.
+        ask = _advisor(_companion(args.provider, args.model), stored)
         done = run_cases(campaign, cases, ask, runs=args.runs)
         results.extend(done)
         for result in done:
