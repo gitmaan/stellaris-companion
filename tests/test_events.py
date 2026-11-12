@@ -13,9 +13,9 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.events import (
+    _federation,
     _get_leader_name,
     _is_placeholder_recruitment_date,
-    _normalize_federation,
     _pct_change,
     _sign_changed,
     compute_events,
@@ -140,23 +140,29 @@ class TestSignChanged:
         assert _sign_changed(10, None) is False
 
 
-class TestNormalizeFederation:
-    """Tests for _normalize_federation helper function."""
+def _in_federation(snapshot: dict, federation_id: int | None, name: str | None = None) -> None:
+    """Put the player in a federation the way a briefing records it."""
+    snapshot["diplomacy"]["federation"] = federation_id
+    snapshot["federation_details"] = {"federation_id": federation_id, "name": name}
 
-    def test_returns_none_for_no_federation(self):
-        """Returns None when not in federation."""
-        briefing = {"diplomacy": {"federation": None}}
-        assert _normalize_federation(briefing) is None
 
-    def test_returns_string_federation_name(self):
-        """Returns federation name when it's a string."""
-        briefing = {"diplomacy": {"federation": "Galactic Union"}}
-        assert _normalize_federation(briefing) == "Galactic Union"
+class TestFederation:
+    """The player's federation is read as its ID and its name."""
 
-    def test_extracts_name_from_dict(self):
-        """Extracts name from federation dict."""
-        briefing = {"diplomacy": {"federation": {"name": "Star Alliance"}}}
-        assert _normalize_federation(briefing) == "Star Alliance"
+    def test_no_federation(self):
+        assert _federation({"diplomacy": {"federation": None}}) == (None, None)
+        assert _federation({}) == (None, None)
+
+    def test_the_first_federation_in_a_galaxy_has_id_zero(self):
+        briefing = {
+            "diplomacy": {"federation": 0},
+            "federation_details": {"federation_id": 0, "name": "Free Academy Coalition"},
+        }
+        assert _federation(briefing) == (0, "Free Academy Coalition")
+
+    def test_a_snapshot_from_before_names_were_recorded_has_no_name(self):
+        briefing = {"diplomacy": {"federation": 3}, "federation_details": {"federation_id": 3}}
+        assert _federation(briefing) == (3, None)
 
 
 class TestGetLeaderName:
@@ -251,8 +257,8 @@ class TestComputeEvents:
 
     def test_detects_federation_joined(self, base_prev_snapshot, base_curr_snapshot):
         """Detects joining a federation."""
-        base_prev_snapshot["diplomacy"]["federation"] = None
-        base_curr_snapshot["diplomacy"]["federation"] = "Galactic Union"
+        # The galaxy's first federation, whose ID is 0.
+        _in_federation(base_curr_snapshot, 0, "Free Academy Coalition")
 
         result = compute_events(
             prev=base_prev_snapshot,
@@ -260,13 +266,14 @@ class TestComputeEvents:
             from_snapshot_id=1,
             to_snapshot_id=2,
         )
-        event_types = [e.event_type for e in result]
-        assert "federation_joined" in event_types
+        joined = [e for e in result if e.event_type == "federation_joined"]
+        assert [e.summary for e in joined] == ["Joined a federation: Free Academy Coalition"]
+        assert joined[0].data["after"] == "Free Academy Coalition"
+        assert joined[0].data["after_id"] == 0
 
     def test_detects_federation_left(self, base_prev_snapshot, base_curr_snapshot):
         """Detects leaving a federation."""
-        base_prev_snapshot["diplomacy"]["federation"] = "Galactic Union"
-        base_curr_snapshot["diplomacy"]["federation"] = None
+        _in_federation(base_prev_snapshot, 0, "Free Academy Coalition")
 
         result = compute_events(
             prev=base_prev_snapshot,
@@ -274,8 +281,52 @@ class TestComputeEvents:
             from_snapshot_id=1,
             to_snapshot_id=2,
         )
-        event_types = [e.event_type for e in result]
-        assert "federation_left" in event_types
+        left = [e for e in result if e.event_type == "federation_left"]
+        assert [e.summary for e in left] == ["Left federation: Free Academy Coalition"]
+
+    def test_detects_moving_to_another_federation(self, base_prev_snapshot, base_curr_snapshot):
+        _in_federation(base_prev_snapshot, 0, "Free Academy Coalition")
+        _in_federation(base_curr_snapshot, 3, "Star Compact")
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        changed = [e for e in result if e.event_type == "federation_changed"]
+        assert [e.summary for e in changed] == [
+            "Federation changed: Free Academy Coalition → Star Compact"
+        ]
+
+    def test_a_federation_named_for_the_first_time_is_not_a_change(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        # The earlier snapshot was taken before federation names were recorded.
+        _in_federation(base_prev_snapshot, 3)
+        _in_federation(base_curr_snapshot, 3, "Star Compact")
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        assert not [e for e in result if e.event_type.startswith("federation_")]
+
+    def test_joining_a_federation_without_a_recorded_name(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        _in_federation(base_curr_snapshot, 3)
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        joined = [e for e in result if e.event_type == "federation_joined"]
+        assert [e.summary for e in joined] == ["Joined a federation"]
 
     def test_detects_war_started(self, base_prev_snapshot, base_curr_snapshot):
         """Detects new wars starting."""

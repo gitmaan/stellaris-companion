@@ -88,20 +88,19 @@ def _reserves_stage(briefing: dict[str, Any]) -> str | None:
     return stage if isinstance(stage, str) and stage else None
 
 
-def _normalize_federation(briefing: dict[str, Any]) -> str | None:
-    dip = briefing.get("diplomacy", {}) if isinstance(briefing, dict) else {}
-    fed = dip.get("federation")
-    if not fed:
-        return None
-    if isinstance(fed, str):
-        return fed.strip() or "Federation"
-    if isinstance(fed, dict):
-        for key in ("name", "federation_name", "federation", "id"):
-            val = fed.get(key)
-            if isinstance(val, str) and val.strip():
-                return val.strip()
-        return "Federation"
-    return "Federation"
+def _federation(briefing: dict[str, Any]) -> tuple[int | None, str | None]:
+    """The player's federation as (ID, name); (None, None) when they are in none.
+
+    The first federation formed in a galaxy has ID 0. The name is missing from
+    snapshots taken before it was recorded.
+    """
+    diplomacy = briefing.get("diplomacy") if isinstance(briefing, dict) else None
+    federation_id = safe_int(diplomacy.get("federation")) if isinstance(diplomacy, dict) else None
+    if federation_id is None:
+        return None, None
+    details = briefing.get("federation_details")
+    name = details.get("name") if isinstance(details, dict) else None
+    return federation_id, name.strip() if isinstance(name, str) and name.strip() else None
 
 
 def _get_leader_name(leader: dict[str, Any]) -> str:
@@ -479,48 +478,36 @@ def compute_events(
             )
 
     # Federation changes
-    prev_fed = _normalize_federation(prev)
-    curr_fed = _normalize_federation(curr)
-    if prev_fed != curr_fed:
-        if prev_fed is None and curr_fed is not None:
-            events.append(
-                DetectedEvent(
-                    event_type="federation_joined",
-                    summary=f"Joined a federation: {curr_fed}",
-                    data={
-                        "before": None,
-                        "after": curr_fed,
-                        "from_snapshot_id": from_snapshot_id,
-                        "to_snapshot_id": to_snapshot_id,
-                    },
-                )
+    prev_fed_id, prev_fed = _federation(prev)
+    curr_fed_id, curr_fed = _federation(curr)
+    if prev_fed_id != curr_fed_id:
+        if prev_fed_id is None:
+            event_type = "federation_joined"
+            summary = f"Joined a federation: {curr_fed}" if curr_fed else "Joined a federation"
+        elif curr_fed_id is None:
+            event_type = "federation_left"
+            summary = f"Left federation: {prev_fed}" if prev_fed else "Left a federation"
+        else:
+            event_type = "federation_changed"
+            summary = (
+                f"Federation changed: {prev_fed} → {curr_fed}"
+                if prev_fed and curr_fed
+                else "Moved to another federation"
             )
-        elif prev_fed is not None and curr_fed is None:
-            events.append(
-                DetectedEvent(
-                    event_type="federation_left",
-                    summary=f"Left federation: {prev_fed}",
-                    data={
-                        "before": prev_fed,
-                        "after": None,
-                        "from_snapshot_id": from_snapshot_id,
-                        "to_snapshot_id": to_snapshot_id,
-                    },
-                )
+        events.append(
+            DetectedEvent(
+                event_type=event_type,
+                summary=summary,
+                data={
+                    "before": prev_fed,
+                    "after": curr_fed,
+                    "before_id": prev_fed_id,
+                    "after_id": curr_fed_id,
+                    "from_snapshot_id": from_snapshot_id,
+                    "to_snapshot_id": to_snapshot_id,
+                },
             )
-        elif prev_fed and curr_fed:
-            events.append(
-                DetectedEvent(
-                    event_type="federation_changed",
-                    summary=f"Federation changed: {prev_fed} → {curr_fed}",
-                    data={
-                        "before": prev_fed,
-                        "after": curr_fed,
-                        "from_snapshot_id": from_snapshot_id,
-                        "to_snapshot_id": to_snapshot_id,
-                    },
-                )
-            )
+        )
 
     # War events. Wars are matched by ID; a snapshot from before IDs were recorded
     # only has names, and a war named differently is not a war that ended.

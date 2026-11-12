@@ -343,13 +343,16 @@ class DiplomacyMixin:
 
         result = {
             "federation_id": None,
+            "name": None,
             "type": None,
             "level": None,
             "cohesion": None,
             "experience": None,
             "laws": {},
             "members": [],
+            "member_names": [],
             "president": None,
+            "president_name": None,
         }
 
         # Get player's country entry via Rust session
@@ -379,6 +382,8 @@ class DiplomacyMixin:
         if not fed_entry or not isinstance(fed_entry, dict):
             return result
 
+        result["name"] = self.resolve_name(fed_entry.get("name"), default=None).display
+
         # Extract president (try 'leader' first, then 'president')
         leader = fed_entry.get("leader")
         if leader is not None:
@@ -399,6 +404,15 @@ class DiplomacyMixin:
                 except (ValueError, TypeError):
                     continue
             result["members"] = member_ids
+
+        country_names = self._get_country_names_map()
+        result["member_names"] = [
+            country_names.get(member_id, f"Empire {member_id}") for member_id in result["members"]
+        ]
+        if result["president"] is not None:
+            result["president_name"] = country_names.get(
+                result["president"], f"Empire {result['president']}"
+            )
 
         # Extract federation_progression data
         progression = fed_entry.get("federation_progression")

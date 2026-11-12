@@ -55,15 +55,15 @@ outside those fields is never looked up. Text the running game fills in
 (`[Root.GetName]`) is not a fixed name and gives none.
 
 Names of things in the campaign (planets, systems, leaders, empires, species, fleets,
-factions, wars) are not text in the save either. The save holds a key into the game's
+factions, federations, wars) are not text in the save either. The save holds a key into the game's
 text, often with variables that are names themselves. `stellaris_companion/stored_names.py`
 builds the name the way the game does, following the rules in the game's own
 `name_system` text file (word order of adjectives, turning a noun into an adjective,
 number formats), so "Planet Name Glebsig" is "Ladnah" and a leader has both names.
 Extractors reach it through `resolve_name`; it gives no name when a part cannot be
 built exactly, and the readable guess from the key is used instead, as it is with no
-install. History matches wars, neighbours and fallen empires by ID, never by name: a
-name read differently is not something that happened in the game.
+install. History matches wars, neighbours, fallen empires and the player's federation
+by ID, never by name: a name read differently is not something that happened in the game.
 
 Dict keys are the app's own field names and are left alone, except in the few dicts
 that are keyed by save IDs (tradition trees, starbase levels, ship classes, federation
