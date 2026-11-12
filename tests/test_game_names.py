@@ -434,3 +434,32 @@ def test_changing_the_games_language_is_picked_up_while_the_app_runs(
         assert game_names.game_name("building_factory_3") == "Ziviler Replikator-Komplex"
     finally:
         game_names.use_names(None)
+
+
+def test_a_later_tier_of_a_leader_trait_is_named_after_its_first_tier() -> None:
+    # The game's text names a few later tiers itself and leaves most without text.
+    game_names.use_names(
+        GameNames(
+            {
+                "leader_trait_resilient": "Resilient",
+                "leader_trait_resilient_2": "$leader_trait_resilient$ II",
+                "leader_trait_scout": "Scout",
+                "trait_ruler_industrialist": "Mining Rush",
+                "leader_trait_salvager": "[triggered_salvager_name]",
+                "building_foundry": "Alloy Foundries",
+            }
+        )
+    )
+    try:
+        assert briefing_value_name("leader_trait_resilient_2") == "Resilient II"
+        assert briefing_value_name("leader_trait_scout_2") == "Scout II"
+        assert briefing_value_name("leader_trait_scout_3") == "Scout III"
+        assert briefing_value_name("trait_ruler_industrialist_2") == "Mining Rush II"
+        # The first tier's name depends on the empire, so no name is made up from it.
+        assert briefing_value_name("leader_trait_salvager_2") is None
+        assert briefing_value_name("leader_trait_unknown_2") is None
+        # Only traits have tiers named this way.
+        assert briefing_value_name("building_foundry_2") is None
+        assert _display_identifier("leader_trait_scout_2", "leadership", "traits") == "Scout II"
+    finally:
+        game_names.use_names(None)

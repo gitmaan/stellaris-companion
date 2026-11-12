@@ -44,14 +44,26 @@ KEY_NAME_PREFIXES: dict[tuple[str, str], tuple[str, ...]] = {
 # an ordinary word, so it is only looked up in a field listed above.
 ID_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$")
 
+# A leader trait's second and third tier. The game's text names a few of them, always
+# as the first tier's name and the tier ("$leader_trait_resilient$ II"), and leaves
+# most without text of their own; those are named here the same way.
+TIERED_TRAIT = re.compile(r"^((?:leader_)?trait_[a-z0-9_]+)_([23])$")
+TIER_NUMERALS = {"2": "II", "3": "III"}
+
 
 def briefing_value_name(value: str, section: str = "", field: str = "") -> str | None:
     """What the installed game calls ``value``; None when it has no name for it."""
     prefixes = NAME_KEY_PREFIXES.get((section, field), ())
     name = game_name(*(prefix + value for prefix in prefixes))
     if name is None and ID_PATTERN.match(value):
-        name = game_name(value)
+        name = game_name(value) or _tiered_trait_name(value)
     return name
+
+
+def _tiered_trait_name(value: str) -> str | None:
+    tiered = TIERED_TRAIT.match(value)
+    first_tier = game_name(tiered.group(1)) if tiered else None
+    return f"{first_tier} {TIER_NUMERALS[tiered.group(2)]}" if first_tier else None
 
 
 def briefing_key_names(keys: Iterable[str], section: str, field: str) -> dict[str, str]:

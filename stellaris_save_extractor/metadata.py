@@ -61,14 +61,9 @@ class MetadataMixin:
         if getattr(self, "_gamestate", None) is not None:
             result["gamestate_chars"] = len(self.gamestate)
 
-        # Parse meta file for simple key=value pairs
-        for line in self.meta.split("\n"):
-            if "=" in line and "flag" not in line.lower():
-                key, _, value = line.partition("=")
-                key = key.strip()
-                value = value.strip().strip('"')
-                if key in ["version", "name", "date"]:
-                    result[key] = value
+        # The save's own top-level lines. Lines inside a block (the flag) are indented.
+        for key, value in re.findall(r"^(version|name|date)=(.*)$", self.meta, re.M):
+            result[key] = value.strip().strip('"')
 
         # Parse required_dlcs block
         result["required_dlcs"], result["required_dlcs_status"] = (
