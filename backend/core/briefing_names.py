@@ -19,6 +19,7 @@ from stellaris_companion.game_names import game_name
 NAME_KEY_PREFIXES: dict[tuple[str, str], tuple[str, ...]] = {
     ("territory", "buildings"): ("building_",),
     ("territory", "type"): ("pc_",),
+    ("defense", "level"): ("starbase_",),
     ("defense", "buildings"): ("sm_",),
     ("defense", "defense_buildings"): ("sm_",),
     ("defense", "modules"): ("sm_",),

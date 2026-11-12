@@ -293,6 +293,19 @@ class TestDiplomaticContext:
         assert "=== SPECIAL CONTACTS (NOT ORDINARY EMPIRES) ===" in context
         assert "Privateers | type: pirate | special contact" in context
 
+    def test_names_the_players_federation(self, generator):
+        context = generator._format_diplomatic_context(
+            {
+                "diplomacy": {
+                    "relations": [{"empire_name": "Commonwealth of Sol"}],
+                    "federation": 0,
+                },
+                "federation_details": {"federation_id": 0, "name": "Star Compact"},
+            }
+        )
+
+        assert context.endswith("Federation: Star Compact")
+
     def test_returns_empty_context_without_relations(self, generator):
         assert generator._format_diplomatic_context({"diplomacy": {}}) == ""
 

@@ -13,9 +13,9 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.core.events import (
+    _federation,
     _get_leader_name,
     _is_placeholder_recruitment_date,
-    _normalize_federation,
     _pct_change,
     _sign_changed,
     compute_events,
@@ -140,23 +140,29 @@ class TestSignChanged:
         assert _sign_changed(10, None) is False
 
 
-class TestNormalizeFederation:
-    """Tests for _normalize_federation helper function."""
+def _in_federation(snapshot: dict, federation_id: int | None, name: str | None = None) -> None:
+    """Put the player in a federation the way a briefing records it."""
+    snapshot["diplomacy"]["federation"] = federation_id
+    snapshot["federation_details"] = {"federation_id": federation_id, "name": name}
 
-    def test_returns_none_for_no_federation(self):
-        """Returns None when not in federation."""
-        briefing = {"diplomacy": {"federation": None}}
-        assert _normalize_federation(briefing) is None
 
-    def test_returns_string_federation_name(self):
-        """Returns federation name when it's a string."""
-        briefing = {"diplomacy": {"federation": "Galactic Union"}}
-        assert _normalize_federation(briefing) == "Galactic Union"
+class TestFederation:
+    """The player's federation is read as its ID and its name."""
 
-    def test_extracts_name_from_dict(self):
-        """Extracts name from federation dict."""
-        briefing = {"diplomacy": {"federation": {"name": "Star Alliance"}}}
-        assert _normalize_federation(briefing) == "Star Alliance"
+    def test_no_federation(self):
+        assert _federation({"diplomacy": {"federation": None}}) == (None, None)
+        assert _federation({}) == (None, None)
+
+    def test_the_first_federation_in_a_galaxy_has_id_zero(self):
+        briefing = {
+            "diplomacy": {"federation": 0},
+            "federation_details": {"federation_id": 0, "name": "Free Academy Coalition"},
+        }
+        assert _federation(briefing) == (0, "Free Academy Coalition")
+
+    def test_a_snapshot_from_before_names_were_recorded_has_no_name(self):
+        briefing = {"diplomacy": {"federation": 3}, "federation_details": {"federation_id": 3}}
+        assert _federation(briefing) == (3, None)
 
 
 class TestGetLeaderName:
@@ -251,8 +257,8 @@ class TestComputeEvents:
 
     def test_detects_federation_joined(self, base_prev_snapshot, base_curr_snapshot):
         """Detects joining a federation."""
-        base_prev_snapshot["diplomacy"]["federation"] = None
-        base_curr_snapshot["diplomacy"]["federation"] = "Galactic Union"
+        # The galaxy's first federation, whose ID is 0.
+        _in_federation(base_curr_snapshot, 0, "Free Academy Coalition")
 
         result = compute_events(
             prev=base_prev_snapshot,
@@ -260,13 +266,14 @@ class TestComputeEvents:
             from_snapshot_id=1,
             to_snapshot_id=2,
         )
-        event_types = [e.event_type for e in result]
-        assert "federation_joined" in event_types
+        joined = [e for e in result if e.event_type == "federation_joined"]
+        assert [e.summary for e in joined] == ["Joined a federation: Free Academy Coalition"]
+        assert joined[0].data["after"] == "Free Academy Coalition"
+        assert joined[0].data["after_id"] == 0
 
     def test_detects_federation_left(self, base_prev_snapshot, base_curr_snapshot):
         """Detects leaving a federation."""
-        base_prev_snapshot["diplomacy"]["federation"] = "Galactic Union"
-        base_curr_snapshot["diplomacy"]["federation"] = None
+        _in_federation(base_prev_snapshot, 0, "Free Academy Coalition")
 
         result = compute_events(
             prev=base_prev_snapshot,
@@ -274,13 +281,60 @@ class TestComputeEvents:
             from_snapshot_id=1,
             to_snapshot_id=2,
         )
-        event_types = [e.event_type for e in result]
-        assert "federation_left" in event_types
+        left = [e for e in result if e.event_type == "federation_left"]
+        assert [e.summary for e in left] == ["Left federation: Free Academy Coalition"]
+
+    def test_detects_moving_to_another_federation(self, base_prev_snapshot, base_curr_snapshot):
+        _in_federation(base_prev_snapshot, 0, "Free Academy Coalition")
+        _in_federation(base_curr_snapshot, 3, "Star Compact")
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        changed = [e for e in result if e.event_type == "federation_changed"]
+        assert [e.summary for e in changed] == [
+            "Federation changed: Free Academy Coalition → Star Compact"
+        ]
+
+    def test_a_federation_named_for_the_first_time_is_not_a_change(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        # The earlier snapshot was taken before federation names were recorded.
+        _in_federation(base_prev_snapshot, 3)
+        _in_federation(base_curr_snapshot, 3, "Star Compact")
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        assert not [e for e in result if e.event_type.startswith("federation_")]
+
+    def test_joining_a_federation_without_a_recorded_name(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        _in_federation(base_curr_snapshot, 3)
+
+        result = compute_events(
+            prev=base_prev_snapshot,
+            curr=base_curr_snapshot,
+            from_snapshot_id=1,
+            to_snapshot_id=2,
+        )
+        joined = [e for e in result if e.event_type == "federation_joined"]
+        assert [e.summary for e in joined] == ["Joined a federation"]
 
     def test_detects_war_started(self, base_prev_snapshot, base_curr_snapshot):
         """Detects new wars starting."""
-        base_prev_snapshot["history"]["wars"]["wars"] = []
-        base_curr_snapshot["history"]["wars"]["wars"] = ["Conquest of Terra"]
+        base_prev_snapshot["history"]["wars"] = {"wars": [], "by_id": {}}
+        base_curr_snapshot["history"]["wars"] = {
+            "wars": ["Conquest of Terra"],
+            "by_id": {"4": "Conquest of Terra"},
+        }
 
         result = compute_events(
             prev=base_prev_snapshot,
@@ -288,13 +342,17 @@ class TestComputeEvents:
             from_snapshot_id=1,
             to_snapshot_id=2,
         )
-        event_types = [e.event_type for e in result]
-        assert "war_started" in event_types
+        started = [e for e in result if e.event_type == "war_started"]
+        assert [e.data["war_name"] for e in started] == ["Conquest of Terra"]
 
     def test_detects_war_ended(self, base_prev_snapshot, base_curr_snapshot):
         """Detects wars ending."""
-        base_prev_snapshot["history"]["wars"]["wars"] = ["Conquest of Terra"]
-        base_curr_snapshot["history"]["wars"]["wars"] = []
+        base_prev_snapshot["history"]["wars"] = {
+            "wars": ["Conquest of Terra"],
+            "by_id": {"4": "Conquest of Terra"},
+            "battle_locations": {"Conquest of Terra": ["Sol"]},
+        }
+        base_curr_snapshot["history"]["wars"] = {"wars": [], "by_id": {}}
 
         result = compute_events(
             prev=base_prev_snapshot,
@@ -302,8 +360,65 @@ class TestComputeEvents:
             from_snapshot_id=1,
             to_snapshot_id=2,
         )
-        event_types = [e.event_type for e in result]
-        assert "war_ended" in event_types
+        ended = [e for e in result if e.event_type == "war_ended"]
+        assert [e.summary for e in ended] == ["War ended: Conquest of Terra (fought at Sol)"]
+
+    def test_a_war_read_under_another_name_is_the_same_war(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """The same war ID is one war, however each snapshot's reading named it."""
+        base_prev_snapshot["history"]["wars"] = {
+            "wars": ["Steccashi MekoNass War"],
+            "by_id": {"4": "Steccashi MekoNass War"},
+        }
+        base_curr_snapshot["history"]["wars"] = {
+            "wars": ["Steccashian - Meko'Naan War"],
+            "by_id": {"4": "Steccashian - Meko'Naan War"},
+        }
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        assert not [e for e in result if e.event_type in {"war_started", "war_ended"}]
+
+    def test_wars_from_a_snapshot_without_ids_are_not_compared(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """Older snapshots only named their wars; a new name is not a new war."""
+        base_prev_snapshot["history"]["wars"] = {"wars": ["Steccashi-MekoNass War"]}
+        base_curr_snapshot["history"]["wars"] = {
+            "wars": ["Steccashian - Meko'Naan War"],
+            "by_id": {"4": "Steccashian - Meko'Naan War"},
+        }
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        assert not [e for e in result if e.event_type in {"war_started", "war_ended"}]
+
+    def test_a_neighbor_read_under_another_name_is_not_a_new_neighbor(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        def geography(*neighbors):
+            return {
+                "border_neighbors": [
+                    {"empire_id": empire_id, "empire_name": name} for empire_id, name in neighbors
+                ]
+            }
+
+        base_prev_snapshot["history"]["geography"] = geography((7, "MekoNass Hive"))
+        base_curr_snapshot["history"]["geography"] = geography(
+            (7, "Meko'Naan Hive"), (9, "Empire of Izk")
+        )
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        new = [e.data["empire_name"] for e in result if e.event_type == "new_border_contact"]
+        assert new == ["Empire of Izk"]
 
     def test_detects_leader_hired(self, base_prev_snapshot, base_curr_snapshot):
         """Detects new leaders being hired."""
@@ -800,6 +915,24 @@ class TestComputeEvents:
         )
         event_types = [e.event_type for e in result]
         assert "fallen_empire_awakened" in event_types
+
+    def test_a_fallen_empire_that_takes_a_new_name_on_awakening_is_still_seen(
+        self, base_prev_snapshot, base_curr_snapshot
+    ):
+        """The game renames an empire when it awakens; its ID stays the same."""
+        base_prev_snapshot["history"]["fallen_empires"]["fallen_empires"] = [
+            {"country_id": 15, "name": "Steccashian Conservers", "status": "dormant"}
+        ]
+        base_curr_snapshot["history"]["fallen_empires"]["fallen_empires"] = [
+            {"country_id": 15, "name": "Steccashian Guardians", "status": "awakened"}
+        ]
+
+        result = compute_events(
+            prev=base_prev_snapshot, curr=base_curr_snapshot, from_snapshot_id=1, to_snapshot_id=2
+        )
+
+        awakened = [e for e in result if e.event_type == "fallen_empire_awakened"]
+        assert [e.data["name"] for e in awakened] == ["Steccashian Guardians"]
 
     def test_detects_war_in_heaven_started(self, base_prev_snapshot, base_curr_snapshot):
         """Detects War in Heaven beginning."""
