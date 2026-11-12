@@ -76,6 +76,35 @@ python3 -m compileall -q backend stellaris_companion stellaris_save_extractor
 pytest -q
 ```
 
+Your own saves, through the real pipeline (no model calls):
+
+```bash
+python3 scripts/check_local_saves.py
+```
+
+What the Advisor then says about them. This asks the configured model questions whose
+answers are lists in the briefing (a planet's buildings, the tradition trees taken) and
+counts the names given exactly. Each question is a real model call, so start with
+`--dry-run`, which lists the questions and the number of calls. Answers vary between
+runs; compare totals, not single answers.
+
+```bash
+python3 scripts/check_advisor_answers.py --dry-run
+python3 scripts/check_advisor_answers.py --out artifacts/advisor-check
+```
+
+That asks Gemini with the key in `GOOGLE_API_KEY`. To ask the ChatGPT plan connected
+in the app, quit the app and run the check through Electron, which starts the app's
+own local bridge so the sign-in never leaves that process:
+
+```bash
+electron/node_modules/.bin/electron scripts/advisor_check_chatgpt.cjs -- --out artifacts/advisor-check
+```
+
+The score says whether the Advisor repeats the briefing's names. It does not say the
+briefing's names are right: on a build that reads a war's name as `war_vs_adjectives`,
+an answer that says `war_vs_adjectives` scores as exact. Read the answers as well.
+
 Renderer:
 
 ```bash
