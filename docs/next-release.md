@@ -1,3 +1,49 @@
+# Stable 1.1.2 candidate
+
+Promote 1.1.2-beta.5 to stable. The app is the beta.5 code with only the version and the
+release notes changed, so stable users on 1.1.1 receive all five betas at once (#84 to
+#124). The maintainer approved the five lines in `electron/release-notes.md`, including
+the thanks to @LightArchon1 and @arseking as the fifth line: the update dialog of the
+installed 1.1.1 shows the first five bullets and nothing else. The notes were rendered in
+that dialog and fit without scrolling at 1000x700 and at the 800x600 minimum.
+
+## Upgrade from 1.1.1
+
+- Three local campaigns were recorded by the 1.1.1 code and continued in the same history
+  database by this code. The database opens and gains `campaign_sources` and
+  `story_continuations`; nothing existing is altered. No event was invented at the
+  handover. One "Researched" event was skipped at the first save after the update in two
+  of the three, as intended: a snapshot from before the corrected technology reading is
+  not compared.
+- The Advisor briefing, the recap and the Chronicle were built from data stored by 1.1.1
+  with a stand-in model, without errors.
+- One late-game save took 2.3s against 2.2s, with peak memory about 12% higher.
+- Those stretches of play were quiet: no war or federation changed across the handover, so
+  those paths rest on the automated tests.
+
+## Validation and publication
+
+- Complete combined Python, Rust, desktop, localization and renderer checks on the
+  release pull request, and `scripts/check_local_saves.py` locally.
+- Tag the merged main commit as `v1.1.2`. The publishing workflow rebuilds all four
+  platforms, repeats the installed Windows journeys, publishes the `latest` feeds with
+  matching `beta` aliases, and synchronizes the download site's release facts.
+- Verify macOS signing and notarization, package versions, both subscriber tracks and
+  every payload checksum.
+- Publish the site's 1.1.2 changelog page (English only for now) on the day of release,
+  with its date set to that day.
+- The 1.1.1 feedback invitation targets exactly 1.1.1 and expires on 2026-11-24; 1.1.2
+  ships without an invitation of its own.
+
+Not claimed: everything listed as not claimed for beta.5 below still stands. Each beta was
+downloaded 5 to 10 times against about 400 for 1.1.1, and no beta user reported a
+regression. Finding the game and reading its text ran on one macOS install only; on
+Windows and Linux it is covered by tests with built folders and falls back to the shipped
+names when no game is found. Whether 1.1.1 can reopen a database this version has written
+was not tested. #83 and #86 still await reporter confirmation.
+
+## Earlier release records
+
 # Beta 1.1.2-beta.5 candidate
 
 This beta reads names from the player's installed game (#115, #118), builds the names
