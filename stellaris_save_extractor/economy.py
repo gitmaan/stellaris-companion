@@ -271,8 +271,23 @@ class EconomyMixin:
         """
         return self._get_resources_rust()
 
+    @staticmethod
+    def _resource_amounts(block: object) -> dict[str, float]:
+        """Every resource a save block lists with an amount, under the game's own ID for it.
+
+        The game and its mods decide which resources exist. Taking the block as written,
+        with no list of expected names, keeps Trade, Nanites and a mod's own resources.
+        """
+        amounts: dict[str, float] = {}
+        if isinstance(block, dict):
+            for resource, value in block.items():
+                if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+                    with contextlib.suppress(ValueError):
+                        amounts[resource] = float(value)
+        return amounts
+
     def _get_resources_rust(self) -> dict:
-        """Get resource information using Rust parser."""
+        """Read the player's stockpiles and this month's income and expenses."""
         result = {
             "stockpiles": {},
             "monthly_income": {},
@@ -281,28 +296,6 @@ class EconomyMixin:
         }
 
         player_id = self.get_player_empire_id()
-
-        # All tracked resources
-        ALL_RESOURCES = [
-            "energy",
-            "minerals",
-            "food",
-            "consumer_goods",
-            "alloys",
-            "physics_research",
-            "society_research",
-            "engineering_research",
-            "influence",
-            "unity",
-            "volatile_motes",
-            "exotic_gases",
-            "rare_crystals",
-            "sr_living_metal",
-            "sr_zro",
-            "sr_dark_matter",
-            "minor_artifacts",
-            "astral_threads",
-        ]
 
         # Use cached player country entry for fast lookup
         player_data = self._get_player_country_entry(player_id)
@@ -316,12 +309,7 @@ class EconomyMixin:
         if isinstance(modules, dict):
             econ_module = modules.get("standard_economy_module", {})
             if isinstance(econ_module, dict):
-                resources = econ_module.get("resources", {})
-                if isinstance(resources, dict):
-                    for resource in ALL_RESOURCES:
-                        if resource in resources:
-                            with contextlib.suppress(ValueError, TypeError):
-                                result["stockpiles"][resource] = float(resources[resource])
+                result["stockpiles"] = self._resource_amounts(econ_module.get("resources"))
 
         # Extract budget data
         budget = player_data.get("budget", {})
@@ -335,41 +323,18 @@ class EconomyMixin:
             # Fallback - check for income/expenses directly on budget
             current_month = budget
 
-        income_section = current_month.get("income", {})
-        expenses_section = current_month.get("expenses", {})
-
-        # Sum up income from all sources
-        income_resources = {}
-        if isinstance(income_section, dict):
-            for source, resources in income_section.items():
-                if isinstance(resources, dict):
-                    for resource, value_str in resources.items():
-                        if resource in ALL_RESOURCES:
-                            try:
-                                value = float(value_str)
-                                income_resources[resource] = (
-                                    income_resources.get(resource, 0) + value
-                                )
-                            except (ValueError, TypeError):
-                                pass
+        # Each side lists its sources (jobs, ships, ...), each with the resources it moves.
+        totals: dict[str, dict[str, float]] = {}
+        for side in ("income", "expenses"):
+            sources = current_month.get(side, {})
+            total: dict[str, float] = {}
+            for source in sources.values() if isinstance(sources, dict) else ():
+                for resource, amount in self._resource_amounts(source).items():
+                    total[resource] = total.get(resource, 0) + amount
+            totals[side] = total
+        income_resources, expenses_resources = totals["income"], totals["expenses"]
 
         result["monthly_income"] = income_resources
-
-        # Sum up expenses from all sources
-        expenses_resources = {}
-        if isinstance(expenses_section, dict):
-            for source, resources in expenses_section.items():
-                if isinstance(resources, dict):
-                    for resource, value_str in resources.items():
-                        if resource in ALL_RESOURCES:
-                            try:
-                                value = float(value_str)
-                                expenses_resources[resource] = (
-                                    expenses_resources.get(resource, 0) + value
-                                )
-                            except (ValueError, TypeError):
-                                pass
-
         result["monthly_expenses"] = expenses_resources
 
         # Calculate net
