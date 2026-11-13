@@ -124,11 +124,13 @@ def synthetic_meta(
     date: str = "2300.01.01",
     version: str = "Pegasus v4.4.6",
     required_dlcs: list[str] | None = None,
+    mods: list[str] | None = None,
 ) -> str:
     lines = [f'version="{version}"', f'name="{name}"', f'date="{date}"']
-    if required_dlcs is not None:
-        quoted = " ".join(f'"{dlc}"' for dlc in required_dlcs)
-        lines.append(f"required_dlcs={{ {quoted} }}")
+    for key, names in (("required_dlcs", required_dlcs), ("mods", mods)):
+        if names is not None:
+            quoted = " ".join(f'"{entry}"' for entry in names)
+            lines.append(f"{key}={{ {quoted} }}")
     return "\n".join(lines) + "\n"
 
 
