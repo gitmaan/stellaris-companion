@@ -61,3 +61,21 @@ def test_windows_line_endings_are_read_the_same(tmp_path):
 
     assert metadata["name"] == "Flagellant Concord"
     assert metadata["date"] == "2215.01.01"
+
+
+MODDED = META.replace(
+    'player_portrait="mol7"',
+    'mods=\n{\n\t"Gigastructural Engineering & More (4.5)"\n\t"UI Overhaul Dynamic"\n}\n'
+    'player_portrait="mol7"',
+)
+
+
+def test_a_save_made_with_mods_names_them(tmp_path):
+    metadata = _metadata(tmp_path, MODDED)
+
+    assert metadata["mods"] == ["Gigastructural Engineering & More (4.5)", "UI Overhaul Dynamic"]
+    assert metadata["required_dlcs"] == ["Federations", "Utopia"]
+
+
+def test_a_save_without_mods_has_none(tmp_path):
+    assert _metadata(tmp_path, META)["mods"] == []

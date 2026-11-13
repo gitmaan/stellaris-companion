@@ -214,6 +214,8 @@ class BriefingMixin:
                 "version": meta.get("version"),
                 "required_dlcs": meta.get("required_dlcs", []),
                 "required_dlcs_status": meta.get("required_dlcs_status", "not_recorded"),
+                # Present only for a save made with mods; an unmodded save has no such block.
+                **({"mods": meta["mods"]} if meta.get("mods") else {}),
                 "player_id": player_clean.get("player_id"),
                 "campaign_id": self._extract_campaign_id(),
             },
