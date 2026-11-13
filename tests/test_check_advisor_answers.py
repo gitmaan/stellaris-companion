@@ -49,6 +49,7 @@ BRIEFING = {
     },
     "model_context": {"technology": {"names": {"tech_lasers_2": "Blue Lasers"}}},
     "situation": {"wars": []},
+    "economy": {"net_monthly": {"Energy Credits": 12.5, "Zro": -1.0}},
 }
 
 
@@ -66,6 +67,7 @@ def test_the_questions_and_their_answers_come_from_the_briefing() -> None:
     # A technology the game has no name for cannot be asked for by name.
     assert cases["current_research"].expected == ["Blue Lasers"]
     assert cases["factions"].expected == ["Peace Movement", "Free Traders"]
+    assert cases["resources"].expected == ["Energy Credits", "Zro"]
     # Nothing to list, no question.
     assert "ascension_perks" not in cases
     assert "wars" not in cases
