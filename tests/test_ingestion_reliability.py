@@ -118,3 +118,34 @@ def test_instruction_edit_during_ingestion_does_not_change_previous_campaign(cam
     assert (
         db.get_session_advisor_custom(session_id=db.get_active_session_id(a_id)) == "A_ONLY_STYLE"
     )
+
+
+def test_the_info_panel_is_given_the_empires_identity_by_name(campaign_state):
+    """The panel showed IDs made readable: "Default" for Prosperous Unification."""
+    db, companion, manager, ingest, client = campaign_state
+    companion.identity = {
+        "ethics": ["fanatic_egalitarian", "xenophile"],
+        "authority": "machine_intelligence",
+        "civics": ["machine_servitor", "a_mod_civic"],
+        "origin": "default",
+        "is_machine": True,
+    }
+
+    health = manager.get_health_payload()
+
+    assert health["empire_ethics"] == ["Fanatic Egalitarian", "Xenophile"]
+    assert health["empire_authority"] == "Machine Intelligence"
+    # A civic neither the game nor the catalog knows stays an ID for the panel to make readable.
+    assert health["empire_civics"] == ["Rogue Servitor", "a_mod_civic"]
+    assert health["empire_origin"] == "Prosperous Unification"
+    assert health["empire_type"] == "machine"
+
+
+def test_an_empire_with_no_origin_read_has_none_for_the_panel(campaign_state):
+    db, companion, manager, ingest, client = campaign_state
+    companion.identity = {"ethics": [], "civics": [], "authority": None, "origin": None}
+
+    health = manager.get_health_payload()
+
+    assert health["empire_ethics"] == [] and health["empire_civics"] == []
+    assert "empire_authority" not in health and "empire_origin" not in health

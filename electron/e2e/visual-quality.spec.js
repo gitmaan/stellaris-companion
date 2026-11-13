@@ -531,6 +531,20 @@ test('settings feedback stays inline without moving controls; the section picker
   })
 })
 
+test('the advisor info panel shows the empire as the game names it', async () => {
+  const backend = createMockChronicleBackend()
+  // Names arrive as the player's game writes them; one the game has no name for arrives as an ID.
+  backend.setHealth({ empire_ethics: ['Fanatic Egalitarian', '排外主义'], empire_authority: 'Machine Intelligence', empire_civics: ['Rogue Servitor', 'a_mod_civic'], empire_origin: 'On the Shoulders of Giants' })
+  await withApp(backend, async page => {
+    await expect(page.locator('#page-chat textarea')).toBeEnabled()
+    await page.getByRole('button', { name: 'Advisor info' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Advisor style' })
+    for (const name of ['Fanatic Egalitarian', '排外主义', 'Machine Intelligence', 'Rogue Servitor', 'A Mod Civic', 'On the Shoulders of Giants']) {
+      await expect(dialog.getByText(name, { exact: true })).toBeVisible()
+    }
+  })
+})
+
 test('update and report dialogs share keyboard dismissal and focus restoration', async () => {
   await withApp(createMockChronicleBackend(), async (page, app) => {
     await resize(app, 800, 600); await preferences(page, { uiScale: 1.25 })
