@@ -67,6 +67,14 @@ _IDENTITY_PREFIXES = {
 }
 
 
+MODS_INSTRUCTION = (
+    "This campaign is played with the mods listed. Mods can add or change buildings, "
+    "megastructures, resources, technologies, crises and rules. The game knowledge supplied "
+    "here describes the unmodded game. Where the save shows something it does not cover, go "
+    "by the save, and say so when a piece of advice assumes unmodded rules."
+)
+
+
 def resolve_content_availability(metadata: dict[str, Any] | None) -> dict[str, Any]:
     """Describe positive content evidence without inventing negative availability.
 
@@ -97,7 +105,7 @@ def resolve_content_availability(metadata: dict[str, Any] | None) -> dict[str, A
     else:
         status = "reported" if valid_list else "invalid"
 
-    return {
+    availability = {
         "game_version": version or None,
         "version_status": "parsed" if parsed_version is not None else "unknown",
         "dlc_evidence_status": status,
@@ -109,6 +117,17 @@ def resolve_content_availability(metadata: dict[str, Any] | None) -> dict[str, A
         ),
         "unreported_dlc_status": "unknown",
     }
+    # A save names its mods only when it has some, so their absence says nothing.
+    mods = meta.get("mods")
+    mods = (
+        [m.strip() for m in mods if isinstance(m, str) and m.strip()]
+        if isinstance(mods, list)
+        else []
+    )
+    if mods:
+        availability["mods"] = mods
+        availability["mods_instruction"] = MODS_INSTRUCTION
+    return availability
 
 
 def resolve_empire_identity(identity: dict[str, Any] | None) -> dict[str, Any]:
