@@ -4,7 +4,8 @@
 A change to what the Advisor is told can only be judged by what it then says.
 For the newest save of each campaign this check builds the briefing the Advisor
 is sent, asks questions whose answers are lists in that briefing (the capital's
-buildings, the tradition trees taken, a starbase's modules, a leader's traits),
+buildings, the tradition trees taken, a starbase's modules, a leader's traits,
+the resources in the monthly budget),
 and counts how many of the listed things each answer names exactly as the
 player's game shows them. The questions come from the save, so the same command
 measures the same thing after every change.
@@ -188,6 +189,13 @@ def build_cases(briefing: dict[str, Any]) -> list[Case]:
         "wars",
         "Which wars am I in right now? Give each war's name.",
         _distinct([w.get("name") for w in _dicts(_section(briefing, "situation", "wars"))]),
+    )
+
+    net_monthly = _section(briefing, "economy", "net_monthly")
+    add(
+        "resources",
+        "What is my monthly net income of each resource? List every resource by name.",
+        _distinct(list(net_monthly) if isinstance(net_monthly, dict) else []),
     )
     return cases
 
