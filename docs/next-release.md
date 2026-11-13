@@ -32,7 +32,17 @@ Done before the tag, on main with #130, #131 and this change merged together loc
   gives the same version, name, date and DLC list as before on all 22 local saves. The
   report dialog was driven end to end with a modded game's diagnostics.
 
-Still to do before the tag: the candidate build again, on main with #133.
+- The candidate build of main with #133 (`b132ed5`) passed on four platforms at the first
+  attempt, with 12 installed-app journeys on Windows.
+
+## Publication
+
+The maintainer asked for the tag once #133 was in. `v1.1.3-beta.1` was pushed on
+`b132ed5` and published on 2026-11-13 as a prerelease with installers for Windows, macOS
+(Apple silicon and Intel) and Linux. The three `beta*.yml` update files say
+1.1.3-beta.1, the Linux installer's checksum matches the one in its update file, and
+the latest stable release is still 1.1.2. The other installers' checksums and a real
+update from 1.1.2 on a player's machine were not checked.
 
 Not claimed:
 
