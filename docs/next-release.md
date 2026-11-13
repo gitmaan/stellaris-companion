@@ -1,3 +1,46 @@
+# Beta 1.1.3-beta.1 candidate
+
+The first beta after stable 1.1.2. It reads the empire's origin (#127, reported in #125),
+shows the empire's ethics, civics, authority and origin in the Advisor panel by their
+in-game names (#128), reads every resource the save lists for the player and no longer
+only eighteen of them (#129), tells the Advisor which mods a campaign is played with
+(#130), and names resources in the Advisor's briefing as the game does (#131). Stable
+remains 1.1.2. Merge this after #130 and #131: the release notes describe both.
+
+## Release validation
+
+Done before the tag, on main with #130, #131 and this change merged together locally:
+
+- 1038 tests pass and ruff is clean.
+- `scripts/check_local_saves.py`: all 12 sampled real saves pass.
+- Briefings of 22 real saves were compared before and after each change. #129 adds the
+  Trade stockpile and budget to every save and changes nothing else; #130 changes nothing
+  for an unmodded save; #131 changes the keys of the economy tables only.
+- On a real modded save (Gigastructural Engineering, attached publicly to #79) the
+  Advisor's request names both mods, and the origin reads as "Voidfarers".
+- The new live Advisor question about monthly income, 8 campaigns, one run each on the
+  ChatGPT plan: 96 of 96 resource names exact with in-game names, 95 of 96 with IDs only,
+  and the same numbers in both.
+- Three campaigns recorded by the 1.1.2 code and continued by this code record no event
+  at the handover. The same pairs of saves record none under either version alone, so
+  this shows that nothing is invented, and does not exercise a real change.
+
+Still to do before the tag: the candidate build on four platforms and the installed-app
+journeys on Windows.
+
+Not claimed:
+
+- #125 also reports wrong ethics. That does not reproduce on any local save and awaits
+  the reporter's save; this beta does not change how ethics are read.
+- Whether a mod's own text is found on a player's machine has not been checked against a
+  real mod install. Mods packed as archives are not read. A mod's crisis is not
+  recognised as a crisis.
+- No local save holds a resource whose ID differs from its name beyond the common ones
+  ("Valor", a mod's resources); that case is covered by tests with made-up game text.
+- The Chronicle is not told about mods.
+
+## Earlier release records
+
 # Stable 1.1.2 candidate
 
 Promote 1.1.2-beta.5 to stable. The app is the beta.5 code with only the version and the
