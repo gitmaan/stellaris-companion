@@ -1,5 +1,4 @@
-- Planets, leaders, wars, technologies and buildings now appear under their in-game names, in your game's language.
-- Lost your empire and took over another? Your Chronicle can carry on with the new one.
-- Sharper reading of your save: Nomad reserves, research, civics, treaties, your federation, the crises and the Great Khan.
-- Newer AI models, and the option to attach your save to a bug report.
-- Thanks to @LightArchon1 and @arseking, whose reports and saves led to several of these fixes.
+- Your empire's origin now appears in the Advisor panel, with its ethics, civics and authority under their in-game names.
+- Playing with mods? The Advisor now knows which ones.
+- The Advisor follows Trade and every other resource in your game, by its in-game name.
+- Thanks to @arseking, whose report brought origins to the panel.

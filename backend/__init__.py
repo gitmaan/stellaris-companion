@@ -5,4 +5,4 @@ Stellaris Companion Backend
 Electron app backend with a configurable strategic advisor for Stellaris.
 """
 
-__version__ = "1.1.2"
+__version__ = "1.1.3-beta.1"
