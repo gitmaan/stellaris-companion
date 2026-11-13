@@ -1050,6 +1050,7 @@
         "civics": "Civics: {{value}}",
         "dlcs_one": "{{count}} DLC enabled",
         "dlcs_other": "{{count}} DLCs enabled",
+        "mods": "Mods: {{value}}",
         "ingestionLastError": "Last ingestion error: {{value}}",
         "source": "Source: {{value}}",
         "message": "Message: {{value}}",

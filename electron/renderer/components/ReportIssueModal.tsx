@@ -31,6 +31,7 @@ interface ReportContext {
   gameYear?: string
   stellarisVersion?: string
   dlcs?: string[]
+  mods?: string[]
   saveFileSizeMb?: number
   galaxySize?: string
   ingestionStage?: string
@@ -188,6 +189,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
           ctx.gameYear = diagnostics.gameYear || undefined
           ctx.stellarisVersion = diagnostics.stellarisVersion || undefined
           ctx.dlcs = diagnostics.dlcs?.length ? diagnostics.dlcs : undefined
+          ctx.mods = diagnostics.mods?.length ? diagnostics.mods : undefined
           ctx.saveFileSizeMb = diagnostics.saveFileSizeMb || undefined
           ctx.galaxySize = diagnostics.galaxySize || undefined
           ctx.ingestionStage = diagnostics.ingestionStage || undefined
@@ -254,6 +256,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
       if (ctx.empireEthics?.length) lines.push(field('ethics', ctx.empireEthics.join(', ')))
       if (ctx.empireCivics?.length) lines.push(field('civics', ctx.empireCivics.join(', ')))
       if (ctx.dlcs?.length) lines.push(`- ${t('report.markdown.fields.dlcs', { count: ctx.dlcs.length })}`)
+      if (ctx.mods?.length) lines.push(field('mods', ctx.mods.join(', ')))
       if (ctx.ingestionLastError) lines.push(field('ingestionLastError', ctx.ingestionLastError))
       if (ctx.warDiagnostics) {
         const warDiagnosticsJson = JSON.stringify(ctx.warDiagnostics, null, 2)
@@ -414,6 +417,7 @@ export default function ReportIssueModal({ isOpen, onClose, prefill }: ReportIss
               display: enriched.display,
               stellarisVersion: enriched.stellarisVersion,
               dlcs: enriched.dlcs,
+              mods: enriched.mods,
               empireName: enriched.empireName,
               empireType: enriched.empireType,
               empireOrigin: enriched.empireOrigin,

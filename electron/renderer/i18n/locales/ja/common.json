@@ -1081,6 +1081,7 @@
         "civics": "国是：{{value}}",
         "dlcs_one": "有効なDLC：{{count}}件",
         "dlcs_other": "有効なDLC：{{count}}件",
+        "mods": "MOD：{{value}}",
         "ingestionLastError": "最後の読み込みエラー：{{value}}",
         "source": "発生元：{{value}}",
         "message": "メッセージ：{{value}}",

@@ -1091,6 +1091,7 @@
         "civics": "Principios cívicos: {{value}}",
         "dlcs_one": "{{count}} DLC activado",
         "dlcs_other": "{{count}} DLC activados",
+        "mods": "Mods: {{value}}",
         "dlcs_many": "{{count}} DLC activados",
         "ingestionLastError": "Último error de lectura: {{value}}",
         "source": "Origen del error: {{value}}",

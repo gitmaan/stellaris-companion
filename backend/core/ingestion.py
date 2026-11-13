@@ -3,7 +3,6 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
-import re
 import threading
 import time
 import zipfile
@@ -15,6 +14,7 @@ from backend.core.database import DEFAULT_KEEP_FULL_BRIEFINGS_RECENT
 from backend.core.history import compute_save_id, record_snapshot_from_briefing
 from backend.core.ingestion_worker import WorkerJob, run_worker_job
 from stellaris_companion.campaign_evidence import resolve_empire_identity
+from stellaris_save_extractor import SaveExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -221,28 +221,8 @@ class IngestionManager:
         self._active_worker_job = None
 
     def _read_meta_only(self, save_path: Path) -> dict[str, Any]:
-        with zipfile.ZipFile(save_path, "r") as z:
-            meta_text = z.read("meta").decode("utf-8", errors="replace")
-        parsed: dict[str, Any] = {
-            "file_path": str(save_path),
-            "file_size_mb": save_path.stat().st_size / (1024 * 1024),
-            "modified": time.strftime(
-                "%Y-%m-%dT%H:%M:%S", time.localtime(save_path.stat().st_mtime)
-            ),
-        }
-        for line in meta_text.split("\n"):
-            if "=" in line and "flag" not in line.lower():
-                key, _, value = line.partition("=")
-                key = key.strip()
-                value = value.strip().strip('"')
-                if key in {"version", "name", "date"}:
-                    parsed[key] = value
-
-        # Mirror SaveExtractor metadata behavior for diagnostics/UI/prompt context.
-        # We parse required_dlcs directly from the meta text without loading gamestate.
-        dlc_match = re.search(r"required_dlcs\s*=\s*\{([^}]*)\}", meta_text, re.DOTALL)
-        parsed["required_dlcs"] = re.findall(r'"([^"]+)"', dlc_match.group(1)) if dlc_match else []
-        return parsed
+        """The save's header, read the way the full extraction reads it."""
+        return SaveExtractor(str(save_path)).get_metadata()
 
     def _wait_for_stable_save(self, save_path: Path, request_id: int) -> bool:
         """Wait until save file is stable and readable as a zip/meta."""

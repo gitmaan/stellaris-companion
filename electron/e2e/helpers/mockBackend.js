@@ -282,6 +282,11 @@ function createMockChronicleBackend(options = {}) {
       return
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/diagnostics' && options.diagnostics) {
+      sendJson(res, 200, options.diagnostics)
+      return
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/status') {
       sendJson(res, 200, statusPayload())
       return

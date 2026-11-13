@@ -1091,6 +1091,7 @@
         "civics": "Doctrines civiques : {{value}}",
         "dlcs_one": "{{count}} DLC activé",
         "dlcs_other": "{{count}} DLC activés",
+        "mods": "Mods : {{value}}",
         "dlcs_many": "{{count}} DLC activés",
         "ingestionLastError": "Dernière erreur de lecture : {{value}}",
         "source": "Source : {{value}}",

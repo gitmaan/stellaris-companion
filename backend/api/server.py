@@ -419,6 +419,7 @@ def create_app() -> FastAPI:
         diagnostics: dict[str, Any] = {
             "stellarisVersion": None,
             "dlcs": [],
+            "mods": [],
             "empireType": None,
             "empireName": None,
             "empireEthics": [],
@@ -449,6 +450,7 @@ def create_app() -> FastAPI:
 
             diagnostics["stellarisVersion"] = meta.get("version")
             diagnostics["dlcs"] = meta.get("required_dlcs", [])
+            diagnostics["mods"] = meta.get("mods", [])
             diagnostics["empireName"] = meta.get("empire_name") or meta.get("name")
             diagnostics["gameYear"] = meta.get("date") or status.get("t2_game_date")
             diagnostics["saveFileSizeMb"] = meta.get("file_size_mb")
@@ -473,6 +475,7 @@ def create_app() -> FastAPI:
             precompute_status = companion.get_precompute_status()
             diagnostics["stellarisVersion"] = meta.get("version")
             diagnostics["dlcs"] = meta.get("required_dlcs", [])
+            diagnostics["mods"] = meta.get("mods", [])
             diagnostics["empireName"] = meta.get("name")
             diagnostics["gameYear"] = meta.get("date")
             diagnostics["saveFileSizeMb"] = meta.get("file_size_mb")

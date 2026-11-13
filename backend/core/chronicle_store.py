@@ -87,10 +87,11 @@ def compact_chronicle_context(briefing: dict[str, Any]) -> dict[str, Any]:
                 identity[key] = deepcopy(raw_identity[key])
     meta = fields(briefing.get("meta"), ("date", "version", "empire_name", "required_dlcs_status"))
     raw_meta = briefing.get("meta")
-    if isinstance(raw_meta, dict) and "required_dlcs" in raw_meta:
-        # A truncated list would change the evidence. Preserve the reported field
-        # verbatim, including invalid/legacy values for the read-time resolver.
-        meta["required_dlcs"] = deepcopy(raw_meta["required_dlcs"])
+    # A truncated list would change the evidence. Preserve the reported fields
+    # verbatim, including invalid/legacy values for the read-time resolver.
+    for name in ("required_dlcs", "mods"):
+        if isinstance(raw_meta, dict) and name in raw_meta:
+            meta[name] = deepcopy(raw_meta[name])
     if not identity.get("empire_name") and meta.get("empire_name"):
         identity["empire_name"] = meta["empire_name"]
     diplomacy = briefing.get("diplomacy") or {}
