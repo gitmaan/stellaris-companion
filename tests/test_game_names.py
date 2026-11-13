@@ -463,3 +463,42 @@ def test_a_later_tier_of_a_leader_trait_is_named_after_its_first_tier() -> None:
         assert _display_identifier("leader_trait_scout_2", "leadership", "traits") == "Scout II"
     finally:
         game_names.use_names(None)
+
+
+def test_resources_are_named_as_the_game_names_them(machine) -> None:
+    """A resource's ID is not always its name: ``integrity`` is shown as "Valor"."""
+    install = machine(
+        mods={
+            "resource_mod": (
+                'l_english:\n energy:0 "Energy Credits"\n sr_zro:0 "Zro"\n'
+                ' integrity:0 "Valor"\n giga_sr_negative_mass:0 "Negative Mass"\n'
+            )
+        }
+    )
+    game_names.use_names(GameNames.from_install(install))
+    source = {
+        "economy": {
+            "net_monthly": {"energy": 5.0, "integrity": 1.0, "giga_sr_negative_mass": 0.5},
+            "key_resources": {"energy": 5.0},
+            "resources": {
+                "stockpiles": {"energy": 100.0, "sr_zro": 3.0, "a_mod_resource": 2.0},
+                "strategic_stockpiles": {"zro": 3.0},
+                "summary": {"energy_net": 5.0},
+            },
+        }
+    }
+
+    economy = build_model_briefing(source)["economy"]
+
+    assert economy["net_monthly"] == {"Energy Credits": 5.0, "Valor": 1.0, "Negative Mass": 0.5}
+    # A resource the game has no text for keeps its ID.
+    assert economy["resources"]["stockpiles"] == {
+        "Energy Credits": 100.0,
+        "Zro": 3.0,
+        "a_mod_resource": 2.0,
+    }
+    assert economy["resources"]["strategic_stockpiles"] == {"Zro": 3.0}
+    # The app's own field names are never looked up.
+    assert economy["key_resources"] == {"energy": 5.0}
+    assert economy["resources"]["summary"] == {"energy_net": 5.0}
+    game_names.use_names(None)

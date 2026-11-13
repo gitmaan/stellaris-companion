@@ -182,3 +182,17 @@ def test_complete_briefing_persists_dlc_evidence_for_all_consumers(monkeypatch, 
     assert stored["meta"]["required_dlcs_status"] == "reported"
     model = build_model_briefing(stored)
     assert model["model_context"]["content_availability"]["reported_dlcs"] == ["Overlord"]
+
+
+def test_mods_are_told_to_the_advisor_only_when_the_save_names_some() -> None:
+    plain = {"version": "Cygnus v4.5.3", "required_dlcs": [], "required_dlcs_status": "reported"}
+
+    unmodded = resolve_content_availability({**plain, "mods": []})
+    assert unmodded == resolve_content_availability(plain)
+    assert "mods" not in unmodded and "mods_instruction" not in unmodded
+
+    modded = resolve_content_availability({**plain, "mods": ["Gigastructural Engineering", " "]})
+    assert modded["mods"] == ["Gigastructural Engineering"]
+    assert "describes the unmodded game" in modded["mods_instruction"]
+    # Malformed evidence is not turned into a claim.
+    assert "mods" not in resolve_content_availability({**plain, "mods": "Gigastructural"})

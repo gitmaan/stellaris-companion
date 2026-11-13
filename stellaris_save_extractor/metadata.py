@@ -69,6 +69,8 @@ class MetadataMixin:
         result["required_dlcs"], result["required_dlcs_status"] = (
             self._parse_required_dlcs_evidence()
         )
+        # A save made with mods lists them by the names the launcher shows.
+        result["mods"] = self._quoted_names_block("mods")[0]
 
         return result
 
@@ -88,13 +90,21 @@ class MetadataMixin:
 
     def _parse_required_dlcs_evidence(self) -> tuple[list[str], str]:
         """Distinguish a reported empty list from missing or malformed metadata."""
+        return self._quoted_names_block("required_dlcs")
+
+    def _quoted_names_block(self, key: str) -> tuple[list[str], str]:
+        """The quoted names of a ``key={ "A" "B" }`` block of the save's header.
+
+        The status is ``reported``, ``not_recorded`` when the header has no such block,
+        or ``invalid`` when the block holds anything but quoted names.
+        """
         meta = getattr(self, "_meta", None) or ""
         # Ignore comments without stripping a # inside a quoted name.
         meta = re.sub(r'("(?:\\.|[^"\\])*")|#[^\n]*', lambda m: m.group(1) or "", meta)
-        if not re.search(r"\brequired_dlcs\s*=", meta):
+        if not re.search(rf"\b{key}\s*=", meta):
             return [], "not_recorded"
 
-        match = re.search(r"\brequired_dlcs\s*=\s*\{([^{}]*)\}", meta, re.DOTALL)
+        match = re.search(rf"\b{key}\s*=\s*\{{([^{{}}]*)\}}", meta, re.DOTALL)
         if not match:
             return [], "invalid"
         block = match.group(1)

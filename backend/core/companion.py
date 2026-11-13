@@ -317,7 +317,7 @@ class Companion:
             return None
         return {
             key: metadata[key]
-            for key in ("version", "required_dlcs", "required_dlcs_status")
+            for key in ("version", "required_dlcs", "required_dlcs_status", "mods")
             if key in metadata
         }
 

@@ -38,6 +38,12 @@ KEY_NAME_PREFIXES: dict[tuple[str, str], tuple[str, ...]] = {
     ("defense", "by_level"): ("starbase_", ""),
     ("military", "ship_classes"): ("",),
     ("federation_details", "laws"): ("",),
+    # Resources: ``sr_zro`` is "Zro", ``integrity`` is "Valor", and a mod's are its own.
+    ("economy", "stockpiles"): ("",),
+    ("economy", "monthly_income"): ("",),
+    ("economy", "monthly_expenses"): ("",),
+    ("economy", "net_monthly"): ("",),
+    ("economy", "strategic_stockpiles"): ("sr_",),
 }
 
 # A save ID: lowercase words joined by underscores. One bare word is too easily
