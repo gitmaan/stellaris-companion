@@ -4,8 +4,8 @@ The first beta after stable 1.1.2. It reads the empire's origin (#127, reported 
 shows the empire's ethics, civics, authority and origin in the Advisor panel by their
 in-game names (#128), reads every resource the save lists for the player and no longer
 only eighteen of them (#129), tells the Advisor which mods a campaign is played with
-(#130), and names resources in the Advisor's briefing as the game does (#131). Stable
-remains 1.1.2. Merge this after #130 and #131: the release notes describe both.
+(#130), names resources in the Advisor's briefing as the game does (#131), and tells the
+Chronicle and a bug report about the mods too (#133). Stable remains 1.1.2.
 
 ## Release validation
 
@@ -25,8 +25,14 @@ Done before the tag, on main with #130, #131 and this change merged together loc
   at the handover. The same pairs of saves record none under either version alone, so
   this shows that nothing is invented, and does not exercise a real change.
 
-Still to do before the tag: the candidate build on four platforms and the installed-app
-journeys on Windows.
+- A candidate build of main at #132 (`0f17d95`) passed on four platforms, with 11
+  installed-app journeys on Windows. The Intel Mac build failed once when Apple's service
+  dropped the connection while the notarization ticket was attached, and passed when rerun.
+- #133: the quick read of a new save's header now is the extractor's own reading, and
+  gives the same version, name, date and DLC list as before on all 22 local saves. The
+  report dialog was driven end to end with a modded game's diagnostics.
+
+Still to do before the tag: the candidate build again, on main with #133.
 
 Not claimed:
 
@@ -37,7 +43,9 @@ Not claimed:
   recognised as a crisis.
 - No local save holds a resource whose ID differs from its name beyond the common ones
   ("Valor", a mod's resources); that case is covered by tests with made-up game text.
-- The Chronicle is not told about mods.
+- A bug report carries the mod names, but the feedback service does not yet print them
+  in the issue it files. That is a change to the service in the site repository, deployed
+  separately.
 
 ## Earlier release records
 

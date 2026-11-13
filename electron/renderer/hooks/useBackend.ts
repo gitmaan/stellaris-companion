@@ -359,6 +359,7 @@ export interface ErrorResponse {
 export interface DiagnosticsResponse {
   stellarisVersion: string | null
   dlcs: string[]
+  mods?: string[]
   empireType: string | null
   empireName: string | null
   empireEthics: string[]

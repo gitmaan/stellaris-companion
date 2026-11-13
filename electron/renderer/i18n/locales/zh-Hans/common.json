@@ -1081,6 +1081,7 @@
         "civics": "国民理念：{{value}}",
         "dlcs_one": "已启用 {{count}} 个 DLC",
         "dlcs_other": "已启用 {{count}} 个 DLC",
+        "mods": "模组：{{value}}",
         "ingestionLastError": "最近一次读取错误：{{value}}",
         "source": "来源：{{value}}",
         "message": "消息：{{value}}",

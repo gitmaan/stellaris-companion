@@ -6,8 +6,8 @@ const { createMockChronicleBackend } = require('./helpers/mockBackend')
 const { getElectronLaunchOptions, assertPackagedApp } = require('./helpers/electronLaunch')
 const zh = require('../renderer/i18n/locales/zh-Hans/common.json')
 
-async function withApp(run) {
-  const backend = createMockChronicleBackend({ chatResponse: '这是一条完整的测试回复。舰队守护边境，研究者追踪古老的信号。最后一句也应该清晰可见。' })
+async function withApp(run, backendOptions = {}) {
+  const backend = createMockChronicleBackend({ chatResponse: '这是一条完整的测试回复。舰队守护边境，研究者追踪古老的信号。最后一句也应该清晰可见。', ...backendOptions })
   const port = await backend.start()
   const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-feedback-'))
   let app
@@ -102,6 +102,27 @@ test('feedback previews the unobscured screen and submits exactly the opted-in p
     await expect(page.getByRole('dialog')).toHaveCount(0)
     expect(await page.locator('#root').evaluate(root => root.inert)).toBe(false)
   })
+})
+
+test('a report from a modded game names the mods', async () => {
+  const mods = ['Gigastructural Engineering & More (4.5)', 'UI Overhaul Dynamic']
+  await withApp(async (page, app) => {
+    const submissions = []
+    await page.route('https://feedback.galacticfilingcabinet.com/**', async route => {
+      submissions.push(route.request().postDataJSON())
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ issueUrl: 'https://example.test/fixture-report' }) })
+    })
+    await page.getByLabel(zh.report.includeDiagnostics, { exact: true }).check()
+    await page.getByRole('button', { name: zh.report.copy, exact: true }).click()
+    await expect.poll(() => app.evaluate(() => globalThis.feedbackCopiedText))
+      .toContain(`- ${zh.report.markdown.fields.mods.replace('{{value}}', mods.join(', '))}`)
+    const submit = page.getByRole('button', { name: zh.report.submit, exact: true })
+    if (await submit.isEnabled()) {
+      await submit.click()
+      await expect.poll(() => submissions.length).toBe(1)
+      expect(submissions[0].context.diagnostics.mods).toEqual(mods)
+    }
+  }, { diagnostics: { stellarisVersion: 'Cygnus v4.5.2', dlcs: ['Utopia'], mods, empireName: 'Roaming Concord' } })
 })
 
 test('capture errors restore the dialog and allow retry without losing the report', async () => {

@@ -129,6 +129,7 @@ def test_historical_compaction_retains_identity_and_content_evidence(version):
             "version": version,
             "required_dlcs": [f"Pack {n}" for n in range(20)],
             "required_dlcs_status": "reported",
+            "mods": [f"Mod {n}" for n in range(20)],
         },
         "identity": {
             "authority": "machine_intelligence",

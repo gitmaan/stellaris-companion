@@ -1081,6 +1081,7 @@
         "civics": "Staatselemente: {{value}}",
         "dlcs_one": "{{count}} DLC aktiviert",
         "dlcs_other": "{{count}} DLCs aktiviert",
+        "mods": "Mods: {{value}}",
         "ingestionLastError": "Letzter Einlesefehler: {{value}}",
         "source": "Quelle: {{value}}",
         "message": "Meldung: {{value}}",
