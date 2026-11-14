@@ -945,7 +945,8 @@ class DiplomacyMixin:
             if isinstance(rm, dict):
                 for rel in repeated(rm.get("relation")):
                     if isinstance(rel, dict) and str(rel.get("country")) == str(player_id):
-                        with contextlib.suppress(ValueError, TypeError):
+                        # The save leaves the score out of some relation entries.
+                        with contextlib.suppress(KeyError, ValueError, TypeError):
                             empire_info["opinion_of_player"] = int(float(rel["relation_current"]))
                         break
 

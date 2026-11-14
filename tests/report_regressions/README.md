@@ -59,6 +59,7 @@ matter to the report need writing.
 | #83 | Chronicle dates after loading an older save | Chronicle + database | referenced |
 | #95 | Story lost after changing the player's empire | ingestion + narrative ancestry + Advisor/Chronicle/MCP | new + referenced |
 | #104 | Research options under made-up names; technologies in progress counted as researched | Rust lookup + technology extractor + name catalog + model briefing + events + MCP | new + referenced |
+| #135 | No save loads: a Fallen Empire's relation entry has no opinion score | diplomacy extractor | new |
 
 `registry.py` has the node IDs, root causes, fixes, and revert-verification
 status. Excluded reports and the reasons are listed in `NOT_COVERED`.

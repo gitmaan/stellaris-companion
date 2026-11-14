@@ -38,6 +38,28 @@ class Report:
 
 
 REPORTS: dict[int, Report] = {
+    135: Report(
+        summary="No save loads in 1.1.2: the worker stops with KeyError 'relation_current'.",
+        root_cause=(
+            "Since PR #110 a Fallen Empire's opinion of the player is read from "
+            "relation_current in its relation entry for the player. That read allowed for "
+            "a malformed score but not for an entry that has no score, and nothing between "
+            "it and the worker catches the error, so one such entry failed the whole save. "
+            "The reporter's saves were not available; which entries lack the score in "
+            "their games is not confirmed."
+        ),
+        fixed_by=("claude/optimistic-volta-ttfw3q",),
+        layer="diplomacy extractor",
+        cases=(
+            Case(
+                f"{_HERE}/test_report_diplomacy.py"
+                "::test_issue_135_a_fallen_empire_without_an_opinion_score_does_not_stop_the_save",
+                "new",
+                True,
+                "Fails with the reported traceback when the fix is reverted.",
+            ),
+        ),
+    ),
     125: Report(
         summary="The Advisor's info panel shows no Origin for the empire.",
         root_cause=(
