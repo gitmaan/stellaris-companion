@@ -52,9 +52,10 @@ They are from Stellaris 4.2.4 (20 saves), 4.3.0 and 4.4.6, in 8 campaigns:
   two by this code hold the same events (4, 9 and 3) as the same campaigns recorded by
   this code alone.
 - 8,803 of the 21,713 relation entries in these saves carry no `relation_current`, so an
-  entry without the score is ordinary for the game and not new in 4.5.4. All 40 entries
-  a Fallen Empire holds for the player carry it, which is why no local save failed to
-  load in 1.1.2.
+  entry without the score is ordinary for the game. All 40 entries a Fallen Empire holds
+  for the player carry it, which is why no local save failed to load in 1.1.2.
+- The public 4.5.2 save attached to #79 still writes `relation_current`, and the empires
+  its player has met carry an opinion.
 
 Still to do before the tag:
 
@@ -66,9 +67,12 @@ Still to do before the tag:
 Not claimed:
 
 - Neither of the reporter's saves was seen, so which relation entries lack the score in
-  their games is not known. No local save is from Stellaris 4.5, so opinion scores were
-  not checked on a 4.5 save. The #135 report was filed on GitHub and not from the app,
-  so it carries no shared save to fetch.
+  their games is not known. No local save is from Stellaris 4.5 and no 4.5.4 save was
+  seen at all; the one 4.5 save checked is the public 4.5.2 save attached to #79. The
+  #135 report was filed on GitHub and not from the app, so it carries no shared save.
+- `scripts/check_local_saves.py` reports one parser difference on that 4.5.2 save: a
+  leading empty block in a list of pop factions, which no reader uses, is not returned.
+  It is not addressed in this release.
 - The #135 report says a multiplayer save failed only after the player's name was set in
   the settings. It ends in the same traceback; the difference was not investigated.
 - The damaged-key test covers the keys the synthetic saves contain, in 13 sections. A
