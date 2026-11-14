@@ -1,4 +1,5 @@
+- Fixed: 1.1.2 could fail to load a save with a Fallen Empire in the galaxy, leaving the Advisor with nothing to answer from.
 - Your empire's origin now appears in the Advisor panel, with its ethics, civics and authority under their in-game names.
 - Playing with mods? The Advisor and the Chronicle now know which ones.
 - The Advisor follows Trade and every other resource in your game, by its in-game name.
-- Thanks to @arseking, whose report brought origins to the panel.
+- Thanks to @Rampage-S and @arseking, whose reports led to these fixes.
