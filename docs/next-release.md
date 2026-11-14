@@ -11,6 +11,12 @@ the version changed. It is beta.1 (#127 to #133) plus:
   held a bare value now read the first value or nothing, and a history signal that could
   not be built is recorded as unread and no longer as empty, which had the campaign
   history record wars ended and leaders removed that never were.
+- #139: ethics are read on a Cygnus 4.5 save. Cygnus writes them as one list,
+  `ethos={ ethics={ ... } }`, where earlier versions repeat `ethic=`, and only the
+  earlier form was read: on any 4.5 save the player's ethics, the ethics of other
+  empires and the archetype of a Fallen Empire were missing (#125). On the public 4.5.2
+  save attached to #79 the player's ethics, a neighbour's and five Fallen Empires' are
+  now read where none were. The 22 local saves, all older than 4.5, read as before.
 
 The maintainer chose to ship #137 in this stable and not in a beta first: each beta is
 downloaded 5 to 10 times against about 400 for a stable, so a beta adds days and little

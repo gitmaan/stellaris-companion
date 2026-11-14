@@ -24,6 +24,17 @@ def is_yes(value: Any) -> bool:
     return any(item == "yes" for item in repeated(value))
 
 
+def ethics_of(country: Any) -> list[str]:
+    """A country's ethics, as IDs such as ``ethic_pacifist``.
+
+    Cygnus 4.5 writes them as one list, ``ethos={ ethics={ "a" "b" } }``. Earlier
+    versions repeat a key, ``ethos={ ethic="a" ethic="b" }``.
+    """
+    ethos = block(country.get("ethos")) if isinstance(country, dict) else {}
+    written = repeated(ethos.get("ethics")) or repeated(ethos.get("ethic"))
+    return [ethic for ethic in written if isinstance(ethic, str)]
+
+
 def one(value: Any) -> Any:
     """The value of a key a reader expects once: the first when the save repeats it."""
     if isinstance(value, list):

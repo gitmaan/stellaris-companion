@@ -22,7 +22,7 @@ from .colony_resolver import (
 from .fleet_classification import classify_owned_fleet
 from .name_resolution import ResolvedName
 from .name_resolution import resolve_name as _resolve_name
-from .save_values import block
+from .save_values import block, ethics_of
 
 logger = logging.getLogger(__name__)
 
@@ -696,17 +696,9 @@ class SaveExtractorBase:
         for country_id_str, country_data in self._get_countries_cached().items():
             country_id = int(country_id_str)
 
-            ethos = country_data.get("ethos")
-            if not isinstance(ethos, dict):
-                continue
-
-            ethic = ethos.get("ethic", [])
-            if isinstance(ethic, str):
-                ethic = [ethic]
-            if isinstance(ethic, list):
-                cleaned = [e.replace("ethic_", "") for e in ethic if isinstance(e, str)]
-                if cleaned:
-                    country_ethics[country_id] = cleaned
+            cleaned = [e.replace("ethic_", "") for e in ethics_of(country_data)]
+            if cleaned:
+                country_ethics[country_id] = cleaned
 
         self._country_ethics = country_ethics
         return self._country_ethics
