@@ -61,16 +61,18 @@ REPORTS: dict[int, Report] = {
         ),
     ),
     125: Report(
-        summary="The Advisor's info panel shows no Origin for the empire.",
+        summary="The Advisor's info panel shows no Origin and no Ethics for the empire.",
         root_cause=(
             "The save keeps the empire's origin in the country's government block, beside "
             "the authority and civics, and the identity extractor never read it. The "
             "Advisor's empire identity, the info panel and the report dialog all had a "
-            "place for the origin and received nothing. The report also said ethics were "
-            "never read; that did not reproduce: all 22 local Cygnus 4.5.3 saves write "
-            "ethos.ethic and their ethics are read."
+            "place for the origin and received nothing. Ethics: Cygnus 4.5 writes them as "
+            "one list, ethos.ethics, where earlier versions repeat ethos.ethic, and only the "
+            "earlier form was read. This was first recorded as not reproduced, because the "
+            "22 local saves were taken for 4.5.3 saves; they are from 4.2.4 to 4.4.6. A "
+            "public 4.5.2 save (attached to #79) has the form the reporter described."
         ),
-        fixed_by=("PR #127",),
+        fixed_by=("PR #127", "PR #139"),
         layer="identity extractor",
         cases=(
             Case(
@@ -78,6 +80,13 @@ REPORTS: dict[int, Report] = {
                 "::test_issue_125_the_empires_origin_is_read_with_its_ethics",
                 "new",
                 True,
+            ),
+            Case(
+                f"{_HERE}/test_report_campaign_evidence.py"
+                "::test_issue_125_ethics_are_read_as_cygnus_writes_them",
+                "new",
+                True,
+                "Fails with no ethics read when the fix is reverted.",
             ),
         ),
     ),
