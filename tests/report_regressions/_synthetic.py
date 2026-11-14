@@ -13,6 +13,8 @@ a case does not define behave like empty sections in a minimal save.
 from __future__ import annotations
 
 import contextlib
+import json
+import os
 import zipfile
 from collections.abc import Iterator
 from copy import deepcopy
@@ -21,6 +23,9 @@ from typing import Any
 
 from stellaris_companion import rust_bridge
 
+# Names a file; when set, each synthetic save is appended to it as one JSON line.
+RECORD_SAVES_ENV = "STELLARIS_RECORD_SYNTHETIC_SAVES"
+
 
 class SyntheticSession:
     """In-memory stand-in for ``rust_bridge.RustSession``."""
@@ -28,6 +33,11 @@ class SyntheticSession:
     def __init__(self, sections: dict[str, Any]) -> None:
         self._sections = deepcopy(sections)
         self._streaming = False
+        # tests/test_damaged_save_keys.py collects every save the cases build.
+        record = os.environ.get(RECORD_SAVES_ENV)
+        if record:
+            with open(record, "a", encoding="utf-8") as out:
+                out.write(json.dumps(sections, default=str) + "\n")
 
     def _section(self, name: str) -> dict[str, Any]:
         value = self._sections.get(name)

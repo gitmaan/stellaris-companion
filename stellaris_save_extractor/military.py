@@ -8,7 +8,7 @@ import re
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
 from .fleet_classification import classify_owned_fleet
-from .save_values import is_yes
+from .save_values import block, is_yes, one, text
 
 logger = logging.getLogger(__name__)
 
@@ -168,8 +168,8 @@ class MilitaryMixin:
             if isinstance(attackers, list):
                 for attacker in attackers:
                     if isinstance(attacker, dict):
-                        country = attacker.get("country")
-                        if country:
+                        country = one(attacker.get("country"))
+                        if str(country).isdigit():
                             attacker_ids.append(str(country))
 
             # Extract defender country IDs
@@ -178,8 +178,8 @@ class MilitaryMixin:
             if isinstance(defenders, list):
                 for defender in defenders:
                     if isinstance(defender, dict):
-                        country = defender.get("country")
-                        if country:
+                        country = one(defender.get("country"))
+                        if str(country).isdigit():
                             defender_ids.append(str(country))
 
             # Check if player is involved
@@ -1082,8 +1082,7 @@ class MilitaryMixin:
 
         # Now get starbase details from starbase_mgr (P031)
         data = session.extract_sections(["starbase_mgr"])
-        starbase_mgr = data.get("starbase_mgr", {})
-        starbases_section = starbase_mgr.get("starbases", {})
+        starbases_section = block(block(data.get("starbase_mgr")).get("starbases"))
 
         starbases_found = []
         level_counts = {}
@@ -1220,7 +1219,7 @@ class MilitaryMixin:
                 continue
 
             # P011: Use .get() with defaults
-            mega_type = entry.get("type")
+            mega_type = text(entry.get("type"))
             if not mega_type:
                 continue
 

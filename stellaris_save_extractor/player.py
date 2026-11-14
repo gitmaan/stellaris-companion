@@ -7,7 +7,7 @@ from collections import defaultdict
 
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
-from stellaris_save_extractor.save_values import repeated
+from stellaris_save_extractor.save_values import repeated, text
 
 logger = logging.getLogger(__name__)
 
@@ -551,11 +551,11 @@ class PlayerMixin:
         # Extract government info
         gov = country.get("government", {})
         if isinstance(gov, dict):
-            gov_type = gov.get("type", "")
+            gov_type = text(gov.get("type"))
             if gov_type:
                 result["government"] = gov_type.replace("gov_", "")
 
-            authority = gov.get("authority", "")
+            authority = text(gov.get("authority"))
             if authority:
                 result["authority"] = authority.replace("auth_", "")
 

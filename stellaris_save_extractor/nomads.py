@@ -21,6 +21,8 @@ from typing import Any
 
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
+from .save_values import block, text
+
 logger = logging.getLogger(__name__)
 
 NOMAD_ECONOMY_SITUATION = "situation_nomad_economy"
@@ -151,7 +153,7 @@ class NomadsMixin:
                 stage = RESERVE_STAGES[index]
         except (TypeError, ValueError):
             pass
-        approach = entry.get("approach")
+        approach = text(entry.get("approach")) or None
         summary = {
             "current": _number(entry.get("progress")),
             "stage": stage,
@@ -214,8 +216,8 @@ class NomadsMixin:
             )
 
         station_ships: dict[str, dict] = {}
-        starbases = session.extract_sections(["starbase_mgr"]).get("starbase_mgr") or {}
-        for starbase in (starbases.get("starbases") or {}).values():
+        starbases = block(session.extract_sections(["starbase_mgr"]).get("starbase_mgr"))
+        for starbase in block(starbases.get("starbases")).values():
             if not isinstance(starbase, dict):
                 continue
             level = str(starbase.get("level") or "")

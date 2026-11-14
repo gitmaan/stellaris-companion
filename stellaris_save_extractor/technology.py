@@ -4,6 +4,8 @@ import logging
 
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
+from .save_values import block
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,7 +67,7 @@ class TechnologyMixin:
             result["error"] = "Could not find player country"
             return result
 
-        tech_status = player_data.get("tech_status")
+        tech_status = block(player_data.get("tech_status"))
         if not tech_status:
             result["error"] = "Could not find tech_status section"
             return result

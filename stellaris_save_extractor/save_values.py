@@ -22,3 +22,22 @@ def repeated(value: Any) -> list[Any]:
 def is_yes(value: Any) -> bool:
     """Whether a yes/no key is set. The game writes some flags more than once."""
     return any(item == "yes" for item in repeated(value))
+
+
+def one(value: Any) -> Any:
+    """The value of a key a reader expects once: the first when the save repeats it."""
+    if isinstance(value, list):
+        return value[0] if value else None
+    return value
+
+
+def text(value: Any, default: str = "") -> str:
+    """A key's value as text; ``default`` when it is absent or holds a block."""
+    value = one(value)
+    return value if isinstance(value, str) else default
+
+
+def block(value: Any) -> dict[str, Any]:
+    """A key's block; ``{}`` when it is absent or holds a bare value such as ``none``."""
+    value = one(value)
+    return value if isinstance(value, dict) else {}

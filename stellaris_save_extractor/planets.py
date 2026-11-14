@@ -6,7 +6,7 @@ import logging
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
-from .save_values import repeated
+from .save_values import repeated, text
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class PlanetsMixin:
             carrier = ref.carrier
 
             # Get planet class and skip non-habitable
-            planet_class = colony_value(colony, carrier, "planet_class", "")
+            planet_class = text(colony_value(colony, carrier, "planet_class", ""))
             ptype = planet_class.replace("pc_", "") if planet_class else ""
             if ref.carrier_type == "ship" and not ptype:
                 ship_type = carrier.get("ship_size") or carrier.get("ship_class")

@@ -7,7 +7,7 @@ import logging
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
 from .game_vocabulary import WAR_IN_HEAVEN_FLAG
-from .save_values import is_yes, repeated
+from .save_values import is_yes, one, repeated
 
 logger = logging.getLogger(__name__)
 
@@ -933,8 +933,8 @@ class DiplomacyMixin:
 
             # Extract military power
             mil_power = country.get("military_power")
-            if mil_power is not None:
-                empire_info["military_power"] = float(mil_power)
+            with contextlib.suppress(TypeError, ValueError):
+                empire_info["military_power"] = float(one(mil_power))
                 if player_military > 0:
                     empire_info["power_ratio"] = round(
                         empire_info["military_power"] / player_military, 1

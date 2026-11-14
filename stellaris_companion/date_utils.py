@@ -27,7 +27,7 @@ def parse_date(date_str: str) -> tuple[int, int, int] | None:
     Returns:
         Tuple of (year, month, day) or None if invalid
     """
-    if not date_str:
+    if not date_str or not isinstance(date_str, str):
         return None
 
     match = re.match(r"^(\d{4})\.(\d{2})\.(\d{2})$", date_str.strip())

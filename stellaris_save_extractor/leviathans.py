@@ -6,6 +6,7 @@ import logging
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
 from .game_vocabulary import LEVIATHAN_COUNTRY_TYPES
+from .save_values import text
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,9 @@ class LeviathansMixin:
 
         fleets: dict[str, int] = {}
         for country in self._get_countries_cached().values():
-            kind = LEVIATHAN_COUNTRY_TYPES.get(country.get("country_type") or country.get("type"))
+            kind = LEVIATHAN_COUNTRY_TYPES.get(
+                text(country.get("country_type")) or text(country.get("type"))
+            )
             if kind:
                 fleets[kind] = fleets.get(kind, 0) + len(
                     self._get_owned_fleet_ids_from_entry(country)
