@@ -48,7 +48,7 @@ REPORTS: dict[int, Report] = {
             "The reporter's saves were not available; which entries lack the score in "
             "their games is not confirmed."
         ),
-        fixed_by=("claude/optimistic-volta-ttfw3q",),
+        fixed_by=("PR #136",),
         layer="diplomacy extractor",
         cases=(
             Case(
