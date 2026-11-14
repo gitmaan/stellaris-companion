@@ -1,3 +1,47 @@
+# Stable 1.1.3 candidate
+
+Promote 1.1.3-beta.1 to stable with one fix added. Stable 1.1.2 fails to load a save in
+which a Fallen Empire's relation entry for the player carries no opinion score (#135):
+the worker stops with `KeyError: 'relation_current'`, and the reporter went back to
+1.1.1. Unlike 1.1.2, this is therefore not a beta's code with only the version changed.
+It is beta.1 (#127 to #133) plus that fix, which has not been in a beta. The fix makes one
+read tolerate a missing key; a save that has the score reads as before.
+
+The five lines in `electron/release-notes.md` are a draft for the maintainer to approve.
+The fix leads, because it is the reason to update from 1.1.2, and the thanks to @Rampage-S
+(#135) and @arseking (#125) are the fifth line: the update dialog shows the first five
+bullets and nothing else.
+
+## Validation
+
+Done on the release branch, on Linux:
+
+- 1039 tests pass and ruff is clean.
+- The synthetic case for #135 fails with the reported traceback when the fix is reverted
+  and passes with it.
+
+Still to do before the tag:
+
+- `scripts/check_local_saves.py` and a before-and-after comparison of briefings on the
+  local real saves. The branch was prepared where no real save was available.
+- A candidate build of the merged main commit on four platforms, with the installed
+  Windows journeys.
+- Tag the merged main commit as `v1.1.3`, then verify signing and notarization, package
+  versions, both subscriber tracks and the payload checksums, as for 1.1.2.
+
+Not claimed:
+
+- Neither of the reporter's saves was seen, so which relation entries lack the score in
+  their games is not known. If Cygnus 4.5.4 writes the score under another key, the save
+  now loads but opinion scores are missing; the 22 local saves are 4.5.3.
+- The #135 report says a multiplayer save failed only after the player's name was set in
+  the settings. It ends in the same traceback; the difference was not investigated.
+- beta.1 was published on 2026-11-13, so its changes reach stable after a short time in
+  beta. Everything listed as not claimed for beta.1 below still stands.
+- A real update from 1.1.2 on a player's machine has not been checked.
+
+## Earlier release records
+
 # Beta 1.1.3-beta.1 candidate
 
 The first beta after stable 1.1.2. It reads the empire's origin (#127, reported in #125),
