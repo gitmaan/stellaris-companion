@@ -1,29 +1,47 @@
 # Stable 1.1.3 candidate
 
-Promote 1.1.3-beta.1 to stable with one fix added. Stable 1.1.2 fails to load a save in
-which a Fallen Empire's relation entry for the player carries no opinion score (#135):
-the worker stops with `KeyError: 'relation_current'`, and the reporter went back to
-1.1.1. Unlike 1.1.2, this is therefore not a beta's code with only the version changed.
-It is beta.1 (#127 to #133) plus that fix, which has not been in a beta. The fix makes one
-read tolerate a missing key; a save that has the score reads as before.
+Promote 1.1.3-beta.1 to stable with two changes that have not been in a beta. Stable 1.1.2
+fails to load a save in which a Fallen Empire's relation entry for the player carries no
+opinion score (#135): the worker stops with `KeyError: 'relation_current'`, and the
+reporter went back to 1.1.1. Unlike 1.1.2, this is therefore not a beta's code with only
+the version changed. It is beta.1 (#127 to #133) plus:
+
+- #136: that read tolerates a missing key; a save that has the score reads as before.
+- #137: 18 more lines that stopped a save from loading when a key was written twice or
+  held a bare value now read the first value or nothing, and a history signal that could
+  not be built is recorded as unread and no longer as empty, which had the campaign
+  history record wars ended and leaders removed that never were.
+
+The maintainer chose to ship #137 in this stable and not in a beta first: each beta is
+downloaded 5 to 10 times against about 400 for a stable, so a beta adds days and little
+evidence. The gate is the real-save comparison below. If it shows a difference, tag
+`7c74ac3` (main at #136) as 1.1.3 without #137.
 
 The five lines in `electron/release-notes.md` are a draft for the maintainer to approve.
 The fix leads, because it is the reason to update from 1.1.2, and the thanks to @Rampage-S
 (#135) and @arseking (#125) are the fifth line: the update dialog shows the first five
-bullets and nothing else.
+bullets and nothing else. #137 adds no line of its own; it is covered by the first.
 
 ## Validation
 
-Done on the release branch, on Linux:
+Done on the release branches, on Linux:
 
-- 1039 tests pass and ruff is clean.
+- 1051 tests pass and ruff is clean; CI passes on Linux and Windows.
 - The synthetic case for #135 fails with the reported traceback when the fix is reverted
   and passes with it.
+- `tests/test_damaged_save_keys.py` removes, repeats or replaces by `none` every key of
+  every synthetic save the tests build (about 1,300 keys, 4,000 runs). All load. With
+  the reader fixes of #137 reverted it fails; with the #135 fix reverted it finds #135.
+- The briefings and signals of all 19 synthetic saves are identical before and after #137.
+- On main before #137, an unchanged campaign saved three times, with the history signals
+  failing at the second save, records "War ended" and then "War started". With #137 it
+  records nothing, and a war that really ended while unread is recorded once.
 
 Still to do before the tag:
 
 - `scripts/check_local_saves.py` and a before-and-after comparison of briefings on the
-  local real saves. The branch was prepared where no real save was available.
+  local real saves, on main with #137. The branches were prepared where no real save was
+  available, so this is the only check of #136 and #137 against real saves.
 - A candidate build of the merged main commit on four platforms, with the installed
   Windows journeys.
 - Tag the merged main commit as `v1.1.3`, then verify signing and notarization, package
@@ -36,6 +54,10 @@ Not claimed:
   now loads but opinion scores are missing; the 22 local saves are 4.5.3.
 - The #135 report says a multiplayer save failed only after the player's name was set in
   the settings. It ends in the same traceback; the difference was not investigated.
+- The damaged-key test covers the keys the synthetic saves contain, in 13 sections. A
+  reader that fails for another reason still stops the whole save from loading.
+- A key written twice now reads as its first value. Whether the game uses the first or
+  the last is not known.
 - beta.1 was published on 2026-11-13, so its changes reach stable after a short time in
   beta. Everything listed as not claimed for beta.1 below still stands.
 - A real update from 1.1.2 on a player's machine has not been checked.
