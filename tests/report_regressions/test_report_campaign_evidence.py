@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from ._synthetic import advisor_request, country, ingest_synthetic_save, synthetic_meta
 
 # A plausible reported DLC list for a 4.4.6 save that never lists Synthetic Dawn,
@@ -117,4 +119,52 @@ def test_issue_125_the_empires_origin_is_read_with_its_ethics(monkeypatch, tmp_p
         "kind": "origin",
         "source": "verified_catalog",
     }
+    assert [ethic["name"] for ethic in identity["ethics"]] == ["Pacifist", "Fanatic Materialist"]
+
+
+def test_issue_125_ethics_are_read_as_cygnus_writes_them(monkeypatch, tmp_path):
+    """https://github.com/gitmaan/stellaris-companion/issues/125
+
+    Cygnus 4.5 writes an empire's ethics as one list, ethos={ ethics={ "a" "b" } },
+    where earlier versions repeated a key, ethos={ ethic="a" ethic="b" }. Only the
+    earlier form was read, so on a 4.5 save the Advisor and its info panel had no
+    ethics for the player, none for the empires the player has met, and no
+    archetype for a Fallen Empire.
+    """
+    sections = {
+        "player": [{"name": "Reporter", "country": "0"}],
+        "country": {
+            "0": country(
+                "Habitat Concord",
+                government={"type": "gov_representative_democracy", "authority": "auth_democratic"},
+                ethos={"ethics": ["ethic_pacifist", "ethic_fanatic_materialist"]},
+                relations_manager={
+                    "relation": {"owner": "0", "country": "1", "relation_current": "25"}
+                },
+            ),
+            "1": country("Tidal Assembly", ethos={"ethics": ["ethic_xenophile"]}),
+            "2": country(
+                "Silent Wardens",
+                type="fallen_empire",
+                ethos={"ethics": ["ethic_fanatic_xenophobe"]},
+            ),
+        },
+    }
+    payload = ingest_synthetic_save(
+        monkeypatch,
+        tmp_path,
+        sections,
+        meta=synthetic_meta(name="Habitat Concord", date="2218.01.01", version="Cygnus v4.5.4"),
+    )
+
+    assert payload["identity"]["ethics"] == ["pacifist", "fanatic_materialist"]
+    briefing = json.loads(payload["briefing_json"])
+    met = {empire["country_id"]: empire for empire in briefing["diplomacy"]["relations"]}
+    assert met[1]["ethics"] == ["xenophile"]
+    (fallen,) = briefing["fallen_empires"]["fallen_empires"]
+    assert fallen["ethics"] == "ethic_fanatic_xenophobe"
+    assert fallen["archetype"] == "Militant Isolationists"
+
+    _, _, model_briefing = advisor_request(monkeypatch, payload, "Who am I?")
+    identity = model_briefing["model_context"]["empire_identity"]
     assert [ethic["name"] for ethic in identity["ethics"]] == ["Pacifist", "Fanatic Materialist"]

@@ -7,7 +7,7 @@ import logging
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
 
 from .game_vocabulary import WAR_IN_HEAVEN_FLAG
-from .save_values import is_yes, one, repeated
+from .save_values import ethics_of, is_yes, one, repeated, text
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +180,7 @@ class DiplomacyMixin:
             # empires from special entities (enclaves, marauders, primitives, etc.).
             target_country = self._get_countries_cached().get(str(target_country_id))
             if isinstance(target_country, dict):
-                ctype = target_country.get("type")
+                ctype = text(target_country.get("type"))
                 if ctype:
                     relation_info["country_type"] = ctype
 
@@ -908,28 +908,15 @@ class DiplomacyMixin:
                             )
                             break
 
-            # Extract ethics
-            ethos_data = country.get("ethos")
-            if isinstance(ethos_data, dict):
-                ethic = ethos_data.get("ethic")
-                if isinstance(ethic, list):
-                    # Multiple ethics - prefer fanatic
-                    for e in ethic:
-                        if "fanatic" in str(e):
-                            empire_info["ethics"] = e
-                            break
-                    if not empire_info["ethics"] and ethic:
-                        empire_info["ethics"] = ethic[0]
-                elif ethic:
-                    empire_info["ethics"] = ethic
-
-                # Map to FE archetype
-                if empire_info["ethics"]:
-                    for key, (archetype, behavior) in FE_ARCHETYPES.items():
-                        if key in empire_info["ethics"]:
-                            empire_info["archetype"] = archetype
-                            empire_info["archetype_behavior"] = behavior
-                            break
+            # A Fallen Empire is known by one ethic: the fanatic one when it has several.
+            written = ethics_of(country)
+            if written:
+                empire_info["ethics"] = next((e for e in written if "fanatic" in e), written[0])
+                for key, (archetype, behavior) in FE_ARCHETYPES.items():
+                    if key in empire_info["ethics"]:
+                        empire_info["archetype"] = archetype
+                        empire_info["archetype_behavior"] = behavior
+                        break
 
             # Extract military power
             mil_power = country.get("military_power")

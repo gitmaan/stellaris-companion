@@ -7,7 +7,7 @@ from collections import defaultdict
 
 # Rust bridge for Clausewitz parsing (required for session mode)
 from stellaris_companion.rust_bridge import ParserError, _get_active_session
-from stellaris_save_extractor.save_values import repeated, text
+from stellaris_save_extractor.save_values import ethics_of, repeated, text
 
 logger = logging.getLogger(__name__)
 
@@ -541,12 +541,7 @@ class PlayerMixin:
             return result
 
         # Extract ethics
-        ethos = country.get("ethos", {})
-        if isinstance(ethos, dict):
-            ethic = ethos.get("ethic", [])
-            if isinstance(ethic, str):
-                ethic = [ethic]
-            result["ethics"] = [e.replace("ethic_", "") for e in ethic if isinstance(e, str)]
+        result["ethics"] = [e.replace("ethic_", "") for e in ethics_of(country)]
 
         # Extract government info
         gov = country.get("government", {})
