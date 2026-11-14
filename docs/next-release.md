@@ -23,7 +23,7 @@ downloaded 5 to 10 times against about 400 for a stable, so a beta adds days and
 evidence. The gate is the real-save comparison below. If it shows a difference, tag
 `7c74ac3` (main at #136) as 1.1.3 without #137.
 
-The five lines in `electron/release-notes.md` are a draft for the maintainer to approve.
+The maintainer approved the five lines in `electron/release-notes.md` on 2026-11-14.
 The fix leads, because it is the reason to update from 1.1.2, and the thanks to @Rampage-S
 (#135) and @arseking (#125) are the fifth line: the update dialog shows the first five
 bullets and nothing else. #137 adds no line of its own; it is covered by the first.
@@ -43,11 +43,28 @@ Done on the release branches, on Linux:
   failing at the second save, records "War ended" and then "War started". With #137 it
   records nothing, and a war that really ended while unread is recorded once.
 
+Done on the maintainer's machine, on main at #137 (`2698509`), with its 22 real saves.
+They are from Stellaris 4.2.4 (20 saves), 4.3.0 and 4.4.6, in 8 campaigns:
+
+- 1053 tests pass and ruff is clean.
+- `scripts/check_local_saves.py --all`: all 22 saves pass, and no history signal failed
+  to build.
+- The stored briefing of every save and the events recorded for every campaign are
+  identical at `7c74ac3` (without #137) and `2698509` (with it). The comparison ran with
+  `PYTHONHASHSEED=0`. Without it `defense.starbase_ids`, `projects.notable_completed` and
+  the order of the chokepoints differ between two runs of the same commit; that is older
+  than #137 and changes no recorded event.
+- Three campaigns whose first three saves were recorded by the 1.1.2 code and whose last
+  two by this code hold the same events (4, 9 and 3) as the same campaigns recorded by
+  this code alone.
+- 8,803 of the 21,713 relation entries in these saves carry no `relation_current`, so an
+  entry without the score is ordinary for the game. All 40 entries a Fallen Empire holds
+  for the player carry it, which is why no local save failed to load in 1.1.2.
+- The public 4.5.2 save attached to #79 still writes `relation_current`, and the empires
+  its player has met carry an opinion.
+
 Still to do before the tag:
 
-- `scripts/check_local_saves.py` and a before-and-after comparison of briefings on the
-  local real saves, on main with #137. The branches were prepared where no real save was
-  available, so this is the only check of #136 and #137 against real saves.
 - A candidate build of the merged main commit on four platforms, with the installed
   Windows journeys.
 - Tag the merged main commit as `v1.1.3`, then verify signing and notarization, package
@@ -56,8 +73,12 @@ Still to do before the tag:
 Not claimed:
 
 - Neither of the reporter's saves was seen, so which relation entries lack the score in
-  their games is not known. If Cygnus 4.5.4 writes the score under another key, the save
-  now loads but opinion scores are missing; the 22 local saves are 4.5.3.
+  their games is not known. No local save is from Stellaris 4.5 and no 4.5.4 save was
+  seen at all; the one 4.5 save checked is the public 4.5.2 save attached to #79. The
+  #135 report was filed on GitHub and not from the app, so it carries no shared save.
+- `scripts/check_local_saves.py` reports one parser difference on that 4.5.2 save: a
+  leading empty block in a list of pop factions, which no reader uses, is not returned.
+  It is not addressed in this release.
 - The #135 report says a multiplayer save failed only after the player's name was set in
   the settings. It ends in the same traceback; the difference was not investigated.
 - The damaged-key test covers the keys the synthetic saves contain, in 13 sections. A
