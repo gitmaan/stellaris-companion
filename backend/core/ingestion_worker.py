@@ -98,7 +98,14 @@ def _process_main(job: WorkerJob, out_q: mp.Queue[dict[str, Any]]) -> None:
                 log_timing("History enrichment (total)", timings["history_enrichment"])
             except Exception as e:
                 timings["history_enrichment"] = 0
-                logger.warning("History enrichment error: %s", e)
+                logger.warning("History enrichment error: %s", e, exc_info=True)
+                # Say that the history was not read. A snapshot with no history at
+                # all compares as "everything ended".
+                if isinstance(briefing, dict):
+                    from backend.core.snapshot_reader import HISTORY_SIGNALS
+
+                    briefing = dict(briefing)
+                    briefing["history"] = {"unread": sorted(HISTORY_SIGNALS)}
 
             t0 = time.time()
             briefing_json = json_dumps(briefing, default=str)

@@ -17,6 +17,37 @@ NAMING CONVENTION:
 
 from typing import Any
 
+# Every signal stored under ``history``. ``history["unread"]`` names the ones a
+# snapshot could not read; those are absent, which is not the same as empty.
+HISTORY_SIGNALS = (
+    "leaders",
+    "wars",
+    "diplomacy",
+    "technology",
+    "megastructures",
+    "crisis",
+    "fallen_empires",
+    "policies",
+    "edicts",
+    "galaxy",
+    "systems",
+    "ascension_perks",
+    "lgate",
+    "menace",
+    "great_khan",
+    "galactic_community",
+    "traditions",
+    "precursors",
+    "subjects",
+    "geography",
+)
+
+
+def get_unread_signals(briefing: dict[str, Any]) -> set[str]:
+    """The history signals this snapshot could not read."""
+    unread = _get_history(briefing).get("unread")
+    return {str(key) for key in unread} if isinstance(unread, list) else set()
+
 
 def _get_history(briefing: dict[str, Any]) -> dict[str, Any]:
     """Get history dict from briefing safely."""

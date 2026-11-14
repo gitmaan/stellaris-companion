@@ -11,12 +11,15 @@ See docs/OPTION_D_UNIFIED_HISTORY_EXTRACTION.md for architecture.
 from __future__ import annotations
 
 import contextlib
+import logging
 import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from stellaris_save_extractor import SaveExtractor
+
+logger = logging.getLogger(__name__)
 
 # Schema version for signals payload - increment when structure changes
 SIGNALS_FORMAT_VERSION = 1
@@ -159,65 +162,41 @@ def build_snapshot_signals(*, extractor: SaveExtractor, briefing: dict[str, Any]
         "player_id": meta.get("player_id"),
     }
 
-    # Extract leader signals with resolved names
-    signals["leaders"] = _extract_leader_signals(source)
-
-    # Extract war signals
-    signals["wars"] = _extract_war_signals(source)
-
-    # Extract diplomacy signals
-    signals["diplomacy"] = _extract_diplomacy_signals(source)
-
-    # Extract technology signals
-    signals["technology"] = _extract_technology_signals(source)
-
-    # Extract megastructures signals
-    signals["megastructures"] = _extract_megastructures_signals(source)
-
-    # Extract crisis signals
-    signals["crisis"] = _extract_crisis_signals(source)
-
-    # Extract fallen empires signals
-    signals["fallen_empires"] = _extract_fallen_empires_signals(source)
-
-    # Extract policies signals
-    signals["policies"] = _extract_policies_signals(source)
-
-    # Extract edicts signals
-    signals["edicts"] = _extract_edicts_signals(source)
-
-    # Extract galaxy settings (static per game but needed for milestone events)
-    signals["galaxy_settings"] = _extract_galaxy_settings_signals(source)
-
-    # Extract systems count (number of controlled systems via starbases)
-    signals["systems"] = _extract_systems_signals(source)
-
-    # Extract ascension perks for chronicle events
-    signals["ascension_perks"] = _extract_ascension_perks_signals(source)
-
-    # Extract L-Gate status for chronicle events (L-Gate opening is chapter-defining)
-    signals["lgate"] = _extract_lgate_signals(source)
-
-    # Extract menace/Become the Crisis status for chronicle events
-    signals["menace"] = _extract_menace_signals(source)
-
-    # Extract Great Khan / Marauder status for chronicle events
-    signals["great_khan"] = _extract_great_khan_signals(source)
-
-    # Extract Galactic Community status for chronicle events
-    signals["galactic_community"] = _extract_galactic_community_signals(source)
-
-    # Extract tradition tree completion status for chronicle events
-    signals["traditions"] = _extract_traditions_signals(source)
-
-    # Extract precursor discovery status for chronicle events
-    signals["precursors"] = _extract_precursor_signals(source)
-
-    # Extract subject/vassal relationships for chronicle events
-    signals["subjects"] = _extract_subjects_signals(source)
-
-    # Extract strategic geography (border neighbors, chokepoints)
-    signals["geography"] = _extract_geography_signals(source)
+    # Each signal is built on its own. One that cannot be built is named in
+    # ``unread`` and left out: stored as empty, it would read as "the player has
+    # none", and the next comparison would record wars ended or leaders removed.
+    builders = (
+        ("leaders", _extract_leader_signals),
+        ("wars", _extract_war_signals),
+        ("diplomacy", _extract_diplomacy_signals),
+        ("technology", _extract_technology_signals),
+        ("megastructures", _extract_megastructures_signals),
+        ("crisis", _extract_crisis_signals),
+        ("fallen_empires", _extract_fallen_empires_signals),
+        ("policies", _extract_policies_signals),
+        ("edicts", _extract_edicts_signals),
+        # Static per game, but needed for milestone events.
+        ("galaxy_settings", _extract_galaxy_settings_signals),
+        ("systems", _extract_systems_signals),
+        ("ascension_perks", _extract_ascension_perks_signals),
+        ("lgate", _extract_lgate_signals),
+        ("menace", _extract_menace_signals),
+        ("great_khan", _extract_great_khan_signals),
+        ("galactic_community", _extract_galactic_community_signals),
+        ("traditions", _extract_traditions_signals),
+        ("precursors", _extract_precursor_signals),
+        ("subjects", _extract_subjects_signals),
+        ("geography", _extract_geography_signals),
+    )
+    unread: list[str] = []
+    for key, build in builders:
+        try:
+            signals[key] = build(source)
+        except Exception:
+            logger.warning("History signal %r could not be built", key, exc_info=True)
+            unread.append(key)
+    if unread:
+        signals["unread"] = unread
 
     return signals
 
