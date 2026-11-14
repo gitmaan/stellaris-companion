@@ -28,7 +28,7 @@ from backend.core.chronicle_store import (
     game_date_key,
     load_chapters_data,
 )
-from backend.core.events import compute_events
+from backend.core.events import carry_unread_history, compute_events
 from backend.core.json_utils import json_dumps
 
 DEFAULT_DB_FILENAME = "stellaris_history.db"
@@ -1104,6 +1104,24 @@ class GameDatabase:
             ).fetchone()
             return dict(row) if row else None
 
+    def _store_event_history(self, snapshot_id: int, history: Any) -> None:
+        """Replace the history a stored snapshot is compared by."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT event_state_json FROM snapshots WHERE id = ?;", (snapshot_id,)
+            ).fetchone()
+            try:
+                state = json.loads((row["event_state_json"] if row else None) or "{}")
+            except ValueError:
+                return
+            if not isinstance(state, dict):
+                return
+            state["history"] = history if isinstance(history, dict) else {}
+            self._conn.execute(
+                "UPDATE snapshots SET event_state_json = ? WHERE id = ?;",
+                (json_dumps(state), snapshot_id),
+            )
+
     def get_snapshot_timeline(
         self,
         *,
@@ -1228,9 +1246,18 @@ class GameDatabase:
         except Exception:
             curr_state = current_briefing
 
+        prev_state = prev_briefing if isinstance(prev_briefing, dict) else {}
+        curr_state = curr_state if isinstance(curr_state, dict) else {}
+        prev_state, carried_state = carry_unread_history(prev_state, curr_state)
+        if carried_state is not curr_state:
+            # Keep the last reading with this snapshot, so the next save is
+            # compared with it and not with a gap.
+            self._store_event_history(int(snapshot_id), carried_state.get("history"))
+            curr_state = carried_state
+
         detected = compute_events(
-            prev=prev_briefing if isinstance(prev_briefing, dict) else {},
-            curr=curr_state if isinstance(curr_state, dict) else {},
+            prev=prev_state,
+            curr=curr_state,
             from_snapshot_id=int(prev_id),
             to_snapshot_id=int(snapshot_id),
         )

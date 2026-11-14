@@ -331,6 +331,12 @@ def build_history_enrichment(
     if geography:
         history["geography"] = geography
 
+    unread = signals.get("unread")
+    if isinstance(unread, list) and unread:
+        history["unread"] = sorted(
+            "galaxy" if key == "galaxy_settings" else str(key) for key in unread
+        )
+
     return history
 
 

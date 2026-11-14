@@ -15,6 +15,7 @@ from .game_vocabulary import (
     LGATE_OPENED_FLAG,
     MARAUDER_COUNTRY_TYPES,
 )
+from .save_values import text
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class EndgameMixin:
         active = set()
         for country_id, country_data in self._get_countries_cached().items():
             crisis_name = CRISIS_COUNTRY_TYPES.get(
-                country_data.get("country_type") or country_data.get("type")
+                text(country_data.get("country_type")) or text(country_data.get("type"))
             )
             if crisis_name:
                 crisis_countries.append({"country_id": int(country_id), "type": crisis_name})
@@ -226,7 +227,7 @@ class EndgameMixin:
         marauder_count = 0
         horde_id = None
         for country_id, country_data in self._get_countries_cached().items():
-            ctype = country_data.get("country_type") or country_data.get("type")
+            ctype = text(country_data.get("country_type")) or text(country_data.get("type"))
             if ctype in MARAUDER_COUNTRY_TYPES:
                 marauder_count += 1
             elif ctype == KHAN_COUNTRY_TYPE:

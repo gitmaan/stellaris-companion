@@ -41,6 +41,7 @@ from backend.core.snapshot_reader import (
     get_system_count,
     get_tech_list,
     get_treaty_reading,
+    get_unread_signals,
     get_war_battle_locations,
     get_wars_by_id,
 )
@@ -267,6 +268,55 @@ def _format_precursor_name(precursor_key: str) -> str:
             name = name[len(prefix) :]
             break
     return name.replace("_", " ").title()
+
+
+def carry_unread_history(
+    prev: dict[str, Any], curr: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Give two snapshots the same reading of every signal one of them could not read.
+
+    A signal a snapshot could not read is absent from its history, and an absent
+    signal compares as empty: every war ended, every leader removed, and all of
+    them back again at the next save. So the comparison uses the other
+    snapshot's reading for both. No event is recorded for that signal now, and a
+    real change is recorded when the signal is next read.
+
+    Returns copies. The current one is what to store for the snapshot: it holds
+    the previous reading of each signal it could not read itself, and still
+    names as unread the signals no earlier snapshot read either.
+    """
+    prev_unread, curr_unread = get_unread_signals(prev), get_unread_signals(curr)
+    if not prev_unread and not curr_unread:
+        return prev, curr
+    if not isinstance(prev.get("history"), dict) or not prev["history"]:
+        # A snapshot stored without any history has no reading to carry.
+        prev_unread = prev_unread | curr_unread
+
+    def with_history(snapshot: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        history = snapshot.get("history")
+        history = dict(history) if isinstance(history, dict) else {}
+        return {**snapshot, "history": history}, history
+
+    prev, prev_history = with_history(prev)
+    curr, curr_history = with_history(curr)
+
+    def copy_signal(key: str, source: dict[str, Any], target: dict[str, Any]) -> None:
+        if key in source:
+            target[key] = source[key]
+        else:
+            target.pop(key, None)
+
+    for key in curr_unread - prev_unread:
+        copy_signal(key, prev_history, curr_history)
+    for key in prev_unread - curr_unread:
+        copy_signal(key, curr_history, prev_history)
+
+    still_unread = sorted(curr_unread & prev_unread)
+    if still_unread:
+        curr_history["unread"] = still_unread
+    else:
+        curr_history.pop("unread", None)
+    return prev, curr
 
 
 def compute_events(

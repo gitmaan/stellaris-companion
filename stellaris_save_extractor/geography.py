@@ -4,6 +4,8 @@ import logging
 import math
 from typing import Any
 
+from .save_values import block
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,7 +59,7 @@ class GeographyMixin:
 
         # Step 2: starbase -> station ship_id from starbase_mgr
         data = extract_sections(self.gamestate_path, ["starbase_mgr"])
-        starbases = data.get("starbase_mgr", {}).get("starbases", {})
+        starbases = block(block(data.get("starbase_mgr")).get("starbases"))
         starbase_stations: dict[str, str] = {}  # sb_id -> station ship_id
         for sb_id, sb_data in starbases.items():
             if isinstance(sb_data, dict):

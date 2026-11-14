@@ -45,6 +45,10 @@ the Rust session API. With it, a case runs the real production path in-process:
 Sections a case leaves out behave like empty sections, so only the facts that
 matter to the report need writing.
 
+Every synthetic save built here is also damaged one key at a time by
+`tests/test_damaged_save_keys.py` (each key removed, written twice, or replaced
+by `none`), and must still load. A new case therefore widens that check too.
+
 ## Covered reports
 
 | Issue | Report | Layer | Cases |

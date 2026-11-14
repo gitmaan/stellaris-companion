@@ -22,6 +22,7 @@ from .colony_resolver import (
 from .fleet_classification import classify_owned_fleet
 from .name_resolution import ResolvedName
 from .name_resolution import resolve_name as _resolve_name
+from .save_values import block
 
 logger = logging.getLogger(__name__)
 
@@ -449,7 +450,7 @@ class SaveExtractorBase:
 
         # Get starbases and check if station is a player ship
         data = extract_sections(self.save_path, ["starbase_mgr"])
-        starbases = data.get("starbase_mgr", {}).get("starbases", {})
+        starbases = block(block(data.get("starbase_mgr")).get("starbases"))
 
         for sb_id, sb_data in starbases.items():
             if not isinstance(sb_data, dict):
