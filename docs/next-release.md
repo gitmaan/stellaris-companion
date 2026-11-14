@@ -1,10 +1,11 @@
-# Stable 1.1.3 candidate
+# Stable 1.1.3
 
-Promote 1.1.3-beta.1 to stable with two changes that have not been in a beta. Stable 1.1.2
-fails to load a save in which a Fallen Empire's relation entry for the player carries no
-opinion score (#135): the worker stops with `KeyError: 'relation_current'`, and the
-reporter went back to 1.1.1. Unlike 1.1.2, this is therefore not a beta's code with only
-the version changed. It is beta.1 (#127 to #133) plus:
+Published on 2026-11-14. It promotes 1.1.3-beta.1 to stable with three changes that
+have not been in a beta. Stable 1.1.2 fails to load a save in which a Fallen Empire's
+relation entry for the player carries no opinion score (#135): the worker stops with
+`KeyError: 'relation_current'`, and the reporter went back to 1.1.1. Unlike 1.1.2, this
+is therefore not a beta's code with only the version changed. It is beta.1 (#127 to
+#133) plus:
 
 - #136: that read tolerates a missing key; a save that has the score reads as before.
 - #137: 18 more lines that stopped a save from loading when a key was written twice or
@@ -20,8 +21,8 @@ the version changed. It is beta.1 (#127 to #133) plus:
 
 The maintainer chose to ship #137 in this stable and not in a beta first: each beta is
 downloaded 5 to 10 times against about 400 for a stable, so a beta adds days and little
-evidence. The gate is the real-save comparison below. If it shows a difference, tag
-`7c74ac3` (main at #136) as 1.1.3 without #137.
+evidence. The gate was the real-save comparison below, which showed no difference. #139
+was found while the release was being validated and went in on the same grounds.
 
 The maintainer approved the five lines in `electron/release-notes.md` on 2026-11-14.
 The fix leads, because it is the reason to update from 1.1.2, and the thanks to @Rampage-S
@@ -63,12 +64,35 @@ They are from Stellaris 4.2.4 (20 saves), 4.3.0 and 4.4.6, in 8 campaigns:
 - The public 4.5.2 save attached to #79 still writes `relation_current`, and the empires
   its player has met carry an opinion.
 
-Still to do before the tag:
+On main with #138 and #139 (`4715a97`), the commit that was tagged:
 
-- A candidate build of the merged main commit on four platforms, with the installed
-  Windows journeys.
-- Tag the merged main commit as `v1.1.3`, then verify signing and notarization, package
-  versions, both subscriber tracks and the payload checksums, as for 1.1.2.
+- 1054 tests and the 137 desktop unit tests pass; all 22 local saves pass
+  `scripts/check_local_saves.py --all`, and their stored briefings and recorded events are
+  identical to those at `2698509`.
+- A candidate build of the same files (branch head `db4094d`, the same tree as `4715a97`)
+  passed on four platforms, with 12 installed-app journeys on Windows. The Intel Mac job
+  failed once when Apple's timestamp service did not answer during signing ("A timestamp
+  was expected but was not found") and passed when re-run.
+
+## Publication
+
+The maintainer asked for the release once every fix was in. `v1.1.3` was pushed on
+`4715a97`, and the publishing workflow passed on all four platforms at the first attempt.
+
+- The release is published, not a draft and not a prerelease, and is the latest release.
+  Its text is the five lines of `electron/release-notes.md`.
+- Installers exist for Windows, macOS (Apple silicon and Intel) and Linux. The three
+  `latest*.yml` feeds and their three `beta*.yml` aliases say 1.1.3, and every payload a
+  feed names was downloaded and matches the feed's checksum and size.
+- Both macOS apps are signed, notarized and stapled, and report version 1.1.3; the Apple
+  silicon app was also checked inside its disk image. The disk images themselves carry
+  no signature, as in 1.1.2. The shipped app contains the ethics reader of #139.
+- The download site's release facts were synchronised by the workflow, and the site's
+  1.1.3 changelog page is dated 2026-11-14.
+
+Not checked: the Windows and Linux installers were not run after publication (the
+candidate's installed Windows journeys ran on the same files), and a real update from
+1.1.2 on a player's machine was not checked.
 
 Not claimed:
 
@@ -85,9 +109,10 @@ Not claimed:
   reader that fails for another reason still stops the whole save from loading.
 - A key written twice now reads as its first value. Whether the game uses the first or
   the last is not known.
+- Whether Cygnus 4.5 changed keys other than the ethics was not audited. The 4.5.2 save's
+  briefing showed nothing else missing at a glance, and no 4.5.4 save was seen.
 - beta.1 was published on 2026-11-13, so its changes reach stable after a short time in
   beta. Everything listed as not claimed for beta.1 below still stands.
-- A real update from 1.1.2 on a player's machine has not been checked.
 
 ## Earlier release records
 
